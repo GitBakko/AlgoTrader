@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ===== Enums =====
@@ -81,6 +81,15 @@ class Market(BaseModel):
     percent_change: float | None = Field(None, alias="percentageChange")
 
 
+def _parse_price(v: Any) -> float:
+    """Parse price from Capital.com API (can be float or {'bid': x, 'ask': y})."""
+    if isinstance(v, dict):
+        bid = v.get("bid", 0.0)
+        ask = v.get("ask", 0.0)
+        return (bid + ask) / 2  # mid-price
+    return float(v)
+
+
 class OHLCCandle(BaseModel):
     """OHLC candlestick data."""
 
@@ -90,6 +99,12 @@ class OHLCCandle(BaseModel):
     low: float = Field(alias="lowPrice")
     close: float = Field(alias="closePrice")
     last_traded_volume: int | None = Field(None, alias="lastTradedVolume")
+
+    @field_validator("open", "high", "low", "close", mode="before")
+    @classmethod
+    def parse_bid_ask_price(cls, v: Any) -> float:
+        """Capital.com returns prices as {'bid': x, 'ask': y} or plain float."""
+        return _parse_price(v)
 
 
 class PriceHistory(BaseModel):

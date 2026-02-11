@@ -442,7 +442,7 @@ class TestCapitalComClientPositions:
 
         assert len(positions) == 1
         assert positions[0].deal_id == "DEAL123"
-        assert positions[0].epic == "GOLD"
+        assert positions[0].epic == "XAUUSD"  # GOLD is mapped back to internal name
 
 
 @pytest.mark.unit

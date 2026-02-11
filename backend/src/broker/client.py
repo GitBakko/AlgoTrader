@@ -32,6 +32,15 @@ from src.utils.config import get_settings
 from src.utils.sanitization import sanitize_dict
 
 
+# Map internal epic names → Capital.com API epic codes
+# Internal names (XAUUSD, BTCUSD, US500) are used throughout the codebase.
+# Capital.com uses different codes for some assets.
+EPIC_TO_BROKER: dict[str, str] = {
+    "XAUUSD": "GOLD",
+}
+BROKER_TO_EPIC: dict[str, str] = {v: k for k, v in EPIC_TO_BROKER.items()}
+
+
 class CapitalComClient:
     """
     Capital.com API client.
@@ -84,6 +93,16 @@ class CapitalComClient:
         )
 
         self._http_client: httpx.AsyncClient | None = None
+
+    @staticmethod
+    def _to_broker_epic(epic: str) -> str:
+        """Translate internal epic name to Capital.com API epic code."""
+        return EPIC_TO_BROKER.get(epic, epic)
+
+    @staticmethod
+    def _from_broker_epic(broker_epic: str) -> str:
+        """Translate Capital.com API epic code back to internal name."""
+        return BROKER_TO_EPIC.get(broker_epic, broker_epic)
 
     async def _get_http_client(self) -> httpx.AsyncClient:
         """Get or create HTTP client with configured timeouts."""
@@ -208,7 +227,8 @@ class CapitalComClient:
         if max_candles:
             params["max"] = max_candles
 
-        response = await self._request("GET", f"/api/v1/prices/{epic}", params=params)
+        broker_epic = self._to_broker_epic(epic)
+        response = await self._request("GET", f"/api/v1/prices/{broker_epic}", params=params)
         price_history = PriceHistory(**response)
         return price_history.prices
 
@@ -222,7 +242,8 @@ class CapitalComClient:
         Returns:
             Client sentiment data
         """
-        response = await self._request("GET", f"/api/v1/clientsentiment/{epic}")
+        broker_epic = self._to_broker_epic(epic)
+        response = await self._request("GET", f"/api/v1/clientsentiment/{broker_epic}")
         return ClientSentiment(**response)
 
     # ===== Position Management =====
@@ -237,7 +258,9 @@ class CapitalComClient:
         Returns:
             Deal confirmation
         """
-        response = await self._request("POST", "/api/v1/positions", json=request.model_dump(by_alias=True))
+        payload = request.model_dump(by_alias=True)
+        payload["epic"] = self._to_broker_epic(payload.get("epic", ""))
+        response = await self._request("POST", "/api/v1/positions", json=payload)
         return DealConfirmation(**response)
 
     async def close_position(self, deal_id: str) -> DealConfirmation:
@@ -278,7 +301,11 @@ class CapitalComClient:
         """
         response = await self._request("GET", "/api/v1/positions")
         positions_data = response.get("positions", [])
-        return [Position(**pos) for pos in positions_data]
+        positions = [Position(**pos) for pos in positions_data]
+        # Translate broker epics back to internal names
+        for p in positions:
+            p.epic = self._from_broker_epic(p.epic)
+        return positions
 
     # ===== Working Orders =====
 
