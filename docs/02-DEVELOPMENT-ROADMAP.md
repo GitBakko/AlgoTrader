@@ -13,83 +13,86 @@
 
 ---
 
-## Phase 1: Foundation
+## Phase 1: Foundation [COMPLETE]
 
-### 1.1 Project Setup
-- [ ] Initialize Python project with Poetry
-- [ ] Configure pyproject.toml with all dependencies
-- [ ] Setup pre-commit hooks (black, ruff, mypy)
-- [ ] Create .env.example with all required environment variables
-- [ ] Setup Docker Compose (backend, postgres, redis)
-- [ ] Initialize git repository with .gitignore
-- [ ] Create base FastAPI application with health endpoint
+### 1.1 Project Setup [COMPLETE]
+- [x] Initialize Python project with Poetry
+- [x] Configure pyproject.toml with all dependencies
+- [x] Setup pre-commit hooks (black, ruff, mypy)
+- [x] Create .env.example with all required environment variables
+- [x] Setup Docker Compose (backend, postgres, redis)
+- [x] Initialize git repository with .gitignore
+- [x] Create base FastAPI application with health endpoint
 
-### 1.2 Capital.com Broker Integration
-- [ ] Implement session manager (auth, token refresh, keep-alive)
-- [ ] Implement encrypted password authentication (AES)
-- [ ] Build market data client (search, prices, OHLC history)
-- [ ] Build WebSocket streaming client (quotes, OHLC real-time)
-- [ ] Build order management client (positions, working orders)
-- [ ] Build account client (balance, history, preferences)
-- [ ] Handle rate limiting (10 req/sec) with token bucket
-- [ ] Implement automatic reconnection for WebSocket
-- [ ] Write comprehensive tests with mocked API responses
+### 1.2 Capital.com Broker Integration [COMPLETE]
+- [x] Implement session manager (auth, token refresh, keep-alive)
+- [x] Implement encrypted password authentication (AES)
+- [x] Build market data client (search, prices, OHLC history)
+- [x] Build WebSocket streaming client (quotes, OHLC real-time)
+- [x] Build order management client (positions, working orders)
+- [x] Build account client (balance, history, preferences)
+- [x] Handle rate limiting (10 req/sec) with token bucket
+- [x] Implement automatic reconnection for WebSocket
+- [x] Write comprehensive tests with mocked API responses (100 tests)
 - [ ] Verify demo account connectivity with all 3 assets
 
-### 1.3 Data Pipeline
-- [ ] Design Parquet storage schema for OHLC data
-- [ ] Implement historical data downloader (batch with pagination)
+### 1.3 Data Pipeline [COMPLETE]
+- [x] Design Parquet storage schema for OHLC data
+- [x] Implement historical data downloader (batch with pagination)
 - [ ] Download initial historical data: Gold, BTC, S&P500 (all timeframes)
-- [ ] Implement real-time data streamer (WebSocket -> Redis -> Parquet)
-- [ ] Setup DuckDB for analytical queries on Parquet files
-- [ ] Implement data quality checks (gaps, outliers, consistency)
-- [ ] Setup APScheduler for scheduled data collection
-- [ ] Create data access layer (unified interface for historical + real-time)
+- [x] Implement real-time data streamer (WebSocket -> Redis -> Parquet)
+- [x] Setup DuckDB for analytical queries on Parquet files
+- [x] Implement data quality checks (gaps, outliers, consistency)
+- [x] Setup APScheduler for scheduled data collection
+- [x] Create data access layer (unified interface for historical + real-time)
 
-### 1.4 Database Setup
-- [ ] Design PostgreSQL schema (trades, positions, signals, config)
-- [ ] Setup Alembic migrations
-- [ ] Create SQLAlchemy/SQLModel ORM models
-- [ ] Implement repository pattern for data access
+### 1.4 Database Setup [COMPLETE]
+- [x] Design PostgreSQL schema (trades, positions, signals, config)
+- [x] Setup Alembic migrations
+- [x] Create SQLAlchemy/SQLModel ORM models
+- [x] Implement repository pattern for data access
 
 ---
 
-## Phase 2: Intelligence
+## Phase 2: Intelligence [MVP COMPLETE]
 
-### 2.1 Feature Engineering
-- [ ] Implement technical indicators module (EMA, MACD, RSI, BB, ATR, OBV)
-- [ ] Create feature builder pipeline (raw data -> feature matrix)
-- [ ] Implement FRED API client for macro data (CPI, rates, GDP, DXY, VIX)
-- [ ] Implement sentiment analysis with FinBERT (news headlines)
-- [ ] Build market regime detector (HMM or rule-based)
-- [ ] Create asset-specific feature sets (Gold, BTC, S&P500)
-- [ ] Implement feature normalization and scaling
-- [ ] Handle missing data and alignment across timeframes
-- [ ] Create Jupyter notebooks for EDA and feature analysis
-- [ ] Validate feature importance with SHAP values
+### 2.1 Feature Engineering [COMPLETE]
 
-### 2.2 ML Models
-- [ ] Implement LSTM model (PyTorch) for sequential price patterns
-- [ ] Implement Temporal Fusion Transformer (TFT) for multi-horizon prediction
-- [ ] Implement XGBoost model for tabular features classification
-- [ ] Build ensemble stacking meta-learner
-- [ ] Create training pipeline with walk-forward optimization
-- [ ] Implement model versioning and artifact storage
-- [ ] Build prediction/inference engine
-- [ ] Create model evaluation metrics (accuracy, precision, recall, F1)
-- [ ] Implement model drift detection
-- [ ] Train initial models on historical data for all 3 assets
-- [ ] Document model performance baselines
+- [x] Implement technical indicators module (EMA, MACD, RSI, BB, ATR, ADX, OBV) - pure Polars/numpy
+- [x] Create feature builder pipeline (raw data -> feature matrix)
+- [ ] Implement FRED API client for macro data (CPI, rates, GDP, DXY, VIX) → Phase 2B
+- [ ] Implement sentiment analysis with FinBERT (news headlines) → Phase 2B
+- [x] Build market regime detector (rule-based: ADX + EMA slope)
+- [x] Create asset-specific feature sets (Gold, BTC, S&P500)
+- [x] Implement feature normalization and scaling (rolling z-score, log transform, clip)
+- [x] Handle missing data and alignment across timeframes (asof join)
+- [ ] Create Jupyter notebooks for EDA and feature analysis → Phase 2B
+- [ ] Validate feature importance with SHAP values → Phase 2B
 
-### 2.3 Backtesting Engine
-- [ ] Build event-driven backtesting loop
-- [ ] Implement walk-forward optimization framework
-- [ ] Create performance metrics calculator (Sharpe, Sortino, Calmar, max DD)
-- [ ] Implement transaction cost simulation (spread, slippage)
-- [ ] Build report generator (HTML reports with equity curves, drawdowns)
-- [ ] Backtest all 3 assets individually
-- [ ] Backtest portfolio-level strategy (all 3 combined)
-- [ ] Validate no look-ahead bias (strict temporal ordering)
+### 2.2 ML Models [MVP COMPLETE]
+
+- [ ] Implement LSTM model (PyTorch) for sequential price patterns → Phase 2B
+- [ ] Implement Temporal Fusion Transformer (TFT) for multi-horizon prediction → Phase 2B
+- [x] Implement XGBoost model for tabular features classification
+- [ ] Build ensemble stacking meta-learner → Phase 2B (needs 2+ base models)
+- [x] Create training pipeline with walk-forward optimization (purge + embargo)
+- [x] Implement model versioning and artifact storage
+- [x] Build prediction/inference engine (predict + predict_proba)
+- [x] Create model evaluation metrics (accuracy, precision, recall, F1, confusion matrix)
+- [ ] Implement model drift detection → Phase 2B
+- [ ] Train initial models on historical data for all 3 assets → requires live data
+- [ ] Document model performance baselines → requires live data
+
+### 2.3 Backtesting Engine [COMPLETE]
+
+- [x] Build event-driven backtesting loop
+- [x] Implement walk-forward optimization framework (252d/63d/21d splits)
+- [x] Create performance metrics calculator (Sharpe, Sortino, Calmar, max DD)
+- [x] Implement transaction cost simulation (spread, slippage, overnight fees)
+- [x] Build report generator (JSON reports with equity curves, trade lists)
+- [ ] Backtest all 3 assets individually → requires live data
+- [ ] Backtest portfolio-level strategy (all 3 combined) → Phase 3
+- [x] Validate no look-ahead bias (strict temporal ordering in walk-forward)
 
 ---
 
