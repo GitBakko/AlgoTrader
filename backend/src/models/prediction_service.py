@@ -52,7 +52,12 @@ class PredictionService:
                 if not models:
                     continue
 
-                latest = models[0]  # sorted by created_at desc
+                # Filter for XGBoost models (best performing model type for now)
+                xgb_models = [m for m in models if m.model_type == "xgboost"]
+                if not xgb_models:
+                    logger.warning(f"No XGBoost model found for {epic}")
+                    continue
+                latest = xgb_models[0]  # sorted by created_at desc
                 model, meta = self.versioning.load_model(
                     XGBoostClassifier, epic, latest.model_id
                 )

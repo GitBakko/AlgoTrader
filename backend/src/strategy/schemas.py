@@ -40,7 +40,7 @@ class StrategyConfig(BaseModel):
 
     epic: str = ""
     timeframe: str = "1h"
-    min_confidence: float = Field(default=0.50, ge=0.0, le=1.0)
+    min_confidence: float = Field(default=0.40, ge=0.0, le=1.0)
     counter_trend_penalty: float = Field(default=0.5, ge=0.0, le=1.0)
     overbought_rsi: float = Field(default=80.0, ge=50.0, le=100.0)
     oversold_rsi: float = Field(default=20.0, ge=0.0, le=50.0)

@@ -40,7 +40,7 @@ class TestSignalGenerator:
         assert signal.direction == SignalDirection.HOLD
 
     def test_low_confidence_returns_hold(self):
-        pred = _make_prediction(SignalClass.BUY, 0.40)
+        pred = _make_prediction(SignalClass.BUY, 0.35)
         signal = SignalGenerator.generate_signal(pred, "XAUUSD", 2000.0, atr=20.0)
         assert signal.direction == SignalDirection.HOLD
 

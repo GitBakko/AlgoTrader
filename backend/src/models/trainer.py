@@ -235,12 +235,16 @@ class ModelTrainer:
             # Evaluate on validation
             y_val_pred = model.predict(X_val)
             y_val_proba = model.predict_proba(X_val)
-            val_metrics = self.evaluator.evaluate(y_val, y_val_pred, y_val_proba)
+            # Sequence models (LSTM) may return fewer predictions than input samples;
+            # align y by trimming from the front (sequences use last element's label)
+            y_val_aligned = y_val[-len(y_val_pred):]
+            val_metrics = self.evaluator.evaluate(y_val_aligned, y_val_pred, y_val_proba)
 
             # Evaluate on test
             y_test_pred = model.predict(X_test)
             y_test_proba = model.predict_proba(X_test)
-            test_metrics = self.evaluator.evaluate(y_test, y_test_pred, y_test_proba)
+            y_test_aligned = y_test[-len(y_test_pred):]
+            test_metrics = self.evaluator.evaluate(y_test_aligned, y_test_pred, y_test_proba)
 
             fold_result = FoldResult(
                 fold_index=split.fold_index,
@@ -286,8 +290,9 @@ class ModelTrainer:
         if len(X_cal) >= 30:
             try:
                 cal_proba = model.predict_proba(X_cal)
+                y_cal_aligned = y_cal[-len(cal_proba):]
                 calibrator = ConfidenceCalibrator(n_classes=len(np.unique(y)))
-                cal_stats = calibrator.fit(y_cal, cal_proba)
+                cal_stats = calibrator.fit(y_cal_aligned, cal_proba)
                 logger.info(
                     f"Confidence calibration: ECE {cal_stats['ece_before']:.4f} -> "
                     f"{cal_stats['ece_after']:.4f}"
