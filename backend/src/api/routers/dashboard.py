@@ -6,7 +6,7 @@ Dual-mode: uses DB when available, falls back to in-memory state.
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 
 from src.api.dependencies import (
     get_execution_engine,
@@ -29,6 +29,7 @@ router = APIRouter()
 
 @router.get("/overview")
 async def get_overview(
+    request: Request,
     engine: ExecutionEngine = Depends(get_execution_engine),
     risk_mgr: RiskManager = Depends(get_risk_manager),
     position_repo=Depends(get_position_repo),
@@ -65,7 +66,21 @@ async def get_overview(
         trading_mode="paper" if engine.mode == ExecutionMode.PAPER else "live",
     )
 
-    return success_response(overview.model_dump())
+    data = overview.model_dump()
+
+    # Add paper trading loop status
+    paper_loop = getattr(request.app.state, "paper_loop", None)
+    if paper_loop is not None:
+        data["paper_trading"] = {
+            "running": paper_loop.is_running,
+            "iteration_count": paper_loop.iteration_count,
+            "signal_count": paper_loop.signal_count,
+            "trade_count": paper_loop.trade_count,
+            "last_run": paper_loop.last_run.isoformat() if paper_loop.last_run else None,
+            "last_signals": paper_loop.last_signals,
+        }
+
+    return success_response(data)
 
 
 @router.get("/equity-curve")

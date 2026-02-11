@@ -440,6 +440,7 @@ class TestGracefulDegradation:
         app.state.prediction_service = None
         app.state.model_versioning = None
         app.state.db_session_factory = None
+        app.state.paper_loop = None
 
         with TestClient(app) as tc:
             # All endpoints should return 200
@@ -448,5 +449,6 @@ class TestGracefulDegradation:
             assert tc.get("/api/signals/").status_code == 200
             assert tc.get("/api/models/").status_code == 200
             assert tc.get("/api/backtest/runs").status_code == 200
+            assert tc.get("/api/trading/status").status_code == 200
 
         app.dependency_overrides.clear()

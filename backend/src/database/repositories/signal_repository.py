@@ -2,7 +2,7 @@
 Signal repository for ML predictions and trading signals.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -91,7 +91,7 @@ class SignalRepository(BaseRepository[Signal]):
         Returns:
             List of recent signals
         """
-        since = datetime.utcnow().replace(microsecond=0)
+        since = datetime.now(timezone.utc).replace(microsecond=0)
         since = since.replace(hour=since.hour - hours)
 
         query = (
@@ -155,7 +155,7 @@ class SignalRepository(BaseRepository[Signal]):
         Returns:
             Number of signals expired
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         result = await self.session.execute(
             select(Signal)
             .where(Signal.status == "PENDING")

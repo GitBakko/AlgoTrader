@@ -3,7 +3,8 @@ Health check system for AlgoTrader AI dependencies.
 Monitors PostgreSQL, Redis, and Capital.com API connectivity.
 """
 
-from datetime import datetime
+import asyncio
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -64,16 +65,20 @@ class HealthChecker:
         Returns:
             System health status
         """
-        components: dict[str, ComponentHealth] = {}
+        # Run all checks in parallel
+        db_check, redis_check, api_check, data_check = await asyncio.gather(
+            self.check_database(),
+            self.check_redis(),
+            self.check_capital_com(),
+            self.check_data_freshness(),
+        )
 
-        # Check PostgreSQL
-        components["database"] = await self.check_database()
-
-        # Check Redis
-        components["redis"] = await self.check_redis()
-
-        # Check Capital.com API
-        components["capital_com_api"] = await self.check_capital_com()
+        components: dict[str, ComponentHealth] = {
+            "database": db_check,
+            "redis": redis_check,
+            "capital_com_api": api_check,
+            "data_freshness": data_check,
+        }
 
         # Determine overall status
         unhealthy = [c for c in components.values() if c.status == HealthStatus.UNHEALTHY]
@@ -87,7 +92,7 @@ class HealthChecker:
             overall_status = HealthStatus.HEALTHY
 
         return SystemHealth(
-            status=overall_status, timestamp=datetime.utcnow(), components=components
+            status=overall_status, timestamp=datetime.now(timezone.utc), components=components
         )
 
     async def check_database(self) -> ComponentHealth:
@@ -199,6 +204,72 @@ class HealthChecker:
                 status=HealthStatus.UNHEALTHY,
                 message=f"Redis connection failed: {str(e)}",
                 response_time_ms=response_time_ms,
+            )
+
+    async def check_data_freshness(self) -> ComponentHealth:
+        """
+        Check data freshness: last candle timestamp for each epic/timeframe.
+        Stale if latest candle > 2 hours old for 1h timeframe.
+        """
+        try:
+            from src.data.storage import ParquetStorageManager
+
+            storage = ParquetStorageManager()
+            details = {}
+            stale_count = 0
+            now = datetime.now(timezone.utc)
+
+            for epic in ["XAUUSD", "BTCUSD", "US500"]:
+                for tf in ["1h"]:
+                    last_ts = storage.get_latest_timestamp(epic=epic, timeframe=tf)
+                    if last_ts is None:
+                        details[f"{epic}/{tf}"] = "no_data"
+                        stale_count += 1
+                        continue
+
+                    # Polars datetime -> python datetime
+                    if hasattr(last_ts, "to_pydatetime"):
+                        last_ts = last_ts.to_pydatetime()
+                    # Ensure timezone-aware for comparison with now(utc)
+                    if last_ts.tzinfo is None:
+                        last_ts = last_ts.replace(tzinfo=timezone.utc)
+
+                    bar_count = storage.get_bar_count(epic=epic, timeframe=tf)
+                    age_hours = (now - last_ts).total_seconds() / 3600
+                    is_stale = age_hours > 2.0
+                    if is_stale:
+                        stale_count += 1
+
+                    details[f"{epic}/{tf}"] = {
+                        "last_candle": last_ts.isoformat(),
+                        "age_hours": round(age_hours, 1),
+                        "stale": is_stale,
+                        "bars": bar_count,
+                    }
+
+            if stale_count == 0:
+                status = HealthStatus.HEALTHY
+                msg = "All data series are fresh"
+            elif stale_count < 3:
+                status = HealthStatus.DEGRADED
+                msg = f"{stale_count} data series are stale"
+            else:
+                status = HealthStatus.UNHEALTHY
+                msg = "All data series are stale or missing"
+
+            return ComponentHealth(
+                name="Data Freshness",
+                status=status,
+                message=msg,
+                details=details,
+            )
+
+        except Exception as e:
+            logger.error(f"Data freshness check failed: {e}")
+            return ComponentHealth(
+                name="Data Freshness",
+                status=HealthStatus.DEGRADED,
+                message=f"Check failed: {str(e)}",
             )
 
     async def check_capital_com(self) -> ComponentHealth:

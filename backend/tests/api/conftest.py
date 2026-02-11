@@ -88,6 +88,7 @@ def client(engine, risk_mgr, strategy_mgr):
     app.state.prediction_service = None
     app.state.model_versioning = None
     app.state.db_session_factory = None
+    app.state.paper_loop = None
 
     with TestClient(app) as tc:
         yield tc

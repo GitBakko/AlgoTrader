@@ -275,6 +275,36 @@ class ParquetStorageManager:
 
         return df_all
 
+    def get_latest_timestamp(
+        self, epic: str, timeframe: str
+    ) -> datetime | None:
+        """
+        Get the latest candle timestamp without reading full data.
+        Reads only the timestamp column from the most recent Parquet file.
+
+        Returns:
+            Latest timestamp or None if no data exists
+        """
+        files = list_parquet_files(self.data_dir, epic, timeframe)
+        if not files:
+            return None
+
+        # Files are sorted by month; last file is most recent
+        last_file = files[-1]
+        df = pl.read_parquet(last_file, columns=["timestamp"])
+        if df.is_empty():
+            return None
+
+        return df["timestamp"].max()
+
+    def get_bar_count(self, epic: str, timeframe: str) -> int:
+        """Get total number of bars without reading full data."""
+        files = list_parquet_files(self.data_dir, epic, timeframe)
+        total = 0
+        for f in files:
+            total += pq.read_metadata(f).num_rows
+        return total
+
     def list_available_data(self) -> dict[str, dict[str, list[str]]]:
         """
         List all available data organized by asset and timeframe.

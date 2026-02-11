@@ -29,6 +29,10 @@ class PositionTracker:
         # Paper trading internal state: deal_id -> position dict
         self._paper_positions: dict[str, dict] = {}
 
+    def get_paper_positions_sync(self) -> list[dict]:
+        """Get paper positions synchronously (for status queries in paper mode)."""
+        return list(self._paper_positions.values())
+
     async def sync_positions(self) -> list[dict]:
         """
         Get all open positions (from broker or internal state).

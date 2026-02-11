@@ -2,7 +2,7 @@
 Position repository with trading-specific queries.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -124,7 +124,7 @@ class PositionRepository(BaseRepository[Position]):
         position.status = "CLOSED"
         position.current_price = close_price
         position.profit_loss = profit_loss
-        position.closed_at = datetime.utcnow()
+        position.closed_at = datetime.now(timezone.utc)
         position.close_reason = close_reason
 
         await self.session.flush()

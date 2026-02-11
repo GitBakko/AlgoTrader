@@ -3,7 +3,7 @@ Pydantic models for data pipeline module.
 Extends broker models with storage-specific fields.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 from pydantic import BaseModel, Field
@@ -87,7 +87,7 @@ class DownloadProgress(BaseModel):
     @property
     def candles_per_second(self) -> float:
         """Calculate download speed in candles/sec."""
-        elapsed = (datetime.utcnow() - self.start_time).total_seconds()
+        elapsed = (datetime.now(timezone.utc) - self.start_time).total_seconds()
         if elapsed == 0:
             return 0.0
         return self.downloaded_candles / elapsed

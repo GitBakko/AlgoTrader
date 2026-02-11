@@ -67,12 +67,18 @@ async def start_data_scheduler(app_state) -> None:
         logger.info("Skipping scheduler start (no broker or storage)")
         return
 
+    data_access = getattr(app_state, "data_access", None)
+    if not data_access:
+        logger.info("Skipping scheduler start (no data_access)")
+        return
+
     try:
         from src.data.scheduler import DataScheduler
 
         scheduler = DataScheduler(
             client=broker,
             storage=storage,
+            data_access=data_access,
         )
         scheduler.setup()
         scheduler.start()

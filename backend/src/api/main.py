@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
 
-from src.api.routers import backtest, dashboard, markets, models, positions, signals, strategy, system
+from src.api.routers import backtest, dashboard, markets, models, positions, signals, strategy, system, trading
 from src.api.websocket import prices_endpoint, trades_endpoint
 from src.database.session import DatabaseManager
 from src.monitoring.health import HealthChecker
@@ -109,12 +109,27 @@ async def lifespan(app: FastAPI):
         task = asyncio.create_task(coro, name=name)
         task.add_done_callback(_bg_task_done)
 
+    # Initialize paper trading loop (does not start automatically)
+    from src.trading.paper_loop import PaperTradingLoop
+
+    app.state.paper_loop = PaperTradingLoop(
+        prediction_service=app.state.prediction_service,
+        strategy_manager=app.state.strategy_manager,
+        risk_manager=app.state.risk_manager,
+        execution_engine=app.state.execution_engine,
+    )
+    logger.info("Paper trading loop initialized (use POST /api/trading/start to begin)")
+
     logger.success("✅ Application startup complete")
 
     yield
 
     # Shutdown
     logger.info("🛑 Shutting down AlgoTrader AI Backend...")
+
+    # Stop paper trading loop
+    if getattr(app.state, "paper_loop", None) and app.state.paper_loop.is_running:
+        app.state.paper_loop.stop()
 
     # Stop data scheduler
     if getattr(app.state, "data_scheduler", None):
@@ -279,6 +294,7 @@ app.include_router(backtest.router, prefix="/api/backtest", tags=["Backtest"])
 app.include_router(strategy.router, prefix="/api/strategy", tags=["Strategy"])
 app.include_router(models.router, prefix="/api/models", tags=["Models"])
 app.include_router(system.router, prefix="/api/system", tags=["System"])
+app.include_router(trading.router, prefix="/api/trading", tags=["Trading"])
 
 # ===== WebSocket Endpoints =====
 app.websocket("/ws/prices")(prices_endpoint)
