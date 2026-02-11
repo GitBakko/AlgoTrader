@@ -6,7 +6,6 @@ import {
   BadgeComponent, ButtonDirective, ProgressComponent
 } from '@coreui/angular';
 import { TradingService } from '../../core/services/trading.service';
-import { TradingSignal } from '../../core/models';
 
 @Component({
   selector: 'app-signals',
@@ -27,7 +26,7 @@ import { TradingSignal } from '../../core/models';
             </button>
           </c-card-header>
           <c-card-body>
-            @if (signals.length === 0) {
+            @if (signals().length === 0) {
               <p class="text-body-secondary">No signals generated yet</p>
             } @else {
               <table cTable striped hover>
@@ -44,7 +43,7 @@ import { TradingSignal } from '../../core/models';
                   </tr>
                 </thead>
                 <tbody>
-                  @for (sig of signals; track sig.timestamp) {
+                  @for (sig of signals(); track sig.timestamp) {
                     <tr>
                       <td><strong>{{ sig.epic }}</strong></td>
                       <td>
@@ -74,17 +73,15 @@ import { TradingSignal } from '../../core/models';
 })
 export class SignalsComponent implements OnInit {
   private readonly trading = inject(TradingService);
-  signals: TradingSignal[] = [];
+  readonly signals = this.trading.signals;
 
   ngOnInit(): void {
     this.trading.loadSignals();
-    this.signals = this.trading.signals();
   }
 
   generateTestSignal(): void {
     this.trading.generateSignal('XAUUSD').subscribe(() => {
       this.trading.loadSignals();
-      setTimeout(() => this.signals = this.trading.signals(), 300);
     });
   }
 

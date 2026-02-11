@@ -7,7 +7,6 @@ import {
 } from '@coreui/angular';
 import { IconDirective } from '@coreui/icons-angular';
 import { TradingService } from '../../core/services/trading.service';
-import { Position } from '../../core/models';
 
 @Component({
   selector: 'app-positions',
@@ -23,7 +22,7 @@ import { Position } from '../../core/models';
         <c-card class="mb-4">
           <c-card-header><strong>Open Positions</strong></c-card-header>
           <c-card-body>
-            @if (positions.length === 0) {
+            @if (positions().length === 0) {
               <p class="text-body-secondary">No open positions</p>
             } @else {
               <table cTable striped hover>
@@ -40,7 +39,7 @@ import { Position } from '../../core/models';
                   </tr>
                 </thead>
                 <tbody>
-                  @for (pos of positions; track pos.deal_id) {
+                  @for (pos of positions(); track pos.deal_id) {
                     <tr>
                       <td><strong>{{ pos.epic }}</strong></td>
                       <td>
@@ -73,11 +72,10 @@ import { Position } from '../../core/models';
 })
 export class PositionsComponent implements OnInit {
   private readonly trading = inject(TradingService);
-  positions: Position[] = [];
+  readonly positions = this.trading.positions;
 
   ngOnInit(): void {
     this.trading.loadPositions();
-    this.positions = this.trading.positions();
   }
 
   closePosition(dealId: string): void {
