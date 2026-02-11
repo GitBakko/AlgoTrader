@@ -1,13 +1,19 @@
 """
 Dashboard API router.
 Provides overview data, equity curve, and recent trade history.
+Dual-mode: uses DB when available, falls back to in-memory state.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query
 
-from src.api.dependencies import get_execution_engine, get_risk_manager
+from src.api.dependencies import (
+    get_execution_engine,
+    get_position_repo,
+    get_risk_manager,
+    get_trade_repo,
+)
 from src.api.schemas import (
     DashboardOverview,
     EquityCurvePoint,
@@ -25,16 +31,36 @@ router = APIRouter()
 async def get_overview(
     engine: ExecutionEngine = Depends(get_execution_engine),
     risk_mgr: RiskManager = Depends(get_risk_manager),
+    position_repo=Depends(get_position_repo),
+    trade_repo=Depends(get_trade_repo),
 ):
     """Get dashboard overview with key metrics."""
-    positions = await engine.get_open_positions()
     state = risk_mgr.drawdown_monitor.state
+
+    # Count open positions
+    if position_repo is not None:
+        open_positions = await position_repo.get_open_positions()
+        open_count = len(open_positions)
+    else:
+        positions = await engine.get_open_positions()
+        open_count = len(positions)
+
+    # Get trade stats from DB if available
+    win_rate = 0.0
+    if trade_repo is not None:
+        now = datetime.now(timezone.utc)
+        summary = await trade_repo.get_pnl_summary(
+            now - timedelta(days=30), now
+        )
+        if summary["trade_count"] > 0:
+            win_rate = summary.get("win_rate", 0.0)
 
     overview = DashboardOverview(
         equity=state.current_equity,
         daily_pnl=state.daily_pnl,
         total_pnl=state.current_equity - risk_mgr.initial_equity,
-        open_positions_count=len(positions),
+        open_positions_count=open_count,
+        win_rate=win_rate,
         circuit_breaker_active=state.circuit_breaker_active,
         trading_mode="paper" if engine.mode == ExecutionMode.PAPER else "live",
     )
@@ -48,9 +74,8 @@ async def get_equity_curve(
 ):
     """
     Get equity curve data points.
-    MVP: returns placeholder data. Full implementation with DB in Phase 5.
+    Returns placeholder data (full equity curve tracking requires account snapshots).
     """
-    # Placeholder: single point with current state
     now = datetime.now(timezone.utc).isoformat()
     points = [
         EquityCurvePoint(date=now, equity=10000.0, drawdown_pct=0.0).model_dump()
@@ -62,12 +87,25 @@ async def get_equity_curve(
 @router.get("/recent-trades")
 async def get_recent_trades(
     limit: int = Query(default=20, ge=1, le=100),
-    engine: ExecutionEngine = Depends(get_execution_engine),
+    trade_repo=Depends(get_trade_repo),
 ):
-    """
-    Get recent closed trades.
-    MVP: returns trades from in-memory position tracker.
-    """
-    # Paper mode tracks positions in memory; closed ones are removed
-    # For MVP, return empty list (full history requires DB)
+    """Get recent closed trades."""
+    # Try DB first
+    if trade_repo is not None:
+        trades = await trade_repo.get_recent_trades(hours=168)
+        result = [
+            TradeResponse(
+                deal_id=t.deal_reference or f"trade-{t.id}",
+                epic=t.epic,
+                direction=t.direction,
+                size=float(t.size),
+                entry_price=float(t.price),
+                pnl=float(t.profit_loss) if t.profit_loss else None,
+                timestamp=t.executed_at.isoformat() if t.executed_at else "",
+            ).model_dump()
+            for t in trades[:limit]
+        ]
+        return success_response(result)
+
+    # Fallback: no trade history without DB
     return success_response([])

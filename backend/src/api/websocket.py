@@ -1,5 +1,6 @@
 """
 WebSocket manager for real-time price streaming and trade notifications.
+Dual-mode: uses broker WebSocket when available, falls back to mock random walk.
 """
 
 import asyncio
@@ -95,11 +96,68 @@ async def _mock_price_stream(websocket: WebSocket) -> None:
         logger.debug(f"Price stream ended: {e}")
 
 
+async def _broker_price_stream(websocket: WebSocket, broker_ws) -> None:
+    """
+    Forward real broker quotes to the frontend WebSocket.
+    Uses an asyncio.Queue per connection so multiple frontend clients
+    can share the single broker WebSocket without overwriting handlers.
+    """
+    quote_queue: asyncio.Queue = asyncio.Queue(maxsize=100)
+
+    def on_quote(quote) -> None:
+        try:
+            quote_queue.put_nowait({
+                "epic": quote.epic,
+                "bid": quote.bid,
+                "offer": quote.offer,
+                "timestamp": quote.timestamp.isoformat() if quote.timestamp else
+                    datetime.now(timezone.utc).isoformat(),
+            })
+        except asyncio.QueueFull:
+            pass  # Drop if full — next tick arrives soon
+
+    # Register as additional listener (fan-out pattern for multiple clients)
+    listeners: list = getattr(broker_ws, "_quote_listeners", [])
+    if not listeners:
+        original_handler = getattr(broker_ws, "_quote_handler", None)
+        broker_ws._quote_listeners = listeners
+
+        async def _fan_out(quote):
+            if original_handler:
+                await original_handler(quote)
+            for listener in list(listeners):
+                listener(quote)
+
+        broker_ws.on_quote(_fan_out)
+
+    listeners.append(on_quote)
+
+    try:
+        while True:
+            try:
+                tick = await asyncio.wait_for(quote_queue.get(), timeout=5.0)
+                await websocket.send_json(tick)
+            except asyncio.TimeoutError:
+                await websocket.send_json({"type": "heartbeat"})
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logger.debug(f"Broker price stream ended: {e}")
+    finally:
+        if on_quote in listeners:
+            listeners.remove(on_quote)
+
+
 async def prices_endpoint(websocket: WebSocket) -> None:
     """WebSocket endpoint for real-time price streaming."""
     await ws_manager.connect(websocket, "prices")
     try:
-        await _mock_price_stream(websocket)
+        # Check if broker WebSocket is available
+        broker_ws = getattr(websocket.app.state, "broker_ws_client", None)
+        if broker_ws and getattr(broker_ws, "_connected", False):
+            await _broker_price_stream(websocket, broker_ws)
+        else:
+            await _mock_price_stream(websocket)
     finally:
         ws_manager.disconnect(websocket, "prices")
 

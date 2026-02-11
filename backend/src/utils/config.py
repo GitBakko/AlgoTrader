@@ -88,6 +88,11 @@ class Settings(BaseSettings):
         default=10, alias="RATE_LIMIT_REQUESTS_PER_SECOND"
     )
 
+    @property
+    def capital_ws_url(self) -> str:
+        """Get the active Capital.com WebSocket URL based on use_demo flag."""
+        return self.capital_demo_ws_url if self.use_demo else self.capital_live_ws_url
+
     # HTTP Timeouts
     http_timeout_seconds: int = Field(default=30, alias="HTTP_TIMEOUT_SECONDS")
     http_connect_timeout_seconds: int = Field(default=10, alias="HTTP_CONNECT_TIMEOUT_SECONDS")

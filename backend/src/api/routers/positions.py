@@ -1,11 +1,12 @@
 """
 Positions API router.
 Manages open positions: list, close, modify stop-loss/take-profit.
+Dual-mode: uses DB when available, falls back to in-memory engine.
 """
 
 from fastapi import APIRouter, Depends, Path
 
-from src.api.dependencies import get_execution_engine
+from src.api.dependencies import get_execution_engine, get_position_repo
 from src.api.schemas import (
     ModifyStopsRequest,
     PositionResponse,
@@ -17,55 +18,77 @@ from src.execution.execution_engine import ExecutionEngine
 router = APIRouter()
 
 
+def _position_from_db(p) -> dict:
+    """Convert a DB Position model to PositionResponse dict."""
+    return PositionResponse(
+        deal_id=p.deal_id,
+        epic=p.epic,
+        direction=p.direction,
+        size=float(p.size),
+        entry_price=float(p.entry_price),
+        stop_loss=float(p.stop_loss) if p.stop_loss else None,
+        take_profit=float(p.take_profit) if p.take_profit else None,
+        current_pnl=float(p.profit_loss) if p.profit_loss else 0.0,
+        opened_at=p.opened_at.isoformat() if p.opened_at else None,
+    ).model_dump()
+
+
+def _position_from_engine(p: dict) -> dict:
+    """Convert an in-memory engine position dict to PositionResponse dict."""
+    return PositionResponse(
+        deal_id=p.get("deal_id", ""),
+        epic=p.get("epic", ""),
+        direction=p.get("direction", ""),
+        size=p.get("size", 0.0),
+        entry_price=p.get("level", 0.0),
+        stop_loss=p.get("stop_level"),
+        take_profit=p.get("profit_level"),
+        opened_at=p.get("opened_at"),
+    ).model_dump()
+
+
 @router.get("/")
 async def list_positions(
     epic: str | None = None,
     engine: ExecutionEngine = Depends(get_execution_engine),
+    position_repo=Depends(get_position_repo),
 ):
     """List all open positions, optionally filtered by epic."""
+    # Try DB first
+    if position_repo is not None:
+        if epic:
+            positions = await position_repo.get_by_epic(epic, status="OPEN")
+        else:
+            positions = await position_repo.get_open_positions()
+        return success_response([_position_from_db(p) for p in positions])
+
+    # Fallback: in-memory engine
     positions = await engine.get_open_positions(epic)
-
-    result = [
-        PositionResponse(
-            deal_id=p.get("deal_id", ""),
-            epic=p.get("epic", ""),
-            direction=p.get("direction", ""),
-            size=p.get("size", 0.0),
-            entry_price=p.get("level", 0.0),
-            stop_loss=p.get("stop_level"),
-            take_profit=p.get("profit_level"),
-            opened_at=p.get("opened_at"),
-        ).model_dump()
-        for p in positions
-    ]
-
-    return success_response(result)
+    return success_response([_position_from_engine(p) for p in positions])
 
 
 @router.get("/{deal_id}")
 async def get_position(
     deal_id: str = Path(...),
     engine: ExecutionEngine = Depends(get_execution_engine),
+    position_repo=Depends(get_position_repo),
 ):
     """Get a single position by deal ID."""
+    # Try DB first
+    if position_repo is not None:
+        position = await position_repo.get_by_deal_id(deal_id)
+        if position is None:
+            return error_response(f"Position {deal_id} not found", 404)
+        return success_response(_position_from_db(position))
+
+    # Fallback: in-memory engine
     positions = await engine.get_open_positions()
     position = next((p for p in positions if p.get("deal_id") == deal_id), None)
 
     if position is None:
         return error_response(f"Position {deal_id} not found", 404)
 
-    result = PositionResponse(
-        deal_id=position.get("deal_id", ""),
-        epic=position.get("epic", ""),
-        direction=position.get("direction", ""),
-        size=position.get("size", 0.0),
-        entry_price=position.get("level", 0.0),
-        stop_loss=position.get("stop_level"),
-        take_profit=position.get("profit_level"),
-        opened_at=position.get("opened_at"),
-    )
-
-    return success_response(result.model_dump())
+    return success_response(_position_from_engine(position))
 
 
 @router.post("/close/{deal_id}")
