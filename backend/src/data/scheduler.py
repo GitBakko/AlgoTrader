@@ -1,0 +1,221 @@
+"""
+Data pipeline scheduler.
+Uses APScheduler to run periodic data collection, quality checks, and maintenance.
+"""
+
+from datetime import datetime, timedelta, timezone
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+from loguru import logger
+
+from src.broker.client import CapitalComClient
+from src.data.data_access import DataAccessLayer
+from src.data.historical_downloader import HistoricalDownloader
+from src.data.models import OHLCBar
+from src.data.quality_checks import DataQualityChecker
+from src.data.storage import ParquetStorageManager
+
+
+class DataScheduler:
+    """
+    Manages scheduled data pipeline tasks.
+
+    Tasks:
+    1. EOD data download - Daily at market close
+    2. Quality checks - Daily after download
+    3. Gap backfill - Weekly scan and fill
+    4. Parquet optimization - Weekly compaction
+    """
+
+    def __init__(
+        self,
+        client: CapitalComClient,
+        storage: ParquetStorageManager,
+        data_access: DataAccessLayer,
+    ):
+        self.client = client
+        self.storage = storage
+        self.data_access = data_access
+        self.downloader = HistoricalDownloader(client, storage)
+        self.quality_checker = DataQualityChecker()
+        self.scheduler = AsyncIOScheduler()
+
+        self._assets = ["XAUUSD", "BTCUSD", "US500"]
+        self._timeframes = ["1h", "4h", "1d"]
+
+    def setup(self) -> None:
+        """Register all scheduled jobs."""
+
+        # 1. EOD download - weekdays at 22:00 UTC (after most markets close)
+        self.scheduler.add_job(
+            self.job_eod_download,
+            CronTrigger(hour=22, minute=0, day_of_week="mon-fri"),
+            id="eod_download",
+            name="End-of-day data download",
+            replace_existing=True,
+        )
+
+        # 2. Quality checks - weekdays at 22:30 UTC (after EOD download)
+        self.scheduler.add_job(
+            self.job_quality_checks,
+            CronTrigger(hour=22, minute=30, day_of_week="mon-fri"),
+            id="quality_checks",
+            name="Data quality checks",
+            replace_existing=True,
+        )
+
+        # 3. Gap backfill - Sundays at 12:00 UTC
+        self.scheduler.add_job(
+            self.job_gap_backfill,
+            CronTrigger(hour=12, day_of_week="sun"),
+            id="gap_backfill",
+            name="Weekly gap backfill",
+            replace_existing=True,
+        )
+
+        # 4. Parquet optimization - Sundays at 14:00 UTC
+        self.scheduler.add_job(
+            self.job_optimize_storage,
+            CronTrigger(hour=14, day_of_week="sun"),
+            id="optimize_storage",
+            name="Weekly Parquet optimization",
+            replace_existing=True,
+        )
+
+        logger.info("Data scheduler configured with 4 jobs")
+
+    def start(self) -> None:
+        """Start the scheduler."""
+        self.scheduler.start()
+        logger.info("Data scheduler started")
+
+    def stop(self) -> None:
+        """Stop the scheduler."""
+        self.scheduler.shutdown(wait=False)
+        logger.info("Data scheduler stopped")
+
+    async def job_eod_download(self) -> None:
+        """
+        End-of-day data download.
+        Downloads last 2 days of data for all assets/timeframes.
+        Uses append with deduplication to avoid duplicates.
+        """
+        logger.info("Running EOD download job...")
+        start_date = datetime.now(timezone.utc) - timedelta(days=2)
+
+        for epic in self._assets:
+            for timeframe in self._timeframes:
+                try:
+                    result = await self.downloader.download(
+                        epic=epic,
+                        timeframe=timeframe,
+                        start_date=start_date,
+                    )
+                    logger.info(
+                        f"EOD {epic}/{timeframe}: "
+                        f"{result.downloaded_candles} candles downloaded"
+                    )
+                except Exception as e:
+                    logger.error(f"EOD download failed for {epic}/{timeframe}: {e}")
+
+        logger.info("EOD download job completed")
+
+    async def job_quality_checks(self) -> None:
+        """
+        Run quality checks on recent data (last 7 days).
+        """
+        logger.info("Running quality checks job...")
+        start_date = datetime.now(timezone.utc) - timedelta(days=7)
+
+        for epic in self._assets:
+            for timeframe in self._timeframes:
+                try:
+                    df = self.data_access.get_candles(
+                        epic=epic,
+                        timeframe=timeframe,
+                        start_date=start_date,
+                    )
+                    if len(df) == 0:
+                        continue
+
+                    report = self.quality_checker.run_all_checks(df, epic, timeframe)
+                    if not report.passed:
+                        logger.warning(
+                            f"Quality check FAILED for {epic}/{timeframe}: "
+                            f"{report.validation_errors}"
+                        )
+                except Exception as e:
+                    logger.error(f"Quality check failed for {epic}/{timeframe}: {e}")
+
+        logger.info("Quality checks job completed")
+
+    async def job_gap_backfill(self) -> None:
+        """
+        Scan for gaps and download missing data.
+        """
+        logger.info("Running gap backfill job...")
+
+        for epic in self._assets:
+            for timeframe in self._timeframes:
+                try:
+                    df = self.data_access.get_candles(epic=epic, timeframe=timeframe)
+                    if len(df) == 0:
+                        continue
+
+                    gaps = self.quality_checker.detect_gaps(df, epic, timeframe)
+                    if not gaps:
+                        continue
+
+                    ranges = self.quality_checker.get_gap_fill_ranges(gaps)
+                    logger.info(
+                        f"Found {len(ranges)} gaps for {epic}/{timeframe}, backfilling..."
+                    )
+
+                    for start, end in ranges:
+                        await self.downloader.download(
+                            epic=epic,
+                            timeframe=timeframe,
+                            start_date=start,
+                            end_date=end,
+                        )
+
+                except Exception as e:
+                    logger.error(f"Gap backfill failed for {epic}/{timeframe}: {e}")
+
+        logger.info("Gap backfill job completed")
+
+    async def job_optimize_storage(self) -> None:
+        """
+        Optimize Parquet files: re-sort, deduplicate, recompress.
+        """
+        logger.info("Running storage optimization job...")
+
+        for epic in self._assets:
+            for timeframe in self._timeframes:
+                try:
+                    df = self.storage.read_candles(epic=epic, timeframe=timeframe)
+                    if len(df) == 0:
+                        continue
+
+                    original_count = len(df)
+                    # Deduplicate and re-sort
+                    df = df.sort("timestamp").unique(subset=["timestamp"], keep="first")
+                    optimized_count = len(df)
+
+                    if optimized_count < original_count:
+                        # Convert back to OHLCBar list and rewrite
+                        bars = [
+                            OHLCBar(**row) for row in df.iter_rows(named=True)
+                        ]
+                        self.storage.write_candles(bars, epic, timeframe)
+                        logger.info(
+                            f"Optimized {epic}/{timeframe}: "
+                            f"{original_count} → {optimized_count} candles "
+                            f"({original_count - optimized_count} duplicates removed)"
+                        )
+
+                except Exception as e:
+                    logger.error(f"Optimization failed for {epic}/{timeframe}: {e}")
+
+        logger.info("Storage optimization job completed")

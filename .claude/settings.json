@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"C:\\\\Users\\\\bakko\\\\AppData\\\\Roaming\\\\Python\\\\Python311\\\\Scripts\\\\poetry.exe\" env use py -3.11)"
+    ]
+  }
+}

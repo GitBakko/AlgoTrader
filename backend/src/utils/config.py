@@ -1,0 +1,214 @@
+"""
+Configuration management using pydantic-settings.
+Loads settings from environment variables and .env file.
+"""
+
+from functools import lru_cache
+from typing import Literal
+
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    """Application settings loaded from environment variables."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    # ===== Application =====
+    app_name: str = Field(default="AlgoTrader AI", alias="APP_NAME")
+    app_version: str = Field(default="0.1.0", alias="APP_VERSION")
+    environment: Literal["development", "staging", "production"] = Field(
+        default="development", alias="ENVIRONMENT"
+    )
+    debug: bool = Field(default=True, alias="DEBUG")
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
+        default="INFO", alias="LOG_LEVEL"
+    )
+
+    # ===== FastAPI =====
+    api_host: str = Field(default="0.0.0.0", alias="API_HOST")
+    api_port: int = Field(default=8000, alias="API_PORT")
+    api_reload: bool = Field(default=True, alias="API_RELOAD")
+    cors_origins_str: str = Field(
+        default="http://localhost:4200,http://localhost:8000", alias="CORS_ORIGINS"
+    )
+
+    @property
+    def cors_origins(self) -> list[str]:
+        """Parse CORS origins from comma-separated string."""
+        return [origin.strip() for origin in self.cors_origins_str.split(",")]
+
+    # ===== Capital.com API - Demo =====
+    capital_demo_api_url: str = Field(
+        default="https://demo-api-capital.backend-capital.com", alias="CAPITAL_DEMO_API_URL"
+    )
+    capital_demo_ws_url: str = Field(
+        default="wss://api-streaming-capital.backend-capital.com/connect",
+        alias="CAPITAL_DEMO_WS_URL",
+    )
+    capital_demo_api_key: str = Field(alias="CAPITAL_DEMO_API_KEY")
+    capital_demo_email: str = Field(alias="CAPITAL_DEMO_EMAIL")
+    capital_demo_password: str = Field(alias="CAPITAL_DEMO_PASSWORD")
+
+    @field_validator("capital_demo_api_key", "capital_demo_email", "capital_demo_password")
+    @classmethod
+    def validate_demo_credentials(cls, v: str, info) -> str:
+        """Validate that demo credentials are not empty."""
+        if not v or not v.strip():
+            raise ValueError(
+                f"{info.field_name} is required for demo mode. "
+                f"Please configure it in your .env file."
+            )
+        return v.strip()
+
+    # ===== Capital.com API - Live =====
+    capital_live_api_url: str = Field(
+        default="https://api-capital.backend-capital.com", alias="CAPITAL_LIVE_API_URL"
+    )
+    capital_live_ws_url: str = Field(
+        default="wss://api-streaming-capital.backend-capital.com/connect",
+        alias="CAPITAL_LIVE_WS_URL",
+    )
+    capital_live_api_key: str = Field(default="", alias="CAPITAL_LIVE_API_KEY")
+    capital_live_email: str = Field(default="", alias="CAPITAL_LIVE_EMAIL")
+    capital_live_password: str = Field(default="", alias="CAPITAL_LIVE_PASSWORD")
+
+    # ===== Broker Configuration =====
+    use_demo: bool = Field(default=True, alias="USE_DEMO")
+    session_timeout_minutes: int = Field(default=10, alias="SESSION_TIMEOUT_MINUTES")
+    max_reconnect_attempts: int = Field(default=5, alias="MAX_RECONNECT_ATTEMPTS")
+    reconnect_delay_seconds: int = Field(default=5, alias="RECONNECT_DELAY_SECONDS")
+    rate_limit_requests_per_second: int = Field(
+        default=10, alias="RATE_LIMIT_REQUESTS_PER_SECOND"
+    )
+
+    # HTTP Timeouts
+    http_timeout_seconds: int = Field(default=30, alias="HTTP_TIMEOUT_SECONDS")
+    http_connect_timeout_seconds: int = Field(default=10, alias="HTTP_CONNECT_TIMEOUT_SECONDS")
+
+    # ===== PostgreSQL =====
+    postgres_host: str = Field(default="localhost", alias="POSTGRES_HOST")
+    postgres_port: int = Field(default=5432, alias="POSTGRES_PORT")
+    postgres_db: str = Field(default="algotrader", alias="POSTGRES_DB")
+    postgres_user: str = Field(default="algotrader", alias="POSTGRES_USER")
+    postgres_password: str = Field(default="", alias="POSTGRES_PASSWORD")
+    database_pool_size: int = Field(default=10, alias="DATABASE_POOL_SIZE")
+    database_max_overflow: int = Field(default=20, alias="DATABASE_MAX_OVERFLOW")
+
+    @property
+    def database_url(self) -> str:
+        """
+        Construct PostgreSQL database URL.
+
+        WARNING: Contains plain-text password. Never log this value directly.
+        Use safe_database_url for logging purposes.
+        """
+        return (
+            f"postgresql://{self.postgres_user}:{self.postgres_password}"
+            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+        )
+
+    @property
+    def safe_database_url(self) -> str:
+        """
+        Construct PostgreSQL database URL with masked password for logging.
+        Safe to use in logs and error messages.
+        """
+        return (
+            f"postgresql://{self.postgres_user}:***@{self.postgres_host}:"
+            f"{self.postgres_port}/{self.postgres_db}"
+        )
+
+    # ===== DuckDB =====
+    duckdb_path: str = Field(default="data/analytics.duckdb", alias="DUCKDB_PATH")
+    duckdb_read_only: bool = Field(default=False, alias="DUCKDB_READ_ONLY")
+
+    # ===== Redis =====
+    redis_host: str = Field(default="localhost", alias="REDIS_HOST")
+    redis_port: int = Field(default=6379, alias="REDIS_PORT")
+    redis_db: int = Field(default=0, alias="REDIS_DB")
+    redis_password: str = Field(default="", alias="REDIS_PASSWORD")
+    redis_max_connections: int = Field(default=50, alias="REDIS_MAX_CONNECTIONS")
+
+    @property
+    def redis_url(self) -> str:
+        """
+        Construct Redis URL.
+
+        WARNING: Contains plain-text password. Never log this value directly.
+        Use safe_redis_url for logging purposes.
+        """
+        if self.redis_password:
+            return f"redis://:{self.redis_password}@{self.redis_host}:{self.redis_port}/{self.redis_db}"
+        return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
+
+    @property
+    def safe_redis_url(self) -> str:
+        """
+        Construct Redis URL with masked password for logging.
+        Safe to use in logs and error messages.
+        """
+        if self.redis_password:
+            return f"redis://:***@{self.redis_host}:{self.redis_port}/{self.redis_db}"
+        return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
+
+    # ===== Data Pipeline =====
+    data_dir: str = Field(default="data/historical", alias="DATA_DIR")
+    parquet_compression: Literal["snappy", "gzip", "brotli", "zstd"] = Field(
+        default="snappy", alias="PARQUET_COMPRESSION"
+    )
+    historical_data_assets_str: str = Field(
+        default="XAUUSD,BTCUSD,US500", alias="HISTORICAL_DATA_ASSETS"
+    )
+    historical_data_timeframes_str: str = Field(
+        default="1min,5min,15min,1h,4h,1d", alias="HISTORICAL_DATA_TIMEFRAMES"
+    )
+    max_historical_days: int = Field(default=730, alias="MAX_HISTORICAL_DAYS")
+
+    @property
+    def historical_data_assets(self) -> list[str]:
+        """Parse assets from comma-separated string."""
+        return [asset.strip() for asset in self.historical_data_assets_str.split(",")]
+
+    @property
+    def historical_data_timeframes(self) -> list[str]:
+        """Parse timeframes from comma-separated string."""
+        return [tf.strip() for tf in self.historical_data_timeframes_str.split(",")]
+
+    # ===== Machine Learning =====
+    model_dir: str = Field(default="data/models", alias="MODEL_DIR")
+    device: Literal["cuda", "cpu", "mps"] = Field(default="cpu", alias="DEVICE")
+    train_batch_size: int = Field(default=64, alias="TRAIN_BATCH_SIZE")
+    eval_batch_size: int = Field(default=128, alias="EVAL_BATCH_SIZE")
+
+    # ===== Risk Management =====
+    max_risk_per_trade: float = Field(default=0.02, alias="MAX_RISK_PER_TRADE")
+    max_daily_drawdown: float = Field(default=0.05, alias="MAX_DAILY_DRAWDOWN")
+    max_total_drawdown: float = Field(default=0.15, alias="MAX_TOTAL_DRAWDOWN")
+
+    # ===== Trading =====
+    trading_enabled: bool = Field(default=False, alias="TRADING_ENABLED")
+    paper_trading: bool = Field(default=True, alias="PAPER_TRADING")
+    min_confidence_threshold: float = Field(default=0.65, alias="MIN_CONFIDENCE_THRESHOLD")
+
+    # ===== Security =====
+    secret_key: str = Field(default="dev_secret_key_change_in_production", alias="SECRET_KEY")
+    jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
+    access_token_expire_minutes: int = Field(
+        default=60, alias="ACCESS_TOKEN_EXPIRE_MINUTES"
+    )
+
+
+@lru_cache
+def get_settings() -> Settings:
+    """
+    Get cached settings instance.
+    Uses lru_cache to ensure settings are loaded only once.
+    """
+    return Settings()
