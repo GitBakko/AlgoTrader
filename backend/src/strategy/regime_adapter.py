@@ -6,20 +6,20 @@ Modifies strategy config based on detected market regime.
 from src.strategy.schemas import StrategyConfig
 
 
-# Regime-specific parameter overrides
+# Regime-specific parameter overrides (calibrated for 3-class system)
 _REGIME_PARAMS: dict[str, dict[str, float]] = {
     "trending_up": {
-        "min_confidence": 0.60,
+        "min_confidence": 0.45,
         "stop_multiplier": 2.5,
         "counter_trend_penalty": 0.4,
     },
     "trending_down": {
-        "min_confidence": 0.70,
+        "min_confidence": 0.55,
         "stop_multiplier": 1.5,
         "counter_trend_penalty": 0.3,
     },
     "ranging": {
-        "min_confidence": 0.70,
+        "min_confidence": 0.55,
         "stop_multiplier": 1.5,
         "counter_trend_penalty": 0.7,
     },

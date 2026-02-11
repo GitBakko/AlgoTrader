@@ -12,7 +12,7 @@ def _make_prediction(signal_class=SignalClass.BUY, confidence=0.80) -> Predictio
         signal_class=signal_class,
         signal_name=SignalClass(signal_class).name,
         confidence=confidence,
-        probabilities={"STRONG_SELL": 0.05, "SELL": 0.05, "HOLD": 0.10, "BUY": confidence, "STRONG_BUY": 0.0},
+        probabilities={"SELL": 0.10, "HOLD": 0.10, "BUY": confidence},
     )
 
 
@@ -34,18 +34,13 @@ class TestSignalGenerator:
         assert signal.suggested_stop > 2000.0
         assert signal.suggested_tp < 2000.0
 
-    def test_strong_buy_maps_to_buy(self):
-        pred = _make_prediction(SignalClass.STRONG_BUY, 0.90)
-        signal = SignalGenerator.generate_signal(pred, "XAUUSD", 2000.0, atr=20.0)
-        assert signal.direction == SignalDirection.BUY
-
     def test_hold_returns_hold(self):
-        pred = _make_prediction(SignalClass.HOLD, 0.50)
+        pred = _make_prediction(SignalClass.HOLD, 0.60)
         signal = SignalGenerator.generate_signal(pred, "XAUUSD", 2000.0, atr=20.0)
         assert signal.direction == SignalDirection.HOLD
 
     def test_low_confidence_returns_hold(self):
-        pred = _make_prediction(SignalClass.BUY, 0.50)
+        pred = _make_prediction(SignalClass.BUY, 0.40)
         signal = SignalGenerator.generate_signal(pred, "XAUUSD", 2000.0, atr=20.0)
         assert signal.direction == SignalDirection.HOLD
 
@@ -73,20 +68,20 @@ class TestSignalGenerator:
     def test_counter_trend_penalty(self):
         """SELL in trending_up should have reduced confidence."""
         pred = _make_prediction(SignalClass.SELL, 0.80)
-        config = StrategyConfig(counter_trend_penalty=0.5, min_confidence=0.65)
+        config = StrategyConfig(counter_trend_penalty=0.5, min_confidence=0.50)
         signal = SignalGenerator.generate_signal(
             pred, "XAUUSD", 2000.0, atr=20.0, regime="trending_up", config=config
         )
-        # 0.80 * 0.5 = 0.40 < 0.65 -> should become HOLD
+        # 0.80 * 0.5 = 0.40 < 0.50 -> should become HOLD
         assert signal.direction == SignalDirection.HOLD
 
     def test_counter_trend_mild_penalty(self):
         """High-confidence counter-trend should still trade if penalty isn't too harsh."""
         pred = _make_prediction(SignalClass.SELL, 0.95)
-        config = StrategyConfig(counter_trend_penalty=0.7, min_confidence=0.65)
+        config = StrategyConfig(counter_trend_penalty=0.7, min_confidence=0.50)
         signal = SignalGenerator.generate_signal(
             pred, "XAUUSD", 2000.0, atr=20.0, regime="trending_up", config=config
         )
-        # 0.95 * 0.7 = 0.665 > 0.65 -> should still SELL
+        # 0.95 * 0.7 = 0.665 > 0.50 -> should still SELL
         assert signal.direction == SignalDirection.SELL
         assert signal.confidence == pytest.approx(0.665)

@@ -33,8 +33,8 @@ def mock_prediction_service():
         signal_name="BUY",
         confidence=0.85,
         probabilities={
-            "STRONG_SELL": 0.02, "SELL": 0.03, "HOLD": 0.05,
-            "BUY": 0.85, "STRONG_BUY": 0.05,
+            "SELL": 0.05, "HOLD": 0.10,
+            "BUY": 0.85,
         },
     )
 
@@ -116,8 +116,8 @@ class TestPaperTradingLoop:
             signal_name="HOLD",
             confidence=0.90,
             probabilities={
-                "STRONG_SELL": 0.02, "SELL": 0.03, "HOLD": 0.90,
-                "BUY": 0.03, "STRONG_BUY": 0.02,
+                "SELL": 0.05, "HOLD": 0.90,
+                "BUY": 0.05,
             },
         )
 

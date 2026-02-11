@@ -234,12 +234,21 @@ class FeatureBuilder:
             signal_period=params.get("macd_signal", 9),
         )
         df = ti.add_adx(df, period=params.get("adx_period", 14))
-        df = ti.add_rsi(df, period=params.get("rsi_period", 14))
+        rsi_period = params.get("rsi_period", 14)
+        bb_period = params.get("bb_period", 20)
+
+        df = ti.add_rsi(df, period=rsi_period)
         df = ti.add_bollinger_bands(
             df,
-            period=params.get("bb_period", 20),
+            period=bb_period,
             num_std=params.get("bb_std", 2.0),
         )
+
+        # Advanced mean reversion
+        df = ti.add_stochastic_rsi(df, rsi_period=rsi_period)
+        df = ti.add_bollinger_squeeze(df, bb_period=bb_period)
+        df = ti.add_rsi_divergence(df, rsi_period=rsi_period)
+
         df = ti.add_atr(df, period=params.get("atr_period", 14))
         df = ti.add_historical_volatility(df, period=params.get("hvol_period", 20))
 
@@ -249,9 +258,13 @@ class FeatureBuilder:
             if has_volume:
                 df = ti.add_obv(df)
                 df = ti.add_volume_sma_ratio(df)
+                df = ti.add_vwap(df)
 
         df = ti.add_returns(df, periods=params.get("return_periods", [1, 5, 20]))
         df = ti.add_price_action(df)
+
+        # Session features
+        df = ti.add_session_features(df)
 
         return df
 

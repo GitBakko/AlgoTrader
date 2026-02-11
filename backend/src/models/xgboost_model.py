@@ -18,8 +18,7 @@ class XGBoostClassifier(BaseMLModel):
     """
     XGBoost multi-class classifier for market direction prediction.
 
-    Predicts 5 classes: STRONG_SELL, SELL, HOLD, BUY, STRONG_BUY
-    using ATR-relative targets.
+    Predicts 3 classes: SELL, HOLD, BUY using ATR-relative targets.
     """
 
     def __init__(
@@ -33,7 +32,7 @@ class XGBoostClassifier(BaseMLModel):
         reg_alpha: float = 0.1,
         reg_lambda: float = 1.0,
         early_stopping_rounds: int = 50,
-        n_classes: int = 5,
+        n_classes: int = 3,
         feature_names: list[str] | None = None,
         random_state: int = 42,
     ):
@@ -185,7 +184,7 @@ class XGBoostClassifier(BaseMLModel):
             meta = json.loads(meta_path.read_text())
             self.params = meta.get("params", self.params)
             self.feature_names = meta.get("feature_names")
-            self.n_classes = meta.get("n_classes", 5)
+            self.n_classes = meta.get("n_classes", 3)
 
         # Load XGBoost model
         self._model = xgb.XGBClassifier(**self.params)

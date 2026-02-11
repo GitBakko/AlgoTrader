@@ -31,7 +31,7 @@ class TestGenerateSignal:
 
     def test_generate_signal_custom_params(self, client):
         resp = client.get(
-            "/api/signals/generate?epic=BTCUSD&confidence=0.9&signal_class=3"
+            "/api/signals/generate?epic=BTCUSD&confidence=0.9&signal_class=2"
         )
         assert resp.status_code == 200
         data = resp.json()["data"]
@@ -47,8 +47,8 @@ class TestGenerateSignal:
         assert signals[0]["epic"] == "XAUUSD"
 
     def test_generate_hold_signal(self, client):
-        # signal_class=2 is HOLD, should return HOLD direction
-        resp = client.get("/api/signals/generate?signal_class=2&confidence=0.9")
+        # signal_class=1 is HOLD, should return HOLD direction
+        resp = client.get("/api/signals/generate?signal_class=1&confidence=0.9")
         assert resp.status_code == 200
         data = resp.json()["data"]
         assert data["direction"] == "HOLD"

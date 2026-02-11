@@ -9,7 +9,7 @@ from src.models.xgboost_model import XGBoostClassifier
 
 @pytest.fixture
 def synthetic_data():
-    """Generate synthetic classification data."""
+    """Generate synthetic 3-class classification data."""
     np.random.seed(42)
     n_train = 500
     n_test = 100
@@ -18,32 +18,20 @@ def synthetic_data():
     X_train = np.random.randn(n_train, n_features)
     X_test = np.random.randn(n_test, n_features)
 
-    # Create labels based on a simple rule for testability
+    # Create 3-class labels based on a simple rule for testability
     y_train = np.where(
-        X_train[:, 0] > 1.0, SignalClass.STRONG_BUY,
+        X_train[:, 0] > 0.3, SignalClass.BUY,
         np.where(
-            X_train[:, 0] > 0.3, SignalClass.BUY,
-            np.where(
-                X_train[:, 0] < -1.0, SignalClass.STRONG_SELL,
-                np.where(
-                    X_train[:, 0] < -0.3, SignalClass.SELL,
-                    SignalClass.HOLD
-                )
-            )
+            X_train[:, 0] < -0.3, SignalClass.SELL,
+            SignalClass.HOLD
         )
     ).astype(np.int32)
 
     y_test = np.where(
-        X_test[:, 0] > 1.0, SignalClass.STRONG_BUY,
+        X_test[:, 0] > 0.3, SignalClass.BUY,
         np.where(
-            X_test[:, 0] > 0.3, SignalClass.BUY,
-            np.where(
-                X_test[:, 0] < -1.0, SignalClass.STRONG_SELL,
-                np.where(
-                    X_test[:, 0] < -0.3, SignalClass.SELL,
-                    SignalClass.HOLD
-                )
-            )
+            X_test[:, 0] < -0.3, SignalClass.SELL,
+            SignalClass.HOLD
         )
     ).astype(np.int32)
 
@@ -60,7 +48,7 @@ class TestXGBoostClassifier:
 
         preds = model.predict(X_test)
         assert len(preds) == len(X_test)
-        assert all(p in range(5) for p in preds)
+        assert all(p in range(3) for p in preds)
 
     def test_predict_proba(self, synthetic_data):
         X_train, y_train, X_test, _ = synthetic_data
@@ -68,7 +56,7 @@ class TestXGBoostClassifier:
         model.fit(X_train, y_train)
 
         proba = model.predict_proba(X_test)
-        assert proba.shape == (len(X_test), 5)
+        assert proba.shape == (len(X_test), 3)
         # Each row should sum to ~1
         np.testing.assert_allclose(proba.sum(axis=1), 1.0, atol=1e-5)
 
@@ -78,9 +66,9 @@ class TestXGBoostClassifier:
         model.fit(X_train, y_train)
 
         result = model.predict_single(X_test[0])
-        assert result.signal_class in range(5)
+        assert result.signal_class in range(3)
         assert 0.0 <= result.confidence <= 1.0
-        assert len(result.probabilities) == 5
+        assert len(result.probabilities) == 3
 
     def test_not_fitted_raises(self):
         model = XGBoostClassifier()
@@ -131,11 +119,11 @@ class TestXGBoostClassifier:
         assert model.model_type == "xgboost"
 
     def test_accuracy_above_random(self, synthetic_data):
-        """Model should beat random baseline (20% for 5 classes)."""
+        """Model should beat random baseline (33% for 3 classes)."""
         X_train, y_train, X_test, y_test = synthetic_data
         model = XGBoostClassifier(n_estimators=100, max_depth=4)
         model.fit(X_train, y_train)
 
         preds = model.predict(X_test)
         accuracy = (preds == y_test).mean()
-        assert accuracy > 0.30  # Should beat random (20%) by a good margin
+        assert accuracy > 0.45  # Should beat random (33%) by a good margin

@@ -72,11 +72,9 @@ class TestSignalGenerationPipeline:
             signal_name="BUY",
             confidence=0.85,
             probabilities={
-                "STRONG_SELL": 0.02,
-                "SELL": 0.03,
-                "HOLD": 0.05,
+                "SELL": 0.05,
+                "HOLD": 0.10,
                 "BUY": 0.85,
-                "STRONG_BUY": 0.05,
             },
         )
 
@@ -96,11 +94,9 @@ class TestSignalGenerationPipeline:
             signal_name="HOLD",
             confidence=0.9,
             probabilities={
-                "STRONG_SELL": 0.02,
-                "SELL": 0.03,
+                "SELL": 0.05,
                 "HOLD": 0.90,
-                "BUY": 0.03,
-                "STRONG_BUY": 0.02,
+                "BUY": 0.05,
             },
         )
 
@@ -116,11 +112,9 @@ class TestSignalGenerationPipeline:
             signal_name="SELL",
             confidence=0.35,
             probabilities={
-                "STRONG_SELL": 0.10,
                 "SELL": 0.35,
-                "HOLD": 0.30,
-                "BUY": 0.15,
-                "STRONG_BUY": 0.10,
+                "HOLD": 0.40,
+                "BUY": 0.25,
             },
         )
 
@@ -136,15 +130,13 @@ class TestRiskCheckPipeline:
     def test_risk_approves_valid_trade(self, strategy_mgr, risk_mgr):
         """Risk manager approves a valid trade with proper position sizing."""
         prediction = PredictionResult(
-            signal_class=SignalClass.STRONG_BUY,
-            signal_name="STRONG_BUY",
+            signal_class=SignalClass.BUY,
+            signal_name="BUY",
             confidence=0.90,
             probabilities={
-                "STRONG_SELL": 0.01,
-                "SELL": 0.02,
-                "HOLD": 0.02,
-                "BUY": 0.05,
-                "STRONG_BUY": 0.90,
+                "SELL": 0.03,
+                "HOLD": 0.07,
+                "BUY": 0.90,
             },
         )
 
@@ -171,8 +163,7 @@ class TestRiskCheckPipeline:
             signal_class=SignalClass.BUY,
             signal_name="BUY",
             confidence=0.90,
-            probabilities={"STRONG_SELL": 0.01, "SELL": 0.01, "HOLD": 0.03,
-                           "BUY": 0.90, "STRONG_BUY": 0.05},
+            probabilities={"SELL": 0.03, "HOLD": 0.07, "BUY": 0.90},
         )
 
         market_data = {"current_price": 2000.0, "atr": 20.0}
@@ -196,11 +187,10 @@ class TestExecutionPipeline:
     async def test_paper_execution_succeeds(self, engine, strategy_mgr, risk_mgr):
         """Paper mode execution produces valid result."""
         prediction = PredictionResult(
-            signal_class=SignalClass.STRONG_BUY,
-            signal_name="STRONG_BUY",
+            signal_class=SignalClass.BUY,
+            signal_name="BUY",
             confidence=0.90,
-            probabilities={"STRONG_SELL": 0.01, "SELL": 0.02, "HOLD": 0.02,
-                           "BUY": 0.05, "STRONG_BUY": 0.90},
+            probabilities={"SELL": 0.03, "HOLD": 0.07, "BUY": 0.90},
         )
 
         market_data = {"current_price": 2000.0, "atr": 20.0}
@@ -245,8 +235,8 @@ class TestFullPipelineE2E:
         assert X.shape == (1, matrix.num_features)
 
         # Step 3: Mock XGBoost prediction
-        # Simulate 5-class probabilities
-        mock_proba = np.array([[0.05, 0.05, 0.10, 0.70, 0.10]])
+        # Simulate 3-class probabilities (SELL=0, HOLD=1, BUY=2)
+        mock_proba = np.array([[0.10, 0.15, 0.75]])
         predicted_class = int(np.argmax(mock_proba))
         confidence = float(mock_proba[0, predicted_class])
 
@@ -259,8 +249,8 @@ class TestFullPipelineE2E:
             },
         )
 
-        assert prediction.signal_class == 3  # BUY
-        assert prediction.confidence == 0.70
+        assert prediction.signal_class == SignalClass.BUY  # 2
+        assert prediction.confidence == 0.75
 
     @pytest.mark.asyncio
     async def test_full_pipeline_data_to_paper_trade(self, sample_ohlc_df):
@@ -275,11 +265,10 @@ class TestFullPipelineE2E:
 
         # Mock prediction
         prediction = PredictionResult(
-            signal_class=SignalClass.STRONG_BUY,
-            signal_name="STRONG_BUY",
+            signal_class=SignalClass.BUY,
+            signal_name="BUY",
             confidence=0.85,
-            probabilities={"STRONG_SELL": 0.02, "SELL": 0.03, "HOLD": 0.05,
-                           "BUY": 0.05, "STRONG_BUY": 0.85},
+            probabilities={"SELL": 0.05, "HOLD": 0.10, "BUY": 0.85},
         )
 
         # Get last close as current price
@@ -334,7 +323,7 @@ class TestExecutionPersistence:
             epic="XAUUSD",
             direction=SignalDirection.BUY,
             confidence=0.85,
-            signal_class=3,
+            signal_class=SignalClass.BUY,
             entry_price=2000.0,
             suggested_stop=1980.0,
             suggested_tp=2040.0,
@@ -370,7 +359,7 @@ class TestExecutionPersistence:
             epic="XAUUSD",
             direction=SignalDirection.BUY,
             confidence=0.85,
-            signal_class=3,
+            signal_class=SignalClass.BUY,
             entry_price=2000.0,
         )
 

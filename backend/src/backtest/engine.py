@@ -136,9 +136,9 @@ class BacktestEngine:
     ) -> None:
         """Process a signal: close existing positions if needed, open new ones."""
         # Map signal to direction
-        if signal in (SignalClass.BUY, SignalClass.STRONG_BUY):
+        if signal == SignalClass.BUY:
             desired_direction = TradeDirection.LONG
-        elif signal in (SignalClass.SELL, SignalClass.STRONG_SELL):
+        elif signal == SignalClass.SELL:
             desired_direction = TradeDirection.SHORT
         else:
             # HOLD: do nothing

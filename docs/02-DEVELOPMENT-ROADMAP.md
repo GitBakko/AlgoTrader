@@ -10,7 +10,9 @@
 | 4 | Dashboard | 2-3 weeks | Angular frontend, real-time visualization | COMPLETE |
 | 5 | Integration & Wiring | 2 weeks | End-to-end wiring, paper trading pipeline | COMPLETE |
 | 5B | Paper Trading Validation | 1 week | Scripts, paper loop, health monitoring | COMPLETE |
-| 6 | Optimization & Live | Ongoing | Performance tuning, live deployment | NEXT |
+| 6A | Trading Guru ML Upgrades | 1 week | 3-class migration, calibration, LSTM, features | COMPLETE |
+| 6B | Ensemble & Advanced | TBD | TFT, stacking, hyperopt | NEXT |
+| 7 | Optimization & Live | Ongoing | Performance tuning, live deployment | FUTURE |
 
 ---
 
@@ -264,25 +266,109 @@
 
 ---
 
-## Phase 6: Optimization & Live (Ongoing)
+## Phase 6A: Trading Guru ML Upgrades [COMPLETE]
 
-### 6.1 Performance Optimization
+> Basata sull'analisi di `docs/addestramento.md` e sintesi in `docs/07-TRADING-GURU-SYNTHESIS.md`
+
+### 6A.1 Migrazione 5→3 Classi [COMPLETE]
+
+- [x] Aggiornare `SignalClass` enum: SELL=0, HOLD=1, BUY=2
+- [x] Aggiornare `TargetBuilder`: soglia singola 0.5 ATR
+- [x] Aggiornare `XGBoostClassifier`: n_classes=3
+- [x] Aggiornare `ModelEvaluator`: labels a 3 classi
+- [x] Aggiornare `SignalGenerator`: semplificare mapping
+- [x] Aggiornare `PredictionService`: supporto 3 classi
+- [x] Aggiornare tutti i test (20+ file, 456 test)
+
+### 6A.2 Confidence Calibration [COMPLETE]
+
+- [x] Creare `src/models/calibration.py` — isotonic + Platt scaling, ECE metric
+- [x] Integrare calibrazione nel training pipeline (auto-fit su ultimo fold val)
+- [x] Integrare nella prediction pipeline (PredictionService auto-load)
+- [x] Save/load calibratore con modello
+
+### 6A.3 Nuove Feature Tecniche [COMPLETE]
+
+- [x] Stochastic RSI (%K, %D)
+- [x] Bollinger Squeeze detection (binary + duration)
+- [x] RSI Divergence detection (bullish=+1, bearish=-1)
+- [x] VWAP + distance from VWAP
+- [x] Session features (cyclical hour_sin/cos, dow_sin/cos)
+- [x] Integrato in FeatureBuilder + add_all_indicators
+
+### 6A.4 LSTM Model [COMPLETE]
+
+- [x] Creare `src/models/lstm_model.py` (PyTorch, extends BaseMLModel)
+- [x] Sequence reshaping per input LSTM (batch x seq_len x features)
+- [x] 2-layer LSTM, dropout 0.3, linear head → 3 classi
+- [x] Early stopping, AdamW, class-weighted loss, grad clipping
+- [x] Save/load completo (weights + params)
+
+### 6A.5 Multi-Timeframe Features [COMPLETE]
+
+- [x] `additional_timeframes: ["4h", "1d"]` già configurati nell'asset config
+- [x] `TimeframeAligner` funzionante (asof join, forward-fill)
+- [x] `ModelTrainer.train(multi_timeframe=True)` abilitato
+- [x] `PredictionService` auto-detect multi-TF features
+- [x] `scripts/train_models.py` usa multi_timeframe=True di default
+
+### 6A.6 Re-Training e Validazione
+
+- [ ] Re-train XGBoost con 3 classi → target F1 macro ≥ 0.35
+- [ ] Verificare che il paper trading generi segnali (rate > 0%)
+- [ ] Train LSTM → confrontare con XGBoost
+- [ ] Monitorare paper trading per 2+ settimane
+
+---
+
+## Phase 6B: Ensemble & Advanced (Future)
+
+### 6B.1 TFT Model
+
+- [ ] Implementare Temporal Fusion Transformer (PyTorch)
+- [ ] Variable selection network per feature importance automatica
+- [ ] Multi-horizon prediction (4h, 1d, 1w)
+
+### 6B.2 Ensemble Stacking
+
+- [ ] Meta-learner XGBoost su output di LSTM + TFT + XGBoost
+- [ ] Model agreement voting (2-of-3 per trade)
+- [ ] Weighted averaging basato su performance recente
+
+### 6B.3 Advanced Features
+
+- [ ] FRED API client per macro data (CPI, rates, GDP, DXY, VIX)
+- [ ] Cross-asset correlation features (Gold-DXY, BTC-Gold, VIX-S&P)
+- [ ] FinBERT sentiment analysis (news headlines)
+- [ ] SHAP feature importance dashboard
+
+### 6B.4 Hyperparameter Optimization
+
+- [ ] Optuna integration con walk-forward framework
+- [ ] TPE sampler per efficient search
+- [ ] Obiettivo: risk-adjusted return (Sharpe), non solo F1
+
+---
+
+## Phase 7: Live Trading (Future)
+
+### 7.1 Performance Optimization
+
 - [ ] Optimize model inference latency
-- [ ] Implement Numba JIT for hot feature calculation paths
-- [ ] Optimize Parquet read/write patterns
 - [ ] Frontend bundle optimization
 - [ ] Redis connection pooling tuning
 
-### 6.2 Live Trading Preparation
+### 7.2 Live Trading Preparation
+
 - [ ] Switch from demo to live Capital.com API
 - [ ] Start with minimal position sizes (0.5% risk per trade)
 - [ ] Implement enhanced monitoring and alerting
 - [ ] Setup daily performance reports
 - [ ] Gradually increase position sizes based on performance
 
-### 6.3 Continuous Improvement
+### 7.3 Continuous Improvement
+
 - [ ] Implement automated model retraining pipeline
-- [ ] Add new features based on model drift analysis
-- [ ] Explore additional sentiment data sources
+- [ ] Model drift detection and alerts
 - [ ] A/B test strategy variations
 - [ ] Build model performance leaderboard

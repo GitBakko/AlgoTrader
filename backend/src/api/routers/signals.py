@@ -77,7 +77,7 @@ async def generate_test_signal(
     request: Request,
     epic: str = Query(default="XAUUSD"),
     confidence: float = Query(default=0.80, ge=0.0, le=1.0),
-    signal_class: int = Query(default=3, ge=0, le=4),
+    signal_class: int = Query(default=2, ge=0, le=2),
     manager: StrategyManager = Depends(get_strategy_manager),
 ):
     """

@@ -11,30 +11,27 @@ from pydantic import BaseModel, Field
 
 class SignalClass(IntEnum):
     """
-    ATR-relative signal classification.
-    Integer values for direct use as ML labels.
+    ATR-relative signal classification (3-class).
+    Simplified from 5 classes to concentrate probability mass
+    and produce meaningful confidence values (0.50-0.80 range).
     """
 
-    STRONG_SELL = 0
-    SELL = 1
-    HOLD = 2
-    BUY = 3
-    STRONG_BUY = 4
+    SELL = 0
+    HOLD = 1
+    BUY = 2
 
 
 SIGNAL_CLASS_NAMES = {
-    SignalClass.STRONG_SELL: "STRONG_SELL",
     SignalClass.SELL: "SELL",
     SignalClass.HOLD: "HOLD",
     SignalClass.BUY: "BUY",
-    SignalClass.STRONG_BUY: "STRONG_BUY",
 }
 
 
 class PredictionResult(BaseModel):
     """Result of a single model prediction."""
 
-    signal_class: int  # SignalClass value
+    signal_class: int = Field(ge=0, le=2)  # SignalClass value (0=SELL, 1=HOLD, 2=BUY)
     signal_name: str  # Human-readable name
     confidence: float  # Probability of predicted class
     probabilities: dict[str, float]  # Class name -> probability

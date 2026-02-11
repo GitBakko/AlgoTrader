@@ -201,6 +201,104 @@ class TestPriceAction:
         assert cp.max() <= 1.0
 
 
+class TestStochasticRSI:
+    def test_stoch_rsi_columns(self, sample_ohlcv: pl.DataFrame):
+        df = TechnicalIndicators.add_rsi(sample_ohlcv)
+        df = TechnicalIndicators.add_stochastic_rsi(df)
+        assert "stoch_rsi_k" in df.columns
+        assert "stoch_rsi_d" in df.columns
+
+    def test_stoch_rsi_range(self, sample_ohlcv: pl.DataFrame):
+        df = TechnicalIndicators.add_rsi(sample_ohlcv)
+        df = TechnicalIndicators.add_stochastic_rsi(df)
+        k = df["stoch_rsi_k"].drop_nulls()
+        assert k.min() >= -0.01  # Allow small float imprecision
+        assert k.max() <= 1.01
+
+    def test_stoch_rsi_auto_adds_rsi(self, sample_ohlcv: pl.DataFrame):
+        """StochRSI should auto-add RSI if missing."""
+        df = TechnicalIndicators.add_stochastic_rsi(sample_ohlcv)
+        assert "rsi_14" in df.columns
+        assert "stoch_rsi_k" in df.columns
+
+
+class TestBollingerSqueeze:
+    def test_squeeze_columns(self, sample_ohlcv: pl.DataFrame):
+        df = TechnicalIndicators.add_bollinger_bands(sample_ohlcv)
+        df = TechnicalIndicators.add_bollinger_squeeze(df)
+        assert "bb_squeeze" in df.columns
+        assert "bb_squeeze_duration" in df.columns
+
+    def test_squeeze_binary(self, sample_ohlcv: pl.DataFrame):
+        df = TechnicalIndicators.add_bollinger_bands(sample_ohlcv)
+        df = TechnicalIndicators.add_bollinger_squeeze(df)
+        unique = set(df["bb_squeeze"].to_list())
+        assert unique.issubset({0, 1})
+
+    def test_squeeze_duration_non_negative(self, sample_ohlcv: pl.DataFrame):
+        df = TechnicalIndicators.add_bollinger_bands(sample_ohlcv)
+        df = TechnicalIndicators.add_bollinger_squeeze(df)
+        assert df["bb_squeeze_duration"].min() >= 0
+
+
+class TestRSIDivergence:
+    def test_divergence_column(self, sample_ohlcv: pl.DataFrame):
+        df = TechnicalIndicators.add_rsi(sample_ohlcv)
+        df = TechnicalIndicators.add_rsi_divergence(df)
+        assert "rsi_divergence" in df.columns
+
+    def test_divergence_values(self, sample_ohlcv: pl.DataFrame):
+        df = TechnicalIndicators.add_rsi(sample_ohlcv)
+        df = TechnicalIndicators.add_rsi_divergence(df)
+        unique = set(df["rsi_divergence"].drop_nulls().to_list())
+        assert unique.issubset({-1, 0, 1})
+
+    def test_no_temp_columns(self, sample_ohlcv: pl.DataFrame):
+        df = TechnicalIndicators.add_rsi(sample_ohlcv)
+        df = TechnicalIndicators.add_rsi_divergence(df)
+        temp = [c for c in df.columns if c.startswith("_")]
+        assert len(temp) == 0
+
+
+class TestVWAP:
+    def test_vwap_columns(self, sample_ohlcv: pl.DataFrame):
+        df = TechnicalIndicators.add_vwap(sample_ohlcv)
+        assert "vwap" in df.columns
+        assert "vwap_distance" in df.columns
+
+    def test_vwap_positive(self, sample_ohlcv: pl.DataFrame):
+        df = TechnicalIndicators.add_vwap(sample_ohlcv)
+        assert df["vwap"].drop_nulls().min() > 0
+
+    def test_vwap_skips_without_volume(self):
+        df = pl.DataFrame({
+            "open": [100.0], "high": [101.0], "low": [99.0], "close": [100.5],
+        })
+        result = TechnicalIndicators.add_vwap(df)
+        assert "vwap" not in result.columns
+
+
+class TestSessionFeatures:
+    def test_session_columns(self, sample_ohlcv: pl.DataFrame):
+        df = TechnicalIndicators.add_session_features(sample_ohlcv)
+        assert "hour_sin" in df.columns
+        assert "hour_cos" in df.columns
+        assert "dow_sin" in df.columns
+        assert "dow_cos" in df.columns
+
+    def test_cyclical_range(self, sample_ohlcv: pl.DataFrame):
+        df = TechnicalIndicators.add_session_features(sample_ohlcv)
+        for col in ["hour_sin", "hour_cos", "dow_sin", "dow_cos"]:
+            vals = df[col].drop_nulls()
+            assert vals.min() >= -1.01
+            assert vals.max() <= 1.01
+
+    def test_no_timestamp_skips(self):
+        df = pl.DataFrame({"close": [100.0, 101.0]})
+        result = TechnicalIndicators.add_session_features(df)
+        assert "hour_sin" not in result.columns
+
+
 class TestAddAllIndicators:
     def test_all_indicators(self, sample_ohlcv: pl.DataFrame):
         df = TechnicalIndicators.add_all_indicators(sample_ohlcv)
@@ -209,13 +307,22 @@ class TestAddAllIndicators:
             "macd", "macd_signal", "macd_histogram",
             "rsi_14",
             "bb_upper", "bb_lower", "bb_middle",
+            "stoch_rsi_k", "stoch_rsi_d",
+            "bb_squeeze", "bb_squeeze_duration",
+            "rsi_divergence",
             "atr_14", "atr_ratio",
             "adx", "plus_di", "minus_di",
             "returns_1", "returns_5", "returns_20",
             "high_low_range", "close_position",
+            "hour_sin", "hour_cos", "dow_sin", "dow_cos",
         ]
         for col in expected_cols:
             assert col in df.columns, f"Missing column: {col}"
+
+    def test_all_indicators_includes_vwap(self, sample_ohlcv: pl.DataFrame):
+        df = TechnicalIndicators.add_all_indicators(sample_ohlcv)
+        assert "vwap" in df.columns
+        assert "vwap_distance" in df.columns
 
     def test_no_temp_columns(self, sample_ohlcv: pl.DataFrame):
         df = TechnicalIndicators.add_all_indicators(sample_ohlcv)

@@ -11,6 +11,7 @@ from loguru import logger
 from src.data.data_access import DataAccessLayer
 from src.features.builder import FeatureBuilder
 from src.features.technical import TechnicalIndicators
+from src.models.calibration import ConfidenceCalibrator
 from src.models.schemas import ModelMetadata, PredictionResult, SignalClass
 from src.models.versioning import ModelVersioning
 from src.models.xgboost_model import XGBoostClassifier
@@ -34,6 +35,7 @@ class PredictionService:
         self.versioning = model_versioning
         self.data_access = data_access
         self._loaded_models: dict[str, tuple[XGBoostClassifier, ModelMetadata]] = {}
+        self._calibrators: dict[str, ConfidenceCalibrator] = {}
         self._last_candles_cache: dict[str, tuple[str, object]] = {}  # (cache_key, df)
 
     def load_models(self) -> int:
@@ -55,6 +57,19 @@ class PredictionService:
                     XGBoostClassifier, epic, latest.model_id
                 )
                 self._loaded_models[epic] = (model, meta)
+
+                # Load calibrator if available
+                model_dir = self.versioning.base_dir / epic / latest.model_id
+                cal_dir = model_dir / "calibration"
+                if cal_dir.exists():
+                    try:
+                        calibrator = ConfidenceCalibrator()
+                        calibrator.load(cal_dir)
+                        self._calibrators[epic] = calibrator
+                        logger.info(f"Loaded calibrator for {epic}")
+                    except Exception as ce:
+                        logger.warning(f"Failed to load calibrator for {epic}: {ce}")
+
                 loaded += 1
                 logger.info(f"Loaded model for {epic}: {latest.model_id}")
             except Exception as e:
@@ -80,19 +95,36 @@ class PredictionService:
 
         model, meta = self._loaded_models[epic]
 
-        # Need enough bars for feature calculation (indicators need lookback)
-        df = self.data_access.get_candles(epic, timeframe, limit=300)
-        if df.is_empty() or len(df) < 50:
-            logger.warning(f"Insufficient data for {epic}/{timeframe}: {len(df)} bars")
+        # Check if model was trained with multi-TF features
+        has_multi_tf = any(
+            f.startswith("4h_") or f.startswith("1d_")
+            for f in (meta.feature_names or [])
+        )
+
+        # Build features (multi-TF uses build_features with data_access)
+        if has_multi_tf and self.data_access is not None:
+            df_features, matrix = self.feature_builder.build_features(
+                epic=epic, timeframe=timeframe,
+                normalize=True, include_regime=True, multi_timeframe=True,
+            )
+        else:
+            df = self.data_access.get_candles(epic, timeframe, limit=300)
+            if df.is_empty() or len(df) < 50:
+                logger.warning(f"Insufficient data for {epic}/{timeframe}: {len(df)} bars")
+                return None
+            self._last_candles_cache[epic] = (timeframe, df)
+            df_features, matrix = self.feature_builder.build_features_from_df(
+                df, epic, timeframe, normalize=True, include_regime=True,
+            )
+
+        if df_features.is_empty() or len(df_features) < 1:
+            logger.warning(f"No data for {epic}/{timeframe}")
             return None
 
-        # Cache candles so get_market_data() can reuse without re-querying
-        self._last_candles_cache[epic] = (timeframe, df)
-
-        # Build features from loaded data
-        df_features, matrix = self.feature_builder.build_features_from_df(
-            df, epic, timeframe, normalize=True, include_regime=True
-        )
+        # Cache for get_market_data reuse
+        if "timestamp" not in self._last_candles_cache.get(epic, ("", None))[0]:
+            df_cache = self.data_access.get_candles(epic, timeframe, limit=30)
+            self._last_candles_cache[epic] = (timeframe, df_cache)
 
         if matrix.num_features == 0:
             logger.warning(f"No features built for {epic}/{timeframe}")
@@ -118,16 +150,22 @@ class PredictionService:
 
         # Run inference
         try:
-            proba = model.predict_proba(X)[0]
-            predicted_class = int(np.argmax(proba))
-            confidence = float(proba[predicted_class])
+            proba = model.predict_proba(X)
+
+            # Apply confidence calibration if available
+            if epic in self._calibrators:
+                proba = self._calibrators[epic].transform(proba)
+
+            proba_row = proba[0]
+            predicted_class = int(np.argmax(proba_row))
+            confidence = float(proba_row[predicted_class])
 
             return PredictionResult(
                 signal_class=predicted_class,
                 signal_name=SignalClass(predicted_class).name,
                 confidence=confidence,
                 probabilities={
-                    SignalClass(i).name: float(p) for i, p in enumerate(proba)
+                    SignalClass(i).name: float(p) for i, p in enumerate(proba_row)
                 },
                 timestamp=datetime.now(timezone.utc),
             )

@@ -11,13 +11,11 @@ from src.strategy.regime_adapter import RegimeAdapter
 from src.strategy.schemas import SignalDirection, StrategyConfig, TradingSignal
 
 
-# Map SignalClass to direction
+# Map SignalClass to direction (direct 1:1 mapping with 3-class system)
 _SIGNAL_TO_DIRECTION: dict[int, SignalDirection] = {
-    SignalClass.STRONG_BUY: SignalDirection.BUY,
     SignalClass.BUY: SignalDirection.BUY,
     SignalClass.HOLD: SignalDirection.HOLD,
     SignalClass.SELL: SignalDirection.SELL,
-    SignalClass.STRONG_SELL: SignalDirection.SELL,
 }
 
 

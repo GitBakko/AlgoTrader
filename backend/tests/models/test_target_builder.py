@@ -41,11 +41,11 @@ class TestTargetBuilder:
         assert len(non_null) == len(sample_df) - 6
 
     def test_uptrend_produces_buy_signals(self):
-        """Steady uptrend with small ATR should produce BUY/STRONG_BUY."""
+        """Steady uptrend with small ATR should produce BUY."""
         n = 50
         # Each bar gains 2.0, ATR = 1.0, horizon = 5
         # Future change = 5 * 2.0 = 10.0, ATR-relative = 10.0 / 1.0 = 10.0
-        # Should be STRONG_BUY (>1.5)
+        # Should be BUY (>0.5)
         close = [100.0 + i * 2.0 for i in range(n)]
         atr = [1.0] * n
 
@@ -54,9 +54,8 @@ class TestTargetBuilder:
         result = builder.build_targets(df)
 
         valid = result.filter(pl.col("target").is_not_null())
-        # Most should be STRONG_BUY
-        strong_buys = valid.filter(pl.col("target") == SignalClass.STRONG_BUY)
-        assert len(strong_buys) > len(valid) * 0.8
+        buys = valid.filter(pl.col("target") == SignalClass.BUY)
+        assert len(buys) > len(valid) * 0.8
 
     def test_flat_market_produces_hold(self):
         """Flat market should produce HOLD signals."""
@@ -72,6 +71,20 @@ class TestTargetBuilder:
         holds = valid.filter(pl.col("target") == SignalClass.HOLD)
         assert len(holds) == len(valid)  # All should be HOLD
 
+    def test_downtrend_produces_sell_signals(self):
+        """Steady downtrend should produce SELL."""
+        n = 50
+        close = [200.0 - i * 2.0 for i in range(n)]
+        atr = [1.0] * n
+
+        df = pl.DataFrame({"close": close, "atr_14": atr})
+        builder = TargetBuilder(horizon_bars=5)
+        result = builder.build_targets(df)
+
+        valid = result.filter(pl.col("target").is_not_null())
+        sells = valid.filter(pl.col("target") == SignalClass.SELL)
+        assert len(sells) > len(valid) * 0.8
+
     def test_missing_atr_raises(self):
         df = pl.DataFrame({"close": [100.0, 101.0]})
         builder = TargetBuilder()
@@ -84,3 +97,11 @@ class TestTargetBuilder:
         dist = builder.get_class_distribution(result)
         assert isinstance(dist, dict)
         assert sum(dist.values()) == len(sample_df) - 6
+
+    def test_three_classes_only(self, sample_df: pl.DataFrame):
+        """Verify only 3 classes are produced (SELL=0, HOLD=1, BUY=2)."""
+        builder = TargetBuilder(horizon_bars=6)
+        result = builder.build_targets(sample_df)
+        valid = result.filter(pl.col("target").is_not_null())
+        unique_targets = set(valid["target"].unique().to_list())
+        assert unique_targets.issubset({0, 1, 2})

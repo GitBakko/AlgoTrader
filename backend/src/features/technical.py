@@ -446,6 +446,247 @@ class TechnicalIndicators:
 
         return df
 
+    # ===== Advanced Indicators =====
+
+    @staticmethod
+    def add_stochastic_rsi(
+        df: pl.DataFrame,
+        rsi_period: int = 14,
+        stoch_period: int = 14,
+        smooth_k: int = 3,
+        smooth_d: int = 3,
+    ) -> pl.DataFrame:
+        """
+        Add Stochastic RSI (StochRSI).
+
+        Applies stochastic oscillator formula to RSI values.
+        More sensitive to overbought/oversold than standard RSI.
+
+        Adds columns: stoch_rsi_k, stoch_rsi_d
+        """
+        rsi_col = f"rsi_{rsi_period}"
+
+        # Ensure RSI exists
+        if rsi_col not in df.columns:
+            df = TechnicalIndicators.add_rsi(df, period=rsi_period)
+
+        # StochRSI = (RSI - RSI_min) / (RSI_max - RSI_min)
+        df = df.with_columns(
+            [
+                pl.col(rsi_col).rolling_min(window_size=stoch_period).alias("_rsi_min"),
+                pl.col(rsi_col).rolling_max(window_size=stoch_period).alias("_rsi_max"),
+            ]
+        )
+
+        df = df.with_columns(
+            (
+                (pl.col(rsi_col) - pl.col("_rsi_min"))
+                / (pl.col("_rsi_max") - pl.col("_rsi_min"))
+            )
+            .fill_nan(0.5)
+            .alias("_stoch_rsi_raw")
+        )
+
+        # %K = SMA of raw StochRSI
+        df = df.with_columns(
+            pl.col("_stoch_rsi_raw")
+            .rolling_mean(window_size=smooth_k)
+            .alias("stoch_rsi_k")
+        )
+
+        # %D = SMA of %K
+        df = df.with_columns(
+            pl.col("stoch_rsi_k")
+            .rolling_mean(window_size=smooth_d)
+            .alias("stoch_rsi_d")
+        )
+
+        df = df.drop(["_rsi_min", "_rsi_max", "_stoch_rsi_raw"])
+
+        return df
+
+    @staticmethod
+    def add_bollinger_squeeze(
+        df: pl.DataFrame,
+        bb_period: int = 20,
+        squeeze_threshold: float = 0.03,
+    ) -> pl.DataFrame:
+        """
+        Detect Bollinger Band squeeze (low volatility -> pending breakout).
+
+        Squeeze = bb_width < threshold (bandwidth contracting).
+        Adds columns: bb_squeeze (1=squeeze, 0=normal), bb_squeeze_duration
+        """
+        if "bb_width" not in df.columns:
+            df = TechnicalIndicators.add_bollinger_bands(df, period=bb_period)
+
+        # Squeeze detection
+        df = df.with_columns(
+            pl.when(pl.col("bb_width") < squeeze_threshold)
+            .then(1)
+            .otherwise(0)
+            .alias("bb_squeeze")
+        )
+
+        # Squeeze duration (consecutive bars in squeeze)
+        squeeze_vals = df["bb_squeeze"].to_numpy()
+        duration = np.zeros(len(squeeze_vals), dtype=np.int32)
+        count = 0
+        for i in range(len(squeeze_vals)):
+            if squeeze_vals[i] == 1:
+                count += 1
+            else:
+                count = 0
+            duration[i] = count
+
+        df = df.with_columns(
+            pl.Series("bb_squeeze_duration", duration)
+        )
+
+        return df
+
+    @staticmethod
+    def add_rsi_divergence(
+        df: pl.DataFrame,
+        lookback: int = 14,
+        rsi_period: int = 14,
+    ) -> pl.DataFrame:
+        """
+        Detect RSI divergence (price vs RSI disagreement).
+
+        Bullish divergence: price makes lower low but RSI makes higher low
+        Bearish divergence: price makes higher high but RSI makes lower high
+
+        Adds column: rsi_divergence (+1=bullish, -1=bearish, 0=none)
+        """
+        rsi_col = f"rsi_{rsi_period}"
+        if rsi_col not in df.columns:
+            df = TechnicalIndicators.add_rsi(df, period=rsi_period)
+
+        # Rolling min/max over lookback period
+        df = df.with_columns(
+            [
+                pl.col("close").rolling_min(window_size=lookback).alias("_price_min"),
+                pl.col("close").rolling_max(window_size=lookback).alias("_price_max"),
+                pl.col(rsi_col).rolling_min(window_size=lookback).alias("_rsi_min"),
+                pl.col(rsi_col).rolling_max(window_size=lookback).alias("_rsi_max"),
+            ]
+        )
+
+        # Price change and RSI change vs their lookback min/max
+        df = df.with_columns(
+            [
+                (pl.col("close") - pl.col("_price_min")).alias("_price_vs_min"),
+                (pl.col("close") - pl.col("_price_max")).alias("_price_vs_max"),
+                (pl.col(rsi_col) - pl.col("_rsi_min")).alias("_rsi_vs_min"),
+                (pl.col(rsi_col) - pl.col("_rsi_max")).alias("_rsi_vs_max"),
+            ]
+        )
+
+        # Bullish: price near recent low but RSI rising (not at its low)
+        # Bearish: price near recent high but RSI falling (not at its high)
+        df = df.with_columns(
+            pl.when(
+                (pl.col("_price_vs_min") < pl.col("_price_vs_max").abs() * 0.1)
+                & (pl.col("_rsi_vs_min") > 5.0)
+            )
+            .then(1)
+            .when(
+                (pl.col("_price_vs_max").abs() < pl.col("_price_vs_min") * 0.1)
+                & (pl.col("_rsi_vs_max").abs() > 5.0)
+            )
+            .then(-1)
+            .otherwise(0)
+            .alias("rsi_divergence")
+        )
+
+        temp_cols = [
+            c for c in df.columns
+            if c.startswith("_price_vs") or c.startswith("_rsi_v")
+            or c in ("_price_min", "_price_max", "_rsi_min", "_rsi_max")
+        ]
+        df = df.drop(temp_cols)
+
+        return df
+
+    @staticmethod
+    def add_vwap(df: pl.DataFrame) -> pl.DataFrame:
+        """
+        Add VWAP (Volume Weighted Average Price).
+
+        Adds columns: vwap, vwap_distance (% distance from close to VWAP)
+        """
+        if "volume" not in df.columns:
+            return df
+
+        has_volume = df["volume"].null_count() < len(df) and df["volume"].sum() > 0
+        if not has_volume:
+            return df
+
+        # Typical price
+        df = df.with_columns(
+            ((pl.col("high") + pl.col("low") + pl.col("close")) / 3.0).alias("_tp")
+        )
+
+        # Cumulative VWAP
+        df = df.with_columns(
+            [
+                (pl.col("_tp") * pl.col("volume")).cum_sum().alias("_tp_vol_sum"),
+                pl.col("volume").cum_sum().alias("_vol_sum"),
+            ]
+        )
+
+        df = df.with_columns(
+            (pl.col("_tp_vol_sum") / pl.col("_vol_sum"))
+            .fill_nan(pl.col("close"))
+            .alias("vwap")
+        )
+
+        # Distance from VWAP (normalized)
+        df = df.with_columns(
+            ((pl.col("close") - pl.col("vwap")) / pl.col("vwap"))
+            .fill_nan(0.0)
+            .alias("vwap_distance")
+        )
+
+        df = df.drop(["_tp", "_tp_vol_sum", "_vol_sum"])
+
+        return df
+
+    @staticmethod
+    def add_session_features(df: pl.DataFrame) -> pl.DataFrame:
+        """
+        Add time-based session features using cyclical encoding.
+
+        Uses sin/cos encoding for hour and day-of-week to capture
+        cyclical patterns (23:00 is close to 00:00).
+
+        Adds columns: hour_sin, hour_cos, dow_sin, dow_cos
+        """
+        if "timestamp" not in df.columns:
+            return df
+
+        df = df.with_columns(
+            [
+                pl.col("timestamp").dt.hour().alias("_hour"),
+                pl.col("timestamp").dt.weekday().alias("_dow"),
+            ]
+        )
+
+        # Cyclical encoding: sin/cos transform
+        df = df.with_columns(
+            [
+                (2 * np.pi * pl.col("_hour") / 24.0).sin().alias("hour_sin"),
+                (2 * np.pi * pl.col("_hour") / 24.0).cos().alias("hour_cos"),
+                (2 * np.pi * pl.col("_dow") / 7.0).sin().alias("dow_sin"),
+                (2 * np.pi * pl.col("_dow") / 7.0).cos().alias("dow_cos"),
+            ]
+        )
+
+        df = df.drop(["_hour", "_dow"])
+
+        return df
+
     # ===== Convenience Methods =====
 
     @staticmethod
@@ -489,6 +730,11 @@ class TechnicalIndicators:
         df = ti.add_rsi(df, period=rsi_period)
         df = ti.add_bollinger_bands(df, period=bb_period)
 
+        # Advanced mean reversion
+        df = ti.add_stochastic_rsi(df, rsi_period=rsi_period)
+        df = ti.add_bollinger_squeeze(df, bb_period=bb_period)
+        df = ti.add_rsi_divergence(df, rsi_period=rsi_period)
+
         # Volatility
         df = ti.add_atr(df, period=atr_period)
         df = ti.add_historical_volatility(df, period=hvol_period)
@@ -499,9 +745,13 @@ class TechnicalIndicators:
             if has_volume:
                 df = ti.add_obv(df)
                 df = ti.add_volume_sma_ratio(df)
+                df = ti.add_vwap(df)
 
         # Price action
         df = ti.add_returns(df, periods=return_periods)
         df = ti.add_price_action(df)
+
+        # Session features
+        df = ti.add_session_features(df)
 
         return df

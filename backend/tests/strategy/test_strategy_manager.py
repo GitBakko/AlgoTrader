@@ -12,7 +12,7 @@ def _make_prediction(signal_class=SignalClass.BUY, confidence=0.80) -> Predictio
         signal_class=signal_class,
         signal_name=SignalClass(signal_class).name,
         confidence=confidence,
-        probabilities={"STRONG_SELL": 0.05, "SELL": 0.05, "HOLD": 0.10, "BUY": confidence, "STRONG_BUY": 0.0},
+        probabilities={"SELL": 0.10, "HOLD": 0.10, "BUY": confidence},
     )
 
 

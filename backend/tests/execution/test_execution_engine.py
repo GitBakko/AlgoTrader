@@ -18,7 +18,7 @@ def _make_signal(epic="XAUUSD", direction=SignalDirection.BUY, price=2000.0) -> 
         epic=epic,
         direction=direction,
         confidence=0.80,
-        signal_class=3,
+        signal_class=2,
         entry_price=price,
     )
 

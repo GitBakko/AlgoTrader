@@ -14,6 +14,7 @@ from loguru import logger
 
 from src.features.builder import FeatureBuilder
 from src.models.base_model import BaseMLModel
+from src.models.calibration import ConfidenceCalibrator
 from src.models.evaluator import ModelEvaluator
 from src.models.schemas import FoldResult, ModelMetadata, TrainingResult
 from src.models.target_builder import TargetBuilder
@@ -53,6 +54,7 @@ class ModelTrainer:
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         save_best: bool = True,
+        multi_timeframe: bool = False,
     ) -> TrainingResult:
         """
         Run the full training pipeline.
@@ -64,6 +66,7 @@ class ModelTrainer:
             start_date: Training data start
             end_date: Training data end
             save_best: Save the best model to disk
+            multi_timeframe: Include higher-timeframe features (4h, 1d)
 
         Returns:
             TrainingResult with all fold metrics
@@ -71,7 +74,7 @@ class ModelTrainer:
         start_time = time.time()
 
         # Step 1: Build features
-        logger.info(f"Building features for {epic}/{timeframe}...")
+        logger.info(f"Building features for {epic}/{timeframe} (multi_tf={multi_timeframe})...")
         df, feature_meta = self.feature_builder.build_features(
             epic=epic,
             timeframe=timeframe,
@@ -79,6 +82,7 @@ class ModelTrainer:
             end_date=end_date,
             normalize=True,
             include_regime=True,
+            multi_timeframe=multi_timeframe,
         )
 
         if df.is_empty():
@@ -274,6 +278,24 @@ class ModelTrainer:
             model.load(best_model_path)
             logger.info(f"Restored best model from fold {best_fold_idx} (F1={best_val_f1:.4f})")
 
+        # Fit confidence calibrator on last fold's validation set
+        calibrator = None
+        last_split = list(self.splitter.split(n_samples))[-1]
+        X_cal = X[last_split.val_indices]
+        y_cal = y[last_split.val_indices]
+        if len(X_cal) >= 30:
+            try:
+                cal_proba = model.predict_proba(X_cal)
+                calibrator = ConfidenceCalibrator(n_classes=len(np.unique(y)))
+                cal_stats = calibrator.fit(y_cal, cal_proba)
+                logger.info(
+                    f"Confidence calibration: ECE {cal_stats['ece_before']:.4f} -> "
+                    f"{cal_stats['ece_after']:.4f}"
+                )
+            except Exception as e:
+                logger.warning(f"Calibration fitting failed: {e}")
+                calibrator = None
+
         # Aggregate metrics
         avg_val = self._average_metrics([f.val_metrics for f in fold_results])
         avg_test = self._average_metrics([f.test_metrics for f in fold_results])
@@ -299,7 +321,7 @@ class ModelTrainer:
             else {},
         )
 
-        # Save best model
+        # Save best model + calibrator
         if save_best:
             model_id = ModelVersioning.generate_model_id(model.model_type, epic)
             metadata = ModelMetadata(
@@ -312,7 +334,10 @@ class ModelTrainer:
                 hyperparameters=result.hyperparameters,
                 training_result=result,
             )
-            self.versioning.save_model(model, metadata)
+            save_path = self.versioning.save_model(model, metadata)
+            if calibrator is not None and save_path is not None:
+                calibrator.save(save_path / "calibration")
+                logger.info(f"Saved calibrator to {save_path / 'calibration'}")
 
         return result
 

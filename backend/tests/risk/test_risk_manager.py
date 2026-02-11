@@ -14,7 +14,7 @@ def _make_signal(
         epic=epic,
         direction=direction,
         confidence=confidence,
-        signal_class=3,
+        signal_class=2,
         entry_price=price,
     )
 

@@ -105,6 +105,7 @@ def train_asset(
             epic=epic,
             timeframe=timeframe,
             save_best=True,
+            multi_timeframe=True,
         )
 
         # Print results
