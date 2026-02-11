@@ -62,8 +62,8 @@ class EventBus:
         if self._redis:
             try:
                 await self._redis.aclose()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Redis close error (ignored): {e}")
             self._redis = None
             logger.info("Redis EventBus closed")
 

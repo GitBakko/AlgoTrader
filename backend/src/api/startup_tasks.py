@@ -33,8 +33,8 @@ async def initial_data_download(app_state) -> None:
         if not df.is_empty():
             logger.info(f"Historical data exists ({len(df)} recent candles), skipping download")
             return
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Data existence check failed, proceeding to download: {e}")
 
     # No data found - download
     logger.info("No historical data found, starting initial download...")

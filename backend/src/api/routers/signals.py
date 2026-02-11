@@ -236,8 +236,8 @@ async def predict_and_execute(
     if event_bus:
         try:
             await event_bus.publish(f"signal:{epic}", response_data)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Event publish failed for signal:{epic}: {e}")
 
     # Store in signal history
     history: list = request.app.state.signal_history

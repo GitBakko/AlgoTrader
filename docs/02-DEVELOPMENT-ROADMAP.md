@@ -250,10 +250,13 @@
 - [x] Updated integration tests for graceful degradation
 - [x] 415 total tests passing
 
-**Remaining (operational — not code):**
+**Operational Steps (completed manually):**
 
-- [ ] Download historical data from Capital.com demo
-- [ ] Train XGBoost models per asset
+- [x] Download historical data from Capital.com demo (53,890 candles, 3 assets x 3 TF)
+- [x] Fix epic mapping (XAUUSD→GOLD) and bid/ask price parsing
+- [x] Fix walk-forward window scaling for hourly data (x24)
+- [x] Train XGBoost models per asset (baseline F1 ~0.20-0.24)
+- [x] Test paper trading loop end-to-end (backend starts, loads 3 models, runs predictions)
 - [ ] Run paper trading for minimum 2 weeks per asset
 - [ ] Compare paper results with backtest predictions
 - [ ] Frontend E2E tests (Cypress or Playwright)
