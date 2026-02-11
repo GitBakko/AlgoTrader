@@ -3,6 +3,7 @@ Unified data access layer.
 Single interface for querying historical + real-time OHLC data.
 """
 
+import time
 from datetime import datetime
 
 import polars as pl
@@ -18,16 +19,20 @@ class DataAccessLayer:
     - Queries Parquet files via ParquetStorageManager
     - Runs analytical queries via DuckDB
     - Merges historical + real-time data seamlessly
+    - Caches recent queries to avoid redundant disk I/O
     """
 
     def __init__(
         self,
         storage: ParquetStorageManager | None = None,
         duckdb: DuckDBInterface | None = None,
+        cache_ttl: float = 300.0,
     ):
         self.storage = storage or ParquetStorageManager()
         self.duckdb = duckdb or DuckDBInterface()
         self._views_created = False
+        self._cache: dict[str, tuple[float, pl.DataFrame]] = {}
+        self._cache_ttl = cache_ttl
 
     def get_candles(
         self,
@@ -40,6 +45,10 @@ class DataAccessLayer:
         """
         Get OHLC candles for an asset/timeframe.
 
+        Uses an in-memory TTL cache to avoid redundant Parquet reads.
+        Cache stores full results (without limit), so different limit
+        values still get cache hits.
+
         Args:
             epic: Asset epic (XAUUSD, BTCUSD, US500)
             timeframe: Timeframe (1min, 5min, 15min, 1h, 4h, 1d)
@@ -50,6 +59,18 @@ class DataAccessLayer:
         Returns:
             Polars DataFrame sorted by timestamp ascending
         """
+        cache_key = f"{epic}|{timeframe}|{start_date}|{end_date}"
+        now = time.monotonic()
+
+        cached = self._cache.get(cache_key)
+        if cached is not None:
+            cached_time, cached_df = cached
+            if now - cached_time < self._cache_ttl:
+                df = cached_df
+                if limit and len(df) > limit:
+                    df = df.tail(limit)
+                return df
+
         df = self.storage.read_candles(
             epic=epic,
             timeframe=timeframe,
@@ -57,10 +78,27 @@ class DataAccessLayer:
             end_date=end_date,
         )
 
+        self._cache[cache_key] = (now, df)
+
         if limit and len(df) > limit:
             df = df.tail(limit)
 
         return df
+
+    def invalidate_cache(self, epic: str | None = None) -> None:
+        """
+        Invalidate cached data.
+
+        Args:
+            epic: If specified, only invalidate cache for this asset.
+                  If None, clear all cache.
+        """
+        if epic is None:
+            self._cache.clear()
+        else:
+            keys_to_remove = [k for k in self._cache if k.startswith(f"{epic}|")]
+            for k in keys_to_remove:
+                del self._cache[k]
 
     def get_latest_candles(
         self,

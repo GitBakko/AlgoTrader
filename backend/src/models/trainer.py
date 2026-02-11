@@ -3,6 +3,7 @@ Model training orchestrator.
 Coordinates feature building, target generation, walk-forward training, and evaluation.
 """
 
+import shutil
 import tempfile
 import time
 from datetime import datetime
@@ -208,6 +209,7 @@ class ModelTrainer:
         best_val_f1 = -1.0
         best_fold_idx = 0
         best_model_path: Path | None = None
+        last_split = None
 
         # Get timestamps for fold metadata
         timestamps = df_valid["timestamp"].to_list() if "timestamp" in df_valid.columns else None
@@ -216,6 +218,7 @@ class ModelTrainer:
         tmp_dir = Path(tempfile.mkdtemp(prefix="algotrader_train_"))
 
         for split in self.splitter.split(n_samples):
+            last_split = split
             logger.info(
                 f"Fold {split.fold_index}: train[{split.train_start}:{split.train_end}] "
                 f"val[{split.val_start}:{split.val_end}] "
@@ -238,12 +241,18 @@ class ModelTrainer:
             # Sequence models (LSTM) may return fewer predictions than input samples;
             # align y by trimming from the front (sequences use last element's label)
             y_val_aligned = y_val[-len(y_val_pred):]
+            assert len(y_val_aligned) == len(y_val_pred), (
+                f"Val alignment mismatch: {len(y_val_aligned)} vs {len(y_val_pred)}"
+            )
             val_metrics = self.evaluator.evaluate(y_val_aligned, y_val_pred, y_val_proba)
 
             # Evaluate on test
             y_test_pred = model.predict(X_test)
             y_test_proba = model.predict_proba(X_test)
             y_test_aligned = y_test[-len(y_test_pred):]
+            assert len(y_test_aligned) == len(y_test_pred), (
+                f"Test alignment mismatch: {len(y_test_aligned)} vs {len(y_test_pred)}"
+            )
             test_metrics = self.evaluator.evaluate(y_test_aligned, y_test_pred, y_test_proba)
 
             fold_result = FoldResult(
@@ -282,9 +291,14 @@ class ModelTrainer:
             model.load(best_model_path)
             logger.info(f"Restored best model from fold {best_fold_idx} (F1={best_val_f1:.4f})")
 
+        # Clean up temp directory
+        try:
+            shutil.rmtree(tmp_dir)
+        except OSError:
+            pass
+
         # Fit confidence calibrator on last fold's validation set
         calibrator = None
-        last_split = list(self.splitter.split(n_samples))[-1]
         X_cal = X[last_split.val_indices]
         y_cal = y[last_split.val_indices]
         if len(X_cal) >= 30:

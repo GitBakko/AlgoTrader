@@ -18,8 +18,6 @@ from loguru import logger
 from src.data.data_access import DataAccessLayer
 from src.data.storage import ParquetStorageManager
 from src.execution.execution_engine import ExecutionEngine
-from src.execution.order_manager import OrderManager
-from src.execution.position_tracker import PositionTracker
 from src.execution.schemas import ExecutionMode
 from src.features.builder import FeatureBuilder
 from src.models.prediction_service import PredictionService

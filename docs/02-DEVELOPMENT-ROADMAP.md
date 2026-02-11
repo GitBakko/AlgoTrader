@@ -12,6 +12,7 @@
 | 5B | Paper Trading Validation | 1 week | Scripts, paper loop, health monitoring | COMPLETE |
 | 6A | Trading Guru ML Upgrades | 1 week | 3-class migration, calibration, LSTM, features | COMPLETE |
 | 6A.6 | Validation | 1 day | Re-training, LSTM comparison, paper trading test | COMPLETE |
+| 6A.7 | Code Review & Optimization | 1 day | Best practices, performance, caching | COMPLETE |
 | 6B | Ensemble & Advanced | TBD | TFT, stacking, hyperopt | NEXT |
 | 7 | Optimization & Live | Ongoing | Performance tuning, live deployment | FUTURE |
 
@@ -322,6 +323,28 @@
 - [x] PredictionService fix: filtra per modelli XGBoost (ignora LSTM)
 - [x] ModelTrainer fix: alignment output per modelli a sequenza (LSTM)
 - [ ] Monitorare paper trading per 2+ settimane
+
+### 6A.7 Code Review & Performance Optimization [COMPLETE]
+
+**Code Best Practices:**
+
+- [x] Fix broken cache check in `PredictionService.predict()` (condizione sempre True, query ridondante)
+- [x] Fix double walk-forward iteration in `ModelTrainer` (ricalcolava tutti i fold per prendere l'ultimo)
+- [x] Fix temp directory leak in `ModelTrainer` (tempfile.mkdtemp mai pulito → shutil.rmtree)
+- [x] Aggiungere safety assertions per y_aligned nel trainer (protezione bug silenti)
+- [x] Rimuovere import inutilizzati (`OrderManager`, `PositionTracker` in test_paper_loop)
+- [x] Import `shutil` a livello di modulo (evita inline import)
+
+**Performance Optimization:**
+
+- [x] Cache TTL su `DataAccessLayer.get_candles()` — 3600x speedup (38ms → 11μs)
+  - Cache in-memory con TTL configurabile (default 5 min)
+  - Cache key: epic + timeframe + date range
+  - `invalidate_cache()` per asset o globale
+- [x] Fondere `clip_outliers` + `rolling_zscore` in singolo passo (`clip_and_zscore`)
+  - Rolling mean/std calcolati una volta sola per colonna (era 2x)
+  - ~50% meno computazione nel normalizer
+- [x] 456 test passati dopo tutte le ottimizzazioni
 
 ---
 

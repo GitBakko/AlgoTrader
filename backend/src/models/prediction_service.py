@@ -126,8 +126,8 @@ class PredictionService:
             logger.warning(f"No data for {epic}/{timeframe}")
             return None
 
-        # Cache for get_market_data reuse
-        if "timestamp" not in self._last_candles_cache.get(epic, ("", None))[0]:
+        # Cache for get_market_data reuse (only fetch if not already cached)
+        if epic not in self._last_candles_cache:
             df_cache = self.data_access.get_candles(epic, timeframe, limit=30)
             self._last_candles_cache[epic] = (timeframe, df_cache)
 

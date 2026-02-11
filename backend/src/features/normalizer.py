@@ -119,6 +119,60 @@ class FeatureNormalizer:
         return df
 
     @staticmethod
+    def clip_and_zscore(
+        df: pl.DataFrame,
+        columns: list[str],
+        window: int = 252,
+        min_periods: int | None = None,
+        n_sigma: float = 5.0,
+    ) -> pl.DataFrame:
+        """
+        Clip outliers and compute z-score in a single pass.
+        Computes rolling mean/std once per column instead of twice.
+
+        Args:
+            df: Input DataFrame
+            columns: Columns to process
+            window: Rolling window size
+            min_periods: Minimum observations (default: window // 2)
+            n_sigma: Clipping threshold in standard deviations
+        """
+        if min_periods is None:
+            min_periods = max(window // 2, 2)
+
+        for col in columns:
+            if col not in df.columns:
+                continue
+
+            # Compute rolling stats once
+            rm = pl.col(col).rolling_mean(window_size=window, min_periods=min_periods)
+            rs = pl.col(col).rolling_std(window_size=window, min_periods=min_periods)
+            df = df.with_columns([rm.alias("_rm"), rs.alias("_rs")])
+
+            # Clip outliers
+            df = df.with_columns(
+                pl.col(col)
+                .clip(
+                    lower_bound=pl.col("_rm") - n_sigma * pl.col("_rs"),
+                    upper_bound=pl.col("_rm") + n_sigma * pl.col("_rs"),
+                )
+                .alias(col)
+            )
+
+            # Z-score using same rolling stats
+            safe_std = pl.when(pl.col("_rs").abs() < 1e-10).then(None).otherwise(pl.col("_rs"))
+            df = df.with_columns(
+                ((pl.col(col) - pl.col("_rm")) / safe_std)
+                .fill_nan(0.0)
+                .fill_null(0.0)
+                .alias(f"{col}_zscore")
+            )
+
+            df = df.drop(["_rm", "_rs"])
+
+        return df
+
+    @staticmethod
     def normalize_features(
         df: pl.DataFrame,
         feature_columns: list[str],
@@ -131,8 +185,7 @@ class FeatureNormalizer:
 
         Pipeline:
         1. Log transform for specified columns (volume-like features)
-        2. Clip outliers (5 sigma)
-        3. Rolling z-score normalization
+        2. Clip outliers + rolling z-score (fused single-pass)
 
         Args:
             df: Input DataFrame with features
@@ -157,12 +210,8 @@ class FeatureNormalizer:
                     for c in feature_columns
                 ]
 
-        # Step 2: Clip outliers on raw features
-        clip_cols = [c for c in feature_columns if c in df.columns]
-        df = norm.clip_outliers(df, clip_cols, n_sigma=clip_sigma, window=window)
-
-        # Step 3: Rolling z-score
-        zscore_cols = [c for c in feature_columns if c in df.columns]
-        df = norm.rolling_zscore(df, zscore_cols, window=window)
+        # Step 2: Fused clip + z-score (single pass over rolling stats)
+        process_cols = [c for c in feature_columns if c in df.columns]
+        df = norm.clip_and_zscore(df, process_cols, window=window, n_sigma=clip_sigma)
 
         return df
