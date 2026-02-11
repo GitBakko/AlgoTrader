@@ -1,0 +1,118 @@
+import { Component, inject, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import {
+  CardComponent, CardBodyComponent, CardHeaderComponent,
+  ColComponent, RowComponent, ButtonDirective,
+  FormControlDirective, FormLabelDirective, BadgeComponent
+} from '@coreui/angular';
+import { TradingService } from '../../core/services/trading.service';
+import { StrategyConfig, RiskLimits } from '../../core/models';
+
+@Component({
+  selector: 'app-strategy',
+  standalone: true,
+  imports: [
+    CommonModule, FormsModule, CardComponent, CardBodyComponent, CardHeaderComponent,
+    ColComponent, RowComponent, ButtonDirective,
+    FormControlDirective, FormLabelDirective, BadgeComponent
+  ],
+  template: `
+    <c-row>
+      @for (cfg of configs; track cfg.epic) {
+        <c-col md="4">
+          <c-card class="mb-4">
+            <c-card-header>
+              <strong>{{ cfg.epic }}</strong>
+              <c-badge color="info" class="float-end">Strategy</c-badge>
+            </c-card-header>
+            <c-card-body>
+              <div class="mb-2">
+                <label cFormLabel>Min Confidence</label>
+                <input cFormControl type="number" step="0.05" [(ngModel)]="cfg.min_confidence" />
+              </div>
+              <div class="mb-2">
+                <label cFormLabel>Stop Multiplier (ATR)</label>
+                <input cFormControl type="number" step="0.1" [(ngModel)]="cfg.stop_multiplier" />
+              </div>
+              <div class="mb-2">
+                <label cFormLabel>Risk/Reward Ratio</label>
+                <input cFormControl type="number" step="0.1" [(ngModel)]="cfg.risk_reward_ratio" />
+              </div>
+              <div class="mb-2">
+                <label cFormLabel>Counter-trend Penalty</label>
+                <input cFormControl type="number" step="0.1" [(ngModel)]="cfg.counter_trend_penalty" />
+              </div>
+              <button cButton color="primary" size="sm" class="mt-2" (click)="saveConfig(cfg)">Save</button>
+            </c-card-body>
+          </c-card>
+        </c-col>
+      }
+    </c-row>
+    <c-row>
+      <c-col md="6">
+        <c-card class="mb-4">
+          <c-card-header><strong>Risk Limits</strong></c-card-header>
+          <c-card-body>
+            @if (limits) {
+              <div class="mb-2">
+                <label cFormLabel>Max Risk per Trade</label>
+                <input cFormControl type="number" step="0.01" [(ngModel)]="limits.max_risk_per_trade" />
+              </div>
+              <div class="mb-2">
+                <label cFormLabel>Max Daily Drawdown</label>
+                <input cFormControl type="number" step="0.01" [(ngModel)]="limits.max_daily_drawdown" />
+              </div>
+              <div class="mb-2">
+                <label cFormLabel>Max Total Drawdown</label>
+                <input cFormControl type="number" step="0.01" [(ngModel)]="limits.max_total_drawdown" />
+              </div>
+              <button cButton color="primary" size="sm" class="mt-2" (click)="saveLimits()">Save Limits</button>
+            }
+          </c-card-body>
+        </c-card>
+      </c-col>
+      <c-col md="6">
+        <c-card class="mb-4">
+          <c-card-header><strong>Portfolio Allocation</strong></c-card-header>
+          <c-card-body>
+            @if (allocation) {
+              @for (entry of allocationEntries; track entry[0]) {
+                <div class="d-flex justify-content-between mb-2">
+                  <span>{{ entry[0] }}</span>
+                  <strong>{{ (entry[1] * 100) | number:'1.0-0' }}%</strong>
+                </div>
+              }
+            }
+          </c-card-body>
+        </c-card>
+      </c-col>
+    </c-row>
+  `
+})
+export class StrategyComponent implements OnInit {
+  private readonly trading = inject(TradingService);
+  configs: StrategyConfig[] = [];
+  limits: RiskLimits | null = null;
+  allocation: Record<string, number> | null = null;
+  allocationEntries: [string, number][] = [];
+
+  ngOnInit(): void {
+    this.trading.getStrategyConfig().subscribe(data => this.configs = data);
+    this.trading.getRiskLimits().subscribe(data => this.limits = data);
+    this.trading.getAllocation().subscribe(data => {
+      this.allocation = data.weights;
+      this.allocationEntries = Object.entries(data.weights);
+    });
+  }
+
+  saveConfig(cfg: StrategyConfig): void {
+    this.trading.updateStrategyConfig(cfg).subscribe();
+  }
+
+  saveLimits(): void {
+    if (this.limits) {
+      this.trading.updateRiskLimits(this.limits).subscribe();
+    }
+  }
+}

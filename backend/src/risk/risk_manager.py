@@ -33,6 +33,7 @@ class RiskManager:
             limits: Risk limits (uses defaults if None)
         """
         self.limits = limits or RiskLimits()
+        self.initial_equity = initial_equity
         self.drawdown_monitor = DrawdownMonitor(initial_equity)
 
     def check_trade(

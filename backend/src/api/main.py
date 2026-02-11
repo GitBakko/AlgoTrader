@@ -11,6 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
 
+from src.api.routers import backtest, dashboard, markets, models, positions, signals, strategy, system
+from src.api.websocket import prices_endpoint, trades_endpoint
 from src.database.session import DatabaseManager
 from src.monitoring.health import HealthChecker
 from src.utils.config import get_settings
@@ -39,6 +41,12 @@ async def lifespan(app: FastAPI):
 
     # Initialize database connections
     DatabaseManager.initialize()
+
+    # Initialize trading services (paper mode by default)
+    from src.api.dependencies import init_services
+
+    init_services(app)
+    logger.info("Trading services initialized (paper mode)")
 
     # TODO: Initialize Redis connections
     # TODO: Initialize Capital.com broker client
@@ -171,13 +179,19 @@ async def root():
     }
 
 
-# TODO: Import and register API routers
-# from src.api.routes import broker, data, strategy, backtest, monitoring
-# app.include_router(broker.router, prefix="/api/broker", tags=["Broker"])
-# app.include_router(data.router, prefix="/api/data", tags=["Data"])
-# app.include_router(strategy.router, prefix="/api/strategy", tags=["Strategy"])
-# app.include_router(backtest.router, prefix="/api/backtest", tags=["Backtest"])
-# app.include_router(monitoring.router, prefix="/api/monitoring", tags=["Monitoring"])
+# ===== API Routers =====
+app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
+app.include_router(positions.router, prefix="/api/positions", tags=["Positions"])
+app.include_router(signals.router, prefix="/api/signals", tags=["Signals"])
+app.include_router(markets.router, prefix="/api/markets", tags=["Markets"])
+app.include_router(backtest.router, prefix="/api/backtest", tags=["Backtest"])
+app.include_router(strategy.router, prefix="/api/strategy", tags=["Strategy"])
+app.include_router(models.router, prefix="/api/models", tags=["Models"])
+app.include_router(system.router, prefix="/api/system", tags=["System"])
+
+# ===== WebSocket Endpoints =====
+app.websocket("/ws/prices")(prices_endpoint)
+app.websocket("/ws/trades")(trades_endpoint)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,131 @@
+<!-- KPI Cards -->
+<c-row>
+  <c-col sm="6" lg="3">
+    <c-widget-stat-f
+      class="mb-4"
+      color="primary"
+      [padding]="false"
+      [title]="'Equity'"
+      [value]="overview() ? (overview()!.equity | number:'1.2-2')! : '-'"
+    >
+      <ng-template cTemplateId="widgetIcon">
+        <svg cIcon name="cil-chart-pie" size="xl"></svg>
+      </ng-template>
+    </c-widget-stat-f>
+  </c-col>
+  <c-col sm="6" lg="3">
+    <c-widget-stat-f
+      class="mb-4"
+      [color]="overview() && overview()!.daily_pnl >= 0 ? 'success' : 'danger'"
+      [padding]="false"
+      [title]="'Daily P&L'"
+      [value]="overview() ? (overview()!.daily_pnl | number:'1.2-2')! : '-'"
+    >
+      <ng-template cTemplateId="widgetIcon">
+        <svg cIcon name="cil-arrow-thick-top" size="xl"></svg>
+      </ng-template>
+    </c-widget-stat-f>
+  </c-col>
+  <c-col sm="6" lg="3">
+    <c-widget-stat-f
+      class="mb-4"
+      color="warning"
+      [padding]="false"
+      [title]="'Open Positions'"
+      [value]="overview() ? '' + overview()!.open_positions_count : '0'"
+    >
+      <ng-template cTemplateId="widgetIcon">
+        <svg cIcon name="cil-layers" size="xl"></svg>
+      </ng-template>
+    </c-widget-stat-f>
+  </c-col>
+  <c-col sm="6" lg="3">
+    <c-widget-stat-f
+      class="mb-4"
+      [color]="overview() && overview()!.circuit_breaker_active ? 'danger' : 'info'"
+      [padding]="false"
+      [title]="'Mode'"
+      [value]="overview() ? overview()!.trading_mode : '-'"
+    >
+      <ng-template cTemplateId="widgetIcon">
+        <svg cIcon name="cil-speedometer" size="xl"></svg>
+      </ng-template>
+    </c-widget-stat-f>
+  </c-col>
+</c-row>
+
+<!-- Equity Curve Chart -->
+<c-card class="mb-4">
+  <c-card-header><strong>Equity Curve</strong></c-card-header>
+  <c-card-body>
+    @if (equityChartData.datasets) {
+      <c-chart
+        [data]="equityChartData"
+        [height]="250"
+        [options]="equityChartOptions"
+        type="line"
+      >
+        Equity curve chart
+      </c-chart>
+    } @else {
+      <p class="text-body-secondary">Loading equity data...</p>
+    }
+  </c-card-body>
+</c-card>
+
+<!-- Risk Status -->
+<c-row>
+  <c-col md="6">
+    <c-card class="mb-4">
+      <c-card-header><strong>Risk Status</strong></c-card-header>
+      <c-card-body>
+        @if (riskStatus) {
+          <div class="mb-3">
+            <div class="d-flex justify-content-between mb-1">
+              <span>Current Drawdown</span>
+              <strong>{{ (riskStatus.current_drawdown_pct * 100) | number:'1.2-2' }}%</strong>
+            </div>
+            <c-progress [value]="riskStatus.current_drawdown_pct * 100" [max]="20" color="danger" style="height: 8px;"></c-progress>
+          </div>
+          <div class="d-flex justify-content-between mb-2">
+            <span>Peak Equity</span>
+            <strong>{{ riskStatus.peak_equity | number:'1.2-2' }}</strong>
+          </div>
+          <div class="d-flex justify-content-between mb-2">
+            <span>Circuit Breaker</span>
+            <c-badge [color]="riskStatus.circuit_breaker_active ? 'danger' : 'success'">
+              {{ riskStatus.circuit_breaker_active ? 'ACTIVE' : 'OK' }}
+            </c-badge>
+          </div>
+        } @else {
+          <p class="text-body-secondary">Loading...</p>
+        }
+      </c-card-body>
+    </c-card>
+  </c-col>
+  <c-col md="6">
+    <c-card class="mb-4">
+      <c-card-header><strong>Trading Summary</strong></c-card-header>
+      <c-card-body>
+        @if (overview()) {
+          <div class="d-flex justify-content-between mb-2">
+            <span>Win Rate</span>
+            <strong>{{ (overview()!.win_rate * 100) | number:'1.0-0' }}%</strong>
+          </div>
+          <div class="d-flex justify-content-between mb-2">
+            <span>Sharpe Ratio</span>
+            <strong>{{ overview()!.sharpe_ratio | number:'1.2-2' }}</strong>
+          </div>
+          <div class="d-flex justify-content-between mb-2">
+            <span>Total P&L</span>
+            <strong [class]="overview()!.total_pnl >= 0 ? 'text-success' : 'text-danger'">
+              {{ overview()!.total_pnl | number:'1.2-2' }}
+            </strong>
+          </div>
+        } @else {
+          <p class="text-body-secondary">Loading...</p>
+        }
+      </c-card-body>
+    </c-card>
+  </c-col>
+</c-row>
