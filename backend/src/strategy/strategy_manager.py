@@ -54,8 +54,12 @@ class StrategyManager:
         Returns:
             TradingSignal with direction and suggested levels
         """
-        current_price = market_data["current_price"]
-        atr = market_data["atr"]
+        current_price = market_data.get("current_price")
+        atr = market_data.get("atr")
+        if current_price is None or atr is None:
+            raise ValueError(
+                "market_data must contain 'current_price' and 'atr' keys"
+            )
         rsi = market_data.get("rsi")
         regime = market_data.get("regime")
 

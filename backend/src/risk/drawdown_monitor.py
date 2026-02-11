@@ -35,8 +35,8 @@ class DrawdownMonitor:
 
     @property
     def state(self) -> DrawdownState:
-        """Get current drawdown state."""
-        return self._state
+        """Get current drawdown state (copy to prevent external mutation)."""
+        return self._state.model_copy()
 
     def update(self, current_equity: float) -> DrawdownState:
         """

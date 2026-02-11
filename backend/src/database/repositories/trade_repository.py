@@ -67,7 +67,9 @@ class TradeRepository(BaseRepository[Trade]):
             .where(Trade.executed_at <= end)
             .where(Trade.trade_type == "CLOSE")
         )
-        row = result.one()
+        row = result.one_or_none()
+        if row is None:
+            return {"total_pnl": 0.0, "trade_count": 0, "avg_pnl": 0.0}
         return {
             "total_pnl": float(row.total_pnl or 0),
             "trade_count": int(row.trade_count or 0),

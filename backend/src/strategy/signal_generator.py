@@ -73,6 +73,11 @@ class SignalGenerator:
         cfg = config or StrategyConfig(epic=epic)
         confidence = prediction.confidence
 
+        # 0. Validate ATR
+        if atr <= 0:
+            logger.warning(f"{epic}: Invalid ATR={atr}, returning HOLD")
+            return _make_hold_signal(epic, current_price, regime)
+
         # 1. Check minimum confidence threshold
         if confidence < cfg.min_confidence:
             logger.debug(

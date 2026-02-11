@@ -19,6 +19,8 @@ class SlippageRecord:
 class SlippageTracker:
     """Tracks slippage across all executions."""
 
+    MAX_RECORDS = 10000  # Prevent unbounded memory growth
+
     def __init__(self):
         self._records: list[SlippageRecord] = []
 
@@ -48,6 +50,9 @@ class SlippageTracker:
                 slippage=slippage,
             )
         )
+        # Trim oldest records if over limit
+        if len(self._records) > self.MAX_RECORDS:
+            self._records = self._records[-self.MAX_RECORDS:]
 
     def get_average_slippage(self, epic: str | None = None) -> float:
         """

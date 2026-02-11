@@ -57,6 +57,14 @@ class RiskManager:
         open_positions = open_positions or []
         adjustments: list[str] = []
 
+        # 0. Validate inputs
+        if atr <= 0:
+            logger.warning(f"Trade rejected: invalid ATR={atr}")
+            return RiskCheckResult(
+                approved=False,
+                rejection_reason=f"Invalid ATR value: {atr}",
+            )
+
         # 1. Check circuit breaker
         if self.drawdown_monitor.is_circuit_breaker_active():
             reason = self.drawdown_monitor.state.circuit_breaker_reason or "Circuit breaker active"
