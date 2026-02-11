@@ -28,8 +28,31 @@ from src.models.walk_forward import WalkForwardSplitter
 from src.models.xgboost_model import XGBoostClassifier
 
 
-# Walk-forward needs at least 343 bars (252 train + 5 purge + 63 val + 2 embargo + 21 test)
-MIN_BARS_REQUIRED = 343
+# Approximate hourly bars per trading day for each timeframe
+# Gold/BTC trade ~22-24h/day, S&P 500 CFDs ~16-24h; 24 is a safe average
+BARS_PER_DAY = {
+    "1h": 24,
+    "4h": 6,
+    "1d": 1,
+}
+
+
+def get_walk_forward_splitter(timeframe: str) -> WalkForwardSplitter:
+    """Create a WalkForwardSplitter with windows scaled to the timeframe.
+
+    The base windows are calibrated for daily bars (252/63/21 trading days).
+    For intraday timeframes, we scale by bars_per_day to maintain the same
+    calendar coverage (~1 year train, ~3 months val, ~1 month test).
+    """
+    scale = BARS_PER_DAY.get(timeframe, 1)
+    return WalkForwardSplitter(
+        train_window=252 * scale,
+        val_window=63 * scale,
+        test_window=21 * scale,
+        step_size=21 * scale,
+        purge_gap=5 * scale,
+        embargo=2 * scale,
+    )
 
 
 def train_asset(
@@ -54,12 +77,16 @@ def train_asset(
     last = df["timestamp"].max()
     logger.info(f"Data: {n_bars} bars ({first.date()} -> {last.date()})")
 
-    if n_bars < MIN_BARS_REQUIRED:
+    min_required = trainer.splitter.min_samples
+    if n_bars < min_required:
         logger.error(
-            f"Insufficient data: {n_bars} bars, need at least {MIN_BARS_REQUIRED}. "
+            f"Insufficient data: {n_bars} bars, need at least {min_required}. "
             f"Download more historical data."
         )
         return False
+
+    n_folds = trainer.splitter.get_n_splits(n_bars)
+    logger.info(f"Walk-forward: {n_folds} folds (train={trainer.splitter.train_window} bars)")
 
     # Create a fresh model instance for each asset
     model = XGBoostClassifier(
@@ -132,7 +159,9 @@ def main(args: argparse.Namespace) -> None:
     data_access = DataAccessLayer(storage=storage)
     feature_builder = FeatureBuilder(data_access=data_access)
     versioning = ModelVersioning()
-    splitter = WalkForwardSplitter()
+    splitter = get_walk_forward_splitter(timeframe)
+
+    logger.info(f"Walk-forward config: {splitter.describe(0)}")
 
     trainer = ModelTrainer(
         feature_builder=feature_builder,
