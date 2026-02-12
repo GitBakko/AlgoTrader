@@ -13,7 +13,8 @@ from src.backtest.schemas import BacktestTrade
 class MetricsCalculator:
     """
     Calculates performance metrics from backtest results.
-    All ratios are annualized assuming 252 trading days.
+    Sharpe/Sortino use DAILY returns (industry standard) to avoid
+    inflation from zero-return intra-day bars.
     """
 
     TRADING_DAYS_PER_YEAR = 252
@@ -30,7 +31,7 @@ class MetricsCalculator:
         Calculate all performance metrics.
 
         Args:
-            equity_curve: List of equity points (dict with 'equity' key)
+            equity_curve: List of equity points (dict with 'equity' and 'timestamp' keys)
             trades: List of closed trades
             initial_capital: Starting capital
             bars_per_day: Average bars per trading day (for annualization)
@@ -48,15 +49,24 @@ class MetricsCalculator:
         if len(equities) < 2:
             return mc._empty_metrics()
 
-        # Returns
-        returns = np.diff(equities) / equities[:-1]
-        returns = returns[np.isfinite(returns)]
+        # Per-bar returns (for annualized return calculation)
+        bar_returns = np.diff(equities) / equities[:-1]
+        bar_returns = bar_returns[np.isfinite(bar_returns)]
 
-        if len(returns) == 0:
+        if len(bar_returns) == 0:
             return mc._empty_metrics()
 
-        # Annualization factor
+        # Annualization factor (per-bar, for return calculation)
         ann_factor = bars_per_day * mc.TRADING_DAYS_PER_YEAR
+
+        # Daily returns for Sharpe/Sortino (industry standard)
+        # Avoids inflation from zero-return intra-day bars
+        daily_equities = mc._resample_to_daily(equity_curve)
+        if len(daily_equities) >= 2:
+            daily_returns = np.diff(daily_equities) / daily_equities[:-1]
+            daily_returns = daily_returns[np.isfinite(daily_returns)]
+        else:
+            daily_returns = bar_returns  # fallback if no timestamps
 
         metrics = {}
 
@@ -83,31 +93,42 @@ class MetricsCalculator:
         metrics["max_drawdown"] = dd_result["max_drawdown"]
         metrics["max_drawdown_duration_bars"] = dd_result["max_drawdown_duration_bars"]
 
-        # Volatility (annualized)
-        metrics["volatility"] = float(np.std(returns) * math.sqrt(ann_factor))
+        # Volatility (annualized from daily returns)
+        if len(daily_returns) > 0:
+            metrics["volatility"] = float(
+                np.std(daily_returns) * math.sqrt(mc.TRADING_DAYS_PER_YEAR)
+            )
+        else:
+            metrics["volatility"] = 0.0
 
-        # ===== Risk-Adjusted Returns =====
-        # Sharpe Ratio
-        if metrics["volatility"] > 0:
-            mean_return = float(np.mean(returns))
+        # ===== Risk-Adjusted Returns (from DAILY returns) =====
+        # Sharpe Ratio = mean(daily_returns) / std(daily_returns) * sqrt(252)
+        if len(daily_returns) > 0 and np.std(daily_returns) > 0:
             metrics["sharpe_ratio"] = float(
-                (mean_return * ann_factor - mc.RISK_FREE_RATE) / metrics["volatility"]
+                np.mean(daily_returns) / np.std(daily_returns)
+                * math.sqrt(mc.TRADING_DAYS_PER_YEAR)
             )
         else:
             metrics["sharpe_ratio"] = 0.0
 
-        # Sortino Ratio (downside deviation only)
-        downside_returns = returns[returns < 0]
-        if len(downside_returns) > 0:
-            downside_std = float(np.std(downside_returns) * math.sqrt(ann_factor))
-            if downside_std > 0:
-                metrics["sortino_ratio"] = float(
-                    (np.mean(returns) * ann_factor - mc.RISK_FREE_RATE) / downside_std
+        # Sortino Ratio (downside deviation only, daily returns)
+        if len(daily_returns) > 0:
+            downside = daily_returns[daily_returns < 0]
+            if len(downside) > 0:
+                downside_std = float(
+                    np.std(downside) * math.sqrt(mc.TRADING_DAYS_PER_YEAR)
                 )
+                if downside_std > 0:
+                    ann_mean = float(np.mean(daily_returns)) * mc.TRADING_DAYS_PER_YEAR
+                    metrics["sortino_ratio"] = float(ann_mean / downside_std)
+                else:
+                    metrics["sortino_ratio"] = 0.0
             else:
-                metrics["sortino_ratio"] = 0.0
+                metrics["sortino_ratio"] = (
+                    float("inf") if metrics["total_return"] > 0 else 0.0
+                )
         else:
-            metrics["sortino_ratio"] = float("inf") if metrics["total_return"] > 0 else 0.0
+            metrics["sortino_ratio"] = 0.0
 
         # Calmar Ratio (annualized return / max drawdown)
         if metrics["max_drawdown"] > 0:
@@ -124,12 +145,34 @@ class MetricsCalculator:
         return metrics
 
     @staticmethod
+    def _resample_to_daily(equity_curve: list[dict]) -> np.ndarray:
+        """Resample per-bar equity to daily (last value per day).
+
+        Eliminates zero-return intra-day bars that inflate Sharpe ratio
+        when the strategy is not always in the market.
+        """
+        daily: dict[str, float] = {}
+        for pt in equity_curve:
+            ts = pt.get("timestamp")
+            if ts is None:
+                continue
+            if hasattr(ts, "date"):
+                day = ts.date().isoformat()
+            else:
+                day = str(ts)[:10]
+            daily[day] = pt["equity"]  # last value per day wins
+
+        if not daily:
+            return np.array([], dtype=np.float64)
+
+        return np.array(list(daily.values()), dtype=np.float64)
+
+    @staticmethod
     def _calculate_max_drawdown(equities: np.ndarray) -> dict:
         """Calculate maximum drawdown and its duration."""
         peak = equities[0]
         max_dd = 0.0
         max_dd_duration = 0
-        current_dd_start = 0
         peak_idx = 0
 
         for i, eq in enumerate(equities):

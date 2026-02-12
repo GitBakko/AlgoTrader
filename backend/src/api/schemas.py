@@ -180,6 +180,7 @@ class BacktestRunRequest(BaseModel):
     """Request to start a backtest."""
 
     epic: str = "XAUUSD"
+    timeframe: str = "1h"
     start_date: str | None = None
     end_date: str | None = None
     initial_equity: float = Field(default=10000.0, gt=0)

@@ -108,12 +108,29 @@ export interface BacktestRun {
   created_at: string;
 }
 
+export interface BacktestTrade {
+  trade_id: number;
+  epic: string;
+  direction: string;
+  entry_price: number;
+  entry_time: string;
+  exit_price: number | null;
+  exit_time: string | null;
+  size: number;
+  status: string;
+  pnl: number;
+  fees: number;
+  net_pnl: number;
+  bars_held: number;
+}
+
 export interface BacktestDetail {
   summary: BacktestRun;
   config: Record<string, unknown>;
-  equity_curve: EquityCurvePoint[];
-  trades: unknown[];
+  equity_curve: { timestamp: string; equity: number }[];
+  trades: BacktestTrade[];
   metrics: Record<string, number>;
+  trade_metrics: Record<string, number>;
 }
 
 // Models

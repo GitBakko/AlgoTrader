@@ -59,13 +59,15 @@ class BacktestEngine:
         ohlc_df = ohlc_df.sort("timestamp")
         signals_df = signals_df.sort("timestamp")
 
-        # Create signal lookup by timestamp
-        signal_map = {}
-        atr_map = {}
-        for row in signals_df.iter_rows(named=True):
-            signal_map[row["timestamp"]] = row["signal"]
-            if "atr" in row:
-                atr_map[row["timestamp"]] = row["atr"]
+        # Create signal lookup by timestamp (column-based for speed)
+        sig_ts = signals_df["timestamp"].to_list()
+        sig_vals = signals_df["signal"].to_list()
+        signal_map = dict(zip(sig_ts, sig_vals))
+        atr_map = (
+            dict(zip(sig_ts, signals_df["atr"].to_list()))
+            if "atr" in signals_df.columns
+            else {}
+        )
 
         total_bars = len(ohlc_df)
         logger.info(
@@ -73,15 +75,21 @@ class BacktestEngine:
             f"{total_bars} bars, capital={self.config.initial_capital}"
         )
 
+        # Pre-extract columns as lists for fast iteration (avoids per-row dict allocation)
+        ts_col = ohlc_df["timestamp"].to_list()
+        high_col = ohlc_df["high"].to_list()
+        low_col = ohlc_df["low"].to_list()
+        close_col = ohlc_df["close"].to_list()
+
         # Main loop: iterate over each bar
-        for row in ohlc_df.iter_rows(named=True):
-            ts = row["timestamp"]
-            high = row["high"]
-            low = row["low"]
-            close = row["close"]
+        for i in range(total_bars):
+            ts = ts_col[i]
+            high = high_col[i]
+            low = low_col[i]
+            close = close_col[i]
 
             # Step 1: Check SL/TP exits on open positions
-            closed = self.portfolio.check_exits(high, low, close, ts)
+            self.portfolio.check_exits(high, low, close, ts)
 
             # Step 2: Process signal
             signal = signal_map.get(ts)
@@ -93,9 +101,8 @@ class BacktestEngine:
             self.portfolio.update_equity(close, ts)
 
         # Close any remaining positions at end
-        if ohlc_df.height > 0:
-            last_row = ohlc_df.row(-1, named=True)
-            self.portfolio.close_all_positions(last_row["close"], last_row["timestamp"])
+        if total_bars > 0:
+            self.portfolio.close_all_positions(close_col[-1], ts_col[-1])
 
         # Calculate metrics
         tf_minutes = timeframe_to_minutes(self.config.timeframe)

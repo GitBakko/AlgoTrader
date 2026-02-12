@@ -1,12 +1,13 @@
 """
 Backtest API router.
-Run backtests and retrieve results.
+Run backtests using the BacktestEngine with real ML signals on historical data.
 """
 
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Path, Request
+from loguru import logger
 
 from src.api.schemas import (
     BacktestRunRequest,
@@ -14,6 +15,10 @@ from src.api.schemas import (
     error_response,
     success_response,
 )
+from src.backtest.engine import BacktestEngine
+from src.backtest.reporter import BacktestReporter
+from src.backtest.schemas import BacktestConfig
+from src.backtest.signal_generator import BacktestSignalGenerator
 
 router = APIRouter()
 
@@ -26,42 +31,126 @@ async def run_backtest(
     body: BacktestRunRequest,
 ):
     """
-    Start a new backtest run.
-    MVP: stores results in-memory. Full implementation uses BacktestEngine.
+    Run a backtest using BacktestEngine with ML-generated signals.
+
+    Requires:
+    - PredictionService with loaded models (app.state.prediction_service)
+    - DataAccessLayer with historical data (app.state.data_access)
+    - FeatureBuilder (app.state.feature_builder)
     """
     run_id = uuid.uuid4().hex[:12]
-    now = datetime.now(timezone.utc).isoformat()
+    now_str = datetime.now(timezone.utc).isoformat()
 
-    # MVP: create placeholder run (actual BacktestEngine integration in Phase 5)
-    run = BacktestRunResponse(
+    # Get services from app state
+    prediction_service = getattr(request.app.state, "prediction_service", None)
+    data_access = getattr(request.app.state, "data_access", None)
+    feature_builder = getattr(request.app.state, "feature_builder", None)
+
+    if prediction_service is None or not prediction_service.has_models:
+        return error_response("No ML models loaded. Train models first.", 400)
+
+    if data_access is None:
+        return error_response("DataAccessLayer not available.", 500)
+
+    if feature_builder is None:
+        return error_response("FeatureBuilder not available.", 500)
+
+    epic = body.epic
+    timeframe = body.timeframe
+
+    if not prediction_service.has_model_for(epic):
+        return error_response(f"No model loaded for {epic}.", 400)
+
+    # Parse date range
+    start_date = None
+    end_date = None
+    if body.start_date:
+        try:
+            start_date = datetime.fromisoformat(body.start_date)
+        except ValueError:
+            return error_response(f"Invalid start_date format: {body.start_date}", 400)
+    if body.end_date:
+        try:
+            end_date = datetime.fromisoformat(body.end_date)
+        except ValueError:
+            return error_response(f"Invalid end_date format: {body.end_date}", 400)
+
+    # Load OHLC data
+    ohlc_df = data_access.get_candles(
+        epic=epic, timeframe=timeframe,
+        start_date=start_date, end_date=end_date,
+    )
+
+    if ohlc_df.is_empty() or len(ohlc_df) < 100:
+        return error_response(
+            f"Insufficient data for {epic}/{timeframe}: {len(ohlc_df)} bars (need >= 100).",
+            400,
+        )
+
+    # Get model info
+    model, meta = prediction_service._loaded_models[epic]
+    calibrator = prediction_service._calibrators.get(epic)
+    feature_names = meta.feature_names or []
+
+    # Generate signals
+    signal_gen = BacktestSignalGenerator()
+    signals_df = signal_gen.generate_signals(
+        model=model,
+        feature_builder=feature_builder,
+        ohlc_df=ohlc_df,
+        epic=epic,
+        timeframe=timeframe,
+        feature_names=feature_names,
+        calibrator=calibrator,
+        min_confidence=0.40,
+    )
+
+    if signals_df.is_empty():
+        return error_response("Signal generation produced no signals.", 500)
+
+    # Determine backtest date range from actual data
+    bt_start = ohlc_df["timestamp"].min()
+    bt_end = ohlc_df["timestamp"].max()
+
+    # Run backtest
+    config = BacktestConfig(
+        epic=epic,
+        timeframe=timeframe,
+        start_date=bt_start,
+        end_date=bt_end,
+        initial_capital=body.initial_equity,
+        risk_per_trade=body.risk_per_trade,
+    )
+
+    engine = BacktestEngine(config)
+    result = engine.run(ohlc_df, signals_df)
+
+    # Generate report
+    report = BacktestReporter.generate_report(result)
+    metrics = result.metrics
+
+    # Build response
+    run_response = BacktestRunResponse(
         id=run_id,
-        epic=body.epic,
+        epic=epic,
         status="completed",
-        total_return_pct=0.0,
-        sharpe_ratio=0.0,
-        max_drawdown_pct=0.0,
-        total_trades=0,
-        win_rate=0.0,
-        created_at=now,
+        total_return_pct=round(metrics.get("total_return", 0.0) * 100, 2),
+        sharpe_ratio=round(metrics.get("sharpe_ratio", 0.0), 2),
+        max_drawdown_pct=round(metrics.get("max_drawdown", 0.0) * 100, 2),
+        total_trades=metrics.get("total_trades", 0),
+        win_rate=round(metrics.get("win_rate", 0.0) * 100, 1),
+        created_at=now_str,
     )
 
     # Store in app state
     runs: dict = request.app.state.backtest_runs
     runs[run_id] = {
-        "summary": run.model_dump(),
+        "summary": run_response.model_dump(),
         "config": body.model_dump(),
-        "equity_curve": [],
-        "trades": [],
-        "metrics": {
-            "total_return_pct": 0.0,
-            "sharpe_ratio": 0.0,
-            "sortino_ratio": 0.0,
-            "calmar_ratio": 0.0,
-            "max_drawdown_pct": 0.0,
-            "win_rate": 0.0,
-            "profit_factor": 0.0,
-            "total_trades": 0,
-        },
+        "equity_curve": report.get("equity_curve", []),
+        "trades": report.get("trades", []),
+        "metrics": report.get("risk_metrics", {}),
+        "trade_metrics": report.get("trade_metrics", {}),
     }
 
     # Evict oldest runs if over limit
@@ -70,7 +159,12 @@ async def run_backtest(
         for key in oldest[: len(runs) - MAX_BACKTEST_RUNS]:
             del runs[key]
 
-    return success_response(run.model_dump())
+    logger.info(
+        f"Backtest {run_id} complete: {epic}/{timeframe}, "
+        f"{result.total_trades} trades, return={metrics.get('total_return', 0):.2%}"
+    )
+
+    return success_response(run_response.model_dump())
 
 
 @router.get("/runs")

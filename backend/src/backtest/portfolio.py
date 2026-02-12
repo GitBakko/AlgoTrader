@@ -9,6 +9,7 @@ from loguru import logger
 
 from src.backtest.costs import CostSimulator
 from src.backtest.schemas import BacktestConfig, BacktestTrade, TradeDirection, TradeStatus
+from src.data.utils import timeframe_to_minutes
 
 
 class PortfolioTracker:
@@ -204,9 +205,8 @@ class PortfolioTracker:
         # Calculate fees
         fees = 0.0
         if self.config.include_costs:
-            from src.data.utils import timeframe_to_minutes
-
             tf_minutes = timeframe_to_minutes(self.config.timeframe)
+            is_sl_exit = status == TradeStatus.CLOSED_SL
             fees = self.cost_simulator.calculate_total_cost(
                 epic=trade.epic,
                 size=trade.size,
@@ -214,6 +214,8 @@ class PortfolioTracker:
                 direction=trade.direction,
                 bars_held=trade.bars_held,
                 timeframe_minutes=tf_minutes,
+                is_sl_exit=is_sl_exit,
+                entry_time=trade.entry_time,
             )
 
         trade.exit_price = exit_price
