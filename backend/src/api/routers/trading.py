@@ -23,7 +23,7 @@ async def start_paper_trading(request: Request):
         return error_response("Paper trading loop not initialized", 503)
 
     if loop.is_running:
-        return error_response("Paper trading loop is already running")
+        return error_response("Paper trading loop is already running", 409)
 
     if not loop.prediction_service.has_models:
         return error_response(
@@ -42,7 +42,7 @@ async def stop_paper_trading(request: Request):
         return error_response("Paper trading loop not initialized", 503)
 
     if not loop.is_running:
-        return error_response("Paper trading loop is not running")
+        return error_response("Paper trading loop is not running", 409)
 
     loop.stop()
     return success_response({"message": "Paper trading stopped", **loop.get_status()})
@@ -59,3 +59,23 @@ async def paper_trading_status(request: Request):
         })
 
     return success_response(loop.get_status())
+
+
+@router.get("/positions")
+async def paper_trading_positions(request: Request):
+    """Get paper trading open positions from in-memory state."""
+    loop = _get_paper_loop(request)
+    if loop is None:
+        return success_response([])
+
+    return success_response(loop.get_paper_positions())
+
+
+@router.get("/signals")
+async def paper_trading_signals(request: Request):
+    """Get paper trading signal history (latest 200)."""
+    loop = _get_paper_loop(request)
+    if loop is None:
+        return success_response([])
+
+    return success_response(loop.get_signal_history())

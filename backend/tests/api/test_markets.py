@@ -8,9 +8,12 @@ class TestSearchMarkets:
         resp = client.get("/api/markets/search")
         assert resp.status_code == 200
         data = resp.json()["data"]
-        assert len(data) == 3
+        assert len(data) == 9
         epics = {m["epic"] for m in data}
-        assert epics == {"XAUUSD", "BTCUSD", "US500"}
+        assert epics == {
+            "XAUUSD", "BTCUSD", "US500", "WTIUSD", "EURUSD",
+            "NVDA", "TSLA", "XAGUSD", "DE40",
+        }
 
     def test_search_by_keyword(self, client):
         resp = client.get("/api/markets/search?q=gold")

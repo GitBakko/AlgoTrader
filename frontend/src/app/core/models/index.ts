@@ -184,3 +184,59 @@ export interface TradeEvent {
   direction: string;
   pnl: number;
 }
+
+// Paper Trading Status (GET /api/trading/status)
+export interface PaperTradingStatus {
+  running: boolean;
+  interval_seconds: number;
+  epics: string[];
+  iteration_count: number;
+  check_count: number;
+  last_run: string | null;
+  signal_count: number;
+  trade_count: number;
+  error_count: number;
+  open_positions: number;
+  total_unrealized_pnl: number;
+  last_signals: Record<string, LastSignalInfo>;
+  models_loaded: Record<string, ModelLoadedInfo>;
+  last_candle_timestamps: Record<string, string>;
+  message?: string;
+}
+
+export interface LastSignalInfo {
+  direction: string;
+  confidence: number;
+  entry_price: number;
+  timestamp: string;
+}
+
+export interface ModelLoadedInfo {
+  model_id: string;
+  model_type: string;
+  num_features: number;
+  created_at: string;
+  version: string;
+}
+
+// Paper Trading Positions (GET /api/trading/positions)
+export interface PaperPosition {
+  deal_id: string;
+  epic: string;
+  direction: string;
+  size: number;
+  level: number;         // entry fill price
+  stop_level: number | null;
+  profit_level: number | null;
+  opened_at: string;
+}
+
+// Paper Trading Signal History (GET /api/trading/signals)
+export interface PaperSignal {
+  epic: string;
+  direction: string;
+  confidence: number;
+  entry_price: number;
+  timestamp: string;
+  status: string;  // predicted, executed, rejected, hold
+}

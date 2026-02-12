@@ -1,4 +1,4 @@
-import { Component, effect, inject, OnInit } from '@angular/core';
+import { Component, effect, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
@@ -8,7 +8,6 @@ import {
 import { IconDirective } from '@coreui/icons-angular';
 import { ChartjsComponent } from '@coreui/angular-chartjs';
 import { TradingService } from '../../core/services/trading.service';
-import { RiskStatus } from '../../core/models';
 
 @Component({
   templateUrl: 'dashboard.component.html',
@@ -23,9 +22,9 @@ export class DashboardComponent implements OnInit {
   readonly trading = inject(TradingService);
 
   readonly overview = this.trading.overview;
-  riskStatus: RiskStatus | null = null;
-  equityChartData: any = {};
-  equityChartOptions: any = {};
+  readonly riskStatus = this.trading.riskStatus;
+  readonly equityChartData = signal<any>({});
+  readonly equityChartOptions = signal<any>({});
 
   private equityCurveEffect = effect(() => {
     const curve = this.trading.equityCurve();
@@ -38,14 +37,14 @@ export class DashboardComponent implements OnInit {
     this.trading.loadOverview();
     this.trading.loadEquityCurve();
     this.trading.loadPositions();
-    this.trading.getRiskStatus().subscribe(data => this.riskStatus = data);
+    this.trading.loadRiskStatus();
   }
 
   private buildEquityChart(curve: { date: string; equity: number }[]): void {
     const labels = curve.map(p => p.date?.substring(0, 10) || '');
     const values = curve.map(p => p.equity);
 
-    this.equityChartData = {
+    this.equityChartData.set({
       labels,
       datasets: [{
         label: 'Equity',
@@ -55,9 +54,9 @@ export class DashboardComponent implements OnInit {
         fill: true,
         tension: 0.3,
       }]
-    };
+    });
 
-    this.equityChartOptions = {
+    this.equityChartOptions.set({
       responsive: true,
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
@@ -65,6 +64,6 @@ export class DashboardComponent implements OnInit {
         x: { display: true, grid: { display: false } },
         y: { display: true }
       }
-    };
+    });
   }
 }

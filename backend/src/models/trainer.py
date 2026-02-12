@@ -178,7 +178,8 @@ class ModelTrainer:
         ]
 
         # Use z-score features where available, raw features otherwise
-        feature_cols = zscore_features + raw_features
+        # Sort each group for deterministic ordering across environments
+        feature_cols = sorted(zscore_features) + sorted(raw_features)
         feature_cols = [c for c in feature_cols if c in df_valid.columns]
 
         if not feature_cols:
@@ -192,6 +193,11 @@ class ModelTrainer:
         nan_count = int(np.isnan(X).sum())
         if nan_count > 0:
             nan_pct = nan_count / X.size * 100
+            if nan_pct > 5.0:
+                raise ValueError(
+                    f"Feature matrix has {nan_pct:.1f}% NaN values ({nan_count} total). "
+                    "This likely indicates a data pipeline issue. Threshold: 5%."
+                )
             logger.warning(f"Found {nan_count} NaN values ({nan_pct:.1f}% of feature matrix). Filling with 0.")
         X = np.nan_to_num(X, nan=0.0)
 
@@ -241,18 +247,20 @@ class ModelTrainer:
             # Sequence models (LSTM) may return fewer predictions than input samples;
             # align y by trimming from the front (sequences use last element's label)
             y_val_aligned = y_val[-len(y_val_pred):]
-            assert len(y_val_aligned) == len(y_val_pred), (
-                f"Val alignment mismatch: {len(y_val_aligned)} vs {len(y_val_pred)}"
-            )
+            if len(y_val_aligned) != len(y_val_pred):
+                raise ValueError(
+                    f"Val alignment mismatch: {len(y_val_aligned)} vs {len(y_val_pred)}"
+                )
             val_metrics = self.evaluator.evaluate(y_val_aligned, y_val_pred, y_val_proba)
 
             # Evaluate on test
             y_test_pred = model.predict(X_test)
             y_test_proba = model.predict_proba(X_test)
             y_test_aligned = y_test[-len(y_test_pred):]
-            assert len(y_test_aligned) == len(y_test_pred), (
-                f"Test alignment mismatch: {len(y_test_aligned)} vs {len(y_test_pred)}"
-            )
+            if len(y_test_aligned) != len(y_test_pred):
+                raise ValueError(
+                    f"Test alignment mismatch: {len(y_test_aligned)} vs {len(y_test_pred)}"
+                )
             test_metrics = self.evaluator.evaluate(y_test_aligned, y_test_pred, y_test_proba)
 
             fold_result = FoldResult(
@@ -294,8 +302,8 @@ class ModelTrainer:
         # Clean up temp directory
         try:
             shutil.rmtree(tmp_dir)
-        except OSError:
-            pass
+        except OSError as e:
+            logger.warning(f"Failed to clean up temp dir {tmp_dir}: {e}")
 
         # Fit confidence calibrator on last fold's validation set
         calibrator = None

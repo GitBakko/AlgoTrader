@@ -25,6 +25,16 @@ class PredictionService:
     by chaining: data loading -> feature building -> inference.
     """
 
+    # Assets excluded from live/paper trading (model exists but OOS performance is unviable)
+    # EURUSD: tiny ATR (~0.003) causes massive positions → -99% OOS, 0% win rate
+    EXCLUDED_EPICS = {"EURUSD"}
+
+    # Active trading epics (EURUSD excluded due to unviable OOS performance)
+    ACTIVE_EPICS = [
+        "XAUUSD", "BTCUSD", "US500", "WTIUSD",
+        "NVDA", "TSLA", "XAGUSD", "DE40",
+    ]
+
     def __init__(
         self,
         feature_builder: FeatureBuilder,
@@ -40,13 +50,13 @@ class PredictionService:
 
     def load_models(self) -> int:
         """
-        Load latest trained model for each asset.
+        Load latest trained model for each active asset (excludes EURUSD etc.).
 
         Returns:
             Number of models loaded
         """
         loaded = 0
-        for epic in ["XAUUSD", "BTCUSD", "US500"]:
+        for epic in self.ACTIVE_EPICS:
             try:
                 models = self.versioning.list_models(epic)
                 if not models:
@@ -151,6 +161,10 @@ class PredictionService:
 
         # Extract last row as feature vector
         X = df_features.tail(1).select(available).to_numpy()
+        nan_count = int(np.isnan(X).sum())
+        if nan_count > len(available) * 0.5:
+            logger.warning(f"[{epic}] >50% NaN in feature vector ({nan_count}/{len(available)}), skipping")
+            return None
         X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
 
         # Run inference

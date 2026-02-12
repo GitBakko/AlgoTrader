@@ -58,11 +58,11 @@
 <c-card class="mb-4">
   <c-card-header><strong>Equity Curve</strong></c-card-header>
   <c-card-body>
-    @if (equityChartData.datasets) {
+    @if (equityChartData().datasets) {
       <c-chart
-        [data]="equityChartData"
+        [data]="equityChartData()"
         [height]="250"
-        [options]="equityChartOptions"
+        [options]="equityChartOptions()"
         type="line"
       >
         Equity curve chart
@@ -79,22 +79,22 @@
     <c-card class="mb-4">
       <c-card-header><strong>Risk Status</strong></c-card-header>
       <c-card-body>
-        @if (riskStatus) {
+        @if (riskStatus(); as rs) {
           <div class="mb-3">
             <div class="d-flex justify-content-between mb-1">
               <span>Current Drawdown</span>
-              <strong>{{ (riskStatus.current_drawdown_pct * 100) | number:'1.2-2' }}%</strong>
+              <strong>{{ (rs.current_drawdown_pct * 100) | number:'1.2-2' }}%</strong>
             </div>
-            <c-progress [value]="riskStatus.current_drawdown_pct * 100" [max]="20" color="danger" style="height: 8px;"></c-progress>
+            <c-progress [value]="rs.current_drawdown_pct * 100" [max]="20" color="danger" style="height: 8px;"></c-progress>
           </div>
           <div class="d-flex justify-content-between mb-2">
             <span>Peak Equity</span>
-            <strong>{{ riskStatus.peak_equity | number:'1.2-2' }}</strong>
+            <strong>{{ rs.peak_equity | number:'1.2-2' }}</strong>
           </div>
           <div class="d-flex justify-content-between mb-2">
             <span>Circuit Breaker</span>
-            <c-badge [color]="riskStatus.circuit_breaker_active ? 'danger' : 'success'">
-              {{ riskStatus.circuit_breaker_active ? 'ACTIVE' : 'OK' }}
+            <c-badge [color]="rs.circuit_breaker_active ? 'danger' : 'success'">
+              {{ rs.circuit_breaker_active ? 'ACTIVE' : 'OK' }}
             </c-badge>
           </div>
         } @else {

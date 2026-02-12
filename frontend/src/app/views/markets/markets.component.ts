@@ -5,7 +5,7 @@ import {
   ColComponent, RowComponent, TableDirective
 } from '@coreui/angular';
 import { TradingService } from '../../core/services/trading.service';
-import { MarketInfo } from '../../core/models';
+import { WebSocketService } from '../../core/services/websocket.service';
 
 @Component({
   selector: 'app-markets',
@@ -31,7 +31,7 @@ import { MarketInfo } from '../../core/models';
                 </tr>
               </thead>
               <tbody>
-                @for (market of markets; track market.epic) {
+                @for (market of markets(); track market.epic) {
                   <tr>
                     <td><strong>{{ market.epic }}</strong></td>
                     <td>{{ market.name }}</td>
@@ -42,9 +42,11 @@ import { MarketInfo } from '../../core/models';
                 }
               </tbody>
             </table>
-            <p class="text-body-secondary mt-3">
-              Live prices via WebSocket will be available when connected to the backend.
-            </p>
+            @if (!wsConnected()) {
+              <p class="text-body-secondary mt-3">
+                Live prices via WebSocket will be available when connected to the backend.
+              </p>
+            }
           </c-card-body>
         </c-card>
       </c-col>
@@ -53,9 +55,11 @@ import { MarketInfo } from '../../core/models';
 })
 export class MarketsComponent implements OnInit {
   private readonly trading = inject(TradingService);
-  markets: MarketInfo[] = [];
+  private readonly ws = inject(WebSocketService);
+  readonly markets = this.trading.markets;
+  readonly wsConnected = this.ws.connected;
 
   ngOnInit(): void {
-    this.trading.searchMarkets().subscribe(data => this.markets = data);
+    this.trading.loadMarkets();
   }
 }

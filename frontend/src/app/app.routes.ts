@@ -28,6 +28,10 @@ export const routes: Routes = [
         loadChildren: () => import('./views/markets/routes').then(m => m.routes)
       },
       {
+        path: 'paper-trading',
+        loadChildren: () => import('./views/paper-trading/routes').then(m => m.routes)
+      },
+      {
         path: 'backtest',
         loadChildren: () => import('./views/backtest/routes').then(m => m.routes)
       },

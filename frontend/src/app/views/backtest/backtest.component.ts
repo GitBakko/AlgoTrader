@@ -401,7 +401,7 @@ export class BacktestComponent implements OnInit {
 
         const ret = data.summary.total_return_pct ?? 0;
         const trades = data.summary.total_trades ?? 0;
-        this.successMsg.set(
+        this.showSuccess(
           `Backtest completato: ${data.summary.epic} ${(data.config['timeframe'] ?? '1h')} | ` +
           `${this.formatDate(this.getStartDate())} \u2192 ${this.formatDate(this.getEndDate())} | ` +
           `${trades} trade, return ${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%`
@@ -414,6 +414,11 @@ export class BacktestComponent implements OnInit {
         this.cdr.detectChanges();
       }
     });
+  }
+
+  private showSuccess(msg: string, ms = 2000): void {
+    this.successMsg.set(msg);
+    setTimeout(() => this.successMsg.set(''), ms);
   }
 
   // --- Helpers for table display ---

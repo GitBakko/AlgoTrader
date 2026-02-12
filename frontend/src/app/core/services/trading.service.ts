@@ -15,6 +15,9 @@ import {
   RiskStatus,
   EquityCurvePoint,
   OHLCCandle,
+  PaperTradingStatus,
+  PaperPosition,
+  PaperSignal,
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -32,6 +35,25 @@ export class TradingService {
   // Signals
   readonly signals = signal<TradingSignal[]>([]);
 
+  // Markets
+  readonly markets = signal<MarketInfo[]>([]);
+
+  // Strategy
+  readonly strategyConfigs = signal<StrategyConfig[]>([]);
+  readonly riskLimitsData = signal<RiskLimits | null>(null);
+  readonly allocationData = signal<Allocation | null>(null);
+
+  // Models
+  readonly models = signal<MLModel[]>([]);
+
+  // Risk
+  readonly riskStatus = signal<RiskStatus | null>(null);
+
+  // Paper Trading
+  readonly paperStatus = signal<PaperTradingStatus | null>(null);
+  readonly paperPositions = signal<PaperPosition[]>([]);
+  readonly paperSignals = signal<PaperSignal[]>([]);
+
   // ── Dashboard ──
 
   loadOverview(): void {
@@ -42,6 +64,11 @@ export class TradingService {
   loadEquityCurve(days = 30): void {
     this.api.get<EquityCurvePoint[]>('/api/dashboard/equity-curve', { days })
       .subscribe(data => this.equityCurve.set(data));
+  }
+
+  loadRiskStatus(): void {
+    this.api.get<RiskStatus>('/api/system/risk-status')
+      .subscribe(data => this.riskStatus.set(data));
   }
 
   // ── Positions ──
@@ -74,6 +101,11 @@ export class TradingService {
 
   // ── Markets ──
 
+  loadMarkets(q = ''): void {
+    this.api.get<MarketInfo[]>('/api/markets/search', { q })
+      .subscribe(data => this.markets.set(data));
+  }
+
   searchMarkets(q = '') {
     return this.api.get<MarketInfo[]>('/api/markets/search', { q });
   }
@@ -83,6 +115,23 @@ export class TradingService {
   }
 
   // ── Strategy ──
+
+  loadStrategyConfig(): void {
+    this.api.get<StrategyConfig[]>('/api/strategy/config')
+      .subscribe(data => this.strategyConfigs.set(data));
+  }
+
+  loadRiskLimits(): void {
+    this.api.get<RiskLimits>('/api/strategy/risk-limits')
+      .subscribe(data => this.riskLimitsData.set(data));
+  }
+
+  loadAllocation(regime?: string): void {
+    const params: Record<string, string> = {};
+    if (regime) params['regime'] = regime;
+    this.api.get<Allocation>('/api/strategy/allocation', params)
+      .subscribe(data => this.allocationData.set(data));
+  }
 
   getStrategyConfig() {
     return this.api.get<StrategyConfig[]>('/api/strategy/config');
@@ -122,6 +171,11 @@ export class TradingService {
 
   // ── Models ──
 
+  loadModels(): void {
+    this.api.get<MLModel[]>('/api/models/')
+      .subscribe(data => this.models.set(data));
+  }
+
   listModels() {
     return this.api.get<MLModel[]>('/api/models/');
   }
@@ -134,5 +188,30 @@ export class TradingService {
 
   getRiskStatus() {
     return this.api.get<RiskStatus>('/api/system/risk-status');
+  }
+
+  // ── Paper Trading ──
+
+  loadPaperStatus(): void {
+    this.api.get<PaperTradingStatus>('/api/trading/status')
+      .subscribe({ next: data => this.paperStatus.set(data), error: () => {} });
+  }
+
+  loadPaperPositions(): void {
+    this.api.get<PaperPosition[]>('/api/trading/positions')
+      .subscribe({ next: data => this.paperPositions.set(data), error: () => {} });
+  }
+
+  loadPaperSignals(): void {
+    this.api.get<PaperSignal[]>('/api/trading/signals')
+      .subscribe({ next: data => this.paperSignals.set(data), error: () => {} });
+  }
+
+  startPaperTrading() {
+    return this.api.post<PaperTradingStatus & { message: string }>('/api/trading/start');
+  }
+
+  stopPaperTrading() {
+    return this.api.post<PaperTradingStatus & { message: string }>('/api/trading/stop');
   }
 }

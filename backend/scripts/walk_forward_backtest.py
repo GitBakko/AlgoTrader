@@ -45,7 +45,15 @@ WINDOWS = {
     "1d": {"train": 252, "val": 63, "test": 21, "step": 21, "purge": 5, "embargo": 2},
 }
 
-ASSETS = ["XAUUSD", "BTCUSD", "US500"]
+ASSETS = ["XAUUSD", "BTCUSD", "US500", "WTIUSD", "EURUSD", "NVDA", "TSLA", "XAGUSD", "DE40"]
+
+# Individual stocks trade fewer hours/day → smaller walk-forward windows
+STOCK_EPICS = {"NVDA", "TSLA"}
+STOCK_WINDOWS = {
+    "1h": {"train": 2520, "val": 630, "test": 210, "step": 210, "purge": 50, "embargo": 20},
+    "4h": {"train": 756, "val": 189, "test": 63, "step": 63, "purge": 15, "embargo": 6},
+    "1d": {"train": 252, "val": 63, "test": 21, "step": 21, "purge": 5, "embargo": 2},
+}
 
 DEFAULT_CONFIDENCE = 0.40
 
@@ -133,7 +141,8 @@ def run_walk_forward_backtest(
     feature_builder = FeatureBuilder(data_access)
     target_builder = TargetBuilder()
 
-    windows = WINDOWS.get(timeframe, WINDOWS["1h"])
+    window_map = STOCK_WINDOWS if epic in STOCK_EPICS else WINDOWS
+    windows = window_map.get(timeframe, window_map["1h"])
     splitter = WalkForwardSplitter(
         train_window=windows["train"],
         val_window=windows["val"],
@@ -373,7 +382,7 @@ def run_walk_forward_backtest(
 
 def main():
     parser = argparse.ArgumentParser(description="Walk-Forward Backtest")
-    parser.add_argument("--epic", type=str, default=None, help="Asset (XAUUSD, BTCUSD, US500)")
+    parser.add_argument("--epic", type=str, default=None, help="Single asset epic (default: all 9)")
     parser.add_argument("--timeframe", type=str, default="1h", help="Timeframe (1h, 4h, 1d)")
     parser.add_argument("--capital", type=float, default=10_000.0, help="Initial capital")
     parser.add_argument("--risk", type=float, default=0.02, help="Risk per trade")

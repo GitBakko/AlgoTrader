@@ -12,6 +12,13 @@ from loguru import logger
 CORRELATION_PAIRS: list[tuple[str, str, float]] = [
     ("XAUUSD", "BTCUSD", 0.50),   # Gold <-> BTC: 50% size reduction
     ("BTCUSD", "US500", 0.30),     # BTC <-> SP500: 30% size reduction
+    ("XAUUSD", "XAGUSD", 0.85),   # Gold <-> Silver: 85% reduction (very correlated)
+    ("US500", "DE40", 0.70),       # S&P 500 <-> DAX: 70% reduction (equity indices)
+    ("NVDA", "TSLA", 0.50),        # NVIDIA <-> Tesla: 50% (both tech megacaps)
+    ("US500", "NVDA", 0.40),       # S&P 500 <-> NVIDIA: 40% (index contains stock)
+    ("US500", "TSLA", 0.40),       # S&P 500 <-> Tesla: 40% (index contains stock)
+    ("WTIUSD", "XAUUSD", 0.25),   # Crude Oil <-> Gold: 25% (commodities, weak)
+    ("BTCUSD", "NVDA", 0.30),     # BTC <-> NVIDIA: 30% (risk-on assets)
 ]
 
 # Map epic variants to canonical names for matching
@@ -19,6 +26,9 @@ EPIC_ALIASES: dict[str, str] = {
     "GOLD": "XAUUSD",
     "BITCOIN": "BTCUSD",
     "SP500": "US500",
+    "SILVER": "XAGUSD",
+    "OIL_CRUDE": "WTIUSD",
+    "GERMANY40": "DE40",
 }
 
 

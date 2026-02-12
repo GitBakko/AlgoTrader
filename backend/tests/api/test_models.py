@@ -10,9 +10,12 @@ class TestListModels:
         body = resp.json()
         assert body["success"] is True
         data = body["data"]
-        assert len(data) == 3
+        assert len(data) == 9
         epics = {m["epic"] for m in data}
-        assert epics == {"XAUUSD", "BTCUSD", "US500"}
+        assert epics == {
+            "XAUUSD", "BTCUSD", "US500", "WTIUSD", "EURUSD",
+            "NVDA", "TSLA", "XAGUSD", "DE40",
+        }
 
 
 class TestModelMetrics:

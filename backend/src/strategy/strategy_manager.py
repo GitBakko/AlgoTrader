@@ -60,6 +60,10 @@ class StrategyManager:
             raise ValueError(
                 "market_data must contain 'current_price' and 'atr' keys"
             )
+        if not (isinstance(current_price, (int, float)) and current_price > 0):
+            raise ValueError(f"Invalid current_price: {current_price}")
+        if not (isinstance(atr, (int, float)) and atr > 0):
+            raise ValueError(f"Invalid ATR: {atr}")
         rsi = market_data.get("rsi")
         regime = market_data.get("regime")
 

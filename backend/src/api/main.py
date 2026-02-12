@@ -67,7 +67,10 @@ async def lifespan(app: FastAPI):
                 session_manager=broker.session_manager,
             )
             await broker_ws.connect()
-            await broker_ws.subscribe_quotes(["XAUUSD", "BTCUSD", "US500"])
+            await broker_ws.subscribe_quotes([
+                "XAUUSD", "BTCUSD", "US500", "WTIUSD", "EURUSD",
+                "NVDA", "TSLA", "XAGUSD", "DE40",
+            ])
             app.state.broker_ws_client = broker_ws
             logger.info("Broker WebSocket connected, subscribed to quotes")
         except Exception as e:
@@ -171,7 +174,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
-    description="AI-powered algorithmic trading system for Gold, Bitcoin, and S&P 500",
+    description="AI-powered algorithmic trading system for multi-asset CFD trading",
     docs_url="/docs" if settings.debug else None,
     redoc_url="/redoc" if settings.debug else None,
     lifespan=lifespan,

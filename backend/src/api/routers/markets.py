@@ -17,6 +17,12 @@ SUPPORTED_MARKETS = [
     MarketInfo(epic="XAUUSD", name="Gold (XAU/USD)", change_pct=0.0),
     MarketInfo(epic="BTCUSD", name="Bitcoin (BTC/USD)", change_pct=0.0),
     MarketInfo(epic="US500", name="S&P 500 (US500)", change_pct=0.0),
+    MarketInfo(epic="WTIUSD", name="Crude Oil WTI (WTI/USD)", change_pct=0.0),
+    MarketInfo(epic="EURUSD", name="Euro / US Dollar (EUR/USD)", change_pct=0.0),
+    MarketInfo(epic="NVDA", name="NVIDIA Corporation (NVDA)", change_pct=0.0),
+    MarketInfo(epic="TSLA", name="Tesla Inc (TSLA)", change_pct=0.0),
+    MarketInfo(epic="XAGUSD", name="Silver (XAG/USD)", change_pct=0.0),
+    MarketInfo(epic="DE40", name="Germany 40 / DAX (DE40)", change_pct=0.0),
 ]
 
 _MARKET_MAP = {m.epic: m for m in SUPPORTED_MARKETS}

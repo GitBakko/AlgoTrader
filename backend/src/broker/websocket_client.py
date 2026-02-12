@@ -14,6 +14,7 @@ from loguru import logger
 from pydantic import BaseModel, Field
 from websockets.exceptions import WebSocketException
 
+from src.broker.client import BROKER_TO_EPIC, EPIC_TO_BROKER
 from src.broker.exceptions import ConnectionError as BrokerConnectionError
 from src.broker.session import SessionManager
 
@@ -177,10 +178,15 @@ class CapitalComWebSocketClient:
         Subscribe to real-time quote updates for instruments.
 
         Args:
-            epics: List of epic codes (max 40 total subscriptions)
+            epics: List of internal epic codes (max 40 total subscriptions).
+                   Internal names (e.g. XAUUSD) are mapped to broker names
+                   (e.g. GOLD) automatically.
         """
         if len(self._subscribed_quotes) + len(epics) > 40:
             raise ValueError("Maximum 40 WebSocket subscriptions allowed")
+
+        # Map internal names → broker names for the API
+        broker_epics = [EPIC_TO_BROKER.get(e, e) for e in epics]
 
         tokens = await self.session_manager.get_tokens()
 
@@ -189,20 +195,22 @@ class CapitalComWebSocketClient:
             "correlationId": f"quote-sub-{datetime.now().timestamp()}",
             "cst": tokens.cst,
             "securityToken": tokens.security_token,
-            "payload": {"epics": epics},
+            "payload": {"epics": broker_epics},
         }
 
         await self._send(message)
-        self._subscribed_quotes.update(epics)
-        logger.info(f"📊 Subscribed to quotes: {epics}")
+        self._subscribed_quotes.update(epics)  # Track internal names
+        logger.info(f"📊 Subscribed to quotes: {epics} (broker: {broker_epics})")
 
     async def unsubscribe_quotes(self, epics: list[str]) -> None:
         """
         Unsubscribe from quote updates.
 
         Args:
-            epics: List of epic codes to unsubscribe
+            epics: List of internal epic codes to unsubscribe
         """
+        broker_epics = [EPIC_TO_BROKER.get(e, e) for e in epics]
+
         tokens = await self.session_manager.get_tokens()
 
         message = {
@@ -210,7 +218,7 @@ class CapitalComWebSocketClient:
             "correlationId": f"quote-unsub-{datetime.now().timestamp()}",
             "cst": tokens.cst,
             "securityToken": tokens.security_token,
-            "payload": {"epics": epics},
+            "payload": {"epics": broker_epics},
         }
 
         await self._send(message)
@@ -222,9 +230,11 @@ class CapitalComWebSocketClient:
         Subscribe to real-time OHLC candle updates.
 
         Args:
-            epics: List of epic codes
+            epics: List of internal epic codes
             resolutions: List of resolutions (e.g., ["MINUTE_5", "HOUR"])
         """
+        broker_epics = [EPIC_TO_BROKER.get(e, e) for e in epics]
+
         tokens = await self.session_manager.get_tokens()
 
         message = {
@@ -232,12 +242,12 @@ class CapitalComWebSocketClient:
             "correlationId": f"ohlc-sub-{datetime.now().timestamp()}",
             "cst": tokens.cst,
             "securityToken": tokens.security_token,
-            "payload": {"epics": epics, "resolutions": resolutions, "type": "classic"},
+            "payload": {"epics": broker_epics, "resolutions": resolutions, "type": "classic"},
         }
 
         await self._send(message)
 
-        # Track subscriptions
+        # Track subscriptions with internal names
         for epic in epics:
             if epic not in self._subscribed_ohlc:
                 self._subscribed_ohlc[epic] = []
@@ -282,15 +292,19 @@ class CapitalComWebSocketClient:
             destination = data.get("destination")
 
             if destination == "quote":
-                # Real-time quote
+                # Real-time quote — map broker epic back to internal name
                 payload = data.get("payload", {})
+                if "epic" in payload:
+                    payload["epic"] = BROKER_TO_EPIC.get(payload["epic"], payload["epic"])
                 quote = QuoteData(**payload)
                 if self._quote_handler:
                     await self._quote_handler(quote)
 
             elif destination == "ohlc.event":
-                # OHLC candle
+                # OHLC candle — map broker epic back to internal name
                 payload = data.get("payload", {})
+                if "epic" in payload:
+                    payload["epic"] = BROKER_TO_EPIC.get(payload["epic"], payload["epic"])
                 ohlc = OHLCData(**payload)
                 if self._ohlc_handler:
                     await self._ohlc_handler(ohlc)

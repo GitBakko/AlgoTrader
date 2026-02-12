@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     api_port: int = Field(default=8000, alias="API_PORT")
     api_reload: bool = Field(default=True, alias="API_RELOAD")
     cors_origins_str: str = Field(
-        default="http://localhost:4200,http://localhost:8000", alias="CORS_ORIGINS"
+        default="http://localhost:4200,http://localhost:4321,http://localhost:8000", alias="CORS_ORIGINS"
     )
 
     @property
@@ -169,7 +169,8 @@ class Settings(BaseSettings):
         default="snappy", alias="PARQUET_COMPRESSION"
     )
     historical_data_assets_str: str = Field(
-        default="XAUUSD,BTCUSD,US500", alias="HISTORICAL_DATA_ASSETS"
+        default="XAUUSD,BTCUSD,US500,WTIUSD,EURUSD,NVDA,TSLA,XAGUSD,DE40",
+        alias="HISTORICAL_DATA_ASSETS",
     )
     historical_data_timeframes_str: str = Field(
         default="1min,5min,15min,1h,4h,1d", alias="HISTORICAL_DATA_TIMEFRAMES"

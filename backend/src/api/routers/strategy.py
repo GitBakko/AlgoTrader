@@ -20,7 +20,9 @@ from src.strategy.strategy_manager import StrategyManager
 
 router = APIRouter()
 
-SUPPORTED_EPICS = ["XAUUSD", "BTCUSD", "US500"]
+SUPPORTED_EPICS = [
+    "XAUUSD", "BTCUSD", "US500", "WTIUSD", "EURUSD", "NVDA", "TSLA", "XAGUSD", "DE40",
+]
 
 
 @router.get("/config")

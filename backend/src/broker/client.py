@@ -37,6 +37,8 @@ from src.utils.sanitization import sanitize_dict
 # Capital.com uses different codes for some assets.
 EPIC_TO_BROKER: dict[str, str] = {
     "XAUUSD": "GOLD",
+    "XAGUSD": "SILVER",
+    "WTIUSD": "OIL_CRUDE",
 }
 BROKER_TO_EPIC: dict[str, str] = {v: k for k, v in EPIC_TO_BROKER.items()}
 

@@ -1,4 +1,4 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, computed, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -7,7 +7,7 @@ import {
   FormControlDirective, FormLabelDirective, BadgeComponent
 } from '@coreui/angular';
 import { TradingService } from '../../core/services/trading.service';
-import { StrategyConfig, RiskLimits } from '../../core/models';
+import { StrategyConfig } from '../../core/models';
 
 @Component({
   selector: 'app-strategy',
@@ -19,7 +19,7 @@ import { StrategyConfig, RiskLimits } from '../../core/models';
   ],
   template: `
     <c-row>
-      @for (cfg of configs; track cfg.epic) {
+      @for (cfg of configs(); track cfg.epic) {
         <c-col md="4">
           <c-card class="mb-4">
             <c-card-header>
@@ -54,18 +54,18 @@ import { StrategyConfig, RiskLimits } from '../../core/models';
         <c-card class="mb-4">
           <c-card-header><strong>Risk Limits</strong></c-card-header>
           <c-card-body>
-            @if (limits) {
+            @if (limits(); as l) {
               <div class="mb-2">
                 <label cFormLabel>Max Risk per Trade</label>
-                <input cFormControl type="number" step="0.01" [(ngModel)]="limits.max_risk_per_trade" />
+                <input cFormControl type="number" step="0.01" [(ngModel)]="l.max_risk_per_trade" />
               </div>
               <div class="mb-2">
                 <label cFormLabel>Max Daily Drawdown</label>
-                <input cFormControl type="number" step="0.01" [(ngModel)]="limits.max_daily_drawdown" />
+                <input cFormControl type="number" step="0.01" [(ngModel)]="l.max_daily_drawdown" />
               </div>
               <div class="mb-2">
                 <label cFormLabel>Max Total Drawdown</label>
-                <input cFormControl type="number" step="0.01" [(ngModel)]="limits.max_total_drawdown" />
+                <input cFormControl type="number" step="0.01" [(ngModel)]="l.max_total_drawdown" />
               </div>
               <button cButton color="primary" size="sm" class="mt-2" (click)="saveLimits()">Save Limits</button>
             }
@@ -76,8 +76,8 @@ import { StrategyConfig, RiskLimits } from '../../core/models';
         <c-card class="mb-4">
           <c-card-header><strong>Portfolio Allocation</strong></c-card-header>
           <c-card-body>
-            @if (allocation) {
-              @for (entry of allocationEntries; track entry[0]) {
+            @if (allocation()) {
+              @for (entry of allocationEntries(); track entry[0]) {
                 <div class="d-flex justify-content-between mb-2">
                   <span>{{ entry[0] }}</span>
                   <strong>{{ (entry[1] * 100) | number:'1.0-0' }}%</strong>
@@ -92,18 +92,18 @@ import { StrategyConfig, RiskLimits } from '../../core/models';
 })
 export class StrategyComponent implements OnInit {
   private readonly trading = inject(TradingService);
-  configs: StrategyConfig[] = [];
-  limits: RiskLimits | null = null;
-  allocation: Record<string, number> | null = null;
-  allocationEntries: [string, number][] = [];
+  readonly configs = this.trading.strategyConfigs;
+  readonly limits = this.trading.riskLimitsData;
+  readonly allocation = this.trading.allocationData;
+  readonly allocationEntries = computed(() => {
+    const alloc = this.allocation();
+    return alloc ? Object.entries(alloc.weights) : [];
+  });
 
   ngOnInit(): void {
-    this.trading.getStrategyConfig().subscribe(data => this.configs = data);
-    this.trading.getRiskLimits().subscribe(data => this.limits = data);
-    this.trading.getAllocation().subscribe(data => {
-      this.allocation = data.weights;
-      this.allocationEntries = Object.entries(data.weights);
-    });
+    this.trading.loadStrategyConfig();
+    this.trading.loadRiskLimits();
+    this.trading.loadAllocation();
   }
 
   saveConfig(cfg: StrategyConfig): void {
@@ -111,8 +111,9 @@ export class StrategyComponent implements OnInit {
   }
 
   saveLimits(): void {
-    if (this.limits) {
-      this.trading.updateRiskLimits(this.limits).subscribe();
+    const l = this.limits();
+    if (l) {
+      this.trading.updateRiskLimits(l).subscribe();
     }
   }
 }

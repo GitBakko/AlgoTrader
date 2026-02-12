@@ -53,15 +53,33 @@ class AllocationConfig(BaseModel):
 
     base_weights: dict[str, float] = Field(
         default_factory=lambda: {
-            "XAUUSD": 0.35,
-            "BTCUSD": 0.30,
-            "US500": 0.35,
+            "XAUUSD": 0.14,
+            "BTCUSD": 0.10,
+            "US500": 0.13,
+            "WTIUSD": 0.10,
+            "EURUSD": 0.10,
+            "NVDA": 0.10,
+            "TSLA": 0.08,
+            "XAGUSD": 0.11,
+            "DE40": 0.14,
         }
     )
     regime_adjustments: dict[str, dict[str, float]] = Field(
         default_factory=lambda: {
-            "bull": {"XAUUSD": 0.25, "BTCUSD": 0.35, "US500": 0.40},
-            "bear": {"XAUUSD": 0.45, "BTCUSD": 0.20, "US500": 0.35},
-            "high_vol": {"XAUUSD": 0.50, "BTCUSD": 0.15, "US500": 0.35},
+            "bull": {
+                "XAUUSD": 0.08, "BTCUSD": 0.12, "US500": 0.15,
+                "WTIUSD": 0.12, "EURUSD": 0.06, "NVDA": 0.14,
+                "TSLA": 0.11, "XAGUSD": 0.07, "DE40": 0.15,
+            },
+            "bear": {
+                "XAUUSD": 0.18, "BTCUSD": 0.06, "US500": 0.10,
+                "WTIUSD": 0.08, "EURUSD": 0.16, "NVDA": 0.06,
+                "TSLA": 0.04, "XAGUSD": 0.16, "DE40": 0.16,
+            },
+            "high_vol": {
+                "XAUUSD": 0.18, "BTCUSD": 0.05, "US500": 0.12,
+                "WTIUSD": 0.08, "EURUSD": 0.15, "NVDA": 0.06,
+                "TSLA": 0.04, "XAGUSD": 0.14, "DE40": 0.18,
+            },
         }
     )

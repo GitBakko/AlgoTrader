@@ -1,18 +1,23 @@
 """
 Script per addestrare modelli XGBoost su dati storici scaricati.
 Usa walk-forward optimization con purge+embargo per ogni asset.
+Supporta Optuna hyperparameter tuning e feature selection.
 
 Prerequisito: dati storici scaricati via download_data.py
 
 Usage:
     cd backend
     .venv/Scripts/python.exe scripts/train_models.py
-    .venv/Scripts/python.exe scripts/train_models.py --assets XAUUSD --timeframe 1h
+    .venv/Scripts/python.exe scripts/train_models.py --tune --prune-pct 0.25
+    .venv/Scripts/python.exe scripts/train_models.py --assets XAUUSD --timeframe 1h --tune
 """
 
 import argparse
+import json
 import sys
 from pathlib import Path
+
+import numpy as np
 
 # Add backend src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -29,22 +34,41 @@ from src.models.xgboost_model import XGBoostClassifier
 
 
 # Approximate hourly bars per trading day for each timeframe
-# Gold/BTC trade ~22-24h/day, S&P 500 CFDs ~16-24h; 24 is a safe average
+# Gold/BTC/Forex trade ~22-24h/day, S&P 500/DAX CFDs ~16-24h
 BARS_PER_DAY = {
     "1h": 24,
     "4h": 6,
     "1d": 1,
 }
 
+# Individual stocks (NVDA, TSLA) trade ~8-11h/day on Capital.com CFDs
+STOCK_EPICS = {"NVDA", "TSLA"}
+STOCK_BARS_PER_DAY = {
+    "1h": 10,
+    "4h": 3,
+    "1d": 1,
+}
 
-def get_walk_forward_splitter(timeframe: str) -> WalkForwardSplitter:
+# Active trading assets (EURUSD excluded: tiny ATR → massive position sizes → -99% OOS)
+ACTIVE_ASSETS = ["XAUUSD", "BTCUSD", "US500", "WTIUSD", "NVDA", "TSLA", "XAGUSD", "DE40"]
+ALL_ASSETS = ACTIVE_ASSETS + ["EURUSD"]
+
+# Directory to save/load tuned hyperparameters
+TUNED_PARAMS_DIR = Path(__file__).parent.parent / "data" / "tuned_params"
+
+
+def get_walk_forward_splitter(timeframe: str, epic: str = "") -> WalkForwardSplitter:
     """Create a WalkForwardSplitter with windows scaled to the timeframe.
 
     The base windows are calibrated for daily bars (252/63/21 trading days).
     For intraday timeframes, we scale by bars_per_day to maintain the same
     calendar coverage (~1 year train, ~3 months val, ~1 month test).
+    Stock epics (NVDA, TSLA) use reduced bars_per_day since they trade fewer hours.
     """
-    scale = BARS_PER_DAY.get(timeframe, 1)
+    if epic in STOCK_EPICS:
+        scale = STOCK_BARS_PER_DAY.get(timeframe, 1)
+    else:
+        scale = BARS_PER_DAY.get(timeframe, 1)
     return WalkForwardSplitter(
         train_window=252 * scale,
         val_window=63 * scale,
@@ -55,15 +79,94 @@ def get_walk_forward_splitter(timeframe: str) -> WalkForwardSplitter:
     )
 
 
+def tune_hyperparameters(
+    epic: str,
+    timeframe: str,
+    feature_builder: FeatureBuilder,
+    splitter: WalkForwardSplitter,
+    n_trials: int = 40,
+) -> dict:
+    """Run Optuna tuning on the first walk-forward fold. Returns best params dict."""
+    from src.models.target_builder import TargetBuilder
+    from src.models.tuner import XGBoostTuner
+
+    logger.info(f"Tuning hyperparameters for {epic} ({n_trials} trials)...")
+
+    # Build features
+    df, feature_meta = feature_builder.build_features(
+        epic=epic, timeframe=timeframe, normalize=True,
+        include_regime=True, multi_timeframe=True,
+    )
+    if df.is_empty():
+        logger.warning(f"No data for {epic}/{timeframe}, skipping tuning")
+        return {}
+
+    target_builder = TargetBuilder()
+    df = target_builder.build_targets(df)
+    df_valid = df.filter(df["target"].is_not_null())
+
+    # Extract feature matrix
+    zscore_features = [c for c in feature_meta.feature_names if c.endswith("_zscore")]
+    raw_features = [
+        c for c in feature_meta.feature_names
+        if not c.endswith("_zscore") and c != "regime" and f"{c}_zscore" not in df.columns
+    ]
+    feature_cols = zscore_features + raw_features
+    feature_cols = [c for c in feature_cols if c in df_valid.columns]
+
+    X = df_valid.select(feature_cols).to_numpy().astype(np.float64)
+    y = df_valid["target"].to_numpy().astype(np.int32)
+    X = np.nan_to_num(X, nan=0.0)
+
+    n_samples = len(X)
+    if n_samples < splitter.min_samples:
+        logger.warning(f"Not enough data for tuning ({n_samples} < {splitter.min_samples})")
+        return {}
+
+    # Get first fold
+    first_split = next(splitter.split(n_samples))
+    X_train = X[first_split.train_indices]
+    y_train = y[first_split.train_indices]
+    X_val = X[first_split.val_indices]
+    y_val = y[first_split.val_indices]
+
+    # Feature selection before tuning (optional, reduces search space)
+    tuner = XGBoostTuner(n_trials=n_trials)
+    best_params = tuner.tune(X_train, y_train, X_val, y_val)
+
+    return best_params
+
+
+def save_tuned_params(epic: str, timeframe: str, params: dict) -> None:
+    """Save tuned hyperparameters to disk for reuse."""
+    TUNED_PARAMS_DIR.mkdir(parents=True, exist_ok=True)
+    path = TUNED_PARAMS_DIR / f"{epic}_{timeframe}.json"
+    path.write_text(json.dumps(params, indent=2))
+    logger.info(f"Saved tuned params to {path}")
+
+
+def load_tuned_params(epic: str, timeframe: str) -> dict | None:
+    """Load previously tuned params. Returns None if not found."""
+    path = TUNED_PARAMS_DIR / f"{epic}_{timeframe}.json"
+    if path.exists():
+        params = json.loads(path.read_text())
+        logger.info(f"Loaded tuned params from {path}")
+        return params
+    return None
+
+
 def train_asset(
     trainer: ModelTrainer,
     epic: str,
     timeframe: str,
     data_access: DataAccessLayer,
+    xgb_params: dict | None = None,
 ) -> bool:
     """Train XGBoost model for a single asset. Returns True on success."""
     logger.info(f"\n{'='*60}")
     logger.info(f"Training {epic}/{timeframe}")
+    if xgb_params:
+        logger.info(f"Using tuned params: {xgb_params}")
     logger.info(f"{'='*60}")
 
     # Check data availability
@@ -88,16 +191,29 @@ def train_asset(
     n_folds = trainer.splitter.get_n_splits(n_bars)
     logger.info(f"Walk-forward: {n_folds} folds (train={trainer.splitter.train_window} bars)")
 
-    # Create a fresh model instance for each asset
-    model = XGBoostClassifier(
-        max_depth=6,
-        learning_rate=0.1,
-        n_estimators=500,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        min_child_weight=5,
-        early_stopping_rounds=20,
-    )
+    # Create model with tuned or default params
+    if xgb_params:
+        model = XGBoostClassifier(
+            max_depth=xgb_params.get("max_depth", 6),
+            learning_rate=xgb_params.get("learning_rate", 0.1),
+            n_estimators=xgb_params.get("n_estimators", 500),
+            subsample=xgb_params.get("subsample", 0.8),
+            colsample_bytree=xgb_params.get("colsample_bytree", 0.8),
+            min_child_weight=xgb_params.get("min_child_weight", 5),
+            reg_alpha=xgb_params.get("reg_alpha", 0.1),
+            reg_lambda=xgb_params.get("reg_lambda", 1.0),
+            early_stopping_rounds=50,
+        )
+    else:
+        model = XGBoostClassifier(
+            max_depth=6,
+            learning_rate=0.1,
+            n_estimators=500,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            min_child_weight=5,
+            early_stopping_rounds=20,
+        )
 
     try:
         result = trainer.train(
@@ -147,6 +263,8 @@ def main(args: argparse.Namespace) -> None:
     """Train XGBoost models for all configured assets."""
     logger.info("=" * 60)
     logger.info("AlgoTrader AI - Model Training")
+    if args.tune:
+        logger.info(f"  Optuna tuning: {args.tune_trials} trials per asset")
     logger.info("=" * 60)
 
     assets = args.assets
@@ -160,20 +278,33 @@ def main(args: argparse.Namespace) -> None:
     data_access = DataAccessLayer(storage=storage)
     feature_builder = FeatureBuilder(data_access=data_access)
     versioning = ModelVersioning()
-    splitter = get_walk_forward_splitter(timeframe)
-
-    logger.info(f"Walk-forward config: {splitter.describe(0)}")
-
-    trainer = ModelTrainer(
-        feature_builder=feature_builder,
-        versioning=versioning,
-        splitter=splitter,
-    )
 
     # Train each asset
     results = {}
     for epic in assets:
-        success = train_asset(trainer, epic, timeframe, data_access)
+        splitter = get_walk_forward_splitter(timeframe, epic)
+        logger.info(f"Walk-forward config for {epic}: {splitter.describe(0)}")
+
+        # Optuna hyperparameter tuning
+        xgb_params = None
+        if args.tune:
+            # Try to load cached params first
+            if not args.retune:
+                xgb_params = load_tuned_params(epic, timeframe)
+
+            if xgb_params is None:
+                xgb_params = tune_hyperparameters(
+                    epic, timeframe, feature_builder, splitter, args.tune_trials
+                )
+                if xgb_params:
+                    save_tuned_params(epic, timeframe, xgb_params)
+
+        trainer = ModelTrainer(
+            feature_builder=feature_builder,
+            versioning=versioning,
+            splitter=splitter,
+        )
+        success = train_asset(trainer, epic, timeframe, data_access, xgb_params)
         results[epic] = success
 
     # Summary
@@ -204,13 +335,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--assets",
         nargs="+",
-        default=["XAUUSD", "BTCUSD", "US500"],
-        help="Asset epics to train (default: XAUUSD BTCUSD US500)",
+        default=ACTIVE_ASSETS,
+        help="Asset epics to train (default: 8 active assets, excludes EURUSD)",
     )
     parser.add_argument(
         "--timeframe",
         default="1h",
         help="Timeframe for training (default: 1h)",
+    )
+    parser.add_argument(
+        "--tune", action="store_true",
+        help="Enable Optuna hyperparameter tuning (40 trials per asset)",
+    )
+    parser.add_argument(
+        "--tune-trials", type=int, default=40,
+        help="Number of Optuna trials per asset (default: 40)",
+    )
+    parser.add_argument(
+        "--retune", action="store_true",
+        help="Force re-tuning even if cached params exist",
     )
     return parser.parse_args()
 

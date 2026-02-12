@@ -257,7 +257,7 @@ class TestTradingEndpoints:
     def test_stop_endpoint_when_not_running(self, trading_client):
         """POST /api/trading/stop when not running returns error."""
         resp = trading_client.post("/api/trading/stop")
-        assert resp.status_code == 400
+        assert resp.status_code == 409
         data = resp.json()
         assert data["success"] is False
 

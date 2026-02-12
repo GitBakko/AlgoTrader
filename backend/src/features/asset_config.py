@@ -105,11 +105,155 @@ US500_CONFIG = AssetFeatureConfig(
 )
 
 
+# ===== Crude Oil WTI (WTIUSD) =====
+WTIUSD_CONFIG = AssetFeatureConfig(
+    epic="WTIUSD",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={
+        **DEFAULT_TECHNICAL_PARAMS,
+        # Oil: high volatility, news-driven, standard periods
+        "ema_periods": [8, 21, 50, 200],
+        "hvol_period": 20,
+    },
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="gold_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with Gold (commodities)"},
+        ),
+    ],
+)
+
+
+# ===== EUR/USD (EURUSD) =====
+EURUSD_CONFIG = AssetFeatureConfig(
+    epic="EURUSD",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={
+        **DEFAULT_TECHNICAL_PARAMS,
+        # Forex: low volatility, high liquidity, standard periods
+        "ema_periods": [8, 21, 50, 200],
+        "rsi_period": 14,
+    },
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="dxy_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Inverse correlation with DXY index"},
+        ),
+    ],
+)
+
+
+# ===== NVIDIA (NVDA) =====
+NVDA_CONFIG = AssetFeatureConfig(
+    epic="NVDA",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={
+        **DEFAULT_TECHNICAL_PARAMS,
+        # Tech stock: high volatility, earnings-driven
+        "ema_periods": [8, 21, 50, 200],
+        "hvol_period": 20,
+    },
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="sp500_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with S&P 500"},
+        ),
+    ],
+)
+
+
+# ===== Tesla (TSLA) =====
+TSLA_CONFIG = AssetFeatureConfig(
+    epic="TSLA",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={
+        **DEFAULT_TECHNICAL_PARAMS,
+        # Tesla: very high volatility, sentiment-driven
+        "ema_periods": [8, 21, 50, 200],
+        "hvol_period": 20,
+    },
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="sp500_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with S&P 500"},
+        ),
+    ],
+)
+
+
+# ===== Silver (XAGUSD) =====
+XAGUSD_CONFIG = AssetFeatureConfig(
+    epic="XAGUSD",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={
+        **DEFAULT_TECHNICAL_PARAMS,
+        # Silver: correlates with gold, higher volatility
+        "ema_periods": [8, 21, 50, 200],
+        "rsi_period": 14,
+    },
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="gold_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with Gold price"},
+        ),
+    ],
+)
+
+
+# ===== DAX / Germany 40 (DE40) =====
+DE40_CONFIG = AssetFeatureConfig(
+    epic="DE40",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={
+        **DEFAULT_TECHNICAL_PARAMS,
+        # European index, similar to US500
+        "ema_periods": [8, 21, 50, 200],
+        "rsi_period": 14,
+    },
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="sp500_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with S&P 500"},
+        ),
+    ],
+)
+
+
 # Master config dict
 ASSET_FEATURE_CONFIGS: dict[str, AssetFeatureConfig] = {
     "XAUUSD": XAUUSD_CONFIG,
     "BTCUSD": BTCUSD_CONFIG,
     "US500": US500_CONFIG,
+    "WTIUSD": WTIUSD_CONFIG,
+    "EURUSD": EURUSD_CONFIG,
+    "NVDA": NVDA_CONFIG,
+    "TSLA": TSLA_CONFIG,
+    "XAGUSD": XAGUSD_CONFIG,
+    "DE40": DE40_CONFIG,
 }
 
 
@@ -118,7 +262,7 @@ def get_asset_config(epic: str) -> AssetFeatureConfig:
     Get feature configuration for an asset.
 
     Args:
-        epic: Asset epic (XAUUSD, BTCUSD, US500)
+        epic: Asset epic code
 
     Returns:
         AssetFeatureConfig for the asset

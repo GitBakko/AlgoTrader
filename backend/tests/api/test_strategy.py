@@ -9,9 +9,12 @@ class TestStrategyConfig:
         assert resp.status_code == 200
         data = resp.json()["data"]
         assert isinstance(data, list)
-        assert len(data) == 3
+        assert len(data) == 9
         epics = {c["epic"] for c in data}
-        assert epics == {"XAUUSD", "BTCUSD", "US500"}
+        assert epics == {
+            "XAUUSD", "BTCUSD", "US500", "WTIUSD", "EURUSD",
+            "NVDA", "TSLA", "XAGUSD", "DE40",
+        }
 
     def test_config_has_expected_fields(self, client):
         data = client.get("/api/strategy/config").json()["data"]

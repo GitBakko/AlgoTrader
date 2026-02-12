@@ -39,6 +39,23 @@
       <div class="nav-item py-1">
         <div class="vr h-100 mx-2 text-body text-opacity-75"></div>
       </div>
+      <c-nav-item>
+        <span
+          class="nav-link d-flex align-items-center gap-1"
+          [cTooltip]="wsConnected() ? 'WebSocket connected' : 'WebSocket disconnected'"
+        >
+          <span
+            class="d-inline-block rounded-circle"
+            [style.width.px]="8"
+            [style.height.px]="8"
+            [style.background-color]="wsConnected() ? '#2eb85c' : '#e55353'"
+          ></span>
+          <small class="d-none d-lg-inline">{{ wsConnected() ? 'Live' : 'Offline' }}</small>
+        </span>
+      </c-nav-item>
+      <div class="nav-item py-1">
+        <div class="vr h-100 mx-2 text-body text-opacity-75"></div>
+      </div>
       <ng-container *ngTemplateOutlet="themeDropdown" />
       <div class="nav-item py-1">
         <div class="vr h-100 mx-2 text-body text-opacity-75"></div>

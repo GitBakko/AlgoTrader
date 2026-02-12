@@ -66,6 +66,12 @@ _BASE_PRICES = {
     "XAUUSD": 2000.0,
     "BTCUSD": 50000.0,
     "US500": 5000.0,
+    "WTIUSD": 75.0,
+    "EURUSD": 1.08,
+    "NVDA": 800.0,
+    "TSLA": 250.0,
+    "XAGUSD": 25.0,
+    "DE40": 18000.0,
 }
 
 

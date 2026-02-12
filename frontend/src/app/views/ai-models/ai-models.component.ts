@@ -5,7 +5,6 @@ import {
   ColComponent, RowComponent, TableDirective, BadgeComponent
 } from '@coreui/angular';
 import { TradingService } from '../../core/services/trading.service';
-import { MLModel } from '../../core/models';
 
 @Component({
   selector: 'app-ai-models',
@@ -34,7 +33,7 @@ import { MLModel } from '../../core/models';
                 </tr>
               </thead>
               <tbody>
-                @for (model of models; track model.id) {
+                @for (model of models(); track model.id) {
                   <tr>
                     <td><strong>{{ model.name }}</strong></td>
                     <td>{{ model.type }}</td>
@@ -60,9 +59,9 @@ import { MLModel } from '../../core/models';
 })
 export class AiModelsComponent implements OnInit {
   private readonly trading = inject(TradingService);
-  models: MLModel[] = [];
+  readonly models = this.trading.models;
 
   ngOnInit(): void {
-    this.trading.listModels().subscribe(data => this.models = data);
+    this.trading.loadModels();
   }
 }

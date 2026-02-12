@@ -26,6 +26,11 @@ export const navItems: INavData[] = [
     iconComponent: { name: 'cil-chart-line' }
   },
   {
+    name: 'Paper Trading',
+    url: '/paper-trading',
+    iconComponent: { name: 'cil-media-play' }
+  },
+  {
     title: true,
     name: 'Analysis'
   },
