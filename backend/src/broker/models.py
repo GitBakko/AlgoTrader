@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 # ===== Enums =====
@@ -184,16 +184,33 @@ class WorkingOrder(BaseModel):
 
 # ===== Account Models =====
 class Account(BaseModel):
-    """Account information."""
+    """Account information.
+
+    Capital.com returns balance as a nested dict:
+    {"balance": {"balance": 0.0, "deposit": 10000.0, "profitLoss": 0.0, "available": 0.0}}
+    This model flattens it automatically.
+    """
 
     account_id: str = Field(alias="accountId")
     account_name: str = Field(alias="accountName")
     account_type: str = Field(alias="accountType")
     currency: str
-    balance: float
-    deposit: float  # Total deposits
-    profit_loss: float = Field(alias="profitLoss")
-    available: float  # Available funds
+    balance: float = 0.0
+    deposit: float = 0.0
+    profit_loss: float = Field(default=0.0, alias="profitLoss")
+    available: float = 0.0
+
+    @model_validator(mode="before")
+    @classmethod
+    def _flatten_balance(cls, data: Any) -> Any:
+        """Flatten nested balance dict from Capital.com API."""
+        if isinstance(data, dict) and isinstance(data.get("balance"), dict):
+            bal = data.pop("balance")
+            data["balance"] = bal.get("balance", 0.0)
+            data.setdefault("deposit", bal.get("deposit", 0.0))
+            data.setdefault("profitLoss", bal.get("profitLoss", 0.0))
+            data.setdefault("available", bal.get("available", 0.0))
+        return data
 
 
 class Transaction(BaseModel):
