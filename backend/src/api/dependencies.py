@@ -90,13 +90,17 @@ async def get_db_session(request: Request) -> AsyncGenerator[AsyncSession | None
         yield None
         return
 
-    async with db_factory() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
+    try:
+        async with db_factory() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+    except OSError:
+        # PostgreSQL not reachable — fall back to in-memory mode
+        yield None
 
 
 async def get_position_repo(

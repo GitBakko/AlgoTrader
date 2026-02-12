@@ -117,6 +117,7 @@ async def lifespan(app: FastAPI):
         strategy_manager=app.state.strategy_manager,
         risk_manager=app.state.risk_manager,
         execution_engine=app.state.execution_engine,
+        data_access=app.state.data_access,
     )
     logger.info("Paper trading loop initialized (use POST /api/trading/start to begin)")
 

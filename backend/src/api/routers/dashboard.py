@@ -7,6 +7,7 @@ Dual-mode: uses DB when available, falls back to in-memory state.
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query, Request
+from loguru import logger
 
 from src.api.dependencies import (
     get_execution_engine,
@@ -38,23 +39,32 @@ async def get_overview(
     """Get dashboard overview with key metrics."""
     state = risk_mgr.drawdown_monitor.state
 
-    # Count open positions
-    if position_repo is not None:
-        open_positions = await position_repo.get_open_positions()
-        open_count = len(open_positions)
-    else:
+    # Count open positions (graceful DB fallback)
+    open_count = 0
+    try:
+        if position_repo is not None:
+            open_positions = await position_repo.get_open_positions()
+            open_count = len(open_positions)
+        else:
+            positions = await engine.get_open_positions()
+            open_count = len(positions)
+    except Exception as e:
+        logger.debug(f"DB position query failed, using in-memory: {e}")
         positions = await engine.get_open_positions()
         open_count = len(positions)
 
-    # Get trade stats from DB if available
+    # Get trade stats from DB if available (graceful fallback)
     win_rate = 0.0
     if trade_repo is not None:
-        now = datetime.now(timezone.utc)
-        summary = await trade_repo.get_pnl_summary(
-            now - timedelta(days=30), now
-        )
-        if summary["trade_count"] > 0:
-            win_rate = summary.get("win_rate", 0.0)
+        try:
+            now = datetime.utcnow()
+            summary = await trade_repo.get_pnl_summary(
+                now - timedelta(days=30), now
+            )
+            if summary["trade_count"] > 0:
+                win_rate = summary.get("win_rate", 0.0)
+        except Exception as e:
+            logger.debug(f"DB trade summary query failed: {e}")
 
     overview = DashboardOverview(
         equity=state.current_equity,
@@ -105,22 +115,25 @@ async def get_recent_trades(
     trade_repo=Depends(get_trade_repo),
 ):
     """Get recent closed trades."""
-    # Try DB first
+    # Try DB first (graceful fallback)
     if trade_repo is not None:
-        trades = await trade_repo.get_recent_trades(hours=168)
-        result = [
-            TradeResponse(
-                deal_id=t.deal_reference or f"trade-{t.id}",
-                epic=t.epic,
-                direction=t.direction,
-                size=float(t.size),
-                entry_price=float(t.price),
-                pnl=float(t.profit_loss) if t.profit_loss else None,
-                timestamp=t.executed_at.isoformat() if t.executed_at else "",
-            ).model_dump()
-            for t in trades[:limit]
-        ]
-        return success_response(result)
+        try:
+            trades = await trade_repo.get_recent_trades(hours=168)
+            result = [
+                TradeResponse(
+                    deal_id=t.deal_reference or f"trade-{t.id}",
+                    epic=t.epic,
+                    direction=t.direction,
+                    size=float(t.size),
+                    entry_price=float(t.price),
+                    pnl=float(t.profit_loss) if t.profit_loss else None,
+                    timestamp=t.executed_at.isoformat() if t.executed_at else "",
+                ).model_dump()
+                for t in trades[:limit]
+            ]
+            return success_response(result)
+        except Exception as e:
+            logger.debug(f"DB recent trades query failed: {e}")
 
     # Fallback: no trade history without DB
     return success_response([])

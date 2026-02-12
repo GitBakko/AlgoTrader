@@ -28,9 +28,9 @@ class TradeRepository(BaseRepository[Trade]):
 
     async def get_recent_trades(self, hours: int = 24) -> list[Trade]:
         """Get trades executed in the last N hours."""
-        from datetime import timedelta, timezone
+        from datetime import timedelta
 
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+        cutoff = datetime.utcnow() - timedelta(hours=hours)
         result = await self.session.execute(
             select(Trade)
             .where(Trade.executed_at >= cutoff)
