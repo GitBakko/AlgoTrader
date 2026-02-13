@@ -85,3 +85,61 @@ class TestSignalGenerator:
         # 0.95 * 0.7 = 0.665 > 0.50 -> should still SELL
         assert signal.direction == SignalDirection.SELL
         assert signal.confidence == pytest.approx(0.665)
+
+    # ===== ADX Pre-Signal Filter Tests =====
+
+    def test_adx_low_rejects_directional_signal(self):
+        """ADX below ranging threshold rejects BUY/SELL -> HOLD."""
+        pred = _make_prediction(SignalClass.BUY, 0.80)
+        config = StrategyConfig(adx_ranging_threshold=20.0)
+        signal = SignalGenerator.generate_signal(
+            pred, "XAUUSD", 2000.0, atr=20.0, config=config, adx=15.0
+        )
+        assert signal.direction == SignalDirection.HOLD
+
+    def test_adx_trending_boosts_confidence(self):
+        """ADX above trending threshold boosts confidence."""
+        pred = _make_prediction(SignalClass.BUY, 0.70)
+        config = StrategyConfig(
+            adx_trending_threshold=25.0,
+            adx_confidence_boost=0.05,
+        )
+        signal = SignalGenerator.generate_signal(
+            pred, "XAUUSD", 2000.0, atr=20.0, config=config, adx=30.0
+        )
+        assert signal.direction == SignalDirection.BUY
+        assert signal.confidence == pytest.approx(0.75)
+
+    def test_adx_none_skips_filter(self):
+        """adx=None should not affect signal (backward compatible)."""
+        pred = _make_prediction(SignalClass.BUY, 0.80)
+        signal = SignalGenerator.generate_signal(
+            pred, "XAUUSD", 2000.0, atr=20.0, adx=None
+        )
+        assert signal.direction == SignalDirection.BUY
+        assert signal.confidence == 0.80
+
+    def test_atr_zero_returns_hold(self):
+        """ATR <= 0 should return HOLD immediately."""
+        pred = _make_prediction(SignalClass.BUY, 0.80)
+        signal = SignalGenerator.generate_signal(pred, "XAUUSD", 2000.0, atr=0.0)
+        assert signal.direction == SignalDirection.HOLD
+
+    def test_atr_negative_returns_hold(self):
+        """Negative ATR should return HOLD."""
+        pred = _make_prediction(SignalClass.SELL, 0.90)
+        signal = SignalGenerator.generate_signal(pred, "XAUUSD", 2000.0, atr=-5.0)
+        assert signal.direction == SignalDirection.HOLD
+
+    def test_adx_between_thresholds_no_effect(self):
+        """ADX between ranging and trending thresholds: no reject, no boost."""
+        pred = _make_prediction(SignalClass.BUY, 0.70)
+        config = StrategyConfig(
+            adx_ranging_threshold=20.0,
+            adx_trending_threshold=25.0,
+        )
+        signal = SignalGenerator.generate_signal(
+            pred, "XAUUSD", 2000.0, atr=20.0, config=config, adx=22.0
+        )
+        assert signal.direction == SignalDirection.BUY
+        assert signal.confidence == 0.70

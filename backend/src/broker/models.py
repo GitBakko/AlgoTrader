@@ -136,6 +136,8 @@ class CreatePositionRequest(BaseModel):
 class ModifyPositionRequest(BaseModel):
     """Request to modify an existing position."""
 
+    model_config = {"populate_by_name": True}
+
     stop_level: float | None = Field(None, alias="stopLevel")
     profit_level: float | None = Field(None, alias="profitLevel")
 

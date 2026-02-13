@@ -10,9 +10,10 @@ from pydantic import BaseModel, Field
 
 
 class ExecutionMode(str, Enum):
-    """Execution mode: paper trading or live."""
+    """Execution mode: paper trading, demo broker, or live."""
 
     PAPER = "PAPER"
+    DEMO = "DEMO"
     LIVE = "LIVE"
 
 
@@ -38,5 +39,6 @@ class ExecutionResult(BaseModel):
     fill_price: float | None = None
     slippage: float = 0.0
     error: str | None = None
+    error_detail: dict | None = None
     execution_time_ms: float = 0.0
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

@@ -155,12 +155,12 @@ class TestSessionManager:
 
         assert manager.tokens is None
 
-        # Mock authenticate method
+        # Mock inner authenticate method (get_tokens calls _authenticate_inner)
         expected_tokens = SessionTokens(
             cst="new_cst", security_token="new_token", created_at=datetime.now(timezone.utc)
         )
 
-        with patch.object(manager, "authenticate", return_value=expected_tokens) as mock_auth:
+        with patch.object(manager, "_authenticate_inner", return_value=expected_tokens) as mock_auth:
             tokens = await manager.get_tokens()
 
         assert tokens == expected_tokens
@@ -213,7 +213,7 @@ class TestSessionManager:
             cst="new_cst", security_token="new_token", created_at=datetime.now(timezone.utc)
         )
 
-        with patch.object(manager, "authenticate", return_value=new_tokens) as mock_auth:
+        with patch.object(manager, "_authenticate_inner", return_value=new_tokens) as mock_auth:
             tokens = await manager.get_tokens()
 
         # Should re-authenticate and return new tokens

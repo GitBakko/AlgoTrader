@@ -171,8 +171,13 @@ class CapitalComClient:
             if response.status_code >= 400:
                 error_data = response.json() if response.text else {}
                 error_code = error_data.get("errorCode", "unknown")
-                error_message = error_data.get("errorMessage", response.text)
-                raise map_error(error_code, error_message)
+                error_message = error_data.get("errorMessage", "")
+                # Capital.com sometimes puts the full message inside errorCode
+                # (e.g., "Rejected. TSLA is currently closed. Timetable in place: ...")
+                if len(error_code) > 50 or (" " in error_code and error_code != "unknown"):
+                    error_message = error_message or error_code
+                    error_code = error_code  # keep for fuzzy matching in map_error
+                raise map_error(error_code, error_message or response.text)
 
             # Parse response
             if response.text:
@@ -184,6 +189,22 @@ class CapitalComClient:
             raise CapitalComError(f"HTTP error: {e}")
 
     # ===== Market Data Methods =====
+
+    async def get_market_details(self, epic: str) -> dict:
+        """
+        Get detailed market info including status, trading hours, and instrument specs.
+
+        Uses GET /api/v1/markets/{epic} — returns snapshot with marketStatus
+        (TRADEABLE, CLOSED, etc.), instrument details, and dealing rules.
+
+        Args:
+            epic: Internal epic code (e.g., "XAUUSD", "TSLA")
+
+        Returns:
+            Raw dict from Capital.com (includes 'snapshot', 'instrument', 'dealingRules')
+        """
+        broker_epic = self._to_broker_epic(epic)
+        return await self._request("GET", f"/api/v1/markets/{broker_epic}")
 
     async def search_markets(self, search_term: str) -> list[Market]:
         """

@@ -37,6 +37,9 @@ from src.models.schemas import SignalClass
 from src.models.target_builder import TargetBuilder
 from src.models.walk_forward import WalkForwardSplitter
 from src.models.xgboost_model import XGBoostClassifier
+from src.strategy.squeeze_strategy import SqueezeBreakoutStrategy
+from src.strategy.strategy_router import StrategyRouter
+from src.strategy.vwap_strategy import VWAPReversionStrategy
 
 # Walk-forward window sizes (scaled for timeframe)
 WINDOWS = {
@@ -111,6 +114,98 @@ def sweep_confidence_thresholds(
     return best_threshold, results
 
 
+def _run_strategy_backtest(
+    strategy_name: str,
+    df: pl.DataFrame,
+    epic: str,
+    timeframe: str,
+    data_access: DataAccessLayer,
+    initial_capital: float,
+    risk_per_trade: float,
+) -> None:
+    """
+    Run a backtest using a rule-based strategy instead of ML walk-forward.
+
+    Generates signals from the strategy's vectorized backtest method,
+    converts to BacktestEngine format, and runs the backtest.
+    """
+    # Create strategy instance
+    if strategy_name == "squeeze_breakout":
+        strat = SqueezeBreakoutStrategy()
+    elif strategy_name == "vwap_reversion":
+        strat = VWAPReversionStrategy()
+    elif strategy_name == "auto":
+        router = StrategyRouter()
+        router.register_strategy(SqueezeBreakoutStrategy())
+        router.register_strategy(VWAPReversionStrategy())
+        strat = router
+    else:
+        logger.error(f"Unknown strategy: {strategy_name}")
+        return
+
+    logger.info(f"Generating {strategy_name} signals on {len(df)} bars...")
+    strategy_df = strat.generate_backtest_signals(df, epic, timeframe)
+
+    # Check signal columns exist
+    if "signal_direction" not in strategy_df.columns:
+        logger.error("Strategy did not produce signal_direction column")
+        return
+
+    # Convert signal_direction (1=BUY, -1=SELL, 0=HOLD) to SignalClass
+    # BUY=2, SELL=0, HOLD=1
+    atr_col = "atr_14" if "atr_14" in strategy_df.columns else None
+
+    signals_df = strategy_df.select([
+        pl.col("timestamp"),
+        pl.when(pl.col("signal_direction") == 1)
+        .then(pl.lit(SignalClass.BUY))
+        .when(pl.col("signal_direction") == -1)
+        .then(pl.lit(SignalClass.SELL))
+        .otherwise(pl.lit(SignalClass.HOLD))
+        .alias("signal"),
+        pl.col("signal_confidence").alias("confidence"),
+        pl.col(atr_col).alias("atr") if atr_col else pl.lit(0.0).alias("atr"),
+    ]).sort("timestamp")
+
+    # Signal stats
+    n_buy = signals_df.filter(pl.col("signal") == SignalClass.BUY).height
+    n_sell = signals_df.filter(pl.col("signal") == SignalClass.SELL).height
+    n_hold = signals_df.filter(pl.col("signal") == SignalClass.HOLD).height
+    logger.info(f"Signals: {n_buy} BUY, {n_sell} SELL, {n_hold} HOLD")
+
+    if n_buy + n_sell == 0:
+        logger.warning("No active signals (all HOLD). Check strategy parameters.")
+        return
+
+    # Get OHLC data for backtest period
+    bt_start = signals_df["timestamp"].min()
+    bt_end = signals_df["timestamp"].max()
+
+    ohlc_df = data_access.get_candles(
+        epic=epic, timeframe=timeframe,
+        start_date=bt_start, end_date=bt_end,
+    )
+
+    if ohlc_df.is_empty():
+        logger.error("No OHLC data for signal period")
+        return
+
+    config = BacktestConfig(
+        epic=epic,
+        timeframe=timeframe,
+        start_date=bt_start,
+        end_date=bt_end,
+        initial_capital=initial_capital,
+        risk_per_trade=risk_per_trade,
+    )
+
+    engine = BacktestEngine(config)
+    result = engine.run(ohlc_df, signals_df)
+
+    print("\n" + BacktestReporter.summarize(result))
+    print()
+
+
 def run_walk_forward_backtest(
     epic: str,
     timeframe: str,
@@ -120,10 +215,11 @@ def run_walk_forward_backtest(
     tune_trials: int = 40,
     prune_pct: float = 0.0,
     do_sweep_threshold: bool = False,
+    strategy: str = "ml_ensemble",
 ) -> None:
     """Run walk-forward backtest for a single asset."""
     logger.info(f"\n{'='*60}")
-    logger.info(f"Walk-Forward Backtest: {epic}/{timeframe}")
+    logger.info(f"Walk-Forward Backtest: {epic}/{timeframe} [{strategy}]")
     opts = []
     if tune:
         opts.append(f"tune({tune_trials})")
@@ -161,6 +257,19 @@ def run_walk_forward_backtest(
 
     if df.is_empty():
         logger.error(f"No data available for {epic}/{timeframe}")
+        return
+
+    # === Non-ML strategy path ===
+    if strategy != "ml_ensemble":
+        _run_strategy_backtest(
+            strategy_name=strategy,
+            df=df,
+            epic=epic,
+            timeframe=timeframe,
+            data_access=data_access,
+            initial_capital=initial_capital,
+            risk_per_trade=risk_per_trade,
+        )
         return
 
     # Generate targets
@@ -396,6 +505,11 @@ def main():
         "--sweep-threshold", action="store_true",
         help="Sweep confidence thresholds to find optimal per-asset"
     )
+    parser.add_argument(
+        "--strategy", type=str, default="ml_ensemble",
+        choices=["ml_ensemble", "squeeze_breakout", "vwap_reversion", "auto"],
+        help="Strategy to use (default: ml_ensemble)"
+    )
     args = parser.parse_args()
 
     epics = [args.epic] if args.epic else ASSETS
@@ -411,6 +525,7 @@ def main():
                 tune_trials=args.tune_trials,
                 prune_pct=args.prune_pct,
                 do_sweep_threshold=args.sweep_threshold,
+                strategy=args.strategy,
             )
         except Exception as e:
             logger.error(f"Failed for {epic}: {e}")

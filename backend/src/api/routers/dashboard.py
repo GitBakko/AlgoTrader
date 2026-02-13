@@ -73,7 +73,7 @@ async def get_overview(
         open_positions_count=open_count,
         win_rate=win_rate,
         circuit_breaker_active=state.circuit_breaker_active,
-        trading_mode="paper" if engine.mode == ExecutionMode.PAPER else "live",
+        trading_mode=engine.mode.value.lower(),
     )
 
     data = overview.model_dump()

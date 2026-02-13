@@ -9,7 +9,7 @@ import {
 
 import { TradingService } from '../../core/services/trading.service';
 import { WebSocketService } from '../../core/services/websocket.service';
-import { PaperPosition, PaperSignal } from '../../core/models';
+import { PaperPosition, PaperSignal, BrokerErrorDetail } from '../../core/models';
 
 interface KpiCard {
   label: string;
@@ -54,6 +54,9 @@ interface LivePosition extends PaperPosition {
             <c-badge [color]="status()?.running ? 'success' : 'secondary'" class="fs-6 mb-1">
               {{ status()?.running ? 'RUNNING' : 'STOPPED' }}
             </c-badge>
+            <c-badge [color]="modeColor()" class="fs-6 mb-1 ms-2">
+              {{ status()?.execution_mode ?? 'PAPER' }}
+            </c-badge>
             @if (status()?.message && !status()?.running && !status()?.epics) {
               <div class="text-warning small mt-1">{{ status()?.message }}</div>
             }
@@ -72,7 +75,7 @@ interface LivePosition extends PaperPosition {
           </c-col>
           <c-col md="4" class="text-end">
             <button cButton [color]="status()?.running ? 'danger' : 'success'"
-                    (click)="togglePaperTrading()" [disabled]="actionInProgress()">
+                    (click)="togglePaperTrading()" [disabled]="actionInProgress() || !statusLoaded()">
               @if (actionInProgress()) {
                 <c-spinner size="sm" class="me-2"></c-spinner>
               }
@@ -145,7 +148,7 @@ interface LivePosition extends PaperPosition {
                     <th>Direzione</th>
                     <th>Confidenza</th>
                     <th>Prezzo</th>
-                    <th>Ora</th>
+                    <th>Stato</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -169,7 +172,24 @@ interface LivePosition extends PaperPosition {
                         </div>
                       </td>
                       <td>{{ s.info.entry_price | number:'1.2-2' }}</td>
-                      <td class="small">{{ formatDateTime(s.info.timestamp) }}</td>
+                      <td>
+                        @if (s.info.status) {
+                          <c-badge [color]="statusColor(s.info.status)">
+                            {{ statusLabel(s.info.status) }}
+                          </c-badge>
+                          @if (s.info.error_detail) {
+                            <div [class]="s.info.status === 'market_closed' ? 'text-body-secondary small mt-1' : 'text-danger small mt-1'" style="max-width: 200px;">
+                              {{ s.info.error_detail.summary }}
+                            </div>
+                          } @else if (s.info.rejection_reason) {
+                            <div class="text-danger small mt-1" style="max-width: 200px;">
+                              {{ s.info.rejection_reason }}
+                            </div>
+                          }
+                        } @else {
+                          <small class="text-body-secondary">{{ formatDateTime(s.info.timestamp) }}</small>
+                        }
+                      </td>
                     </tr>
                   }
                 </tbody>
@@ -235,7 +255,12 @@ interface LivePosition extends PaperPosition {
 
     <!-- Section E: Recent Signals -->
     <c-card class="mb-4">
-      <c-card-header><strong>Attivita Recente</strong></c-card-header>
+      <c-card-header class="d-flex align-items-center">
+        <strong>Attivita Recente</strong>
+        @if (rejectedCount() > 0) {
+          <c-badge color="danger" class="ms-2">{{ rejectedCount() }} rejected</c-badge>
+        }
+      </c-card-header>
       <c-card-body>
         @if (recentSignals().length > 0) {
           <table cTable [striped]="true" [hover]="true" [small]="true" [responsive]="true">
@@ -246,12 +271,14 @@ interface LivePosition extends PaperPosition {
                 <th>Direzione</th>
                 <th>Confidenza</th>
                 <th>Prezzo</th>
-                <th>Status</th>
+                <th>Stato</th>
+                <th>Dettaglio</th>
               </tr>
             </thead>
             <tbody>
               @for (sig of recentSignals(); track sig.timestamp + sig.epic) {
-                <tr>
+                <tr [class.table-danger]="sig.status === 'rejected' || sig.status === 'exec_failed'"
+                    [class.table-secondary]="sig.status === 'market_closed'">
                   <td class="small">{{ formatDateTime(sig.timestamp) }}</td>
                   <td><strong>{{ sig.epic }}</strong></td>
                   <td>
@@ -263,8 +290,43 @@ interface LivePosition extends PaperPosition {
                   <td>{{ sig.entry_price | number:'1.2-2' }}</td>
                   <td>
                     <c-badge [color]="statusColor(sig.status)">
-                      {{ sig.status }}
+                      {{ statusLabel(sig.status) }}
                     </c-badge>
+                  </td>
+                  <td class="small" style="max-width: 300px;">
+                    @if (sig.error_detail) {
+                      <div class="d-flex align-items-start gap-1">
+                        <span>{{ errorIcon(sig.error_detail.error_type) }}</span>
+                        <div>
+                          <span [class]="sig.status === 'market_closed' ? 'text-body-secondary' : 'text-danger'">
+                            {{ sig.error_detail.summary }}
+                          </span>
+                          @if (sig.error_detail.details) {
+                            <div class="text-body-secondary mt-1" style="font-size: 0.75rem;">
+                              {{ sig.error_detail.details }}
+                            </div>
+                          }
+                          <button class="btn btn-link btn-sm p-0 mt-1" style="font-size: 0.7rem;"
+                                  (click)="toggleRaw(sig)">
+                            {{ sig._showRaw ? 'Nascondi RAW' : 'Visualizza RAW' }}
+                          </button>
+                          @if (sig._showRaw) {
+                            <pre class="bg-body-tertiary p-2 mt-1 rounded small mb-0"
+                                 style="font-size: 0.7rem; max-height: 100px; overflow: auto;">{{ sig.error_detail.raw }}</pre>
+                          }
+                        </div>
+                      </div>
+                    } @else if (sig.rejection_reason) {
+                      <span class="text-danger">{{ sig.rejection_reason }}</span>
+                    } @else if (sig.status === 'executed') {
+                      <span class="text-success">Trade eseguito</span>
+                    } @else if (sig.status === 'hold') {
+                      <span class="text-body-secondary">Segnale HOLD, nessuna azione</span>
+                    } @else if (sig.status === 'market_closed') {
+                      <span class="text-body-secondary">Mercato chiuso</span>
+                    } @else {
+                      <span class="text-body-secondary">—</span>
+                    }
                   </td>
                 </tr>
               }
@@ -286,6 +348,7 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   readonly errorMsg = signal('');
 
   readonly status = this.trading.paperStatus;
+  readonly statusLoaded = computed(() => this.status() !== null);
 
   // KPI cards derived from status
   readonly kpiCards = computed<KpiCard[]>(() => {
@@ -336,9 +399,14 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     return this.livePositions().reduce((sum, pos) => sum + pos.live_pnl, 0);
   });
 
-  // Recent signals (latest 20)
+  // Recent signals (latest 50)
   readonly recentSignals = computed(() => {
-    return this.trading.paperSignals().slice(0, 20);
+    return this.trading.paperSignals().slice(0, 50);
+  });
+
+  // Count of rejected signals in recent history
+  readonly rejectedCount = computed(() => {
+    return this.recentSignals().filter(s => s.status === 'rejected' || s.status === 'exec_failed').length;
   });
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -388,6 +456,14 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     setTimeout(() => this.successMsg.set(''), ms);
   }
 
+  modeColor(): string {
+    switch (this.status()?.execution_mode) {
+      case 'DEMO': return 'warning';
+      case 'LIVE': return 'danger';
+      default: return 'info';
+    }
+  }
+
   directionColor(direction: string): string {
     switch (direction) {
       case 'BUY': return 'success';
@@ -400,10 +476,39 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     switch (status) {
       case 'executed': return 'success';
       case 'rejected': return 'danger';
+      case 'exec_failed': return 'danger';
       case 'predicted': return 'info';
       case 'hold': return 'warning';
+      case 'market_closed': return 'dark';
       default: return 'secondary';
     }
+  }
+
+  statusLabel(status: string): string {
+    switch (status) {
+      case 'executed': return 'Eseguito';
+      case 'rejected': return 'Rifiutato';
+      case 'exec_failed': return 'Fallito';
+      case 'predicted': return 'Predetto';
+      case 'hold': return 'Hold';
+      case 'market_closed': return 'Chiuso';
+      default: return status;
+    }
+  }
+
+  errorIcon(errorType: string): string {
+    switch (errorType) {
+      case 'market_closed': return '\u{1F550}';
+      case 'insufficient_funds': return '\u{1F4B0}';
+      case 'rate_limit': return '\u{23F1}';
+      case 'min_size': return '\u{1F4CF}';
+      case 'max_positions': return '\u{1F4CA}';
+      default: return '\u{26A0}';
+    }
+  }
+
+  toggleRaw(sig: any): void {
+    sig._showRaw = !sig._showRaw;
   }
 
   formatDateTime(iso: string | null): string {

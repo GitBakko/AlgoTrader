@@ -40,10 +40,11 @@ class TestRiskManager:
     def test_rejects_on_total_drawdown(self):
         rm = RiskManager(initial_equity=10000.0)
         signal = _make_signal()
-        # Equity dropped 20% -> exceeds default 15% limit
+        # Equity dropped 20% -> exceeds default 15% limit (or circuit breaker daily loss)
         result = rm.check_trade(signal, equity=8000.0, atr=20.0)
         assert result.approved is False
-        assert "drawdown" in result.rejection_reason.lower()
+        reason = result.rejection_reason.lower()
+        assert "drawdown" in reason or "daily loss" in reason
 
     def test_rejects_on_daily_drawdown(self):
         rm = RiskManager(initial_equity=10000.0)

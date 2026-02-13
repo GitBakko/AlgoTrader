@@ -66,6 +66,7 @@ class StrategyManager:
             raise ValueError(f"Invalid ATR: {atr}")
         rsi = market_data.get("rsi")
         regime = market_data.get("regime")
+        adx = market_data.get("adx")
 
         # Get base config and adapt for regime
         base_config = self._get_config(epic)
@@ -80,6 +81,7 @@ class StrategyManager:
             rsi=rsi,
             regime=regime,
             config=adapted_config,
+            adx=adx,
         )
 
         logger.info(

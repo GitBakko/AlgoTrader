@@ -15,8 +15,13 @@ class RiskCheckResult(BaseModel):
     position_size: float = 0.0
     stop_loss: float = 0.0
     take_profit: float = 0.0
+    take_profit_1: float | None = None
+    take_profit_2: float | None = None
+    partial_close_pct: float = Field(default=0.50, ge=0.0, le=1.0)
     rejection_reason: str | None = None
     adjustments: list[str] = Field(default_factory=list)
+    sizing_method: str = "fixed_fractional"
+    circuit_breaker_details: dict | None = None
 
 
 class RiskLimits(BaseModel):

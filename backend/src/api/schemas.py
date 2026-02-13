@@ -185,6 +185,7 @@ class BacktestRunRequest(BaseModel):
     end_date: str | None = None
     initial_equity: float = Field(default=10000.0, gt=0)
     risk_per_trade: float = Field(default=0.02, gt=0, le=0.10)
+    strategy: str = "ml_ensemble"  # ml_ensemble, squeeze_breakout, vwap_reversion, auto
 
 
 class BacktestRunResponse(BaseModel):

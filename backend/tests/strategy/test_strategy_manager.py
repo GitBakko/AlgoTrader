@@ -60,3 +60,21 @@ class TestStrategyManager:
         sm = StrategyManager()
         alloc = sm.get_allocation("bear")
         assert alloc["XAUUSD"] > alloc["BTCUSD"]
+
+    def test_missing_current_price_raises(self):
+        sm = StrategyManager()
+        pred = _make_prediction(SignalClass.BUY, 0.80)
+        with pytest.raises(ValueError, match="current_price"):
+            sm.process_prediction(pred, "XAUUSD", {"atr": 20.0})
+
+    def test_invalid_current_price_raises(self):
+        sm = StrategyManager()
+        pred = _make_prediction(SignalClass.BUY, 0.80)
+        with pytest.raises(ValueError, match="Invalid current_price"):
+            sm.process_prediction(pred, "XAUUSD", {"current_price": -1, "atr": 20.0})
+
+    def test_invalid_atr_raises(self):
+        sm = StrategyManager()
+        pred = _make_prediction(SignalClass.BUY, 0.80)
+        with pytest.raises(ValueError, match="Invalid ATR"):
+            sm.process_prediction(pred, "XAUUSD", {"current_price": 2000.0, "atr": 0})

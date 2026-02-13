@@ -44,6 +44,7 @@ class SignalGenerator:
         rsi: float | None = None,
         regime: str | None = None,
         config: StrategyConfig | None = None,
+        adx: float | None = None,
     ) -> TradingSignal:
         """
         Generate a trading signal from an ML prediction.
@@ -51,6 +52,7 @@ class SignalGenerator:
         Pipeline:
         1. Check minimum confidence threshold
         2. Map SignalClass to BUY/SELL/HOLD direction
+        2.5. ADX pre-signal filter (reject choppy markets, boost trending)
         3. RSI overbought/oversold filter
         4. Counter-trend penalty
         5. Re-check confidence after penalty
@@ -64,6 +66,7 @@ class SignalGenerator:
             rsi: Current RSI value (optional, skips RSI filter if None)
             regime: Current market regime (optional)
             config: Strategy configuration (uses defaults if None)
+            adx: Current ADX value (optional, skips ADX filter if None)
 
         Returns:
             TradingSignal with direction, confidence, and suggested levels
@@ -88,6 +91,25 @@ class SignalGenerator:
         direction = _SIGNAL_TO_DIRECTION.get(prediction.signal_class, SignalDirection.HOLD)
         if direction == SignalDirection.HOLD:
             return _make_hold_signal(epic, current_price, regime)
+
+        # 2.5. ADX pre-signal filter
+        if adx is not None and direction != SignalDirection.HOLD:
+            if adx < cfg.adx_ranging_threshold:
+                # Choppy market: reject directional signals
+                logger.debug(
+                    f"{epic}: ADX={adx:.1f} < {cfg.adx_ranging_threshold} "
+                    f"(choppy) -> HOLD"
+                )
+                return _make_hold_signal(epic, current_price, regime)
+            elif adx >= cfg.adx_trending_threshold:
+                # Strong trend: small confidence boost
+                boost = min(cfg.adx_confidence_boost, 1.0 - confidence)
+                if boost > 0:
+                    confidence += boost
+                    logger.debug(
+                        f"{epic}: ADX={adx:.1f} >= {cfg.adx_trending_threshold} "
+                        f"(trending), confidence boosted +{boost:.3f}"
+                    )
 
         # 3. RSI overbought/oversold filter
         technical_confirmation = True

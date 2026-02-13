@@ -201,6 +201,7 @@ class Settings(BaseSettings):
     # ===== Trading =====
     trading_enabled: bool = Field(default=False, alias="TRADING_ENABLED")
     paper_trading: bool = Field(default=True, alias="PAPER_TRADING")
+    execution_mode: str = Field(default="PAPER", alias="EXECUTION_MODE")
     min_confidence_threshold: float = Field(default=0.65, alias="MIN_CONFIDENCE_THRESHOLD")
 
     # ===== Security =====

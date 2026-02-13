@@ -150,6 +150,9 @@ def init_services(app) -> None:
     """Initialize all services and store in app.state. Called during lifespan startup."""
     settings = get_settings()
 
+    # Store desired execution mode for upgrade after broker connects
+    app.state._desired_execution_mode = settings.execution_mode.upper()
+
     limits = RiskLimits(
         max_risk_per_trade=settings.max_risk_per_trade,
         max_daily_drawdown=settings.max_daily_drawdown,

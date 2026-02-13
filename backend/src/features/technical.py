@@ -687,6 +687,175 @@ class TechnicalIndicators:
 
         return df
 
+    # ===== Candlestick Patterns =====
+
+    @staticmethod
+    def add_candlestick_patterns(df: pl.DataFrame) -> pl.DataFrame:
+        """
+        Add 8 candlestick pattern features as binary columns.
+
+        Adds columns: candle_hammer, candle_inv_hammer, candle_engulf_bull,
+        candle_engulf_bear, candle_doji, candle_morning_star, candle_evening_star,
+        candle_pin_bar
+        """
+        o = pl.col("open")
+        h = pl.col("high")
+        l = pl.col("low")
+        c = pl.col("close")
+
+        body = (c - o).abs()
+        candle_range = h - l
+        upper_wick = h - pl.max_horizontal(o, c)
+        lower_wick = pl.min_horizontal(o, c) - l
+
+        # Guard against zero range
+        safe_range = pl.when(candle_range > 0).then(candle_range).otherwise(1.0)
+        body_pct = body / safe_range
+
+        # 1. Hammer: small body at top, long lower wick
+        df = df.with_columns(
+            pl.when(
+                (body_pct < 0.3) & (lower_wick > body * 2) & (upper_wick < body)
+            ).then(1).otherwise(0).alias("candle_hammer")
+        )
+
+        # 2. Inverted hammer: small body at bottom, long upper wick
+        df = df.with_columns(
+            pl.when(
+                (body_pct < 0.3) & (upper_wick > body * 2) & (lower_wick < body)
+            ).then(1).otherwise(0).alias("candle_inv_hammer")
+        )
+
+        # 3. Bullish engulfing: current bullish body engulfs previous bearish body
+        prev_o = o.shift(1)
+        prev_c = c.shift(1)
+        df = df.with_columns(
+            pl.when(
+                (c > o)  # Current is bullish
+                & (prev_c < prev_o)  # Previous is bearish
+                & (o <= prev_c)  # Current open <= prev close
+                & (c >= prev_o)  # Current close >= prev open
+            ).then(1).otherwise(0).alias("candle_engulf_bull")
+        )
+
+        # 4. Bearish engulfing: current bearish body engulfs previous bullish body
+        df = df.with_columns(
+            pl.when(
+                (c < o)  # Current is bearish
+                & (prev_c > prev_o)  # Previous is bullish
+                & (o >= prev_c)  # Current open >= prev close
+                & (c <= prev_o)  # Current close <= prev open
+            ).then(1).otherwise(0).alias("candle_engulf_bear")
+        )
+
+        # 5. Doji: very small body relative to range
+        df = df.with_columns(
+            pl.when(body_pct < 0.1).then(1).otherwise(0).alias("candle_doji")
+        )
+
+        # 6. Morning star: bearish + small body + bullish (3-bar pattern)
+        prev2_o = o.shift(2)
+        prev2_c = c.shift(2)
+        prev_body_pct = (prev_c - prev_o).abs() / pl.when(
+            (h.shift(1) - l.shift(1)) > 0
+        ).then(h.shift(1) - l.shift(1)).otherwise(1.0)
+        df = df.with_columns(
+            pl.when(
+                (prev2_c < prev2_o)  # Bar -2 is bearish
+                & (prev_body_pct < 0.3)  # Bar -1 is small body
+                & (c > o)  # Current is bullish
+                & (c > (prev2_o + prev2_c) / 2)  # Close above midpoint of bar -2
+            ).then(1).otherwise(0).alias("candle_morning_star")
+        )
+
+        # 7. Evening star: bullish + small body + bearish (3-bar pattern)
+        df = df.with_columns(
+            pl.when(
+                (prev2_c > prev2_o)  # Bar -2 is bullish
+                & (prev_body_pct < 0.3)  # Bar -1 is small body
+                & (c < o)  # Current is bearish
+                & (c < (prev2_o + prev2_c) / 2)  # Close below midpoint of bar -2
+            ).then(1).otherwise(0).alias("candle_evening_star")
+        )
+
+        # 8. Pin bar: longest wick > 3x body
+        max_wick = pl.max_horizontal(upper_wick, lower_wick)
+        df = df.with_columns(
+            pl.when(
+                (max_wick > body * 3) & (body > 0)
+            ).then(1).otherwise(0).alias("candle_pin_bar")
+        )
+
+        return df
+
+    # ===== Fibonacci Levels =====
+
+    @staticmethod
+    def add_fibonacci_levels(
+        df: pl.DataFrame,
+        swing_lookback: int = 20,
+        atr_period: int = 14,
+    ) -> pl.DataFrame:
+        """
+        Add Fibonacci retracement level features.
+
+        Uses rolling swing high/low to compute Fib levels,
+        then measures distance from close to each level (normalized by ATR).
+
+        Adds columns: fib_dist_236, fib_dist_382, fib_dist_500, fib_dist_618,
+        fib_dist_786, fib_nearest_level, fib_cluster_strength
+        """
+        # Swing high/low detection via rolling window
+        df = df.with_columns([
+            pl.col("high").rolling_max(window_size=swing_lookback).alias("_swing_high"),
+            pl.col("low").rolling_min(window_size=swing_lookback).alias("_swing_low"),
+        ])
+
+        # Ensure ATR exists
+        atr_col = f"atr_{atr_period}"
+        if atr_col not in df.columns:
+            df = TechnicalIndicators.add_atr(df, period=atr_period)
+
+        swing_range = pl.col("_swing_high") - pl.col("_swing_low")
+        safe_atr = pl.when(pl.col(atr_col) > 0).then(pl.col(atr_col)).otherwise(1.0)
+
+        # Fibonacci levels
+        fib_levels = [0.236, 0.382, 0.500, 0.618, 0.786]
+        fib_exprs = []
+        fib_dist_cols = []
+
+        for level in fib_levels:
+            fib_price = pl.col("_swing_high") - swing_range * level
+            col_name = f"fib_dist_{str(level).replace('.', '')}"
+            fib_dist_cols.append(col_name)
+            fib_exprs.append(
+                ((pl.col("close") - fib_price) / safe_atr)
+                .fill_nan(0.0)
+                .alias(col_name)
+            )
+
+        df = df.with_columns(fib_exprs)
+
+        # Nearest Fibonacci level (min absolute distance)
+        abs_dists = [pl.col(c).abs() for c in fib_dist_cols]
+        df = df.with_columns(
+            pl.min_horizontal(*abs_dists).alias("fib_nearest_level")
+        )
+
+        # Cluster strength: how many Fib levels are within 0.5 ATR of close
+        cluster_exprs = [
+            pl.when(pl.col(c).abs() < 0.5).then(1).otherwise(0)
+            for c in fib_dist_cols
+        ]
+        df = df.with_columns(
+            pl.sum_horizontal(*cluster_exprs).alias("fib_cluster_strength")
+        )
+
+        # Cleanup
+        df = df.drop(["_swing_high", "_swing_low"])
+
+        return df
+
     # ===== Convenience Methods =====
 
     @staticmethod
@@ -753,5 +922,11 @@ class TechnicalIndicators:
 
         # Session features
         df = ti.add_session_features(df)
+
+        # Candlestick patterns
+        df = ti.add_candlestick_patterns(df)
+
+        # Fibonacci levels
+        df = ti.add_fibonacci_levels(df, atr_period=atr_period)
 
         return df

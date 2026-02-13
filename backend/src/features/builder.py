@@ -12,6 +12,9 @@ from loguru import logger
 from src.data.data_access import DataAccessLayer
 from src.features.alignment import TimeframeAligner
 from src.features.asset_config import DEFAULT_TECHNICAL_PARAMS, get_asset_config
+from src.features.keltner import KeltnerChannel
+from src.features.market_structure import MarketStructureDetector
+from src.features.vwap_bands import VWAPBands
 from src.features.normalizer import FeatureNormalizer
 from src.features.regime import RegimeDetector
 from src.features.schemas import AssetFeatureConfig, FeatureMatrix
@@ -265,6 +268,38 @@ class FeatureBuilder:
 
         # Session features
         df = ti.add_session_features(df)
+
+        # Candlestick patterns (8 binary features)
+        df = ti.add_candlestick_patterns(df)
+
+        # Fibonacci cluster zones (7 features)
+        df = ti.add_fibonacci_levels(
+            df,
+            swing_lookback=params.get("fib_swing_lookback", 20),
+            atr_period=params.get("atr_period", 14),
+        )
+
+        # Keltner Channel + True Squeeze detection
+        df = KeltnerChannel.add_keltner(
+            df,
+            ema_period=params.get("kc_ema_period", 20),
+            atr_period=params.get("atr_period", 14),
+            multiplier=params.get("kc_multiplier", 1.5),
+        )
+        df = KeltnerChannel.add_true_squeeze(df)
+
+        # VWAP SD bands (requires volume)
+        if "volume" in df.columns:
+            has_volume = df["volume"].null_count() < len(df) and df["volume"].sum() > 0
+            if has_volume:
+                df = VWAPBands.add_vwap_bands(df)
+
+        # Market structure (BOS/CHoCH)
+        if "high" in df.columns and "low" in df.columns and "close" in df.columns:
+            detector = MarketStructureDetector(
+                pivot_lookback=params.get("structure_pivot_lookback", 5),
+            )
+            df = detector.add_all(df)
 
         return df
 

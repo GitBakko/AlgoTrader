@@ -2,19 +2,21 @@
 
 ## Phase Overview
 
-| Phase | Name | Duration | Focus | Status |
-|-------|------|----------|-------|--------|
-| 1 | Foundation | 2-3 weeks | Project setup, data pipeline, broker connection | COMPLETE |
-| 2 | Intelligence | 3-4 weeks | Feature engineering, ML models, backtesting | MVP COMPLETE |
-| 3 | Trading Engine | 2-3 weeks | Strategy, risk management, execution | COMPLETE |
-| 4 | Dashboard | 2-3 weeks | Angular frontend, real-time visualization | COMPLETE |
-| 5 | Integration & Wiring | 2 weeks | End-to-end wiring, paper trading pipeline | COMPLETE |
-| 5B | Paper Trading Validation | 1 week | Scripts, paper loop, health monitoring | COMPLETE |
-| 6A | Trading Guru ML Upgrades | 1 week | 3-class migration, calibration, LSTM, features | COMPLETE |
-| 6A.6 | Validation | 1 day | Re-training, LSTM comparison, paper trading test | COMPLETE |
-| 6A.7 | Code Review & Optimization | 1 day | Best practices, performance, caching | COMPLETE |
-| 6B | Ensemble & Advanced | TBD | TFT, stacking, hyperopt | NEXT |
-| 7 | Optimization & Live | Ongoing | Performance tuning, live deployment | FUTURE |
+| Phase | Name | Focus | Status |
+|-------|------|-------|--------|
+| 1 | Foundation | Project setup, data pipeline, broker connection | COMPLETE |
+| 2 | Intelligence | Feature engineering, ML models, backtesting | COMPLETE |
+| 3 | Trading Engine | Strategy, risk management, execution | COMPLETE |
+| 4 | Dashboard | Angular frontend, real-time visualization | COMPLETE |
+| 5 | Integration & Wiring | End-to-end wiring, paper trading pipeline | COMPLETE |
+| 5B | Paper Trading Validation | Scripts, paper loop, health monitoring | COMPLETE |
+| 6A | Trading Guru ML Upgrades | 3-class migration, calibration, LSTM, features | COMPLETE |
+| 6B | ML Optimization + Backtest Realism | Optuna, feature selection, cost model, backtest API | COMPLETE |
+| 6B.2 | Optuna Production Re-training | 8 models tuned, multi-asset expansion (9 assets) | COMPLETE |
+| 7 | Paper Trading Dashboard | Frontend paper trading page, signal history, live P&L | COMPLETE |
+| 8 | TRADING MAGNA AI | 15 improvements: risk, features, strategies, pairs | COMPLETE |
+| 9 | Integration & Coverage | Paper loop wiring, backtest router, coverage 80% | COMPLETE |
+| 10 | Live Preparation | Walk-forward validation, frontend upgrade, live deploy | IN PROGRESS |
 
 ---
 
@@ -348,54 +350,134 @@
 
 ---
 
-## Phase 6B: Ensemble & Advanced (Future)
+## Phase 6B: ML Optimization + Backtest Realism [COMPLETE]
 
-### 6B.1 TFT Model
+### 6B.1 Walk-Forward Upgrades [COMPLETE]
 
-- [ ] Implementare Temporal Fusion Transformer (PyTorch)
-- [ ] Variable selection network per feature importance automatica
-- [ ] Multi-horizon prediction (4h, 1d, 1w)
+- [x] Multi-timeframe features in walk-forward (41→121 features)
+- [x] Optuna hyperparameter tuning (`src/models/tuner.py` — TPE sampler, 40 trials)
+- [x] Feature selection by importance (`src/models/feature_selector.py` — drop bottom N%)
+- [x] Confidence calibration per fold (isotonic auto-fit on validation set)
+- [x] Script: `scripts/walk_forward_backtest.py` with `--tune`, `--prune-pct`, `--sweep-threshold`
 
-### 6B.2 Ensemble Stacking
+### 6B.2 Backtest Cost Model [COMPLETE]
 
-- [ ] Meta-learner XGBoost su output di LSTM + TFT + XGBoost
-- [ ] Model agreement voting (2-of-3 per trade)
-- [ ] Weighted averaging basato su performance recente
+- [x] Realistic spreads per asset (Gold 3.5 pips, BTC 50 pips, etc.)
+- [x] SL slippage: 50% of spread added to stop distance
+- [x] Weekend overnight: 3x normal overnight rate
+- [x] Sharpe fix: daily returns (not per-bar) — industry standard
+- [x] Engine performance: column-based iteration, signal_map via zip()
 
-### 6B.3 Advanced Features
+### 6B.3 Backtest API + Frontend [COMPLETE]
 
-- [ ] FRED API client per macro data (CPI, rates, GDP, DXY, VIX)
-- [ ] Cross-asset correlation features (Gold-DXY, BTC-Gold, VIX-S&P)
-- [ ] FinBERT sentiment analysis (news headlines)
-- [ ] SHAP feature importance dashboard
+- [x] `POST /api/backtest/run` endpoint with full parameter control
+- [x] Frontend backtest page with equity curve, trade list, metrics
+- [x] Signal generator: `src/backtest/signal_generator.py` for batch ML inference
 
-### 6B.4 Hyperparameter Optimization
+### 6B.4 Multi-Asset Expansion (3→9 assets) [COMPLETE]
 
-- [ ] Optuna integration con walk-forward framework
-- [ ] TPE sampler per efficient search
-- [ ] Obiettivo: risk-adjusted return (Sharpe), non solo F1
+- [x] 6 new assets: WTIUSD, EURUSD, NVDA, TSLA, XAGUSD, DE40
+- [x] 84,017 candles downloaded (6 assets x 3 timeframes)
+- [x] Walk-forward adaptive for stock CFDs (NVDA/TSLA scale=10)
+- [x] Portfolio allocator, correlation guard, 9-asset configs
+- [x] EURUSD excluded (tiny ATR → massive sizing → -99% OOS)
+
+### 6B.5 Optuna Production Re-training [COMPLETE]
+
+- [x] 8 models re-trained with Optuna tuning (40 trials/asset)
+- [x] Params saved in `data/tuned_params/{EPIC}_1h.json`
+- [x] WF OOS: BTCUSD +57%, TSLA +46%, NVDA +23%, XAUUSD +14%, DE40 +7%, US500 +5%
 
 ---
 
-## Phase 7: Live Trading (Future)
+## Phase 7: Paper Trading Dashboard [COMPLETE]
 
-### 7.1 Performance Optimization
+- [x] Frontend page: control panel, KPI cards, signals, positions, activity
+- [x] Signal history: `deque(maxlen=200)`, live P&L from WebSocket, 12s polling
+- [x] Frontend port: 4321 (angular.json + CORS updated)
+- [x] Code review + hardening: assert→ValueError, NaN threshold, error counting
 
-- [ ] Optimize model inference latency
-- [ ] Frontend bundle optimization
-- [ ] Redis connection pooling tuning
+---
 
-### 7.2 Live Trading Preparation
+## Phase 8: TRADING MAGNA AI [COMPLETE]
+
+> 15 miglioramenti basati su `docs/TRADING_MAGNA_AI_OPTIMIZED.md` — 20 nuovi file, 221 nuovi test
+
+### A — Risk Management [COMPLETE]
+
+- [x] **A1 Circuit Breakers** (6 tipi): daily_loss, consecutive_losses, max_positions, slippage, heartbeat, volatility
+- [x] **A2 ADX Pre-Signal Filter**: ADX<20 reject choppy, ADX>25 boost confidence (+0.05)
+- [x] **A3 Step Trailing Stop** (4 fasi): INITIAL→BREAKEVEN→TP1_LOCK→TRAILING (ATR ratchet)
+- [x] **A4 Equity Curve Filter**: SMA(20 trades), 50% size reduction when below
+
+### B — Feature Engineering + Exit Management [COMPLETE]
+
+- [x] **B5 Multi-Target Exit**: TP1(1xR)/TP2(2xR), partial_close(50%) in ExecutionEngine
+- [x] **B6 MACD+Volume**: verified already present in feature pipeline
+- [x] **B7 Candlestick Patterns**: 8 binary features (hammer, engulfing, doji, stars, pin_bar)
+- [x] **B8 Fibonacci Clusters**: 5 ATR-normalized distance features + nearest + cluster_strength
+
+### C — Execution + Validation [COMPLETE]
+
+- [x] **C9 Market Structure BOS/CHoCH**: swing pivots HH/HL/LH/LL, structural breaks
+- [x] **C10 Monte Carlo Validation**: 10K shuffles, equity/DD/Sharpe CIs, p-value, ruin risk
+- [x] **C11 Volatility Squeeze**: BB-inside-KC detection, momentum+volume breakout entry
+- [x] **C12 Adaptive Kelly**: half-Kelly sizing, fallback to fixed-fractional when <30 trades
+
+### D — Strategic Vision [COMPLETE]
+
+- [x] **D13 Strategy Router**: regime-based switching (trending→ML, ranging→[squeeze, vwap, ML])
+- [x] **D14 VWAP Reversion**: ±2SD entry, VWAP center TP, 3SD SL, ADX/RSI filters
+- [x] **D15 Pairs Trading Gold-BTC**: Engle-Granger cointegration, z-score entry/exit, dollar-neutral
+
+---
+
+## Phase 9: Integration & Coverage [COMPLETE]
+
+- [x] **Paper Loop Wiring**: TrailingStop 4-phase, CircuitBreaker heartbeat/record, EquityCurveFilter, Kelly trade_history, TP1 partial_close — all connected in paper_loop.py
+- [x] **Backtest StrategyRouter**: `--strategy` flag in walk_forward_backtest.py, strategy param in API
+- [x] **Pairs backtest script**: `scripts/pairs_backtest.py` — Gold-BTC cointegration with Monte Carlo
+- [x] **Pydantic v2 bug fix**: ModifyPositionRequest missing `populate_by_name=True`
+- [x] **Coverage**: 75.6% → 80.14% (+168 tests, 865 total)
+- [x] **Retraining**: 121→220 features, F1 macro stabile (~0.53-0.60)
+
+---
+
+## Phase 10: Live Preparation [IN PROGRESS]
+
+### 10.1 Walk-Forward Validation
+
+- [ ] Run WF backtest with retrained models (220 features) on all 8 assets
+- [ ] Compare OOS performance pre/post Phase 8 features
+- [ ] Validate Monte Carlo CIs and risk of ruin
+
+### 10.2 Frontend Upgrade Phase 8
+
+- [ ] Circuit breaker status in dashboard
+- [ ] Trailing stop phase visualization
+- [ ] Equity curve filter indicator
+- [ ] Kelly sizing info in position details
+- [ ] Strategy name in signals table
+
+### 10.3 Paper Trading Validation
+
+- [ ] Run paper trading with all Phase 8/9 modules active
+- [ ] Monitor for 2+ weeks per asset
+- [ ] Validate trailing stop phase transitions
+- [ ] Validate circuit breaker triggers
+
+### 10.4 Live Trading Deployment
 
 - [ ] Switch from demo to live Capital.com API
 - [ ] Start with minimal position sizes (0.5% risk per trade)
-- [ ] Implement enhanced monitoring and alerting
-- [ ] Setup daily performance reports
-- [ ] Gradually increase position sizes based on performance
+- [ ] Enhanced monitoring and alerting
+- [ ] Daily performance reports
+- [ ] Gradual position size increase based on performance
 
-### 7.3 Continuous Improvement
+### 10.5 Continuous Improvement (Future)
 
-- [ ] Implement automated model retraining pipeline
+- [ ] Automated model retraining pipeline
 - [ ] Model drift detection and alerts
-- [ ] A/B test strategy variations
-- [ ] Build model performance leaderboard
+- [ ] TFT model + ensemble stacking
+- [ ] FRED macro features, FinBERT sentiment
+- [ ] SHAP feature importance dashboard

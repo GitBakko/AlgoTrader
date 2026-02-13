@@ -73,50 +73,54 @@ class SessionManager:
             AuthenticationError: If authentication fails
         """
         async with self._lock:
-            logger.info("🔐 Authenticating with Capital.com...")
+            return await self._authenticate_inner()
 
-            client = await self._get_http_client()
+    async def _authenticate_inner(self) -> SessionTokens:
+        """Inner auth implementation — caller must hold self._lock."""
+        logger.info("Authenticating with Capital.com...")
 
-            # Create session request
-            session_request = SessionRequest(
-                identifier=self.email, password=self.password, encrypted_password=False
+        client = await self._get_http_client()
+
+        # Create session request
+        session_request = SessionRequest(
+            identifier=self.email, password=self.password, encrypted_password=False
+        )
+
+        try:
+            response = await client.post(
+                f"{self.api_url}/api/v1/session",
+                headers={"X-CAP-API-KEY": self.api_key},
+                json=session_request.model_dump(by_alias=True),
             )
 
-            try:
-                response = await client.post(
-                    f"{self.api_url}/api/v1/session",
-                    headers={"X-CAP-API-KEY": self.api_key},
-                    json=session_request.model_dump(by_alias=True),
+            if response.status_code != 200:
+                error_data = response.json() if response.text else {}
+                error_code = error_data.get("errorCode", "unknown")
+                raise AuthenticationError(
+                    f"Authentication failed: {response.status_code}", error_code
                 )
 
-                if response.status_code != 200:
-                    error_data = response.json() if response.text else {}
-                    error_code = error_data.get("errorCode", "unknown")
-                    raise AuthenticationError(
-                        f"Authentication failed: {response.status_code}", error_code
-                    )
+            # Extract tokens from response headers
+            cst = response.headers.get("CST")
+            security_token = response.headers.get("X-SECURITY-TOKEN")
 
-                # Extract tokens from response headers
-                cst = response.headers.get("CST")
-                security_token = response.headers.get("X-SECURITY-TOKEN")
+            if not cst or not security_token:
+                raise AuthenticationError("Missing session tokens in response headers")
 
-                if not cst or not security_token:
-                    raise AuthenticationError("Missing session tokens in response headers")
+            self.tokens = SessionTokens(
+                cst=cst, security_token=security_token, created_at=datetime.now(timezone.utc)
+            )
 
-                self.tokens = SessionTokens(
-                    cst=cst, security_token=security_token, created_at=datetime.now(timezone.utc)
-                )
+            logger.success("Authentication successful")
 
-                logger.success("✅ Authentication successful")
+            # Start keep-alive ping task
+            await self._start_ping_task()
 
-                # Start keep-alive ping task
-                await self._start_ping_task()
+            return self.tokens
 
-                return self.tokens
-
-            except httpx.HTTPError as e:
-                logger.error(f"HTTP error during authentication: {e}")
-                raise AuthenticationError(f"HTTP error: {e}")
+        except httpx.HTTPError as e:
+            logger.error(f"HTTP error during authentication: {e}")
+            raise AuthenticationError(f"HTTP error: {e}")
 
     async def get_tokens(self) -> SessionTokens:
         """
@@ -133,7 +137,7 @@ class SessionManager:
             # Check if tokens exist and are still valid
             if self.tokens is None:
                 logger.warning("No active session - authenticating...")
-                return await self.authenticate()
+                return await self._authenticate_inner()
 
             # Check if tokens are about to expire (re-auth 1 min before expiry)
             expiry_time = self.tokens.created_at + timedelta(
@@ -141,7 +145,7 @@ class SessionManager:
             )
             if datetime.now(timezone.utc) >= expiry_time:
                 logger.warning("Session tokens expired - re-authenticating...")
-                return await self.authenticate()
+                return await self._authenticate_inner()
 
             return self.tokens
 

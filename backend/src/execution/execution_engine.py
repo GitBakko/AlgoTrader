@@ -139,6 +139,59 @@ class ExecutionEngine:
             stop_level=new_stop,
         )
 
+    async def partial_close(
+        self,
+        deal_id: str,
+        close_pct: float,
+        reason: str = "TP1_PARTIAL",
+    ) -> ExecutionResult:
+        """
+        Partially close a position (reduce size by close_pct).
+
+        Args:
+            deal_id: Deal ID to partially close
+            close_pct: Fraction to close (0.0 to 1.0)
+            reason: Close reason
+
+        Returns:
+            ExecutionResult
+        """
+        if close_pct <= 0.0 or close_pct > 1.0:
+            return ExecutionResult(
+                success=False,
+                deal_id=deal_id,
+                error=f"Invalid close_pct: {close_pct}",
+            )
+
+        if close_pct >= 1.0:
+            return await self.close_position(deal_id, reason=reason)
+
+        if self._mode == ExecutionMode.PAPER:
+            position = self._position_tracker.reduce_paper_position(deal_id, close_pct)
+            if position is None:
+                return ExecutionResult(
+                    success=False,
+                    deal_id=deal_id,
+                    error=f"Position not found: {deal_id}",
+                )
+            logger.info(
+                f"Partial close: {deal_id} -{close_pct:.0%} "
+                f"remaining={position['size']:.4f} reason={reason}"
+            )
+            return ExecutionResult(
+                success=True,
+                deal_id=deal_id,
+                fill_price=position.get("level"),
+            )
+
+        # Live: close via broker (need to reopen smaller position)
+        result = await self._order_manager.close_order(deal_id)
+        if not result.success:
+            return result
+
+        logger.info(f"Partial close (live): {deal_id} -{close_pct:.0%} reason={reason}")
+        return result
+
     async def get_open_positions(self, epic: str | None = None) -> list[dict]:
         """
         Get open positions.

@@ -134,6 +134,32 @@ class PositionTracker:
             logger.debug(f"Paper position closed: {deal_id}")
         return position
 
+    def reduce_paper_position(self, deal_id: str, reduce_pct: float) -> dict | None:
+        """
+        Reduce a paper position's size (for partial closes).
+
+        Args:
+            deal_id: Deal ID to reduce
+            reduce_pct: Percentage to close (0.0 to 1.0)
+
+        Returns:
+            Updated position dict or None if not found
+        """
+        position = self._paper_positions.get(deal_id)
+        if position is None:
+            return None
+
+        if reduce_pct >= 1.0:
+            return self.close_paper_position(deal_id)
+
+        old_size = position["size"]
+        position["size"] = old_size * (1.0 - reduce_pct)
+        logger.debug(
+            f"Paper position reduced: {deal_id} "
+            f"{old_size:.4f} -> {position['size']:.4f} (-{reduce_pct:.0%})"
+        )
+        return position
+
     @property
     def paper_position_count(self) -> int:
         """Number of open paper positions."""

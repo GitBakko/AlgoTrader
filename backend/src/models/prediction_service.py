@@ -210,12 +210,20 @@ class PredictionService:
             return None
 
         df = TechnicalIndicators.add_atr(df, period=14)
+        df = TechnicalIndicators.add_adx(df, period=14)
         last = df.tail(1).row(0, named=True)
 
-        return {
+        result = {
             "current_price": float(last["close"]),
             "atr": float(last.get("atr_14", last["close"] * 0.01)),
         }
+
+        # Include ADX for strategy filtering
+        adx_val = last.get("adx")
+        if adx_val is not None:
+            result["adx"] = float(adx_val)
+
+        return result
 
     def get_loaded_models(self) -> dict[str, dict]:
         """Get info about currently loaded models."""

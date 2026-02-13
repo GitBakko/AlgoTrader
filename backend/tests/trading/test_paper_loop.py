@@ -152,6 +152,8 @@ class TestPaperTradingLoop:
         status = paper_loop.get_status()
 
         assert "running" in status
+        assert "execution_mode" in status
+        assert status["execution_mode"] == "PAPER"
         assert "interval_seconds" in status
         assert "epics" in status
         assert "iteration_count" in status
@@ -255,11 +257,12 @@ class TestTradingEndpoints:
         assert data["data"]["running"] is True
 
     def test_stop_endpoint_when_not_running(self, trading_client):
-        """POST /api/trading/stop when not running returns error."""
+        """POST /api/trading/stop when not running is idempotent (returns success)."""
         resp = trading_client.post("/api/trading/stop")
-        assert resp.status_code == 409
+        assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is False
+        assert data["success"] is True
+        assert "fermo" in data["data"]["message"].lower()
 
     def test_start_stop_cycle(self, trading_client):
         """Start then stop the paper trading loop."""
@@ -269,9 +272,10 @@ class TestTradingEndpoints:
         stop_resp = trading_client.post("/api/trading/stop")
         assert stop_resp.json()["success"] is True
 
-    def test_double_start_rejected(self, trading_client):
-        """Starting an already running loop returns error."""
+    def test_double_start_idempotent(self, trading_client):
+        """Starting an already running loop is idempotent (returns success)."""
         trading_client.post("/api/trading/start")
         resp = trading_client.post("/api/trading/start")
         data = resp.json()
-        assert data["success"] is False
+        assert data["success"] is True
+        assert "attivo" in data["data"]["message"].lower()

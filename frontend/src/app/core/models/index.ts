@@ -188,6 +188,7 @@ export interface TradeEvent {
 // Paper Trading Status (GET /api/trading/status)
 export interface PaperTradingStatus {
   running: boolean;
+  execution_mode: string; // "PAPER" | "DEMO" | "LIVE"
   interval_seconds: number;
   epics: string[];
   iteration_count: number;
@@ -209,6 +210,9 @@ export interface LastSignalInfo {
   confidence: number;
   entry_price: number;
   timestamp: string;
+  status?: string;
+  rejection_reason?: string;
+  error_detail?: BrokerErrorDetail;
 }
 
 export interface ModelLoadedInfo {
@@ -231,6 +235,15 @@ export interface PaperPosition {
   opened_at: string;
 }
 
+// Structured broker error detail (from broker_error_parser)
+export interface BrokerErrorDetail {
+  error_type: string;    // "market_closed", "insufficient_funds", "rate_limit", etc.
+  summary: string;       // Short Italian message
+  details: string | null;
+  market_hours: Record<string, string> | null;
+  raw: string;           // Original error message
+}
+
 // Paper Trading Signal History (GET /api/trading/signals)
 export interface PaperSignal {
   epic: string;
@@ -238,5 +251,8 @@ export interface PaperSignal {
   confidence: number;
   entry_price: number;
   timestamp: string;
-  status: string;  // predicted, executed, rejected, hold
+  status: string;  // predicted, executed, rejected, exec_failed, hold, market_closed
+  rejection_reason?: string;
+  error_detail?: BrokerErrorDetail;
+  _showRaw?: boolean;  // UI-only: toggle for raw error display
 }

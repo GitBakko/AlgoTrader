@@ -1,0 +1,245 @@
+"""
+Step trailing stop manager with 4 phases.
+Manages stop-loss progression from initial -> breakeven -> TP1 lock -> trailing.
+"""
+
+from enum import IntEnum
+
+from loguru import logger
+from pydantic import BaseModel, Field
+
+
+class TrailingPhase(IntEnum):
+    """Stop-loss management phases."""
+
+    INITIAL = 0       # SL at initial level
+    BREAKEVEN = 1     # SL moved to entry (price reached TP1)
+    TP1_LOCK = 2      # SL moved to TP1 (price reached TP2)
+    TRAILING = 3      # Trailing ATR from highest/lowest (after TP2)
+
+
+class TrailingStopConfig(BaseModel):
+    """Configuration for step trailing stop."""
+
+    tp1_risk_multiple: float = Field(default=1.0, ge=0.5, le=5.0)
+    tp2_risk_multiple: float = Field(default=2.0, ge=1.0, le=10.0)
+    trailing_atr_multiplier: float = Field(default=1.5, ge=0.5, le=5.0)
+    breakeven_offset_pct: float = Field(default=0.001, ge=0.0, le=0.01)
+
+
+class PositionStopState(BaseModel):
+    """Tracks stop state for a single position."""
+
+    deal_id: str
+    epic: str
+    direction: str  # "BUY" or "SELL"
+    entry_price: float
+    initial_stop: float
+    current_stop: float
+    tp1_level: float
+    tp2_level: float
+    risk_distance: float
+    phase: int = TrailingPhase.INITIAL
+    highest_price: float = 0.0
+    lowest_price: float = float("inf")
+
+
+class TrailingStopManager:
+    """
+    Manages step trailing stops for open positions.
+
+    Phase transitions:
+    INITIAL -> BREAKEVEN: when price reaches TP1 (SL moves to entry + offset)
+    BREAKEVEN -> TP1_LOCK: when price reaches TP2 (SL moves to TP1)
+    TP1_LOCK -> TRAILING: beyond TP2, ratchet stop with ATR
+    """
+
+    def __init__(self, config: TrailingStopConfig | None = None):
+        self.config = config or TrailingStopConfig()
+        self._positions: dict[str, PositionStopState] = {}
+
+    def register_position(
+        self,
+        deal_id: str,
+        epic: str,
+        direction: str,
+        entry_price: float,
+        stop_loss: float,
+        atr: float,
+    ) -> PositionStopState:
+        """
+        Register a new position for trailing stop management.
+
+        Args:
+            deal_id: Position deal ID
+            epic: Asset epic
+            direction: "BUY" or "SELL"
+            entry_price: Entry price
+            stop_loss: Initial stop-loss level
+            atr: Current ATR value
+
+        Returns:
+            PositionStopState for the registered position
+        """
+        risk_distance = abs(entry_price - stop_loss)
+
+        if direction == "BUY":
+            tp1 = entry_price + risk_distance * self.config.tp1_risk_multiple
+            tp2 = entry_price + risk_distance * self.config.tp2_risk_multiple
+        else:
+            tp1 = entry_price - risk_distance * self.config.tp1_risk_multiple
+            tp2 = entry_price - risk_distance * self.config.tp2_risk_multiple
+
+        state = PositionStopState(
+            deal_id=deal_id,
+            epic=epic,
+            direction=direction,
+            entry_price=entry_price,
+            initial_stop=stop_loss,
+            current_stop=stop_loss,
+            tp1_level=tp1,
+            tp2_level=tp2,
+            risk_distance=risk_distance,
+            phase=TrailingPhase.INITIAL,
+            highest_price=entry_price,
+            lowest_price=entry_price,
+        )
+
+        self._positions[deal_id] = state
+        logger.debug(
+            f"[{epic}] Trailing stop registered: {direction} entry={entry_price:.2f} "
+            f"SL={stop_loss:.2f} TP1={tp1:.2f} TP2={tp2:.2f}"
+        )
+        return state
+
+    def update_price(
+        self,
+        deal_id: str,
+        current_price: float,
+        current_atr: float | None = None,
+    ) -> tuple[float | None, TrailingPhase]:
+        """
+        Update price and potentially advance the trailing stop phase.
+
+        Args:
+            deal_id: Position deal ID
+            current_price: Current market price
+            current_atr: Current ATR (used for trailing phase)
+
+        Returns:
+            Tuple of (new_stop_level or None if unchanged, current_phase)
+        """
+        state = self._positions.get(deal_id)
+        if state is None:
+            return None, TrailingPhase.INITIAL
+
+        # Update extremes
+        if state.direction == "BUY":
+            state.highest_price = max(state.highest_price, current_price)
+        else:
+            state.lowest_price = min(state.lowest_price, current_price)
+
+        old_stop = state.current_stop
+        old_phase = state.phase
+
+        # Check phase transitions
+        if state.direction == "BUY":
+            new_stop = self._update_buy(state, current_price, current_atr)
+        else:
+            new_stop = self._update_sell(state, current_price, current_atr)
+
+        if new_stop is not None and new_stop != old_stop:
+            state.current_stop = new_stop
+            if state.phase != old_phase:
+                logger.info(
+                    f"[{state.epic}] Trailing phase: {TrailingPhase(old_phase).name} -> "
+                    f"{TrailingPhase(state.phase).name}, SL={new_stop:.2f}"
+                )
+            return new_stop, TrailingPhase(state.phase)
+
+        return None, TrailingPhase(state.phase)
+
+    def unregister_position(self, deal_id: str) -> None:
+        """Remove a position from trailing stop management."""
+        self._positions.pop(deal_id, None)
+
+    def get_state(self, deal_id: str) -> PositionStopState | None:
+        """Get current stop state for a position."""
+        return self._positions.get(deal_id)
+
+    @property
+    def tracked_positions(self) -> list[str]:
+        """List of tracked deal IDs."""
+        return list(self._positions.keys())
+
+    def _update_buy(
+        self,
+        state: PositionStopState,
+        price: float,
+        atr: float | None,
+    ) -> float | None:
+        """Update stop for a BUY position."""
+        if state.phase == TrailingPhase.INITIAL:
+            if price >= state.tp1_level:
+                # Move to breakeven
+                offset = state.entry_price * self.config.breakeven_offset_pct
+                new_stop = state.entry_price + offset
+                state.phase = TrailingPhase.BREAKEVEN
+                return new_stop
+
+        elif state.phase == TrailingPhase.BREAKEVEN:
+            if price >= state.tp2_level:
+                # Lock at TP1
+                state.phase = TrailingPhase.TP1_LOCK
+                return state.tp1_level
+
+        elif state.phase == TrailingPhase.TP1_LOCK:
+            if atr and atr > 0:
+                # Start trailing
+                trail_stop = state.highest_price - atr * self.config.trailing_atr_multiplier
+                if trail_stop > state.current_stop:
+                    state.phase = TrailingPhase.TRAILING
+                    return trail_stop
+
+        elif state.phase == TrailingPhase.TRAILING:
+            if atr and atr > 0:
+                # Ratchet trailing stop (only moves up)
+                trail_stop = state.highest_price - atr * self.config.trailing_atr_multiplier
+                if trail_stop > state.current_stop:
+                    return trail_stop
+
+        return None
+
+    def _update_sell(
+        self,
+        state: PositionStopState,
+        price: float,
+        atr: float | None,
+    ) -> float | None:
+        """Update stop for a SELL position."""
+        if state.phase == TrailingPhase.INITIAL:
+            if price <= state.tp1_level:
+                offset = state.entry_price * self.config.breakeven_offset_pct
+                new_stop = state.entry_price - offset
+                state.phase = TrailingPhase.BREAKEVEN
+                return new_stop
+
+        elif state.phase == TrailingPhase.BREAKEVEN:
+            if price <= state.tp2_level:
+                state.phase = TrailingPhase.TP1_LOCK
+                return state.tp1_level
+
+        elif state.phase == TrailingPhase.TP1_LOCK:
+            if atr and atr > 0:
+                trail_stop = state.lowest_price + atr * self.config.trailing_atr_multiplier
+                if trail_stop < state.current_stop:
+                    state.phase = TrailingPhase.TRAILING
+                    return trail_stop
+
+        elif state.phase == TrailingPhase.TRAILING:
+            if atr and atr > 0:
+                trail_stop = state.lowest_price + atr * self.config.trailing_atr_multiplier
+                if trail_stop < state.current_stop:
+                    return trail_stop
+
+        return None

@@ -57,6 +57,54 @@ async def lifespan(app: FastAPI):
         app.state.broker_client = broker
         logger.info("Broker connected to Capital.com demo")
 
+        # Upgrade execution engine if DEMO/LIVE mode requested
+        desired = getattr(app.state, "_desired_execution_mode", "PAPER")
+        if desired in ("DEMO", "LIVE"):
+            from src.execution.execution_engine import ExecutionEngine
+            from src.execution.schemas import ExecutionMode
+
+            use_demo = desired == "DEMO" and settings.use_demo
+            use_live = desired == "LIVE" and not settings.use_demo
+            if use_demo or use_live:
+                mode = ExecutionMode.DEMO if use_demo else ExecutionMode.LIVE
+                app.state.execution_engine = ExecutionEngine(
+                    broker=broker, mode=mode
+                )
+                logger.info(f"Execution engine upgraded to {mode.value} mode (broker-connected)")
+
+                # Sync risk manager with real broker equity
+                try:
+                    from src.risk.drawdown_monitor import DrawdownMonitor
+
+                    accounts = await broker.get_accounts()
+                    if accounts:
+                        acc = accounts[0]
+                        base = acc.deposit or acc.available or acc.balance
+                        broker_equity = base + acc.profit_loss
+                        logger.info(
+                            f"Broker account: deposit={acc.deposit}, pnl={acc.profit_loss}, "
+                            f"equity={broker_equity:.2f}"
+                        )
+
+                        # Auto top-up demo if equity is depleted
+                        if broker_equity <= 0 and settings.use_demo:
+                            try:
+                                top_up_amount = 10000.0
+                                await broker.top_up_demo_account(top_up_amount)
+                                broker_equity = top_up_amount
+                                logger.info(f"Demo account topped up with {top_up_amount:.2f}")
+                            except Exception as te:
+                                logger.warning(f"Demo top-up failed: {te}")
+
+                        if broker_equity > 0:
+                            app.state.risk_manager.initial_equity = broker_equity
+                            app.state.risk_manager.drawdown_monitor = DrawdownMonitor(broker_equity)
+                            logger.info(f"Risk manager synced with broker equity: {broker_equity:.2f}")
+                        else:
+                            logger.warning(f"Broker equity is {broker_equity:.2f}, keeping default")
+                except Exception as e:
+                    logger.warning(f"Broker equity sync failed (using default): {e}")
+
         # Initialize broker WebSocket for real-time price streaming
         try:
             from src.broker.websocket_client import CapitalComWebSocketClient
@@ -77,7 +125,13 @@ async def lifespan(app: FastAPI):
             logger.warning(f"Broker WebSocket failed (using mock prices): {e}")
             app.state.broker_ws_client = None
     except Exception as e:
-        logger.warning(f"Broker connection failed (continuing in mock mode): {e}")
+        desired = getattr(app.state, "_desired_execution_mode", "PAPER")
+        if desired != "PAPER":
+            logger.warning(
+                f"Broker failed but {desired} mode requested — falling back to PAPER: {e}"
+            )
+        else:
+            logger.warning(f"Broker connection failed (continuing in PAPER mode): {e}")
         app.state.broker_client = None
         app.state.broker_ws_client = None
 
@@ -115,14 +169,19 @@ async def lifespan(app: FastAPI):
     # Initialize paper trading loop (does not start automatically)
     from src.trading.paper_loop import PaperTradingLoop
 
+    mode_label = app.state.execution_engine.mode.value
     app.state.paper_loop = PaperTradingLoop(
         prediction_service=app.state.prediction_service,
         strategy_manager=app.state.strategy_manager,
         risk_manager=app.state.risk_manager,
         execution_engine=app.state.execution_engine,
         data_access=app.state.data_access,
+        broker=app.state.broker_client,
     )
-    logger.info("Paper trading loop initialized (use POST /api/trading/start to begin)")
+    logger.info(
+        f"Trading loop initialized in {mode_label} mode "
+        f"(use POST /api/trading/start to begin)"
+    )
 
     logger.success("✅ Application startup complete")
 

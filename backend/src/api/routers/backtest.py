@@ -1,11 +1,13 @@
 """
 Backtest API router.
-Run backtests using the BacktestEngine with real ML signals on historical data.
+Run backtests using the BacktestEngine with real ML signals on historical data,
+or with rule-based strategies (squeeze_breakout, vwap_reversion, auto).
 """
 
 import uuid
 from datetime import datetime, timezone
 
+import polars as pl
 from fastapi import APIRouter, Path, Request
 from loguru import logger
 
@@ -19,10 +21,41 @@ from src.backtest.engine import BacktestEngine
 from src.backtest.reporter import BacktestReporter
 from src.backtest.schemas import BacktestConfig
 from src.backtest.signal_generator import BacktestSignalGenerator
+from src.features.builder import FeatureBuilder
+from src.models.schemas import SignalClass
+from src.strategy.squeeze_strategy import SqueezeBreakoutStrategy
+from src.strategy.strategy_router import StrategyRouter
+from src.strategy.vwap_strategy import VWAPReversionStrategy
 
 router = APIRouter()
 
 MAX_BACKTEST_RUNS = 100
+
+VALID_STRATEGIES = {"ml_ensemble", "squeeze_breakout", "vwap_reversion", "auto"}
+
+
+def _convert_strategy_signals(strategy_df: pl.DataFrame) -> pl.DataFrame:
+    """
+    Convert strategy backtest signals to BacktestEngine format.
+
+    Strategy output: signal_direction (1=BUY, -1=SELL, 0=HOLD), signal_confidence
+    Engine expects: signal (SignalClass: BUY=2, SELL=0, HOLD=1), confidence, atr
+    """
+    # Map signal_direction to SignalClass values
+    signals_df = strategy_df.select([
+        pl.col("timestamp"),
+        pl.when(pl.col("signal_direction") == 1)
+        .then(pl.lit(SignalClass.BUY))      # 2
+        .when(pl.col("signal_direction") == -1)
+        .then(pl.lit(SignalClass.SELL))      # 0
+        .otherwise(pl.lit(SignalClass.HOLD)) # 1
+        .alias("signal"),
+        pl.col("signal_confidence").alias("confidence"),
+        pl.col("atr_14").alias("atr") if "atr_14" in strategy_df.columns
+        else pl.lit(0.0).alias("atr"),
+    ]).sort("timestamp")
+
+    return signals_df
 
 
 @router.post("/run")
@@ -31,35 +64,50 @@ async def run_backtest(
     body: BacktestRunRequest,
 ):
     """
-    Run a backtest using BacktestEngine with ML-generated signals.
+    Run a backtest using BacktestEngine with ML-generated signals
+    or rule-based strategy signals.
+
+    Strategies:
+    - ml_ensemble (default): ML model inference via BacktestSignalGenerator
+    - squeeze_breakout: Volatility squeeze breakout strategy
+    - vwap_reversion: VWAP SD band mean-reversion strategy
+    - auto: StrategyRouter selects based on regime
 
     Requires:
-    - PredictionService with loaded models (app.state.prediction_service)
     - DataAccessLayer with historical data (app.state.data_access)
-    - FeatureBuilder (app.state.feature_builder)
+    - For ml_ensemble: PredictionService with loaded models + FeatureBuilder
     """
+    strategy_name = body.strategy
+    if strategy_name not in VALID_STRATEGIES:
+        return error_response(
+            f"Invalid strategy '{strategy_name}'. "
+            f"Valid: {', '.join(sorted(VALID_STRATEGIES))}",
+            400,
+        )
+
     run_id = uuid.uuid4().hex[:12]
     now_str = datetime.now(timezone.utc).isoformat()
 
     # Get services from app state
-    prediction_service = getattr(request.app.state, "prediction_service", None)
     data_access = getattr(request.app.state, "data_access", None)
-    feature_builder = getattr(request.app.state, "feature_builder", None)
-
-    if prediction_service is None or not prediction_service.has_models:
-        return error_response("No ML models loaded. Train models first.", 400)
 
     if data_access is None:
         return error_response("DataAccessLayer not available.", 500)
 
-    if feature_builder is None:
-        return error_response("FeatureBuilder not available.", 500)
-
     epic = body.epic
     timeframe = body.timeframe
 
-    if not prediction_service.has_model_for(epic):
-        return error_response(f"No model loaded for {epic}.", 400)
+    # ML-specific validations
+    if strategy_name == "ml_ensemble":
+        prediction_service = getattr(request.app.state, "prediction_service", None)
+        feature_builder = getattr(request.app.state, "feature_builder", None)
+
+        if prediction_service is None or not prediction_service.has_models:
+            return error_response("No ML models loaded. Train models first.", 400)
+        if feature_builder is None:
+            return error_response("FeatureBuilder not available.", 500)
+        if not prediction_service.has_model_for(epic):
+            return error_response(f"No model loaded for {epic}.", 400)
 
     # Parse date range
     start_date = None
@@ -87,23 +135,55 @@ async def run_backtest(
             400,
         )
 
-    # Get model info
-    model, meta = prediction_service._loaded_models[epic]
-    calibrator = prediction_service._calibrators.get(epic)
-    feature_names = meta.feature_names or []
+    # === Generate signals based on strategy ===
+    if strategy_name == "ml_ensemble":
+        # Existing ML flow
+        prediction_service = request.app.state.prediction_service
+        feature_builder = request.app.state.feature_builder
 
-    # Generate signals
-    signal_gen = BacktestSignalGenerator()
-    signals_df = signal_gen.generate_signals(
-        model=model,
-        feature_builder=feature_builder,
-        ohlc_df=ohlc_df,
-        epic=epic,
-        timeframe=timeframe,
-        feature_names=feature_names,
-        calibrator=calibrator,
-        min_confidence=0.40,
-    )
+        model, meta = prediction_service._loaded_models[epic]
+        calibrator = prediction_service._calibrators.get(epic)
+        feature_names = meta.feature_names or []
+
+        signal_gen = BacktestSignalGenerator()
+        signals_df = signal_gen.generate_signals(
+            model=model,
+            feature_builder=feature_builder,
+            ohlc_df=ohlc_df,
+            epic=epic,
+            timeframe=timeframe,
+            feature_names=feature_names,
+            calibrator=calibrator,
+            min_confidence=0.40,
+        )
+    else:
+        # Rule-based strategy flow
+        # Build features (single-timeframe, no DataAccessLayer needed for indicators)
+        fb = FeatureBuilder(data_access=None)
+        df_with_features, _ = fb.build_features_from_df(
+            ohlc_df, epic, timeframe,
+            include_regime=True, normalize=False,
+        )
+
+        # Create strategy instance and generate signals
+        if strategy_name == "squeeze_breakout":
+            strategy = SqueezeBreakoutStrategy()
+        elif strategy_name == "vwap_reversion":
+            strategy = VWAPReversionStrategy()
+        elif strategy_name == "auto":
+            router_inst = StrategyRouter()
+            router_inst.register_strategy(SqueezeBreakoutStrategy())
+            router_inst.register_strategy(VWAPReversionStrategy())
+            strategy = router_inst
+        else:
+            return error_response(f"Unknown strategy: {strategy_name}", 400)
+
+        strategy_df = strategy.generate_backtest_signals(
+            df_with_features, epic, timeframe,
+        )
+
+        # Convert strategy signals to BacktestEngine format
+        signals_df = _convert_strategy_signals(strategy_df)
 
     if signals_df.is_empty():
         return error_response("Signal generation produced no signals.", 500)
@@ -160,7 +240,7 @@ async def run_backtest(
             del runs[key]
 
     logger.info(
-        f"Backtest {run_id} complete: {epic}/{timeframe}, "
+        f"Backtest {run_id} complete: {epic}/{timeframe} [{strategy_name}], "
         f"{result.total_trades} trades, return={metrics.get('total_return', 0):.2%}"
     )
 

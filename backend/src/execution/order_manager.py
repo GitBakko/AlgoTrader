@@ -11,9 +11,11 @@ from src.broker.client import CapitalComClient
 from src.broker.exceptions import (
     CapitalComError,
     InsufficientFundsError,
+    MarketClosedError,
     OrderRejectedError,
     RateLimitError,
 )
+from src.utils.broker_error_parser import parse_broker_error
 from src.broker.models import CreatePositionRequest, Direction, ModifyPositionRequest
 from src.execution.schemas import ExecutionMode, ExecutionOrder, ExecutionResult
 
@@ -36,8 +38,8 @@ class OrderManager:
         self._broker = broker
         self._mode = mode
 
-        if mode == ExecutionMode.LIVE and broker is None:
-            raise ValueError("Broker client is required for LIVE execution mode")
+        if mode in (ExecutionMode.DEMO, ExecutionMode.LIVE) and broker is None:
+            raise ValueError("Broker client is required for DEMO/LIVE execution mode")
 
     @property
     def mode(self) -> ExecutionMode:
@@ -159,18 +161,36 @@ class OrderManager:
                 slippage=slippage,
             )
 
+        except MarketClosedError as e:
+            logger.info(f"Market closed for {order.epic}: {e}")
+            parsed = parse_broker_error(str(e), epic=order.epic)
+            return ExecutionResult(
+                success=False, error=parsed.summary, error_detail=parsed.to_dict(),
+            )
         except InsufficientFundsError as e:
             logger.error(f"Insufficient funds for {order.epic}: {e}")
-            return ExecutionResult(success=False, error=f"Insufficient funds: {e}")
+            parsed = parse_broker_error(str(e), epic=order.epic)
+            return ExecutionResult(
+                success=False, error=parsed.summary, error_detail=parsed.to_dict(),
+            )
         except OrderRejectedError as e:
             logger.error(f"Order rejected for {order.epic}: {e}")
-            return ExecutionResult(success=False, error=f"Order rejected: {e}")
+            parsed = parse_broker_error(str(e), epic=order.epic)
+            return ExecutionResult(
+                success=False, error=parsed.summary, error_detail=parsed.to_dict(),
+            )
         except RateLimitError as e:
             logger.warning(f"Rate limited on {order.epic}: {e}")
-            return ExecutionResult(success=False, error=f"Rate limited: {e}")
+            parsed = parse_broker_error(str(e), epic=order.epic)
+            return ExecutionResult(
+                success=False, error=parsed.summary, error_detail=parsed.to_dict(),
+            )
         except CapitalComError as e:
             logger.error(f"Broker error for {order.epic}: {e}")
-            return ExecutionResult(success=False, error=f"Broker error: {e}")
+            parsed = parse_broker_error(str(e), epic=order.epic)
+            return ExecutionResult(
+                success=False, error=parsed.summary, error_detail=parsed.to_dict(),
+            )
 
     async def _live_close(self, deal_id: str) -> ExecutionResult:
         """Close a live position via broker."""

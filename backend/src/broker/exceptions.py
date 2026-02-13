@@ -49,6 +49,12 @@ class OrderRejectedError(CapitalComError):
     pass
 
 
+class MarketClosedError(CapitalComError):
+    """Raised when market is currently closed."""
+
+    pass
+
+
 class ConnectionError(CapitalComError):
     """Raised when connection to API fails."""
 
@@ -76,12 +82,36 @@ def map_error(error_code: str, message: str = "") -> CapitalComError:
     """
     Map Capital.com error code to appropriate exception.
 
+    Capital.com sometimes puts the full error message inside the errorCode field
+    instead of using a structured code. This function handles both patterns:
+    1. Exact match on known error codes (e.g., "error.invalid.session")
+    2. Fuzzy match on message content (e.g., "Rejected. TSLA is currently closed...")
+
     Args:
-        error_code: Capital.com error code (e.g., "error.invalid.session")
-        message: Optional error message
+        error_code: Capital.com error code or error message
+        message: Optional additional error message
 
     Returns:
         Appropriate CapitalComError subclass
     """
-    exception_class = ERROR_CODE_MAP.get(error_code, CapitalComError)
-    return exception_class(message or error_code, error_code)
+    # 1. Exact match on known error codes
+    if error_code in ERROR_CODE_MAP:
+        return ERROR_CODE_MAP[error_code](message or error_code, error_code)
+
+    # 2. Fuzzy match: Capital.com sometimes puts the full message in errorCode
+    code_lower = (error_code or "").lower()
+    full_msg = message or error_code
+
+    if "currently closed" in code_lower or "timetable" in code_lower:
+        return MarketClosedError(full_msg, "market.closed")
+    if "insufficient" in code_lower and "fund" in code_lower:
+        return InsufficientFundsError(full_msg, "error.insufficient.funds")
+    if "rate" in code_lower and "limit" in code_lower:
+        return RateLimitError(full_msg, "error.exceeds.rate-limit")
+    if "minimum" in code_lower and "size" in code_lower:
+        return OrderRejectedError(full_msg, "error.minimum.size")
+    if "maximum" in code_lower and "position" in code_lower:
+        return OrderRejectedError(full_msg, "error.max.positions")
+
+    # 3. Fallback
+    return CapitalComError(full_msg, error_code)
