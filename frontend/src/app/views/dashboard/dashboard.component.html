@@ -1,129 +1,273 @@
-<!-- KPI Cards -->
+<!-- ═══════ ROW 1: System Status Bar ═══════ -->
+<div class="d-flex align-items-center justify-content-between mb-3 px-1">
+  <div class="d-flex align-items-center gap-2">
+    <h5 class="mb-0 fw-semibold">Dashboard</h5>
+    @if (paperStatus()?.running) {
+      <c-badge color="success" class="ms-2">TRADING ATTIVO</c-badge>
+    } @else {
+      <c-badge color="secondary" class="ms-2">INATTIVO</c-badge>
+    }
+    @if (paperStatus()?.execution_mode; as mode) {
+      <c-badge [color]="mode === 'LIVE' ? 'danger' : mode === 'DEMO' ? 'warning' : 'info'">
+        {{ mode }}
+      </c-badge>
+    }
+  </div>
+  <div class="d-flex align-items-center gap-3 text-body-secondary small">
+    @if (riskStatus()?.circuit_breaker_active) {
+      <c-badge color="danger">CIRCUIT BREAKER ATTIVO</c-badge>
+    }
+    <span>Aggiornamento: 30s</span>
+  </div>
+</div>
+
+<!-- ═══════ ROW 2: KPI Cards ═══════ -->
 <c-row>
-  <c-col sm="6" lg="3">
-    <c-widget-stat-f
-      class="mb-4"
-      color="primary"
-      [padding]="false"
-      [title]="'Equity'"
-      [value]="overview() ? (overview()!.equity | number:'1.2-2')! : '-'"
-    >
-      <ng-template cTemplateId="widgetIcon">
-        <svg cIcon name="cil-chart-pie" size="xl"></svg>
-      </ng-template>
-    </c-widget-stat-f>
+  <c-col sm="6" xl="3">
+    <c-card class="mb-4 border-top border-top-3 border-top-primary">
+      <c-card-body class="pb-0">
+        <div class="text-body-secondary text-uppercase small fw-semibold mb-1">Equity (USD)</div>
+        <div class="fs-4 fw-bold">
+          {{ overview() ? '$ ' + (overview()!.equity | number:'1.2-2') : '...' }}
+        </div>
+      </c-card-body>
+      <div class="px-3 pb-3">
+        @if (riskStatus(); as rs) {
+          <div class="text-body-secondary small">
+            Peak: $ {{ rs.peak_equity | number:'1.2-2' }}
+          </div>
+        }
+      </div>
+    </c-card>
   </c-col>
-  <c-col sm="6" lg="3">
-    <c-widget-stat-f
-      class="mb-4"
-      [color]="overview() && overview()!.daily_pnl >= 0 ? 'success' : 'danger'"
-      [padding]="false"
-      [title]="'Daily P&L'"
-      [value]="overview() ? (overview()!.daily_pnl | number:'1.2-2')! : '-'"
-    >
-      <ng-template cTemplateId="widgetIcon">
-        <svg cIcon name="cil-arrow-thick-top" size="xl"></svg>
-      </ng-template>
-    </c-widget-stat-f>
+  <c-col sm="6" xl="3">
+    <c-card class="mb-4 border-top border-top-3"
+            [class.border-top-success]="overview() && overview()!.daily_pnl >= 0"
+            [class.border-top-danger]="overview() && overview()!.daily_pnl < 0">
+      <c-card-body class="pb-0">
+        <div class="text-body-secondary text-uppercase small fw-semibold mb-1">Daily P&amp;L (USD)</div>
+        <div class="fs-4 fw-bold"
+             [class.text-success]="overview() && overview()!.daily_pnl >= 0"
+             [class.text-danger]="overview() && overview()!.daily_pnl < 0">
+          {{ overview() ? '$ ' + (overview()!.daily_pnl >= 0 ? '+' : '') + (overview()!.daily_pnl | number:'1.2-2') : '...' }}
+        </div>
+      </c-card-body>
+      <div class="px-3 pb-3">
+        <div class="text-body-secondary small">
+          Total: <span [class.text-success]="overview() && overview()!.total_pnl >= 0"
+                       [class.text-danger]="overview() && overview()!.total_pnl < 0">
+            $ {{ overview() ? (overview()!.total_pnl | number:'1.2-2') : '-' }}
+          </span>
+        </div>
+      </div>
+    </c-card>
   </c-col>
-  <c-col sm="6" lg="3">
-    <c-widget-stat-f
-      class="mb-4"
-      color="warning"
-      [padding]="false"
-      [title]="'Open Positions'"
-      [value]="overview() ? '' + overview()!.open_positions_count : '0'"
-    >
-      <ng-template cTemplateId="widgetIcon">
-        <svg cIcon name="cil-layers" size="xl"></svg>
-      </ng-template>
-    </c-widget-stat-f>
+  <c-col sm="6" xl="3">
+    <c-card class="mb-4 border-top border-top-3 border-top-warning">
+      <c-card-body class="pb-0">
+        <div class="text-body-secondary text-uppercase small fw-semibold mb-1">Posizioni Aperte</div>
+        <div class="fs-4 fw-bold">{{ overview()?.open_positions_count ?? 0 }}</div>
+      </c-card-body>
+      <div class="px-3 pb-3">
+        <div class="text-body-secondary small">
+          Segnali: {{ paperStatus()?.signal_count ?? 0 }} |
+          Trade: {{ paperStatus()?.trade_count ?? 0 }}
+        </div>
+      </div>
+    </c-card>
   </c-col>
-  <c-col sm="6" lg="3">
-    <c-widget-stat-f
-      class="mb-4"
-      [color]="overview() && overview()!.circuit_breaker_active ? 'danger' : 'info'"
-      [padding]="false"
-      [title]="'Mode'"
-      [value]="overview() ? overview()!.trading_mode : '-'"
-    >
-      <ng-template cTemplateId="widgetIcon">
-        <svg cIcon name="cil-speedometer" size="xl"></svg>
-      </ng-template>
-    </c-widget-stat-f>
+  <c-col sm="6" xl="3">
+    <c-card class="mb-4 border-top border-top-3"
+            [class.border-top-danger]="drawdownPct() > 5"
+            [class.border-top-success]="drawdownPct() <= 5">
+      <c-card-body class="pb-0">
+        <div class="text-body-secondary text-uppercase small fw-semibold mb-1">Drawdown</div>
+        <div class="fs-4 fw-bold" [class.text-danger]="drawdownPct() > 5">
+          {{ drawdownPct() | number:'1.2-2' }}%
+        </div>
+      </c-card-body>
+      <div class="px-3 pb-3">
+        <c-progress [value]="drawdownPct()" [max]="20" color="danger" style="height: 4px;"></c-progress>
+      </div>
+    </c-card>
   </c-col>
 </c-row>
 
-<!-- Equity Curve Chart -->
-<c-card class="mb-4">
-  <c-card-header><strong>Equity Curve</strong></c-card-header>
-  <c-card-body>
-    @if (equityChartData().datasets) {
-      <c-chart
-        [data]="equityChartData()"
-        [height]="250"
-        [options]="equityChartOptions()"
-        type="line"
-      >
-        Equity curve chart
-      </c-chart>
-    } @else {
-      <p class="text-body-secondary">Loading equity data...</p>
-    }
-  </c-card-body>
-</c-card>
-
-<!-- Risk Status -->
+<!-- ═══════ ROW 3: Equity Curve + Live Prices ═══════ -->
 <c-row>
-  <c-col md="6">
+  <c-col xl="9">
     <c-card class="mb-4">
-      <c-card-header><strong>Risk Status</strong></c-card-header>
-      <c-card-body>
-        @if (riskStatus(); as rs) {
-          <div class="mb-3">
-            <div class="d-flex justify-content-between mb-1">
-              <span>Current Drawdown</span>
-              <strong>{{ (rs.current_drawdown_pct * 100) | number:'1.2-2' }}%</strong>
-            </div>
-            <c-progress [value]="rs.current_drawdown_pct * 100" [max]="20" color="danger" style="height: 8px;"></c-progress>
+      <c-card-header class="d-flex align-items-center justify-content-between py-2">
+        <strong>Equity Curve</strong>
+        @if (overview(); as ov) {
+          <div class="d-flex align-items-center gap-3 small">
+            <span>Win Rate: <strong>{{ (ov.win_rate * 100) | number:'1.0-0' }}%</strong></span>
+            <span>Sharpe: <strong>{{ ov.sharpe_ratio | number:'1.2-2' }}</strong></span>
           </div>
-          <div class="d-flex justify-content-between mb-2">
-            <span>Peak Equity</span>
-            <strong>{{ rs.peak_equity | number:'1.2-2' }}</strong>
-          </div>
-          <div class="d-flex justify-content-between mb-2">
-            <span>Circuit Breaker</span>
-            <c-badge [color]="rs.circuit_breaker_active ? 'danger' : 'success'">
-              {{ rs.circuit_breaker_active ? 'ACTIVE' : 'OK' }}
-            </c-badge>
-          </div>
+        }
+      </c-card-header>
+      <c-card-body class="p-0">
+        @if (equityLineData().length > 0) {
+          <app-tv-chart
+            mode="area"
+            [lineData]="equityLineData()"
+            [height]="300"
+            lineColor="#00d97e"
+            areaTopColor="rgba(0, 217, 126, 0.25)"
+            areaBottomColor="rgba(0, 217, 126, 0.01)"
+          ></app-tv-chart>
         } @else {
-          <p class="text-body-secondary">Loading...</p>
+          <div class="text-center py-5 text-body-secondary">
+            <div class="mb-2" style="font-size: 2rem; opacity: 0.3;">&#x1F4C8;</div>
+            Equity curve non disponibile. Avvia il paper trading per raccogliere dati.
+          </div>
         }
       </c-card-body>
     </c-card>
   </c-col>
-  <c-col md="6">
+
+  <!-- Live Price Tickers -->
+  <c-col xl="3">
     <c-card class="mb-4">
-      <c-card-header><strong>Trading Summary</strong></c-card-header>
+      <c-card-header class="py-2"><strong>Prezzi Live</strong></c-card-header>
+      <c-card-body class="p-0">
+        @if (priceTickers().length > 0) {
+          <table cTable [small]="true" [hover]="true" class="mb-0">
+            <tbody>
+              @for (t of priceTickers(); track t.epic) {
+                <tr>
+                  <td class="fw-semibold">{{ t.epic }}</td>
+                  <td class="text-end font-monospace">{{ t.bid | number:'1.2-2' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        } @else {
+          <div class="text-center py-4 text-body-secondary small">
+            WebSocket non connesso
+          </div>
+        }
+      </c-card-body>
+    </c-card>
+
+    <!-- Risk Mini-Panel -->
+    <c-card class="mb-4">
+      <c-card-header class="py-2"><strong>Risk Status</strong></c-card-header>
       <c-card-body>
-        @if (overview()) {
-          <div class="d-flex justify-content-between mb-2">
-            <span>Win Rate</span>
-            <strong>{{ (overview()!.win_rate * 100) | number:'1.0-0' }}%</strong>
+        @if (riskStatus(); as rs) {
+          <div class="d-flex justify-content-between mb-2 small">
+            <span>Circuit Breaker</span>
+            <c-badge [color]="rs.circuit_breaker_active ? 'danger' : 'success'" class="badge-sm">
+              {{ rs.circuit_breaker_active ? 'ATTIVO' : 'OK' }}
+            </c-badge>
           </div>
-          <div class="d-flex justify-content-between mb-2">
-            <span>Sharpe Ratio</span>
-            <strong>{{ overview()!.sharpe_ratio | number:'1.2-2' }}</strong>
+          <div class="d-flex justify-content-between mb-2 small">
+            <span>Drawdown</span>
+            <strong class="text-danger">{{ (rs.current_drawdown_pct * 100) | number:'1.2-2' }}%</strong>
           </div>
-          <div class="d-flex justify-content-between mb-2">
-            <span>Total P&L</span>
-            <strong [class]="overview()!.total_pnl >= 0 ? 'text-success' : 'text-danger'">
-              {{ overview()!.total_pnl | number:'1.2-2' }}
+          <div class="d-flex justify-content-between small">
+            <span>Daily P&amp;L</span>
+            <strong [class.text-success]="rs.daily_pnl >= 0" [class.text-danger]="rs.daily_pnl < 0">
+              $ {{ rs.daily_pnl | number:'1.2-2' }}
             </strong>
           </div>
         } @else {
-          <p class="text-body-secondary">Loading...</p>
+          <div class="text-body-secondary small">Caricamento...</div>
+        }
+      </c-card-body>
+    </c-card>
+  </c-col>
+</c-row>
+
+<!-- ═══════ ROW 4: Open Positions + Recent Activity ═══════ -->
+<c-row>
+  <!-- Open Positions -->
+  <c-col lg="7">
+    <c-card class="mb-4">
+      <c-card-header class="d-flex align-items-center py-2">
+        <strong>Posizioni Aperte</strong>
+        <c-badge color="info" class="ms-2">{{ livePositions().length }}</c-badge>
+        <a routerLink="/paper-trading" class="ms-auto text-body-secondary small" style="text-decoration: none;">
+          Vedi tutto &rarr;
+        </a>
+      </c-card-header>
+      <c-card-body class="p-0">
+        @if (livePositions().length > 0) {
+          <table cTable [small]="true" [hover]="true" [striped]="true" class="mb-0">
+            <thead>
+              <tr>
+                <th>Asset</th>
+                <th>Dir</th>
+                <th>Size</th>
+                <th>Entry</th>
+                <th class="text-end">P&amp;L (USD)</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (pos of livePositions(); track pos.deal_id) {
+                <tr>
+                  <td class="fw-semibold">{{ pos.epic }}</td>
+                  <td>
+                    <c-badge [color]="directionColor(pos.direction)" class="badge-sm">
+                      {{ pos.direction }}
+                    </c-badge>
+                  </td>
+                  <td>{{ pos.size | number:'1.4-4' }}</td>
+                  <td>{{ pos.level | number:'1.2-2' }}</td>
+                  <td class="text-end fw-semibold"
+                      [class.text-success]="pos.live_pnl >= 0"
+                      [class.text-danger]="pos.live_pnl < 0">
+                    $ {{ pos.live_pnl >= 0 ? '+' : '' }}{{ pos.live_pnl | number:'1.2-2' }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        } @else {
+          <div class="text-center py-4 text-body-secondary small">
+            Nessuna posizione aperta
+          </div>
+        }
+      </c-card-body>
+    </c-card>
+  </c-col>
+
+  <!-- Recent Signals -->
+  <c-col lg="5">
+    <c-card class="mb-4">
+      <c-card-header class="d-flex align-items-center py-2">
+        <strong>Segnali Recenti</strong>
+        <a routerLink="/paper-trading" class="ms-auto text-body-secondary small" style="text-decoration: none;">
+          Vedi tutto &rarr;
+        </a>
+      </c-card-header>
+      <c-card-body class="p-0">
+        @if (recentSignals().length > 0) {
+          <table cTable [small]="true" [hover]="true" class="mb-0">
+            <tbody>
+              @for (sig of recentSignals(); track sig.timestamp + sig.epic) {
+                <tr>
+                  <td class="small text-body-secondary" style="width: 50px;">{{ formatTime(sig.timestamp) }}</td>
+                  <td class="fw-semibold">{{ sig.epic }}</td>
+                  <td>
+                    <c-badge [color]="directionColor(sig.direction)" class="badge-sm">
+                      {{ sig.direction }}
+                    </c-badge>
+                  </td>
+                  <td class="small">{{ (sig.confidence * 100).toFixed(0) }}%</td>
+                  <td>
+                    <c-badge [color]="statusColor(sig.status)" class="badge-sm">
+                      {{ sig.status }}
+                    </c-badge>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        } @else {
+          <div class="text-center py-4 text-body-secondary small">
+            Nessun segnale recente
+          </div>
         }
       </c-card-body>
     </c-card>

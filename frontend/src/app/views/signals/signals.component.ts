@@ -1,78 +1,103 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
-  CardComponent, CardBodyComponent, CardHeaderComponent,
-  ColComponent, RowComponent, TableDirective,
-  BadgeComponent, ButtonDirective, ProgressComponent
+  CardComponent, CardBodyComponent,
+  TableDirective,
+  BadgeComponent, ButtonDirective, ProgressComponent, ProgressBarComponent
 } from '@coreui/angular';
 import { TradingService } from '../../core/services/trading.service';
+import { ToastService } from '../../shared/services/toast.service';
 
 @Component({
   selector: 'app-signals',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    CommonModule, CardComponent, CardBodyComponent, CardHeaderComponent,
-    ColComponent, RowComponent, TableDirective, BadgeComponent,
-    ButtonDirective, ProgressComponent
+    CommonModule, CardComponent, CardBodyComponent,
+    TableDirective, BadgeComponent,
+    ButtonDirective, ProgressComponent, ProgressBarComponent
   ],
   template: `
-    <c-row>
-      <c-col xs="12">
-        <c-card class="mb-4">
-          <c-card-header>
-            <strong>Trading Signals</strong>
-            <button cButton color="primary" size="sm" class="float-end" (click)="generateTestSignal()">
-              Generate Test Signal
-            </button>
-          </c-card-header>
-          <c-card-body>
-            @if (signals().length === 0) {
-              <p class="text-body-secondary">No signals generated yet</p>
-            } @else {
-              <table cTable striped hover>
-                <thead>
+    <!-- Header -->
+    <div class="d-flex align-items-center justify-content-between mb-3 px-1">
+      <div class="d-flex align-items-center gap-2">
+        <h5 class="mb-0 fw-semibold">Segnali</h5>
+        <c-badge color="info">{{ signals().length }}</c-badge>
+      </div>
+      <button cButton color="primary" size="sm" (click)="generateTestSignal()">
+        Test Signal
+      </button>
+    </div>
+
+    <c-card class="mb-4">
+      <c-card-body class="p-0">
+        @if (signals().length === 0) {
+          <div class="text-center py-5 text-body-secondary small">
+            Nessun segnale generato
+          </div>
+        } @else {
+          <div style="max-height: 600px; overflow-y: auto;">
+            <table cTable [small]="true" [hover]="true" [striped]="true" class="mb-0">
+              <thead class="position-sticky top-0" style="z-index: 1;">
+                <tr>
+                  <th>Asset</th>
+                  <th>Dir</th>
+                  <th>Confidenza</th>
+                  <th>Entry</th>
+                  <th>SL</th>
+                  <th>TP</th>
+                  <th>Regime</th>
+                  <th>Status</th>
+                  <th>Data</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (sig of signals(); track sig.timestamp + sig.epic) {
                   <tr>
-                    <th>Epic</th>
-                    <th>Direction</th>
-                    <th>Confidence</th>
-                    <th>Entry Price</th>
-                    <th>Stop</th>
-                    <th>Take Profit</th>
-                    <th>Regime</th>
-                    <th>Time</th>
+                    <td class="fw-semibold">{{ sig.epic }}</td>
+                    <td>
+                      <c-badge [color]="directionColor(sig.direction)" class="badge-sm">
+                        {{ sig.direction }}
+                      </c-badge>
+                    </td>
+                    <td>
+                      <div class="d-flex align-items-center gap-1">
+                        <c-progress class="flex-grow-1" style="height: 4px; min-width: 40px;">
+                          <c-progress-bar
+                            [value]="sig.confidence * 100"
+                            [color]="sig.confidence >= 0.5 ? 'success' : 'warning'">
+                          </c-progress-bar>
+                        </c-progress>
+                        <small class="font-monospace">{{ (sig.confidence * 100) | number:'1.0-0' }}%</small>
+                      </div>
+                    </td>
+                    <td class="font-monospace">{{ sig.entry_price | number:'1.2-2' }}</td>
+                    <td class="font-monospace">{{ sig.suggested_stop ? (sig.suggested_stop | number:'1.2-2') : '—' }}</td>
+                    <td class="font-monospace">{{ sig.suggested_tp ? (sig.suggested_tp | number:'1.2-2') : '—' }}</td>
+                    <td>
+                      @if (sig.regime) {
+                        <c-badge [color]="regimeColor(sig.regime)" class="badge-sm">{{ sig.regime }}</c-badge>
+                      } @else {
+                        <span class="text-body-secondary">-</span>
+                      }
+                    </td>
+                    <td>
+                      <c-badge [color]="statusColor(sig.status)" class="badge-sm">{{ sig.status }}</c-badge>
+                    </td>
+                    <td class="text-body-secondary small text-nowrap">{{ formatDateTime(sig.timestamp) }}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  @for (sig of signals(); track sig.timestamp) {
-                    <tr>
-                      <td><strong>{{ sig.epic }}</strong></td>
-                      <td>
-                        <c-badge [color]="getDirectionColor(sig.direction)">
-                          {{ sig.direction }}
-                        </c-badge>
-                      </td>
-                      <td>
-                        <c-progress [value]="sig.confidence * 100" [color]="getConfidenceColor(sig.confidence)" style="height: 8px;"></c-progress>
-                        <small>{{ (sig.confidence * 100) | number:'1.0-0' }}%</small>
-                      </td>
-                      <td>{{ sig.entry_price | number:'1.2-2' }}</td>
-                      <td>{{ sig.suggested_stop ? (sig.suggested_stop | number:'1.2-2') : '-' }}</td>
-                      <td>{{ sig.suggested_tp ? (sig.suggested_tp | number:'1.2-2') : '-' }}</td>
-                      <td>{{ sig.regime ?? 'N/A' }}</td>
-                      <td>{{ sig.timestamp | date:'short' }}</td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            }
-          </c-card-body>
-        </c-card>
-      </c-col>
-    </c-row>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </c-card-body>
+    </c-card>
   `
 })
 export class SignalsComponent implements OnInit {
   private readonly trading = inject(TradingService);
+  private readonly toast = inject(ToastService);
   readonly signals = this.trading.signals;
 
   ngOnInit(): void {
@@ -80,20 +105,42 @@ export class SignalsComponent implements OnInit {
   }
 
   generateTestSignal(): void {
-    this.trading.generateSignal('XAUUSD').subscribe(() => {
-      this.trading.loadSignals();
+    this.trading.generateSignal('XAUUSD').subscribe({
+      next: () => {
+        this.toast.success('Segnale test generato');
+        this.trading.loadSignals();
+      },
+      error: () => this.toast.error('Errore generazione segnale')
     });
   }
 
-  getDirectionColor(dir: string): string {
-    if (dir === 'BUY') return 'success';
-    if (dir === 'SELL') return 'danger';
+  directionColor(dir: string): string {
+    return dir === 'BUY' ? 'success' : dir === 'SELL' ? 'danger' : 'secondary';
+  }
+
+  regimeColor(regime: string): string {
+    if (regime.includes('trending')) return 'primary';
+    if (regime.includes('ranging')) return 'warning';
     return 'secondary';
   }
 
-  getConfidenceColor(conf: number): string {
-    if (conf >= 0.8) return 'success';
-    if (conf >= 0.6) return 'warning';
-    return 'danger';
+  statusColor(status: string): string {
+    switch (status) {
+      case 'executed': return 'success';
+      case 'rejected': case 'exec_failed': return 'danger';
+      case 'hold': return 'warning';
+      case 'predicted': return 'info';
+      default: return 'secondary';
+    }
+  }
+
+  formatDateTime(iso: string): string {
+    if (!iso) return '-';
+    try {
+      return new Date(iso).toLocaleString('it-IT', {
+        day: '2-digit', month: '2-digit',
+        hour: '2-digit', minute: '2-digit',
+      });
+    } catch { return iso; }
   }
 }

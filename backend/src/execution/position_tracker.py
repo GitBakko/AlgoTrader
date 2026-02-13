@@ -35,12 +35,15 @@ class PositionTracker:
 
     async def sync_positions(self) -> list[dict]:
         """
-        Get all open positions (from broker or internal state).
+        Get all open positions.
+
+        PAPER/DEMO: Uses local in-memory tracking (reliable, no API calls).
+        LIVE: Queries broker for authoritative state.
 
         Returns:
             List of position dicts with keys: deal_id, epic, direction, size, level
         """
-        if self._mode == ExecutionMode.PAPER:
+        if self._mode in (ExecutionMode.PAPER, ExecutionMode.DEMO):
             return list(self._paper_positions.values())
 
         positions = await self._broker.list_positions()
@@ -82,7 +85,7 @@ class PositionTracker:
         Returns:
             Position dict or None
         """
-        if self._mode == ExecutionMode.PAPER:
+        if self._mode in (ExecutionMode.PAPER, ExecutionMode.DEMO):
             return self._paper_positions.get(deal_id)
 
         positions = await self.sync_positions()

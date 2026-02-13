@@ -82,8 +82,8 @@ class ExecutionEngine:
                 direction=signal.direction.value,
             )
 
-            # Track position (paper mode)
-            if self._mode == ExecutionMode.PAPER and result.deal_id:
+            # Track position locally (all modes - needed for trailing stops, etc.)
+            if result.deal_id:
                 self._position_tracker.open_paper_position(
                     order=order,
                     fill_price=result.fill_price,
@@ -117,8 +117,7 @@ class ExecutionEngine:
         result = await self._order_manager.close_order(deal_id)
 
         if result.success:
-            if self._mode == ExecutionMode.PAPER:
-                self._position_tracker.close_paper_position(deal_id)
+            self._position_tracker.close_paper_position(deal_id)
             logger.info(f"Position closed: {deal_id} reason={reason}")
 
         return result

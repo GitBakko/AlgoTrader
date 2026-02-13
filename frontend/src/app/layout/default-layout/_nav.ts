@@ -11,17 +11,17 @@ export const navItems: INavData[] = [
     name: 'Trading'
   },
   {
-    name: 'Positions',
+    name: 'Posizioni',
     url: '/positions',
     iconComponent: { name: 'cil-layers' }
   },
   {
-    name: 'Signals',
+    name: 'Segnali',
     url: '/signals',
     iconComponent: { name: 'cil-bolt' }
   },
   {
-    name: 'Markets',
+    name: 'Mercati',
     url: '/markets',
     iconComponent: { name: 'cil-chart-line' }
   },
@@ -32,7 +32,7 @@ export const navItems: INavData[] = [
   },
   {
     title: true,
-    name: 'Analysis'
+    name: 'Analisi'
   },
   {
     name: 'Backtest',
@@ -40,22 +40,22 @@ export const navItems: INavData[] = [
     iconComponent: { name: 'cil-history' }
   },
   {
-    name: 'Strategy',
+    name: 'Strategia',
     url: '/strategy',
     iconComponent: { name: 'cil-settings' }
   },
   {
-    name: 'AI Models',
+    name: 'Modelli AI',
     url: '/models',
     iconComponent: { name: 'cil-brain' }
   },
   {
     title: true,
-    name: 'System',
+    name: 'Sistema',
     class: 'mt-auto'
   },
   {
-    name: 'Settings',
+    name: 'Impostazioni',
     url: '/settings',
     iconComponent: { name: 'cil-applications-settings' }
   }

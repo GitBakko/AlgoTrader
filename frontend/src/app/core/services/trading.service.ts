@@ -157,7 +157,7 @@ export class TradingService {
 
   // ── Backtest ──
 
-  runBacktest(config: { epic: string; timeframe?: string; start_date?: string; end_date?: string; initial_equity?: number; risk_per_trade?: number }) {
+  runBacktest(config: { epic: string; timeframe?: string; start_date?: string; end_date?: string; initial_equity?: number; risk_per_trade?: number; strategy?: string }) {
     return this.api.post<BacktestRun>('/api/backtest/run', config);
   }
 

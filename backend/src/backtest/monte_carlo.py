@@ -120,30 +120,37 @@ class MonteCarloSimulator:
         orig_dd = original_metrics.get("max_drawdown", orig_dd)
         orig_sharpe = original_metrics.get("sharpe", orig_sharpe)
 
-        # Run simulations
-        final_equities = np.empty(self.n_simulations)
+        # --- Permutation test: shuffle trade ORDER for drawdown CI ---
         max_drawdowns = np.empty(self.n_simulations)
-        sharpe_ratios = np.empty(self.n_simulations)
-
         ruin_count = 0
-        better_return_count = 0
 
         for i in range(self.n_simulations):
             shuffled = rng.permutation(pnls)
             equity_curve = initial_capital + np.cumsum(shuffled)
-
-            final_eq = float(equity_curve[-1])
-            final_equities[i] = final_eq
             max_drawdowns[i] = self._max_drawdown(equity_curve, initial_capital)
-            sharpe_ratios[i] = self._compute_sharpe(shuffled)
 
-            # Check ruin
             min_equity = float(np.min(equity_curve))
             if min_equity <= initial_capital * (1 - self.ruin_threshold):
                 ruin_count += 1
 
-            # Check if random order beats original
-            if final_eq >= orig_final:
+        # --- Bootstrap: resample WITH replacement for equity/Sharpe CI ---
+        final_equities = np.empty(self.n_simulations)
+        sharpe_ratios = np.empty(self.n_simulations)
+
+        for i in range(self.n_simulations):
+            boot_idx = rng.integers(0, n_trades, size=n_trades)
+            boot_pnls = pnls[boot_idx]
+            final_equities[i] = initial_capital + float(np.sum(boot_pnls))
+            sharpe_ratios[i] = self._compute_sharpe(boot_pnls)
+
+        # --- Sign-flip test for p-value (null: direction is random) ---
+        better_return_count = 0
+        n_sign_tests = min(self.n_simulations, 10_000)
+
+        for i in range(n_sign_tests):
+            signs = rng.choice([-1.0, 1.0], size=n_trades)
+            random_return = float(np.sum(pnls * signs))
+            if random_return >= float(np.sum(pnls)):
                 better_return_count += 1
 
         # Compute confidence intervals (5th, 50th, 95th)
@@ -151,10 +158,10 @@ class MonteCarloSimulator:
         dd_ci = tuple(float(x) for x in np.percentile(max_drawdowns, [5, 50, 95]))
         sharpe_ci = tuple(float(x) for x in np.percentile(sharpe_ratios, [5, 50, 95]))
 
-        # P-value: fraction of random shuffles that beat original
-        p_value = better_return_count / self.n_simulations
+        # P-value from sign-flip test
+        p_value = better_return_count / n_sign_tests
 
-        # Risk of ruin
+        # Risk of ruin from permutation test
         risk_of_ruin = ruin_count / self.n_simulations
 
         logger.info(

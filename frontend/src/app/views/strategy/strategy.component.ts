@@ -1,10 +1,10 @@
-import { Component, computed, inject, OnInit } from '@angular/core';
+import { Component, ChangeDetectionStrategy, computed, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
   ColComponent, RowComponent, ButtonDirective,
-  FormControlDirective, FormLabelDirective, BadgeComponent
+  FormControlDirective, BadgeComponent
 } from '@coreui/angular';
 import { TradingService } from '../../core/services/trading.service';
 import { StrategyConfig } from '../../core/models';
@@ -12,10 +12,11 @@ import { StrategyConfig } from '../../core/models';
 @Component({
   selector: 'app-strategy',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, FormsModule, CardComponent, CardBodyComponent, CardHeaderComponent,
     ColComponent, RowComponent, ButtonDirective,
-    FormControlDirective, FormLabelDirective, BadgeComponent
+    FormControlDirective, BadgeComponent
   ],
   template: `
     <c-row>

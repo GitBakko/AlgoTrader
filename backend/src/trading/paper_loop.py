@@ -352,6 +352,7 @@ class PaperTradingLoop:
             "entry_price": signal.entry_price,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "status": "predicted",
+            "strategy_name": signal.strategy_name,
         }
         self._last_signals[epic] = signal_info
         self._signal_history.appendleft(signal_info)

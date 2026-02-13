@@ -216,6 +216,7 @@ def run_walk_forward_backtest(
     prune_pct: float = 0.0,
     do_sweep_threshold: bool = False,
     strategy: str = "ml_ensemble",
+    monte_carlo: bool = False,
 ) -> None:
     """Run walk-forward backtest for a single asset."""
     logger.info(f"\n{'='*60}")
@@ -488,6 +489,28 @@ def run_walk_forward_backtest(
     print("\n" + BacktestReporter.summarize(result))
     print()
 
+    # Monte Carlo validation
+    closed = [t for t in result.trades if t.status.value != "open"]
+    if monte_carlo and closed:
+        from src.backtest.monte_carlo import MonteCarloSimulator
+        mc = MonteCarloSimulator(n_simulations=10_000)
+        trades_dicts = [{"pnl": t.net_pnl} for t in closed]
+        mc_result = mc.run(trades_dicts, initial_capital)
+        eq_ci = mc_result.final_equity_ci
+        dd_ci = mc_result.max_drawdown_ci
+        sh_ci = mc_result.sharpe_ratio_ci
+        print(f"{'='*50}")
+        print(f"MONTE CARLO VALIDATION ({mc_result.n_simulations} simulations)")
+        print(f"{'='*50}")
+        print(f"  Equity 90% CI:  [{eq_ci[0]:,.0f} — {eq_ci[2]:,.0f}] (median {eq_ci[1]:,.0f})")
+        print(f"  Max DD 90% CI:  [{dd_ci[0]:.1%} — {dd_ci[2]:.1%}] (median {dd_ci[1]:.1%})")
+        print(f"  Sharpe 90% CI:  [{sh_ci[0]:.3f} — {sh_ci[2]:.3f}] (median {sh_ci[1]:.3f})")
+        print(f"  P-value (return): {mc_result.p_value_return:.4f}")
+        print(f"  Risk of ruin:     {mc_result.risk_of_ruin:.4f}")
+        sig = "SIGNIFICANT" if mc_result.p_value_return < 0.05 else "NOT significant"
+        print(f"  Strategy edge:    {sig} (p<0.05)")
+        print()
+
 
 def main():
     parser = argparse.ArgumentParser(description="Walk-Forward Backtest")
@@ -510,6 +533,10 @@ def main():
         choices=["ml_ensemble", "squeeze_breakout", "vwap_reversion", "auto"],
         help="Strategy to use (default: ml_ensemble)"
     )
+    parser.add_argument(
+        "--monte-carlo", action="store_true",
+        help="Run Monte Carlo simulation after backtest (10K shuffles)"
+    )
     args = parser.parse_args()
 
     epics = [args.epic] if args.epic else ASSETS
@@ -526,6 +553,7 @@ def main():
                 prune_pct=args.prune_pct,
                 do_sweep_threshold=args.sweep_threshold,
                 strategy=args.strategy,
+                monte_carlo=args.monte_carlo,
             )
         except Exception as e:
             logger.error(f"Failed for {epic}: {e}")

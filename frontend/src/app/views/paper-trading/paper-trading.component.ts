@@ -1,21 +1,16 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { Component, ChangeDetectionStrategy, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
   ColComponent, RowComponent, BadgeComponent, ProgressComponent, ProgressBarComponent,
-  ButtonDirective, SpinnerComponent, AlertComponent,
+  ButtonDirective, SpinnerComponent,
   TableDirective,
 } from '@coreui/angular';
 
 import { TradingService } from '../../core/services/trading.service';
 import { WebSocketService } from '../../core/services/websocket.service';
-import { PaperPosition, PaperSignal, BrokerErrorDetail } from '../../core/models';
-
-interface KpiCard {
-  label: string;
-  value: string;
-  colorClass: string;
-}
+import { ToastService } from '../../shared/services/toast.service';
+import { PaperPosition, PaperSignal } from '../../core/models';
 
 interface LivePosition extends PaperPosition {
   live_pnl: number;
@@ -24,170 +19,290 @@ interface LivePosition extends PaperPosition {
 @Component({
   selector: 'app-paper-trading',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, DecimalPipe,
     CardComponent, CardBodyComponent, CardHeaderComponent,
     ColComponent, RowComponent, BadgeComponent, ProgressComponent, ProgressBarComponent,
-    ButtonDirective, SpinnerComponent, AlertComponent,
+    ButtonDirective, SpinnerComponent,
     TableDirective,
   ],
   template: `
-    <!-- Alerts -->
-    @if (successMsg()) {
-      <c-alert color="success" [dismissible]="true" (visibleChange)="successMsg.set('')">
-        {{ successMsg() }}
-      </c-alert>
-    }
-    @if (errorMsg()) {
-      <c-alert color="danger" [dismissible]="true" (visibleChange)="errorMsg.set('')">
-        {{ errorMsg() }}
-      </c-alert>
-    }
+    <!-- ═══════ ROW 1: Status Bar ═══════ -->
+    <div class="d-flex align-items-center justify-content-between mb-3 px-1">
+      <div class="d-flex align-items-center gap-2">
+        <h5 class="mb-0 fw-semibold">Paper Trading</h5>
+        @if (status()?.running) {
+          <c-badge color="success" class="ms-2">RUNNING</c-badge>
+        } @else {
+          <c-badge color="secondary" class="ms-2">STOPPED</c-badge>
+        }
+        @if (status()?.execution_mode; as mode) {
+          <c-badge [color]="mode === 'LIVE' ? 'danger' : mode === 'DEMO' ? 'warning' : 'info'">
+            {{ mode }}
+          </c-badge>
+        }
+        @if (circuitBreakersTripped().length > 0) {
+          <c-badge color="danger">CIRCUIT BREAKER</c-badge>
+        }
+      </div>
+      <div class="d-flex align-items-center gap-3">
+        @if (status()?.last_run) {
+          <span class="text-body-secondary small">
+            Ultimo check: {{ formatTime(status()!.last_run!) }}
+          </span>
+        }
+        <button cButton [color]="status()?.running ? 'danger' : 'success'" size="sm"
+                (click)="togglePaperTrading()" [disabled]="actionInProgress() || !statusLoaded()">
+          @if (actionInProgress()) {
+            <c-spinner size="sm" class="me-1"></c-spinner>
+          }
+          {{ status()?.running ? 'Stop' : 'Start' }}
+        </button>
+      </div>
+    </div>
 
-    <!-- Section A: Control Panel -->
-    <c-card class="mb-4 border-start border-start-4"
-            [class.border-start-success]="status()?.running"
-            [class.border-start-secondary]="!status()?.running">
-      <c-card-body>
-        <c-row class="align-items-center">
-          <c-col md="4">
-            <c-badge [color]="status()?.running ? 'success' : 'secondary'" class="fs-6 mb-1">
-              {{ status()?.running ? 'RUNNING' : 'STOPPED' }}
-            </c-badge>
-            <c-badge [color]="modeColor()" class="fs-6 mb-1 ms-2">
-              {{ status()?.execution_mode ?? 'PAPER' }}
-            </c-badge>
-            @if (status()?.message && !status()?.running && !status()?.epics) {
-              <div class="text-warning small mt-1">{{ status()?.message }}</div>
-            }
-            @if (status()?.last_run) {
-              <div class="text-body-secondary small mt-1">
-                Ultimo check: {{ formatDateTime(status()!.last_run!) }}
-              </div>
-            }
-          </c-col>
-          <c-col md="4" class="text-center">
-            <div class="text-body-secondary small">Intervallo</div>
-            <div class="fs-5">{{ status()?.interval_seconds ?? '—' }}s</div>
-            <div class="text-body-secondary small">
-              {{ status()?.check_count ?? 0 }} check totali
-            </div>
-          </c-col>
-          <c-col md="4" class="text-end">
-            <button cButton [color]="status()?.running ? 'danger' : 'success'"
-                    (click)="togglePaperTrading()" [disabled]="actionInProgress() || !statusLoaded()">
-              @if (actionInProgress()) {
-                <c-spinner size="sm" class="me-2"></c-spinner>
-              }
-              {{ status()?.running ? 'Stop Trading' : 'Start Trading' }}
-            </button>
-          </c-col>
-        </c-row>
-      </c-card-body>
-    </c-card>
-
-    <!-- Section B: KPI Cards -->
+    <!-- ═══════ ROW 2: KPI Cards ═══════ -->
     <c-row>
-      @for (kpi of kpiCards(); track kpi.label) {
-        <c-col md="2" sm="4" class="mb-4">
+      <c-col sm="6" xl="3">
+        <c-card class="mb-4 border-top border-top-3 border-top-primary">
+          <c-card-body class="pb-0">
+            <div class="text-body-secondary text-uppercase small fw-semibold mb-1">Iterazioni</div>
+            <div class="fs-4 fw-bold">{{ status()?.iteration_count ?? 0 }}</div>
+          </c-card-body>
+          <div class="px-3 pb-3">
+            <div class="text-body-secondary small">
+              Check: {{ status()?.check_count ?? 0 }} |
+              Intervallo: {{ status()?.interval_seconds ?? '—' }}s
+            </div>
+          </div>
+        </c-card>
+      </c-col>
+      <c-col sm="6" xl="3">
+        <c-card class="mb-4 border-top border-top-3 border-top-info">
+          <c-card-body class="pb-0">
+            <div class="text-body-secondary text-uppercase small fw-semibold mb-1">Segnali / Trade</div>
+            <div class="fs-4 fw-bold">
+              {{ status()?.signal_count ?? 0 }}
+              <span class="fs-6 text-body-secondary fw-normal">/ {{ status()?.trade_count ?? 0 }}</span>
+            </div>
+          </c-card-body>
+          <div class="px-3 pb-3">
+            <div class="text-body-secondary small">
+              Conversione: {{ conversionRate() }}%
+            </div>
+          </div>
+        </c-card>
+      </c-col>
+      <c-col sm="6" xl="3">
+        <c-card class="mb-4 border-top border-top-3"
+                [class.border-top-success]="totalPnl() >= 0"
+                [class.border-top-danger]="totalPnl() < 0">
+          <c-card-body class="pb-0">
+            <div class="text-body-secondary text-uppercase small fw-semibold mb-1">P&amp;L (USD)</div>
+            <div class="fs-4 fw-bold"
+                 [class.text-success]="totalPnl() >= 0"
+                 [class.text-danger]="totalPnl() < 0">
+              $ {{ totalPnl() >= 0 ? '+' : '' }}{{ totalPnl() | number:'1.2-2' }}
+            </div>
+          </c-card-body>
+          <div class="px-3 pb-3">
+            <div class="text-body-secondary small">
+              Posizioni aperte: {{ livePositions().length }}
+            </div>
+          </div>
+        </c-card>
+      </c-col>
+      <c-col sm="6" xl="3">
+        <c-card class="mb-4 border-top border-top-3"
+                [class.border-top-danger]="(status()?.error_count ?? 0) > 0"
+                [class.border-top-success]="(status()?.error_count ?? 0) === 0">
+          <c-card-body class="pb-0">
+            <div class="text-body-secondary text-uppercase small fw-semibold mb-1">Errori</div>
+            <div class="fs-4 fw-bold"
+                 [class.text-danger]="(status()?.error_count ?? 0) > 0">
+              {{ status()?.error_count ?? 0 }}
+            </div>
+          </c-card-body>
+          <div class="px-3 pb-3">
+            @if (rejectedCount() > 0) {
+              <div class="text-danger small">{{ rejectedCount() }} segnali rifiutati</div>
+            } @else {
+              <div class="text-success small">Nessun rifiuto</div>
+            }
+          </div>
+        </c-card>
+      </c-col>
+    </c-row>
+
+    <!-- ═══════ ROW 3: Risk Status (compact) ═══════ -->
+    @if (status()?.running) {
+      <c-row class="mb-4">
+        <c-col sm="6" lg="3">
           <c-card class="h-100">
-            <c-card-body class="text-center py-3">
-              <div class="text-body-secondary small text-uppercase mb-1">{{ kpi.label }}</div>
-              <div class="fs-4 fw-semibold" [class]="kpi.colorClass">{{ kpi.value }}</div>
+            <c-card-body class="py-2 d-flex justify-content-between align-items-center">
+              <span class="text-body-secondary small">Circuit Breakers</span>
+              @if (circuitBreakersTripped().length === 0) {
+                <c-badge color="success" class="badge-sm">OK</c-badge>
+              } @else {
+                <div class="d-flex flex-wrap gap-1 justify-content-end" style="max-width: 160px;">
+                  @for (b of circuitBreakersTripped(); track b) {
+                    <c-badge color="danger" class="badge-sm">{{ b }}</c-badge>
+                  }
+                </div>
+              }
             </c-card-body>
           </c-card>
         </c-col>
-      }
-    </c-row>
+        <c-col sm="6" lg="3">
+          <c-card class="h-100">
+            <c-card-body class="py-2 d-flex justify-content-between align-items-center">
+              <span class="text-body-secondary small">Equity Filter</span>
+              @if (status()?.equity_curve_below_sma) {
+                <c-badge color="warning" class="badge-sm">-50% Size</c-badge>
+              } @else {
+                <c-badge color="success" class="badge-sm">Normale</c-badge>
+              }
+            </c-card-body>
+          </c-card>
+        </c-col>
+        <c-col sm="6" lg="3">
+          <c-card class="h-100">
+            <c-card-body class="py-2 d-flex justify-content-between align-items-center">
+              <span class="text-body-secondary small">Kelly History</span>
+              <strong class="text-info">{{ status()?.kelly_trade_history_size ?? 0 }}</strong>
+            </c-card-body>
+          </c-card>
+        </c-col>
+        <c-col sm="6" lg="3">
+          <c-card class="h-100">
+            <c-card-body class="py-2 d-flex justify-content-between align-items-center">
+              <span class="text-body-secondary small">Trailing Stops</span>
+              <strong class="text-primary">{{ status()?.trailing_stops_tracked ?? 0 }}</strong>
+            </c-card-body>
+          </c-card>
+        </c-col>
+      </c-row>
+    }
 
-    <!-- Section C: Models + Last Signals -->
+    <!-- ═══════ ROW 4: Positions + Last Signals per Asset ═══════ -->
     <c-row>
-      <!-- Models Loaded -->
-      <c-col md="6" class="mb-4">
-        <c-card class="h-100">
-          <c-card-header><strong>Modelli Caricati</strong></c-card-header>
-          <c-card-body>
-            @if (modelEntries().length > 0) {
-              <table cTable [striped]="true" [hover]="true" [small]="true">
+      <!-- Open Positions -->
+      <c-col xl="7">
+        <c-card class="mb-4">
+          <c-card-header class="d-flex align-items-center justify-content-between py-2">
+            <div class="d-flex align-items-center">
+              <strong>Posizioni Aperte</strong>
+              <c-badge color="info" class="ms-2">{{ livePositions().length }}</c-badge>
+            </div>
+            @if (livePositions().length > 0) {
+              <c-badge [color]="totalPnl() >= 0 ? 'success' : 'danger'">
+                $ {{ totalPnl() >= 0 ? '+' : '' }}{{ totalPnl() | number:'1.2-2' }}
+              </c-badge>
+            }
+          </c-card-header>
+          <c-card-body class="p-0">
+            @if (livePositions().length > 0) {
+              <table cTable [small]="true" [hover]="true" [striped]="true" class="mb-0">
                 <thead>
                   <tr>
-                    <th>Epic</th>
-                    <th>Tipo</th>
-                    <th>Features</th>
-                    <th>Versione</th>
+                    <th>Asset</th>
+                    <th>Dir</th>
+                    <th>Size</th>
+                    <th>Entry</th>
+                    <th>SL</th>
+                    <th>TP</th>
+                    <th>Trailing</th>
+                    <th class="text-end">P&amp;L (USD)</th>
                   </tr>
                 </thead>
                 <tbody>
-                  @for (m of modelEntries(); track m.epic) {
+                  @for (pos of livePositions(); track pos.deal_id) {
                     <tr>
-                      <td><strong>{{ m.epic }}</strong></td>
-                      <td>{{ m.info.model_type }}</td>
-                      <td>{{ m.info.num_features }}</td>
-                      <td>{{ m.info.version }}</td>
+                      <td class="fw-semibold">{{ pos.epic }}</td>
+                      <td>
+                        <c-badge [color]="directionColor(pos.direction)" class="badge-sm">
+                          {{ pos.direction }}
+                        </c-badge>
+                      </td>
+                      <td class="font-monospace">{{ pos.size | number:'1.4-4' }}</td>
+                      <td class="font-monospace">{{ pos.level | number:'1.2-2' }}</td>
+                      <td class="font-monospace">{{ pos.stop_level !== null ? (pos.stop_level | number:'1.2-2') : '—' }}</td>
+                      <td class="font-monospace">{{ pos.profit_level !== null ? (pos.profit_level | number:'1.2-2') : '—' }}</td>
+                      <td>
+                        @if (pos.trailing_stop_phase) {
+                          <c-badge [color]="trailingPhaseColor(pos.trailing_stop_phase)" class="badge-sm">
+                            {{ pos.trailing_stop_phase }}
+                          </c-badge>
+                        } @else {
+                          <span class="text-body-secondary">-</span>
+                        }
+                      </td>
+                      <td class="text-end fw-semibold font-monospace"
+                          [class.text-success]="pos.live_pnl >= 0"
+                          [class.text-danger]="pos.live_pnl < 0">
+                        $ {{ pos.live_pnl >= 0 ? '+' : '' }}{{ pos.live_pnl | number:'1.2-2' }}
+                      </td>
                     </tr>
                   }
                 </tbody>
               </table>
             } @else {
-              <p class="text-body-secondary mb-0">Nessun modello caricato</p>
+              <div class="text-center py-4 text-body-secondary small">
+                Nessuna posizione aperta
+              </div>
             }
           </c-card-body>
         </c-card>
       </c-col>
 
-      <!-- Last Signals per Epic -->
-      <c-col md="6" class="mb-4">
-        <c-card class="h-100">
-          <c-card-header><strong>Ultimi Segnali per Asset</strong></c-card-header>
-          <c-card-body>
+      <!-- Last Signal per Asset -->
+      <c-col xl="5">
+        <c-card class="mb-4">
+          <c-card-header class="py-2"><strong>Ultimo Segnale per Asset</strong></c-card-header>
+          <c-card-body class="p-0">
             @if (signalEntries().length > 0) {
-              <table cTable [striped]="true" [hover]="true" [small]="true">
+              <table cTable [small]="true" [hover]="true" class="mb-0">
                 <thead>
                   <tr>
-                    <th>Epic</th>
-                    <th>Direzione</th>
-                    <th>Confidenza</th>
-                    <th>Prezzo</th>
+                    <th>Asset</th>
+                    <th>Dir</th>
+                    <th>Conf</th>
                     <th>Stato</th>
                   </tr>
                 </thead>
                 <tbody>
                   @for (s of signalEntries(); track s.epic) {
                     <tr>
-                      <td><strong>{{ s.epic }}</strong></td>
+                      <td class="fw-semibold">{{ s.epic }}</td>
                       <td>
-                        <c-badge [color]="directionColor(s.info.direction)">
+                        <c-badge [color]="directionColor(s.info.direction)" class="badge-sm">
                           {{ s.info.direction }}
                         </c-badge>
                       </td>
                       <td>
-                        <div class="d-flex align-items-center gap-2">
-                          <c-progress class="flex-grow-1" style="height: 6px;">
+                        <div class="d-flex align-items-center gap-1">
+                          <c-progress class="flex-grow-1" style="height: 4px; min-width: 40px;">
                             <c-progress-bar
                               [value]="s.info.confidence * 100"
                               [color]="s.info.confidence >= 0.5 ? 'success' : 'warning'">
                             </c-progress-bar>
                           </c-progress>
-                          <small>{{ (s.info.confidence * 100).toFixed(0) }}%</small>
+                          <small class="font-monospace">{{ (s.info.confidence * 100).toFixed(0) }}%</small>
                         </div>
                       </td>
-                      <td>{{ s.info.entry_price | number:'1.2-2' }}</td>
                       <td>
                         @if (s.info.status) {
-                          <c-badge [color]="statusColor(s.info.status)">
+                          <c-badge [color]="statusColor(s.info.status)" class="badge-sm">
                             {{ statusLabel(s.info.status) }}
                           </c-badge>
                           @if (s.info.error_detail) {
-                            <div [class]="s.info.status === 'market_closed' ? 'text-body-secondary small mt-1' : 'text-danger small mt-1'" style="max-width: 200px;">
+                            <div class="text-body-secondary small mt-1" style="max-width: 150px; font-size: 0.7rem;">
                               {{ s.info.error_detail.summary }}
-                            </div>
-                          } @else if (s.info.rejection_reason) {
-                            <div class="text-danger small mt-1" style="max-width: 200px;">
-                              {{ s.info.rejection_reason }}
                             </div>
                           }
                         } @else {
-                          <small class="text-body-secondary">{{ formatDateTime(s.info.timestamp) }}</small>
+                          <small class="text-body-secondary">{{ formatTime(s.info.timestamp) }}</small>
                         }
                       </td>
                     </tr>
@@ -195,145 +310,149 @@ interface LivePosition extends PaperPosition {
                 </tbody>
               </table>
             } @else {
-              <p class="text-body-secondary mb-0">Nessun segnale generato</p>
+              <div class="text-center py-4 text-body-secondary small">
+                Nessun segnale generato
+              </div>
             }
           </c-card-body>
         </c-card>
       </c-col>
     </c-row>
 
-    <!-- Section D: Open Positions -->
+    <!-- ═══════ ROW 5: Models Loaded ═══════ -->
     <c-card class="mb-4">
-      <c-card-header class="d-flex align-items-center">
-        <strong>Posizioni Aperte</strong>
-        <c-badge color="info" class="ms-2">{{ livePositions().length }}</c-badge>
-        @if (livePositions().length > 0) {
-          <c-badge [color]="totalPnl() >= 0 ? 'success' : 'danger'" class="ms-auto">
-            P&amp;L: {{ totalPnl() >= 0 ? '+' : '' }}{{ totalPnl() | number:'1.2-2' }}
-          </c-badge>
-        }
+      <c-card-header class="d-flex align-items-center py-2">
+        <strong>Modelli Caricati</strong>
+        <c-badge color="primary" class="ms-2">{{ modelEntries().length }}</c-badge>
       </c-card-header>
-      <c-card-body>
-        @if (livePositions().length > 0) {
-          <table cTable [striped]="true" [hover]="true" [small]="true" [responsive]="true">
+      <c-card-body class="p-0">
+        @if (modelEntries().length > 0) {
+          <table cTable [small]="true" [hover]="true" class="mb-0">
             <thead>
               <tr>
                 <th>Epic</th>
-                <th>Direzione</th>
-                <th>Size</th>
-                <th>Entry</th>
-                <th>SL</th>
-                <th>TP</th>
-                <th>P&amp;L</th>
+                <th>Tipo</th>
+                <th>Features</th>
+                <th>Versione</th>
+                <th>Creato</th>
               </tr>
             </thead>
             <tbody>
-              @for (pos of livePositions(); track pos.deal_id) {
+              @for (m of modelEntries(); track m.epic) {
                 <tr>
-                  <td><strong>{{ pos.epic }}</strong></td>
-                  <td>
-                    <c-badge [color]="directionColor(pos.direction)">
-                      {{ pos.direction }}
-                    </c-badge>
-                  </td>
-                  <td>{{ pos.size | number:'1.4-4' }}</td>
-                  <td>{{ pos.level | number:'1.2-2' }}</td>
-                  <td>{{ pos.stop_level !== null ? (pos.stop_level | number:'1.2-2') : '—' }}</td>
-                  <td>{{ pos.profit_level !== null ? (pos.profit_level | number:'1.2-2') : '—' }}</td>
-                  <td [class]="pos.live_pnl >= 0 ? 'text-success fw-semibold' : 'text-danger fw-semibold'">
-                    {{ pos.live_pnl >= 0 ? '+' : '' }}{{ pos.live_pnl | number:'1.2-2' }}
-                  </td>
+                  <td class="fw-semibold">{{ m.epic }}</td>
+                  <td><c-badge color="primary" class="badge-sm">{{ m.info.model_type }}</c-badge></td>
+                  <td class="font-monospace">{{ m.info.num_features }}</td>
+                  <td>{{ m.info.version }}</td>
+                  <td class="text-body-secondary small">{{ formatDate(m.info.created_at) }}</td>
                 </tr>
               }
             </tbody>
           </table>
         } @else {
-          <p class="text-body-secondary mb-0">Nessuna posizione aperta</p>
+          <div class="text-center py-4 text-body-secondary small">
+            Nessun modello caricato. Avvia il trading per caricare i modelli.
+          </div>
         }
       </c-card-body>
     </c-card>
 
-    <!-- Section E: Recent Signals -->
+    <!-- ═══════ ROW 6: Recent Activity Feed ═══════ -->
     <c-card class="mb-4">
-      <c-card-header class="d-flex align-items-center">
-        <strong>Attivita Recente</strong>
-        @if (rejectedCount() > 0) {
-          <c-badge color="danger" class="ms-2">{{ rejectedCount() }} rejected</c-badge>
-        }
+      <c-card-header class="d-flex align-items-center justify-content-between py-2">
+        <div class="d-flex align-items-center">
+          <strong>Attivita Recente</strong>
+          <c-badge color="secondary" class="ms-2">{{ recentSignals().length }}</c-badge>
+          @if (rejectedCount() > 0) {
+            <c-badge color="danger" class="ms-2">{{ rejectedCount() }} rifiutati</c-badge>
+          }
+        </div>
+        <span class="text-body-secondary small">Aggiornamento: 12s</span>
       </c-card-header>
-      <c-card-body>
+      <c-card-body class="p-0">
         @if (recentSignals().length > 0) {
-          <table cTable [striped]="true" [hover]="true" [small]="true" [responsive]="true">
-            <thead>
-              <tr>
-                <th>Ora</th>
-                <th>Epic</th>
-                <th>Direzione</th>
-                <th>Confidenza</th>
-                <th>Prezzo</th>
-                <th>Stato</th>
-                <th>Dettaglio</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (sig of recentSignals(); track sig.timestamp + sig.epic) {
-                <tr [class.table-danger]="sig.status === 'rejected' || sig.status === 'exec_failed'"
-                    [class.table-secondary]="sig.status === 'market_closed'">
-                  <td class="small">{{ formatDateTime(sig.timestamp) }}</td>
-                  <td><strong>{{ sig.epic }}</strong></td>
-                  <td>
-                    <c-badge [color]="directionColor(sig.direction)">
-                      {{ sig.direction }}
-                    </c-badge>
-                  </td>
-                  <td>{{ (sig.confidence * 100).toFixed(0) }}%</td>
-                  <td>{{ sig.entry_price | number:'1.2-2' }}</td>
-                  <td>
-                    <c-badge [color]="statusColor(sig.status)">
-                      {{ statusLabel(sig.status) }}
-                    </c-badge>
-                  </td>
-                  <td class="small" style="max-width: 300px;">
-                    @if (sig.error_detail) {
-                      <div class="d-flex align-items-start gap-1">
-                        <span>{{ errorIcon(sig.error_detail.error_type) }}</span>
+          <div style="max-height: 400px; overflow-y: auto;">
+            <table cTable [small]="true" [hover]="true" class="mb-0">
+              <thead class="position-sticky top-0" style="z-index: 1;">
+                <tr>
+                  <th>Ora</th>
+                  <th>Asset</th>
+                  <th>Strategia</th>
+                  <th>Dir</th>
+                  <th>Conf</th>
+                  <th>Prezzo</th>
+                  <th>Stato</th>
+                  <th>Dettaglio</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (sig of recentSignals(); track sig.timestamp + sig.epic) {
+                  <tr [class.table-danger]="sig.status === 'rejected' || sig.status === 'exec_failed'"
+                      [class.table-secondary]="sig.status === 'market_closed'">
+                    <td class="small text-body-secondary text-nowrap">{{ formatTime(sig.timestamp) }}</td>
+                    <td class="fw-semibold">{{ sig.epic }}</td>
+                    <td>
+                      @if (sig.strategy_name) {
+                        <c-badge [color]="strategyColor(sig.strategy_name)" class="badge-sm">
+                          {{ strategyLabel(sig.strategy_name) }}
+                        </c-badge>
+                      } @else {
+                        <span class="text-body-secondary">-</span>
+                      }
+                    </td>
+                    <td>
+                      <c-badge [color]="directionColor(sig.direction)" class="badge-sm">
+                        {{ sig.direction }}
+                      </c-badge>
+                    </td>
+                    <td class="font-monospace small">{{ (sig.confidence * 100).toFixed(0) }}%</td>
+                    <td class="font-monospace small">{{ sig.entry_price | number:'1.2-2' }}</td>
+                    <td>
+                      <c-badge [color]="statusColor(sig.status)" class="badge-sm">
+                        {{ statusLabel(sig.status) }}
+                      </c-badge>
+                    </td>
+                    <td class="small" style="max-width: 250px;">
+                      @if (sig.error_detail) {
                         <div>
                           <span [class]="sig.status === 'market_closed' ? 'text-body-secondary' : 'text-danger'">
                             {{ sig.error_detail.summary }}
                           </span>
                           @if (sig.error_detail.details) {
-                            <div class="text-body-secondary mt-1" style="font-size: 0.75rem;">
+                            <div class="text-body-secondary" style="font-size: 0.7rem;">
                               {{ sig.error_detail.details }}
                             </div>
                           }
-                          <button class="btn btn-link btn-sm p-0 mt-1" style="font-size: 0.7rem;"
+                          <button class="btn btn-link btn-sm p-0" style="font-size: 0.65rem;"
                                   (click)="toggleRaw(sig)">
-                            {{ sig._showRaw ? 'Nascondi RAW' : 'Visualizza RAW' }}
+                            {{ sig._showRaw ? 'Nascondi' : 'RAW' }}
                           </button>
                           @if (sig._showRaw) {
-                            <pre class="bg-body-tertiary p-2 mt-1 rounded small mb-0"
-                                 style="font-size: 0.7rem; max-height: 100px; overflow: auto;">{{ sig.error_detail.raw }}</pre>
+                            <pre class="bg-body-tertiary p-1 mt-1 rounded mb-0"
+                                 style="font-size: 0.65rem; max-height: 80px; overflow: auto;">{{ sig.error_detail.raw }}</pre>
                           }
                         </div>
-                      </div>
-                    } @else if (sig.rejection_reason) {
-                      <span class="text-danger">{{ sig.rejection_reason }}</span>
-                    } @else if (sig.status === 'executed') {
-                      <span class="text-success">Trade eseguito</span>
-                    } @else if (sig.status === 'hold') {
-                      <span class="text-body-secondary">Segnale HOLD, nessuna azione</span>
-                    } @else if (sig.status === 'market_closed') {
-                      <span class="text-body-secondary">Mercato chiuso</span>
-                    } @else {
-                      <span class="text-body-secondary">—</span>
-                    }
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
+                      } @else if (sig.rejection_reason) {
+                        <span class="text-danger">{{ sig.rejection_reason }}</span>
+                      } @else if (sig.status === 'executed') {
+                        <span class="text-success">Trade eseguito</span>
+                      } @else if (sig.status === 'hold') {
+                        <span class="text-body-secondary">HOLD</span>
+                      } @else if (sig.status === 'market_closed') {
+                        <span class="text-body-secondary">Chiuso</span>
+                      } @else {
+                        <span class="text-body-secondary">—</span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         } @else {
-          <p class="text-body-secondary mb-0">Nessun segnale recente</p>
+          <div class="text-center py-4 text-body-secondary small">
+            Nessun segnale recente. Avvia il paper trading per generare segnali.
+          </div>
         }
       </c-card-body>
     </c-card>
@@ -342,27 +461,18 @@ interface LivePosition extends PaperPosition {
 export class PaperTradingComponent implements OnInit, OnDestroy {
   readonly trading = inject(TradingService);
   readonly ws = inject(WebSocketService);
+  readonly toast = inject(ToastService);
 
   readonly actionInProgress = signal(false);
-  readonly successMsg = signal('');
-  readonly errorMsg = signal('');
 
   readonly status = this.trading.paperStatus;
   readonly statusLoaded = computed(() => this.status() !== null);
 
-  // KPI cards derived from status
-  readonly kpiCards = computed<KpiCard[]>(() => {
+  // Signal/Trade conversion rate
+  readonly conversionRate = computed(() => {
     const s = this.status();
-    if (!s) return [];
-    const pnl = s.total_unrealized_pnl ?? 0;
-    return [
-      { label: 'Iterazioni', value: String(s.iteration_count ?? 0), colorClass: 'text-info' },
-      { label: 'Segnali', value: String(s.signal_count ?? 0), colorClass: 'text-primary' },
-      { label: 'Trade', value: String(s.trade_count ?? 0), colorClass: 'text-success' },
-      { label: 'Errori', value: String(s.error_count ?? 0), colorClass: (s.error_count ?? 0) > 0 ? 'text-danger' : 'text-success' },
-      { label: 'Posizioni', value: String(s.open_positions ?? 0), colorClass: 'text-warning' },
-      { label: 'P&L', value: (pnl >= 0 ? '+' : '') + pnl.toFixed(2), colorClass: pnl >= 0 ? 'text-success' : 'text-danger' },
-    ];
+    if (!s || !s.signal_count) return '0';
+    return ((s.trade_count / s.signal_count) * 100).toFixed(1);
   });
 
   // Models loaded entries
@@ -409,6 +519,14 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     return this.recentSignals().filter(s => s.status === 'rejected' || s.status === 'exec_failed').length;
   });
 
+  // Phase 8: circuit breakers list
+  readonly circuitBreakersTripped = computed<string[]>(() => {
+    const raw = this.status()?.circuit_breakers_tripped;
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
+    return Object.entries(raw).map(([k, v]) => `${k}: ${v}`);
+  });
+
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private readonly POLL_INTERVAL = 12_000;
 
@@ -433,50 +551,30 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
 
   togglePaperTrading(): void {
     this.actionInProgress.set(true);
-    this.errorMsg.set('');
-    this.successMsg.set('');
     const action = this.status()?.running
       ? this.trading.stopPaperTrading()
       : this.trading.startPaperTrading();
     action.subscribe({
       next: (data) => {
-        this.showSuccess(data.message);
+        this.toast.success(data.message);
         this.actionInProgress.set(false);
         this.loadAll();
       },
       error: (err) => {
-        this.errorMsg.set(err?.error?.error || 'Operazione fallita');
+        this.toast.error(err?.error?.error || 'Operazione fallita');
         this.actionInProgress.set(false);
       }
     });
   }
 
-  private showSuccess(msg: string, ms = 2000): void {
-    this.successMsg.set(msg);
-    setTimeout(() => this.successMsg.set(''), ms);
-  }
-
-  modeColor(): string {
-    switch (this.status()?.execution_mode) {
-      case 'DEMO': return 'warning';
-      case 'LIVE': return 'danger';
-      default: return 'info';
-    }
-  }
-
   directionColor(direction: string): string {
-    switch (direction) {
-      case 'BUY': return 'success';
-      case 'SELL': return 'danger';
-      default: return 'secondary';
-    }
+    return direction === 'BUY' ? 'success' : direction === 'SELL' ? 'danger' : 'secondary';
   }
 
   statusColor(status: string): string {
     switch (status) {
       case 'executed': return 'success';
-      case 'rejected': return 'danger';
-      case 'exec_failed': return 'danger';
+      case 'rejected': case 'exec_failed': return 'danger';
       case 'predicted': return 'info';
       case 'hold': return 'warning';
       case 'market_closed': return 'dark';
@@ -496,30 +594,53 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     }
   }
 
-  errorIcon(errorType: string): string {
-    switch (errorType) {
-      case 'market_closed': return '\u{1F550}';
-      case 'insufficient_funds': return '\u{1F4B0}';
-      case 'rate_limit': return '\u{23F1}';
-      case 'min_size': return '\u{1F4CF}';
-      case 'max_positions': return '\u{1F4CA}';
-      default: return '\u{26A0}';
-    }
-  }
-
   toggleRaw(sig: any): void {
     sig._showRaw = !sig._showRaw;
   }
 
-  formatDateTime(iso: string | null): string {
+  strategyColor(name: string): string {
+    switch (name) {
+      case 'ml_ensemble': return 'primary';
+      case 'squeeze_breakout': return 'warning';
+      case 'vwap_reversion': return 'info';
+      default: return 'secondary';
+    }
+  }
+
+  strategyLabel(name: string): string {
+    switch (name) {
+      case 'ml_ensemble': return 'ML';
+      case 'squeeze_breakout': return 'Squeeze';
+      case 'vwap_reversion': return 'VWAP';
+      default: return name;
+    }
+  }
+
+  trailingPhaseColor(phase: string): string {
+    switch (phase) {
+      case 'INITIAL': return 'secondary';
+      case 'BREAKEVEN': return 'info';
+      case 'TP1_LOCK': return 'warning';
+      case 'TRAILING': return 'success';
+      default: return 'secondary';
+    }
+  }
+
+  formatTime(iso: string | null): string {
     if (!iso) return '—';
     try {
       return new Date(iso).toLocaleString('it-IT', {
-        day: '2-digit', month: '2-digit',
         hour: '2-digit', minute: '2-digit', second: '2-digit',
       });
-    } catch {
-      return iso;
-    }
+    } catch { return iso ?? '—'; }
+  }
+
+  formatDate(iso: string | null): string {
+    if (!iso) return '—';
+    try {
+      return new Date(iso).toLocaleDateString('it-IT', {
+        day: '2-digit', month: '2-digit', year: '2-digit',
+      });
+    } catch { return iso ?? '—'; }
   }
 }

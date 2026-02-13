@@ -15,7 +15,7 @@ import { WebSocketService } from './core/services/websocket.service';
     imports: [RouterOutlet]
 })
 export class AppComponent implements OnInit {
-  title = 'AlgoTrader AI';
+  title = 'MANTIS AI';
 
   readonly #destroyRef: DestroyRef = inject(DestroyRef);
   readonly #activatedRoute: ActivatedRoute = inject(ActivatedRoute);
@@ -30,10 +30,10 @@ export class AppComponent implements OnInit {
     this.#titleService.setTitle(this.title);
     // iconSet singleton
     this.#iconSetService.icons = { ...iconSubset };
-    this.#colorModeService.localStorageItemName.set('algotrader-theme');
+    this.#colorModeService.localStorageItemName.set('mantis-theme');
     this.#colorModeService.eventName.set('ColorSchemeChange');
     // Default to dark mode
-    if (!localStorage.getItem('algotrader-theme')) {
+    if (!localStorage.getItem('mantis-theme')) {
       this.#colorModeService.colorMode.set('dark');
     }
   }

@@ -124,6 +124,16 @@ export interface BacktestTrade {
   bars_held: number;
 }
 
+export interface MonteCarloResult {
+  n_simulations: number;
+  n_trades: number;
+  final_equity: { p5: number; p50: number; p95: number; original: number };
+  max_drawdown: { p5: number; p50: number; p95: number; original: number };
+  sharpe_ratio: { p5: number; p50: number; p95: number; original: number };
+  p_value_return: number;
+  risk_of_ruin: number;
+}
+
 export interface BacktestDetail {
   summary: BacktestRun;
   config: Record<string, unknown>;
@@ -131,6 +141,7 @@ export interface BacktestDetail {
   trades: BacktestTrade[];
   metrics: Record<string, number>;
   trade_metrics: Record<string, number>;
+  monte_carlo?: MonteCarloResult;
 }
 
 // Models
@@ -203,6 +214,11 @@ export interface PaperTradingStatus {
   models_loaded: Record<string, ModelLoadedInfo>;
   last_candle_timestamps: Record<string, string>;
   message?: string;
+  // Phase 8 fields (backend sends dict {type: reason} or empty {})
+  circuit_breakers_tripped: Record<string, string> | string[];
+  trailing_stops_tracked: number;
+  equity_curve_below_sma: boolean;
+  kelly_trade_history_size: number;
 }
 
 export interface LastSignalInfo {
@@ -233,6 +249,7 @@ export interface PaperPosition {
   stop_level: number | null;
   profit_level: number | null;
   opened_at: string;
+  trailing_stop_phase?: string; // "INITIAL" | "BREAKEVEN" | "TP1_LOCK" | "TRAILING"
 }
 
 // Structured broker error detail (from broker_error_parser)
@@ -254,5 +271,6 @@ export interface PaperSignal {
   status: string;  // predicted, executed, rejected, exec_failed, hold, market_closed
   rejection_reason?: string;
   error_detail?: BrokerErrorDetail;
+  strategy_name?: string;  // "ml_ensemble", "squeeze_breakout", "vwap_reversion"
   _showRaw?: boolean;  // UI-only: toggle for raw error display
 }

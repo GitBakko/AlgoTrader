@@ -1,148 +1,230 @@
-# AlgoTrader AI
+<p align="center">
+  <img src="frontend/src/assets/favicon.svg" width="80" height="80" alt="MANTIS AI Logo">
+</p>
 
-AI-powered algorithmic trading system for **Gold (XAUUSD)**, **Bitcoin (BTCUSD)**, and **S&P 500 (US500)** using machine learning and Capital.com as broker.
+<h1 align="center">MANTIS AI</h1>
+
+<p align="center">
+  <strong>Algorithmic Trading Platform powered by Machine Learning</strong>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.12+-blue?logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/angular-21-dd0031?logo=angular&logoColor=white" alt="Angular">
+  <img src="https://img.shields.io/badge/tests-865_passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/coverage-80%25-green" alt="Coverage">
+  <img src="https://img.shields.io/badge/assets-9_instruments-blueviolet" alt="Assets">
+  <img src="https://img.shields.io/badge/broker-Capital.com-orange" alt="Broker">
+</p>
+
+---
+
+## Overview
+
+MANTIS AI is a full-stack algorithmic trading system that combines **XGBoost ML models** with advanced risk management to trade 9 financial instruments on Capital.com. Like its namesake predator, the system is patient, precise, and strikes only with high confidence.
+
+### Traded Instruments
+
+| Forex | Commodities | Indices | Stocks |
+|-------|------------|---------|--------|
+| EURUSD | XAUUSD (Gold) | US500 (S&P 500) | NVDA |
+| | XAGUSD (Silver) | DE40 (DAX) | TSLA |
+| | WTIUSD (Oil) | | |
+
+### Key Metrics (Walk-Forward Out-of-Sample)
+
+| Asset | Return | Sharpe | Win Rate | Max DD | MC p-value |
+|-------|--------|--------|----------|--------|------------|
+| BTCUSD | +56.05% | 16.93 | 80.4% | 0.35% | 0.0000 |
+| XAUUSD | +12.87% | 14.58 | 80.2% | 0.64% | 0.0000 |
+| US500 | +5.95% | 18.03 | 78.3% | 0.11% | 0.0000 |
+
+All results include realistic trading costs (spreads, slippage, overnight fees) and are validated via Monte Carlo simulation (10K permutations, sign-flip test).
+
+---
 
 ## Features
 
-- **ML-Driven Signals** -- XGBoost classifier with walk-forward optimization, confidence calibration, and multi-timeframe features (1h + 4h + 1d)
-- **3-Class Prediction** -- SELL / HOLD / BUY with ATR-relative thresholds and isotonic confidence calibration (F1 macro ~0.54)
-- **Risk Management** -- ATR-based position sizing, dynamic stop-loss/take-profit, drawdown circuit breaker (5% daily / 15% total), correlation exposure limits
-- **Paper Trading Loop** -- Continuous background pipeline: ML prediction -> strategy signal -> risk check -> paper execution
-- **Real-Time Dashboard** -- Angular 21 + CoreUI with live prices, positions, signals, equity curves, and model performance
-- **Event-Driven Architecture** -- Redis pub/sub for real-time events, PostgreSQL for persistence, DuckDB for analytics
-- **Graceful Degradation** -- System runs without broker, Redis, or PostgreSQL (in-memory fallback for all services)
+### ML Pipeline
+- **XGBoost 3-class classifier** (BUY / HOLD / SELL) with Optuna hyperparameter tuning
+- **220 features**: technical indicators, candlestick patterns, Fibonacci clusters, market structure (BOS/CHoCH), Keltner channels, VWAP bands, multi-timeframe (1h + 4h + 1d)
+- **Walk-forward optimization** with train/val/test split, purge, and embargo
+- **Isotonic confidence calibration** for reliable probability estimates
+- **F1 macro**: 0.53-0.61 across assets
+
+### Risk Management (TRADING MAGNA AI)
+- **6 Circuit Breakers**: daily loss, consecutive losses, max positions, slippage anomaly, heartbeat timeout, volatility spike
+- **4-Phase Trailing Stop**: Initial -> Breakeven -> TP1 Lock -> ATR Trailing
+- **Multi-Target Exit**: TP1 (1xR) with 50% partial close, TP2 (2xR) full exit
+- **Adaptive Kelly Position Sizing**: half-Kelly with 30-trade minimum, fixed-fractional fallback
+- **Equity Curve Filter**: SMA(20 trades), 50% size reduction when underperforming
+- **ADX Pre-Signal Filter**: reject choppy markets (ADX < 20), boost trending (ADX > 25)
+
+### Strategy Engine
+- **Regime-based Strategy Router**: trending -> ML, ranging -> [Squeeze, VWAP, ML]
+- **Volatility Squeeze Breakout**: BB-inside-KC detection with momentum/volume confirmation
+- **VWAP Reversion**: mean-reversion at +/-2 SD bands in ranging markets
+- **Pairs Trading**: Gold-BTC cointegration with z-score entry/exit (dollar-neutral)
+- **Monte Carlo Validation**: permutation, bootstrap, sign-flip tests with confidence intervals
+
+### Dashboard
+- **Angular 21 + CoreUI** with MANTIS AI dark theme (neon green accents)
+- **9 pages**: Dashboard, Paper Trading, Backtest, Positions, Signals, Markets, Strategy, AI Models, Settings
+- **Real-time**: WebSocket price streaming, live P&L updates
+- **TradingView Lightweight Charts** for candlestick visualization
+- **OnPush change detection** + route preloading for optimal performance
+
+---
 
 ## Architecture
 
 ```
-Frontend (Angular 21 + CoreUI)
-    |
-    | REST API + WebSocket
-    v
-FastAPI Backend (Python 3.12+)
-    |
-    +-- Broker Integration (Capital.com REST + WS)
-    +-- Data Pipeline (Parquet + DuckDB + Redis)
-    +-- Feature Engineering (60+ technical indicators)
-    +-- ML Models (XGBoost, LSTM, Calibration)
-    +-- Strategy Engine (Signal generation + regime adaptation)
-    +-- Risk Management (Position sizing + circuit breakers)
-    +-- Execution Engine (Paper + Live modes)
+                    MANTIS AI - System Architecture
+
+    +------------------+         +-------------------+
+    |   Angular 21     |  REST   |   FastAPI Backend  |
+    |   MANTIS Theme   | <-----> |   Python 3.12+     |
+    |   CoreUI + LWC   |   WS    |                    |
+    +------------------+         +--------+-----------+
+                                          |
+              +---------------------------+---------------------------+
+              |              |            |            |              |
+        +-----+----+  +-----+----+ +-----+----+ +----+-----+ +-----+----+
+        |  Broker   |  |   Data   | | Features | |    ML    | | Strategy |
+        | Capital   |  | Pipeline | |  Engine  | |  Models  | |  Router  |
+        |  .com     |  | Parquet  | | 220 feat | | XGBoost  | |  Regime  |
+        |  REST+WS  |  | DuckDB   | | Multi-TF | | Calibr.  | |  Based   |
+        +-----------+  +----------+ +----------+ +----------+ +----------+
+              |              |            |            |              |
+              +---------------------------+---------------------------+
+                                          |
+                            +-------------+-------------+
+                            |        Risk Stack         |
+                            | CircuitBreakers -> Equity |
+                            | -> Kelly -> TrailingStop  |
+                            +---------------------------+
+                                          |
+                            +-------------+-------------+
+                            |     Execution Engine      |
+                            |  Paper + Live + Partial   |
+                            +---------------------------+
 ```
+
+---
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Backend | Python 3.12+, FastAPI, Pydantic v2 |
-| ML | XGBoost, PyTorch (LSTM), scikit-learn |
-| Data | Polars, Parquet, DuckDB, Redis |
-| Database | PostgreSQL, SQLAlchemy, Alembic |
-| Frontend | Angular 21, CoreUI Free, Chart.js |
-| Broker | Capital.com REST API + WebSocket |
+| Layer | Technologies |
+|-------|-------------|
+| **Backend** | Python 3.12+, FastAPI, Pydantic v2, Loguru |
+| **ML** | XGBoost, PyTorch (LSTM), scikit-learn, Optuna |
+| **Data** | Polars, Parquet, DuckDB, Redis |
+| **Database** | PostgreSQL, SQLAlchemy |
+| **Frontend** | Angular 21, CoreUI Free, TradingView LWC |
+| **Broker** | Capital.com REST API + WebSocket |
+
+---
 
 ## Project Structure
 
 ```
-AlgoTrader/
+mantis-ai/
 +-- backend/
 |   +-- src/
-|   |   +-- api/           # FastAPI REST + WebSocket endpoints
-|   |   +-- broker/        # Capital.com API wrapper
-|   |   +-- data/          # Parquet storage, DuckDB, data pipeline
-|   |   +-- features/      # Technical indicators, normalization
-|   |   +-- models/        # XGBoost, LSTM, calibration, training
-|   |   +-- strategy/      # Signal generation, regime adaptation
-|   |   +-- risk/          # Position sizing, stops, circuit breaker
-|   |   +-- execution/     # Order management, paper/live execution
-|   |   +-- backtest/      # Walk-forward backtesting engine
-|   |   +-- monitoring/    # Health checks, system monitoring
-|   |   +-- trading/       # Paper trading loop
-|   |   +-- utils/         # Config, logging, event bus
-|   +-- tests/             # 456 tests (pytest)
-|   +-- scripts/           # CLI tools (download, train, verify)
-|   +-- data/              # Parquet files + saved models
-+-- frontend/              # Angular 21 dashboard
-+-- docs/                  # Architecture, roadmap, API reference
+|   |   +-- api/             # 8 REST routers + WebSocket
+|   |   +-- broker/          # Capital.com API wrapper
+|   |   +-- data/            # Parquet storage, DuckDB analytics
+|   |   +-- features/        # 220 technical features (Polars)
+|   |   +-- models/          # XGBoost, LSTM, calibration, Optuna
+|   |   +-- strategy/        # ML, Squeeze, VWAP, Pairs strategies
+|   |   +-- risk/            # Circuit breakers, Kelly, trailing stops
+|   |   +-- execution/       # Paper + live execution, partial close
+|   |   +-- backtest/        # Walk-forward engine, Monte Carlo
+|   |   +-- trading/         # Paper trading loop
+|   |   +-- utils/           # Config, event bus, logging
+|   +-- tests/               # 865 tests (pytest, 80% coverage)
+|   +-- scripts/             # download, train, backtest, verify
+|   +-- data/                # Parquet files + saved models
++-- frontend/                # Angular 21 MANTIS AI dashboard
++-- docs/                    # Architecture, API, ML strategy docs
 ```
+
+---
 
 ## Quick Start
 
 ### Prerequisites
 
 - Python 3.12+
-- Node.js 20+ (for frontend)
+- Node.js 20+
 - Capital.com demo account
 
-### Backend Setup
+### Backend
 
 ```bash
 cd backend
 
 # Create virtual environment
 python -m venv .venv
-.venv/Scripts/activate  # Windows
-# source .venv/bin/activate  # Linux/Mac
+.venv/Scripts/activate          # Windows
+# source .venv/bin/activate     # Linux/Mac
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure environment
+# Configure credentials
 cp .env.example .env
-# Edit .env with your Capital.com credentials
+# Edit .env with your Capital.com demo credentials
 
-# Download historical data
+# Download historical data (9 assets x 3 timeframes)
 python scripts/download_data.py
 
-# Train ML models
+# Train ML models (XGBoost with Optuna tuning)
 python scripts/train_models.py
 
 # Start the server
 python -m src.api.main
 ```
 
-### Frontend Setup
+### Frontend
 
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Start development server
-npx ng serve
+npx ng serve --port 4321
 ```
 
-Open http://localhost:4200 for the dashboard.
+Open **http://localhost:4321** for the MANTIS AI dashboard.
 
 ### Paper Trading
 
 ```bash
-# Start backend (auto-loads trained models)
-cd backend && python -m src.api.main
-
-# Start paper trading via API
+# Via API (backend must be running)
 curl -X POST http://localhost:8000/api/trading/start
-
-# Check status
 curl http://localhost:8000/api/trading/status
-
-# Stop
 curl -X POST http://localhost:8000/api/trading/stop
 ```
 
-## ML Pipeline
+Or use the **Paper Trading** page in the dashboard for start/stop controls and live monitoring.
 
-| Stage | Description |
-|-------|------------|
-| Data | Parquet storage with monthly partitioning, 60+ technical indicators |
-| Features | Multi-timeframe (1h/4h/1d), rolling z-score normalization, regime detection |
-| Target | 3-class ATR-relative: SELL (<-0.5 ATR), HOLD, BUY (>+0.5 ATR) |
-| Training | Walk-forward optimization (252d train / 63d val / 21d test, purge + embargo) |
-| Model | XGBoost (F1 ~0.54), with isotonic confidence calibration |
-| Inference | Cached data access (3600x speedup), feature build, predict, calibrate |
+### Walk-Forward Backtest
 
-## API Endpoints
+```bash
+cd backend
+
+# Basic backtest
+python scripts/walk_forward_backtest.py --epic XAUUSD
+
+# With Optuna tuning + Monte Carlo validation
+python scripts/walk_forward_backtest.py --epic BTCUSD --tune --monte-carlo
+
+# Strategy router (regime-based switching)
+python scripts/walk_forward_backtest.py --epic US500 --strategy router
+```
+
+---
+
+## API Reference
 
 | Method | Endpoint | Description |
 |--------|---------|-------------|
@@ -150,63 +232,82 @@ curl -X POST http://localhost:8000/api/trading/stop
 | GET | `/api/dashboard/overview` | Portfolio overview + P&L |
 | GET | `/api/positions/` | Open positions |
 | GET | `/api/signals/` | Active signals |
-| POST | `/api/signals/predict/{epic}` | Run ML prediction |
-| GET | `/api/markets/candles/{epic}` | OHLC candles |
-| POST | `/api/trading/start` | Start paper trading |
-| POST | `/api/trading/stop` | Stop paper trading |
-| GET | `/api/trading/status` | Paper trading status |
+| POST | `/api/signals/predict/{epic}` | Run ML prediction pipeline |
+| GET | `/api/markets/candles/{epic}` | OHLC candle data |
+| POST | `/api/backtest/run` | Run walk-forward backtest |
+| POST | `/api/trading/start` | Start paper trading loop |
+| POST | `/api/trading/stop` | Stop paper trading loop |
+| GET | `/api/trading/status` | Paper trading status + metrics |
+| GET | `/api/strategy/` | Strategy configs per asset |
+| GET | `/api/models/` | Loaded ML model info |
+| GET | `/api/settings/system` | System settings + risk status |
 | WS | `/ws/prices` | Real-time price stream |
+| WS | `/ws/trades` | Trade event stream |
 
-Full API docs at http://localhost:8000/docs (Swagger UI).
+Full interactive docs at **http://localhost:8000/docs** (Swagger UI).
+
+---
 
 ## Testing
 
 ```bash
 cd backend
 
-# Run all tests
+# All tests
 python -m pytest tests/ -v
 
-# Run with coverage
+# With coverage report
 python -m pytest tests/ --cov=src --cov-report=html
 
-# Run specific module
-python -m pytest tests/models/ -v
+# Specific modules
+python -m pytest tests/risk/ -v         # Risk management
+python -m pytest tests/strategy/ -v     # Strategy engine
+python -m pytest tests/models/ -v       # ML models
 ```
 
-456 tests covering broker integration, data pipeline, features, ML models, strategy, risk, execution, API endpoints, and integration flows.
+**865 tests** covering: broker integration, data pipeline, feature engineering, ML models, strategy engine, risk management, execution, API endpoints, integration flows, and paper trading.
 
-## Development Status
+---
 
-| Phase | Status | Key Deliverables |
-|-------|--------|-----------------|
+## Development Phases
+
+| Phase | Status | Highlights |
+|-------|--------|-----------|
 | 1. Foundation | COMPLETE | Broker integration, data pipeline, database |
-| 2. Intelligence | COMPLETE | Features, XGBoost, backtesting |
+| 2. Intelligence | COMPLETE | Feature engineering, XGBoost, backtesting |
 | 3. Trading Engine | COMPLETE | Strategy, risk management, execution |
 | 4. Dashboard | COMPLETE | Angular 21 + CoreUI, 8 pages |
-| 5. Integration | COMPLETE | End-to-end wiring, paper trading |
-| 6A. ML Upgrades | COMPLETE | 3-class migration, calibration, LSTM, multi-TF |
-| 6B. Ensemble | NEXT | TFT, stacking, hyperopt |
-| 7. Live Trading | FUTURE | Performance tuning, live deployment |
+| 5. Integration | COMPLETE | End-to-end wiring, paper trading loop |
+| 6. ML Optimization | COMPLETE | 3-class, Optuna, multi-TF, calibration, 9 assets |
+| 7. Paper Trading UI | COMPLETE | Live dashboard, KPI cards, signal history |
+| 8. TRADING MAGNA AI | COMPLETE | 15 improvements: circuit breakers, trailing stops, Kelly, squeeze, VWAP, pairs, Monte Carlo |
+| 9. Integration + Coverage | COMPLETE | Full wiring, 865 tests, 80% coverage |
+| 10. MANTIS AI Branding | COMPLETE | Dark theme, neon green, SVG logo, OnPush optimization |
+
+---
 
 ## Configuration
 
-Key environment variables (`.env`):
-
 ```ini
-# Capital.com
+# .env file
 CAPITAL_COM_API_KEY=your_api_key
 CAPITAL_COM_EMAIL=your_email
 CAPITAL_COM_PASSWORD=your_password
 CAPITAL_COM_DEMO=true
 
-# Database (optional - system works without)
-DATABASE_URL=postgresql://user:pass@localhost:5432/algotrader
-
-# Redis (optional - system works without)
+# Optional services (system works without them)
+DATABASE_URL=postgresql://user:pass@localhost:5432/mantis
 REDIS_URL=redis://localhost:6379/0
 ```
 
+---
+
 ## License
 
-Private project -- all rights reserved.
+Private project - All rights reserved.
+
+---
+
+<p align="center">
+  <sub>Built with precision by <strong>MANTIS AI</strong></sub>
+</p>

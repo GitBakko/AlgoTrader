@@ -275,6 +275,9 @@ class CapitalComClient:
         """
         Open a new position (market order).
 
+        Capital.com flow: POST returns {dealReference}, then GET /confirms/{ref}
+        returns the full DealConfirmation with dealId, level, status, etc.
+
         Args:
             request: Position creation request
 
@@ -284,6 +287,15 @@ class CapitalComClient:
         payload = request.model_dump(by_alias=True)
         payload["epic"] = self._to_broker_epic(payload.get("epic", ""))
         response = await self._request("POST", "/api/v1/positions", json=payload)
+
+        deal_ref = response.get("dealReference")
+        if deal_ref:
+            # Two-step flow: fetch full confirmation
+            import asyncio
+            await asyncio.sleep(0.3)  # brief pause for broker to process
+            return await self.get_deal_confirmation(deal_ref)
+
+        # Fallback: some API versions return full confirmation directly
         return DealConfirmation(**response)
 
     async def close_position(self, deal_id: str) -> DealConfirmation:
@@ -297,6 +309,13 @@ class CapitalComClient:
             Deal confirmation
         """
         response = await self._request("DELETE", f"/api/v1/positions/{deal_id}")
+
+        deal_ref = response.get("dealReference")
+        if deal_ref:
+            import asyncio
+            await asyncio.sleep(0.3)
+            return await self.get_deal_confirmation(deal_ref)
+
         return DealConfirmation(**response)
 
     async def modify_position(
@@ -324,7 +343,15 @@ class CapitalComClient:
         """
         response = await self._request("GET", "/api/v1/positions")
         positions_data = response.get("positions", [])
-        positions = [Position(**pos) for pos in positions_data]
+        positions = []
+        for pos in positions_data:
+            # Capital.com returns nested {position: {...}, market: {...}}
+            pos_inner = pos.get("position", pos)
+            market_inner = pos.get("market", {})
+            flat = {**pos_inner}
+            if "epic" not in flat and "epic" in market_inner:
+                flat["epic"] = market_inner["epic"]
+            positions.append(Position(**flat))
         # Translate broker epics back to internal names
         for p in positions:
             p.epic = self._from_broker_epic(p.epic)

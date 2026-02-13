@@ -147,6 +147,21 @@ class OrderManager:
 
             confirmation = await self._broker.create_position(request)
 
+            # Check if broker accepted the deal
+            if confirmation.deal_status == "REJECTED":
+                reason = confirmation.reason or "Unknown rejection"
+                logger.warning(
+                    f"Order rejected by broker: {order.epic} {order.direction} "
+                    f"reason={reason}"
+                )
+                parsed = parse_broker_error(reason, epic=order.epic)
+                return ExecutionResult(
+                    success=False,
+                    deal_id=confirmation.deal_id,
+                    error=parsed.summary,
+                    error_detail=parsed.to_dict(),
+                )
+
             slippage = abs(confirmation.level - order.entry_price)
             logger.info(
                 f"Live fill: {order.epic} {order.direction} "

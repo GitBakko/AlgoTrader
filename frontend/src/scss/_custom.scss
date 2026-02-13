@@ -1,14 +1,199 @@
-// Here you can add other styles
+// ═══════════════════════════════════════════════════════════
+// MANTIS AI — Brand Theme
+// ═══════════════════════════════════════════════════════════
 
-// custom .chartjs-tooltip-body-item padding
+// @use rules must be first (SCSS requirement)
 @use "charts";
 
-// custom tweaks for scrollbar styling (wip)
-@use "scrollbar";
+// Brand palette
+$mantis-neon: #39FF14;
+$mantis-green: #00d97e;
+$mantis-green-rgb: 0, 217, 126;
+$mantis-dark: #0a2e1a;
+$mantis-surface: #161b22;
+$mantis-bg: #0d1117;
 
- // custom calendar today cell color
+// ───── Dark Mode Overrides ─────
+[data-coreui-theme="dark"] {
+  // Primary → Mantis Green
+  --cui-primary: #{$mantis-green};
+  --cui-primary-rgb: #{$mantis-green-rgb};
+
+  // Deeper dark backgrounds
+  --cui-body-bg: #{$mantis-bg};
+  --cui-dark-bg-subtle: #0b0f14;
+  --cui-tertiary-bg: #0f1318;
+
+  // Card surfaces
+  --cui-card-bg: #{$mantis-surface};
+  --cui-card-border-color: rgba($mantis-green, 0.08);
+
+  // Table
+  --cui-table-bg: transparent;
+  --cui-table-striped-bg: rgba(255, 255, 255, 0.015);
+  --cui-table-hover-bg: rgba($mantis-green, 0.04);
+
+  // Sidebar
+  --cui-sidebar-bg: #0c1015;
+  --cui-sidebar-border-color: rgba($mantis-green, 0.1);
+  --cui-sidebar-nav-link-active-color: #{$mantis-green};
+  --cui-sidebar-nav-link-active-bg: rgba($mantis-green, 0.08);
+  --cui-sidebar-nav-link-hover-bg: rgba($mantis-green, 0.05);
+
+  // Header
+  --cui-header-bg: rgba(13, 17, 23, 0.85);
+
+  // Footer
+  --cui-footer-bg: #0c1015;
+  --cui-footer-border-color: rgba($mantis-green, 0.08);
+
+  // Links
+  --cui-link-color: #{$mantis-green};
+  --cui-link-hover-color: #{$mantis-neon};
+}
+
+// ───── Sidebar Brand ─────
+.sidebar-brand-full {
+  margin-left: 3px;
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+}
+
+.mantis-logo-icon {
+  flex-shrink: 0;
+}
+
+.mantis-brand-text {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+  color: #{$mantis-neon};
+  text-shadow: 0 0 20px rgba($mantis-green, 0.4);
+
+  .mantis-brand-sub {
+    font-size: 0.55rem;
+    font-weight: 500;
+    letter-spacing: 0.25em;
+    color: rgba(255, 255, 255, 0.45);
+    text-shadow: none;
+    display: block;
+  }
+}
+
+// ───── Header ─────
+.header {
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+}
+
+// ───── Badge utilities ─────
+.badge-sm {
+  font-size: 0.65rem;
+  padding: 0.2em 0.5em;
+  font-weight: 600;
+}
+
+// ───── Neon glow accents ─────
+.glow-green {
+  box-shadow: 0 0 8px rgba($mantis-green, 0.3);
+}
+
+.border-mantis {
+  border-color: rgba($mantis-green, 0.2) !important;
+}
+
+// Card accent override: border-top-primary = mantis green
+[data-coreui-theme="dark"] .border-top-primary {
+  border-top-color: #{$mantis-green} !important;
+}
+
+// ───── Live pulse dot ─────
+.pulse-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #{$mantis-neon};
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.pulse-dot--danger {
+  background-color: var(--cui-danger);
+  animation: pulse-glow-red 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 4px rgba($mantis-green, 0.5); }
+  50% { box-shadow: 0 0 12px rgba($mantis-green, 0.9); }
+}
+
+@keyframes pulse-glow-red {
+  0%, 100% { box-shadow: 0 0 4px rgba(229, 83, 83, 0.5); }
+  50% { box-shadow: 0 0 12px rgba(229, 83, 83, 0.9); }
+}
+
+// ───── Font monospace feature ─────
+.font-monospace {
+  font-feature-settings: "tnum" 1;
+}
+
+// ───── Card hover effect ─────
+[data-coreui-theme="dark"] .card {
+  transition: border-color 0.2s ease;
+
+  &:hover {
+    border-color: rgba($mantis-green, 0.15);
+  }
+}
+
+// ───── Sidebar active item glow ─────
+[data-coreui-theme="dark"] .sidebar-nav .nav-link.active {
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: #{$mantis-neon};
+    box-shadow: 0 0 8px rgba($mantis-green, 0.5);
+    border-radius: 0 2px 2px 0;
+  }
+}
+
+// ───── Scrollbar (mantis-themed) — replaces _scrollbar ─────
+@supports (scrollbar-width: thin) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba($mantis-green, 0.25) transparent;
+  }
+}
+
+::-webkit-scrollbar-track {
+  background: var(--cui-body-bg, #0d1117);
+  border-radius: 100vw;
+  margin-block: .2em;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba($mantis-green, 0.3);
+  border: .15em solid var(--cui-body-bg, #0d1117);
+  border-radius: 100vw;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba($mantis-green, 0.5);
+}
+
+// ───── Inherited from CoreUI template ─────
+
+// custom calendar today cell color
 .calendar-cell.today {
-  --cui-calendar-cell-today-color: var(--cui-info) !important;
+  --cui-calendar-cell-today-color: var(--cui-primary) !important;
 }
 
 // custom select week cursor pointer

@@ -8,8 +8,21 @@
 >
   <c-sidebar-header class="border-bottom">
     <c-sidebar-brand [routerLink]="[]">
-      <span class="sidebar-brand-full fw-bold fs-5 px-3">AlgoTrader AI</span>
-      <span class="sidebar-brand-narrow fw-bold px-1">AT</span>
+      <span class="sidebar-brand-full fw-bold px-3">
+        <!-- Mantis Logo SVG (inline) -->
+        <svg class="mantis-logo-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="30" height="30">
+          <polygon points="32,6 52,26 46,58 18,58 12,26" fill="none" stroke="#39FF14" stroke-width="3" stroke-linejoin="round"/>
+          <ellipse cx="23" cy="28" rx="6" ry="8" fill="#39FF14" opacity="0.9"/>
+          <ellipse cx="41" cy="28" rx="6" ry="8" fill="#39FF14" opacity="0.9"/>
+          <line x1="23" y1="20" x2="12" y2="4" stroke="#39FF14" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+          <line x1="41" y1="20" x2="52" y2="4" stroke="#39FF14" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+        </svg>
+        <span class="mantis-brand-text">
+          MANTIS AI
+          <span class="mantis-brand-sub">ALGO TRADING</span>
+        </span>
+      </span>
+      <span class="sidebar-brand-narrow fw-bold px-1" style="color: #39FF14;">M</span>
     </c-sidebar-brand>
   </c-sidebar-header>
 
@@ -42,3 +55,4 @@
   <!--app footer-->
   <app-default-footer />
 </div>
+<app-toast-container />
