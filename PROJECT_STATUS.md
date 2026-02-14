@@ -136,7 +136,7 @@ Total Project Progress                    ████████████�
 - ✅ TradingView Lightweight Charts with mantis green palette
 - ✅ Port: 4321, localStorage key: `mantis-theme`
 
-### Phase 11: UX Enhancements (100%) ⬅️ CURRENT
+### Phase 11: UX Enhancements (100%)
 
 **Frontend Enhancements**:
 - ✅ News widget component (thumbnail support, sentiment badges, lazy loading)
@@ -158,6 +158,48 @@ Total Project Progress                    ████████████�
 - ✅ PROJECT_STATUS.md aligned to Phase 11 (this file)
 - ✅ README.md highlights updated
 - ✅ frontend/README.md customized for MANTIS AI
+
+### Phase 11.5: Logging & Monitoring System (100%) ⬅️ CURRENT
+
+**Structured Logging**:
+- ✅ TradeLogger class with Pydantic models (SignalLog, ExecutionLog, RiskEventLog)
+- ✅ Async methods: `log_signal()`, `log_execution()`, `log_risk_decision()`
+- ✅ PostgreSQL primary storage + JSONL fallback (graceful degradation)
+- ✅ Singleton pattern with `get_trade_logger()` for easy integration
+- ✅ 18 test passing (100% coverage on core methods)
+
+**Database Schema**:
+- ✅ PostgreSQL tables: `signal_log`, `execution_log`, `risk_event_log`
+- ✅ Optimized indexes for common query patterns
+- ✅ 4 predefined views: `recent_signals`, `open_positions`, `closed_trades`, `recent_risk_events`
+- ✅ Schema SQL in `backend/src/monitoring/schema.sql` (216 lines)
+
+**Log Analyzer**:
+- ✅ Statistical analysis: `SignalStats`, `ExecutionStats`, `RiskStats`
+- ✅ PostgreSQL + JSONL fallback support with Polars DataFrame
+- ✅ Metrics: win rate, profit factor, drawdown, execution rate, health score (0-100)
+- ✅ Date range filtering (default: 30 days)
+- ✅ 19 test passing with mock data and file JSONL tests
+
+**Monitoring API**:
+- ✅ 4 REST endpoints for programmatic log access:
+  - `GET /api/monitoring/logs/signals?days=30`
+  - `GET /api/monitoring/logs/executions?days=30`
+  - `GET /api/monitoring/logs/risk-events?days=30`
+  - `GET /api/monitoring/stats/performance?days=7` (health score)
+- ✅ Health score algorithm (0-100) with execution rate, win rate, risk events
+- ✅ 12 API test passing (endpoints, error handling, score calculation)
+
+**Testing**:
+- ✅ **49 test passing (100%)**
+- ✅ TradeLogger: 18/18 ✅
+- ✅ LogAnalyzer: 19/19 ✅
+- ✅ Monitoring API: 12/12 ✅
+- ✅ Code coverage: ~95% on monitoring modules
+
+**Documentation**:
+- ✅ CHANGELOG.md updated with Phase 11.5
+- ✅ PROJECT_STATUS.md updated (this file)
 
 ---
 

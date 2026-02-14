@@ -4,6 +4,69 @@ Diario di bordo delle implementazioni effettuate e delle modifiche al progetto.
 
 ---
 
+## [Phase 11.5] - 2026-02-14 - Logging & Monitoring System
+
+### 📊 Structured Logging
+
+- **TradeLogger**: Sistema di logging strutturato per analisi paper trading
+  - Pydantic models: `SignalLog`, `ExecutionLog`, `RiskEventLog`
+  - Metodi async: `log_signal()`, `log_execution()`, `log_risk_decision()`
+  - PostgreSQL primary storage + JSONL fallback (graceful degradation)
+  - Singleton pattern: `get_trade_logger()` per facile integrazione
+  - 18 test passing, 100% coverage dei metodi core
+
+- **Database Schema**: PostgreSQL tables per persistent logging
+  - 3 tabelle: `signal_log`, `execution_log`, `risk_event_log`
+  - Indici ottimizzati per query frequenti (epic, timestamp, status)
+  - 4 viste predefinite: `recent_signals`, `open_positions`, `closed_trades`, `recent_risk_events`
+  - Schema SQL completo in `backend/src/monitoring/schema.sql` (216 righe)
+
+- **LogAnalyzer**: Analisi statistiche e metriche di performance
+  - Dataclass results: `SignalStats`, `ExecutionStats`, `RiskStats`
+  - Supporto PostgreSQL + JSONL fallback con Polars DataFrame
+  - Metriche calcolate: win rate, profit factor, drawdown, execution rate, health score (0-100)
+  - Date range filtering (default: 30 giorni)
+  - 19 test passing con mock data e file JSONL
+
+### 🔌 Monitoring API
+
+- **4 REST Endpoints** per accesso programmatico ai log:
+  - `GET /api/monitoring/logs/signals?days=30` - Statistiche segnali
+  - `GET /api/monitoring/logs/executions?days=30` - Statistiche esecuzioni e P&L
+  - `GET /api/monitoring/logs/risk-events?days=30` - Eventi circuit breaker e risk
+  - `GET /api/monitoring/stats/performance?days=7` - Overview combinato con health score
+
+- **Health Score Algorithm** (0-100):
+  - Execution rate: 30% weight (ottimale 65%)
+  - Win rate: 40% weight (ottimale 60%)
+  - Risk events: 30% weight (penalità per circuit breakers, drawdown >10%)
+  - Threshold-based scoring con clamping [0, 100]
+
+### 🧪 Testing
+
+- **49 test passing (100%)**:
+  - TradeLogger: 18 test (models, file logging, serialization)
+  - LogAnalyzer: 19 test (stats calculation, file reading, date filtering)
+  - Monitoring API: 12 test (endpoints, error handling, health score)
+- Code coverage: ~95% su moduli monitoring
+- Nessun fallimento, tutti i test verdi al primo tentativo
+
+### 📁 File Creati
+
+- `backend/src/monitoring/trade_logger.py` (394 righe)
+- `backend/src/monitoring/log_analyzer.py` (489 righe)
+- `backend/src/monitoring/schema.sql` (216 righe)
+- `backend/src/api/routers/monitoring.py` (310 righe)
+- `backend/tests/monitoring/test_trade_logger.py` (18 test)
+- `backend/tests/monitoring/test_log_analyzer.py` (19 test)
+- `backend/tests/api/test_monitoring.py` (12 test)
+
+### ✅ Risultati
+
+Sistema di logging completo e funzionante! Il backend è ora **pronto per il periodo di validazione paper trading di 1-2 settimane** richiesto. Tutti i segnali, esecuzioni e decisioni di risk verranno tracciati automaticamente per analisi post-mortem senza dover fermare il sistema.
+
+---
+
 ## [Phase 11] - 2026-02-14 - UX Enhancements & Architecture Refinement
 
 ### 🎨 Frontend Enhancements
