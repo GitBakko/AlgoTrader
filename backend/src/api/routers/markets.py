@@ -9,6 +9,7 @@ from loguru import logger
 
 from src.api.dependencies import get_broker_client, get_data_access
 from src.api.schemas import MarketInfo, OHLCResponse, error_response, success_response
+from src.data.utils import calculate_next_market_open
 
 router = APIRouter()
 
@@ -158,3 +159,88 @@ async def get_market_prices(
             logger.debug(f"Broker price fetch failed: {e}")
 
     return success_response([])
+
+
+@router.get("/status/{epic}")
+async def get_market_status(
+    epic: str = Path(..., description="Asset symbol (e.g., XAUUSD, BTCUSD)"),
+    broker=Depends(get_broker_client),
+):
+    """
+    Get market status with open/closed info and next open time.
+
+    Returns market hours info from Capital.com broker:
+    - is_open: bool (market currently open)
+    - status: TRADEABLE | CLOSED | SUSPENDED
+    - next_open: timestamp in ms (if closed)
+    - session: {open, close, timezone}
+
+    Example response:
+        {
+            "success": true,
+            "data": {
+                "epic": "XAUUSD",
+                "is_open": false,
+                "status": "CLOSED",
+                "next_open": 1707868800000,
+                "session": {
+                    "open": "23:00",
+                    "close": "22:00",
+                    "timezone": "UTC"
+                }
+            }
+        }
+    """
+    # Try to get market details from broker
+    try:
+        if broker:
+            details = await broker.get_market_details(epic)
+            market_status = details.get("snapshot", {}).get("marketStatus", "TRADEABLE")
+            is_open = market_status == "TRADEABLE"
+
+            # Calculate next open time if market is closed
+            next_open = None
+            if not is_open:
+                next_open = calculate_next_market_open(epic)
+
+            # Extract session info
+            dealing_rules = details.get("dealingRules", {})
+            market_order_pref = dealing_rules.get("marketOrderPreference", {})
+
+            return success_response(
+                {
+                    "epic": epic,
+                    "is_open": is_open,
+                    "status": market_status,
+                    "next_open": next_open,
+                    "session": {
+                        "open": market_order_pref.get("openingTime"),
+                        "close": market_order_pref.get("closingTime"),
+                        "timezone": details.get("snapshot", {}).get("updateTime", "UTC"),
+                    },
+                }
+            )
+    except Exception as e:
+        logger.warning(f"Broker market status failed for {epic}: {e}")
+
+    # Fallback: use simplified local logic
+    from datetime import datetime
+    from src.data.utils import is_market_hours
+
+    now = datetime.now()
+    is_open = is_market_hours(now, epic)
+    next_open = None if is_open else calculate_next_market_open(epic)
+
+    return success_response(
+        {
+            "epic": epic,
+            "is_open": is_open,
+            "status": "TRADEABLE" if is_open else "CLOSED",
+            "next_open": next_open,
+            "session": {
+                "open": "00:00" if epic == "BTCUSD" else "Sunday 23:00",
+                "close": "00:00" if epic == "BTCUSD" else "Friday 22:00",
+                "timezone": "UTC",
+            },
+        }
+    )

@@ -12,14 +12,42 @@
         {{ mode }}
       </c-badge>
     }
+    @if (currentMarketStatus(); as status) {
+      <div class="market-status-indicator">
+        @if (status.is_open) {
+          <c-badge color="success" class="d-flex align-items-center gap-1">
+            <span class="pulse-dot"></span>
+            MARKET OPEN
+          </c-badge>
+        } @else {
+          <c-badge color="danger">
+            MARKET CLOSED
+            @if (status.next_open) {
+              <span class="ms-1">Opens in {{ getCountdown(status.next_open) }}</span>
+            }
+          </c-badge>
+        }
+      </div>
+    }
   </div>
   <div class="d-flex align-items-center gap-3 text-body-secondary small">
     @if (riskStatus()?.circuit_breaker_active) {
       <c-badge color="danger">CIRCUIT BREAKER ATTIVO</c-badge>
     }
-    <span>Aggiornamento: 30s</span>
+    <span>Aggiornamento: {{ (pollingInterval() / 1000) }}s</span>
   </div>
 </div>
+
+<!-- Market Closed Alert -->
+@if (currentMarketStatus(); as status) {
+  @if (!status.is_open) {
+    <c-alert color="warning" class="mb-3">
+      <strong>Using Last Available Data</strong>
+      <br>
+      <small>Market is currently closed. Showing most recent historical data.</small>
+    </c-alert>
+  }
+}
 
 <!-- ═══════ ROW 2: KPI Cards ═══════ -->
 <c-row>
@@ -42,20 +70,20 @@
   </c-col>
   <c-col sm="6" xl="3">
     <c-card class="mb-4 border-top border-top-3"
-            [class.border-top-success]="overview() && overview()!.daily_pnl >= 0"
-            [class.border-top-danger]="overview() && overview()!.daily_pnl < 0">
+            [class.border-top-success]="totalUnrealizedPnl() >= 0"
+            [class.border-top-danger]="totalUnrealizedPnl() < 0">
       <c-card-body class="pb-0">
-        <div class="text-body-secondary text-uppercase small fw-semibold mb-1">Daily P&amp;L (USD)</div>
+        <div class="text-body-secondary text-uppercase small fw-semibold mb-1">P&amp;L Non Realizzato</div>
         <div class="fs-4 fw-bold"
-             [class.text-success]="overview() && overview()!.daily_pnl >= 0"
-             [class.text-danger]="overview() && overview()!.daily_pnl < 0">
-          {{ overview() ? '$ ' + (overview()!.daily_pnl >= 0 ? '+' : '') + (overview()!.daily_pnl | number:'1.2-2') : '...' }}
+             [class.text-success]="totalUnrealizedPnl() >= 0"
+             [class.text-danger]="totalUnrealizedPnl() < 0">
+          $ {{ totalUnrealizedPnl() >= 0 ? '+' : '' }}{{ totalUnrealizedPnl() | number:'1.2-2' }}
         </div>
       </c-card-body>
       <div class="px-3 pb-3">
         <div class="text-body-secondary small">
-          Total: <span [class.text-success]="overview() && overview()!.total_pnl >= 0"
-                       [class.text-danger]="overview() && overview()!.total_pnl < 0">
+          Realizzato: <span [class.text-success]="overview() && overview()!.total_pnl >= 0"
+                            [class.text-danger]="overview() && overview()!.total_pnl < 0">
             $ {{ overview() ? (overview()!.total_pnl | number:'1.2-2') : '-' }}
           </span>
         </div>
@@ -66,7 +94,7 @@
     <c-card class="mb-4 border-top border-top-3 border-top-warning">
       <c-card-body class="pb-0">
         <div class="text-body-secondary text-uppercase small fw-semibold mb-1">Posizioni Aperte</div>
-        <div class="fs-4 fw-bold">{{ overview()?.open_positions_count ?? 0 }}</div>
+        <div class="fs-4 fw-bold">{{ openPositionCount() }}</div>
       </c-card-body>
       <div class="px-3 pb-3">
         <div class="text-body-secondary small">
@@ -137,7 +165,7 @@
               @for (t of priceTickers(); track t.epic) {
                 <tr>
                   <td class="fw-semibold">{{ t.epic }}</td>
-                  <td class="text-end font-monospace">{{ t.bid | number:'1.2-2' }}</td>
+                  <td class="text-end font-monospace">{{ t.bid | priceFormat:t.epic }}</td>
                 </tr>
               }
             </tbody>
@@ -213,7 +241,7 @@
                     </c-badge>
                   </td>
                   <td>{{ pos.size | number:'1.4-4' }}</td>
-                  <td>{{ pos.level | number:'1.2-2' }}</td>
+                  <td class="font-monospace">{{ pos.level | priceFormat:pos.epic }}</td>
                   <td class="text-end fw-semibold"
                       [class.text-success]="pos.live_pnl >= 0"
                       [class.text-danger]="pos.live_pnl < 0">

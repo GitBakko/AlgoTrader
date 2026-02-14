@@ -252,3 +252,41 @@ def is_market_hours(timestamp: datetime, epic: str) -> bool:
         return False
 
     return True
+
+
+def calculate_next_market_open(epic: str) -> int | None:
+    """
+    Calculate the next market open timestamp in milliseconds.
+
+    Args:
+        epic: Asset symbol (e.g., "XAUUSD", "BTCUSD")
+
+    Returns:
+        Unix timestamp in milliseconds when market opens next, or None if 24/7
+
+    Example:
+        >>> epic = "XAUUSD"
+        >>> next_open = calculate_next_market_open(epic)
+        >>> print(f"Market opens at: {datetime.fromtimestamp(next_open/1000)}")
+    """
+    from datetime import datetime, timedelta
+
+    now = datetime.now()
+    weekday = now.weekday()
+
+    # Bitcoin trades 24/7
+    if epic == "BTCUSD":
+        return None
+
+    # If it's weekend (Saturday or Sunday), calculate Monday 00:00
+    if weekday >= 5:  # Saturday = 5, Sunday = 6
+        days_until_monday = 7 - weekday
+        next_open = now + timedelta(days=days_until_monday)
+        next_open = next_open.replace(hour=0, minute=0, second=0, microsecond=0)
+        return int(next_open.timestamp() * 1000)
+
+    # During weekday: assume next day 00:00 (simplified)
+    # In production, use actual market hours (e.g., 23:00 Sun for forex)
+    next_open = now + timedelta(days=1)
+    next_open = next_open.replace(hour=0, minute=0, second=0, microsecond=0)
+    return int(next_open.timestamp() * 1000)

@@ -4,12 +4,14 @@ import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
   ColComponent, RowComponent, BadgeComponent, ProgressComponent, ProgressBarComponent,
   ButtonDirective, SpinnerComponent,
-  TableDirective,
+  TableDirective, AlertComponent,
 } from '@coreui/angular';
 
 import { TradingService } from '../../core/services/trading.service';
 import { WebSocketService } from '../../core/services/websocket.service';
+import { MarketStatusService, MarketStatusResponse } from '../../core/services/market-status.service';
 import { ToastService } from '../../shared/services/toast.service';
+import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
 import { PaperPosition, PaperSignal } from '../../core/models';
 
 interface LivePosition extends PaperPosition {
@@ -25,7 +27,8 @@ interface LivePosition extends PaperPosition {
     CardComponent, CardBodyComponent, CardHeaderComponent,
     ColComponent, RowComponent, BadgeComponent, ProgressComponent, ProgressBarComponent,
     ButtonDirective, SpinnerComponent,
-    TableDirective,
+    TableDirective, AlertComponent,
+    PriceFormatPipe,
   ],
   template: `
     <!-- ═══════ ROW 1: Status Bar ═══════ -->
@@ -45,6 +48,21 @@ interface LivePosition extends PaperPosition {
         @if (circuitBreakersTripped().length > 0) {
           <c-badge color="danger">CIRCUIT BREAKER</c-badge>
         }
+        @if (currentMarketStatus(); as mktStatus) {
+          @if (mktStatus.is_open) {
+            <c-badge color="success" class="d-flex align-items-center gap-1">
+              <span class="pulse-dot"></span>
+              MARKET OPEN
+            </c-badge>
+          } @else {
+            <c-badge color="danger">
+              MARKET CLOSED
+              @if (mktStatus.next_open) {
+                <span class="ms-1">Opens in {{ getCountdown(mktStatus.next_open) }}</span>
+              }
+            </c-badge>
+          }
+        }
       </div>
       <div class="d-flex align-items-center gap-3">
         @if (status()?.last_run) {
@@ -52,6 +70,7 @@ interface LivePosition extends PaperPosition {
             Ultimo check: {{ formatTime(status()!.last_run!) }}
           </span>
         }
+        <span class="text-body-secondary small">Poll: {{ (pollingInterval() / 1000) }}s</span>
         <button cButton [color]="status()?.running ? 'danger' : 'success'" size="sm"
                 (click)="togglePaperTrading()" [disabled]="actionInProgress() || !statusLoaded()">
           @if (actionInProgress()) {
@@ -61,6 +80,17 @@ interface LivePosition extends PaperPosition {
         </button>
       </div>
     </div>
+
+    <!-- Market Closed Alert -->
+    @if (currentMarketStatus(); as mktStatus) {
+      @if (!mktStatus.is_open) {
+        <c-alert color="warning" class="mb-3">
+          <strong>Using Last Available Data</strong>
+          <br>
+          <small>Market is currently closed. Showing most recent positions and signals.</small>
+        </c-alert>
+      }
+    }
 
     <!-- ═══════ ROW 2: KPI Cards ═══════ -->
     <c-row>
@@ -226,9 +256,9 @@ interface LivePosition extends PaperPosition {
                         </c-badge>
                       </td>
                       <td class="font-monospace">{{ pos.size | number:'1.4-4' }}</td>
-                      <td class="font-monospace">{{ pos.level | number:'1.2-2' }}</td>
-                      <td class="font-monospace">{{ pos.stop_level !== null ? (pos.stop_level | number:'1.2-2') : '—' }}</td>
-                      <td class="font-monospace">{{ pos.profit_level !== null ? (pos.profit_level | number:'1.2-2') : '—' }}</td>
+                      <td class="font-monospace">{{ pos.level | priceFormat:pos.epic }}</td>
+                      <td class="font-monospace">{{ pos.stop_level !== null ? (pos.stop_level | priceFormat:pos.epic) : '—' }}</td>
+                      <td class="font-monospace">{{ pos.profit_level !== null ? (pos.profit_level | priceFormat:pos.epic) : '—' }}</td>
                       <td>
                         @if (pos.trailing_stop_phase) {
                           <c-badge [color]="trailingPhaseColor(pos.trailing_stop_phase)" class="badge-sm">
@@ -367,7 +397,7 @@ interface LivePosition extends PaperPosition {
             <c-badge color="danger" class="ms-2">{{ rejectedCount() }} rifiutati</c-badge>
           }
         </div>
-        <span class="text-body-secondary small">Aggiornamento: 12s</span>
+        <span class="text-body-secondary small">Aggiornamento: {{ (pollingInterval() / 1000) }}s</span>
       </c-card-header>
       <c-card-body class="p-0">
         @if (recentSignals().length > 0) {
@@ -406,7 +436,7 @@ interface LivePosition extends PaperPosition {
                       </c-badge>
                     </td>
                     <td class="font-monospace small">{{ (sig.confidence * 100).toFixed(0) }}%</td>
-                    <td class="font-monospace small">{{ sig.entry_price | number:'1.2-2' }}</td>
+                    <td class="font-monospace small">{{ sig.entry_price | priceFormat:sig.epic }}</td>
                     <td>
                       <c-badge [color]="statusColor(sig.status)" class="badge-sm">
                         {{ statusLabel(sig.status) }}
@@ -461,12 +491,24 @@ interface LivePosition extends PaperPosition {
 export class PaperTradingComponent implements OnInit, OnDestroy {
   readonly trading = inject(TradingService);
   readonly ws = inject(WebSocketService);
+  readonly marketStatus = inject(MarketStatusService);
   readonly toast = inject(ToastService);
 
   readonly actionInProgress = signal(false);
+  readonly currentEpic = signal<string>('XAUUSD');
+  readonly currentMarketStatus = signal<MarketStatusResponse | null>(null);
 
   readonly status = this.trading.paperStatus;
   readonly statusLoaded = computed(() => this.status() !== null);
+
+  // Polling interval based on market status
+  readonly pollingInterval = computed(() => {
+    const mktStatus = this.currentMarketStatus();
+    if (!mktStatus) return 12000; // 12s default
+    if (!mktStatus.is_open) return 300000; // 5min if closed
+    if (mktStatus.status === 'TRADEABLE') return 12000; // 12s if open
+    return 60000; // 1min if suspended
+  });
 
   // Signal/Trade conversion rate
   readonly conversionRate = computed(() => {
@@ -528,12 +570,10 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   });
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
-  private readonly POLL_INTERVAL = 12_000;
 
   ngOnInit(): void {
-    this.loadAll();
+    this.startSmartPolling();
     this.ws.connectPrices();
-    this.pollTimer = setInterval(() => this.loadAll(), this.POLL_INTERVAL);
   }
 
   ngOnDestroy(): void {
@@ -541,6 +581,39 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
     }
+  }
+
+  private async startSmartPolling(): Promise<void> {
+    const epic = this.currentEpic();
+
+    // Initial fetch
+    try {
+      const mktStatus = await this.marketStatus.getMarketStatus(epic);
+      this.currentMarketStatus.set(mktStatus);
+      this.loadAll();
+    } catch (error) {
+      console.error('Failed to fetch market status:', error);
+      this.loadAll();
+    }
+
+    // Recursive polling with dynamic interval
+    const poll = async () => {
+      try {
+        const mktStatus = await this.marketStatus.getMarketStatus(epic);
+        this.currentMarketStatus.set(mktStatus);
+
+        // Only load data if market is open
+        if (mktStatus.is_open) {
+          this.loadAll();
+        }
+      } catch (error) {
+        console.error('Polling error:', error);
+      }
+
+      this.pollTimer = setTimeout(() => poll(), this.pollingInterval());
+    };
+
+    this.pollTimer = setTimeout(() => poll(), this.pollingInterval());
   }
 
   loadAll(): void {
@@ -642,5 +715,19 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
         day: '2-digit', month: '2-digit', year: '2-digit',
       });
     } catch { return iso ?? '—'; }
+  }
+
+  getCountdown(timestamp: number): string {
+    const diff = timestamp - Date.now();
+    if (diff < 0) return 'Soon';
+
+    const hours = Math.floor(diff / 3600000);
+    const minutes = Math.floor((diff % 3600000) / 60000);
+
+    if (hours > 24) {
+      const days = Math.floor(hours / 24);
+      return `${days}d ${hours % 24}h`;
+    }
+    return `${hours}h ${minutes}m`;
   }
 }

@@ -1,0 +1,37 @@
+<div class="news-grid">
+  @for (article of filteredNews(); track article.url) {
+    <c-card class="news-card" (click)="onArticleClick(article)">
+      @if (article.thumbnail) {
+        <img
+          [src]="article.thumbnail"
+          class="news-thumbnail"
+          loading="lazy"
+          [alt]="article.title"
+          (error)="onImageError($event)"
+        />
+      }
+      <c-card-body>
+        <h6 class="news-title">{{ article.title }}</h6>
+        <p class="news-description">{{ article.description }}</p>
+        <div class="news-meta">
+          <small class="text-muted">
+            <span class="source-badge">{{ article.source }}</span>
+            <span class="ms-2">{{ formatDate(article.published_at) }}</span>
+          </small>
+          @if (article.sentiment !== 0) {
+            <c-badge
+              [color]="getSentimentColor(article.sentiment)"
+              size="sm"
+            >
+              {{ getSentimentLabel(article.sentiment) }}
+            </c-badge>
+          }
+        </div>
+      </c-card-body>
+    </c-card>
+  } @empty {
+    <div class="text-muted text-center py-4">
+      <p>No news available for this asset.</p>
+    </div>
+  }
+</div>
