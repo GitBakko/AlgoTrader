@@ -118,8 +118,10 @@ def parse_args() -> argparse.Namespace:
         "--assets",
         nargs="+",
         default=["XAUUSD", "BTCUSD", "US500", "WTIUSD", "EURUSD",
-                 "NVDA", "TSLA", "XAGUSD", "DE40"],
-        help="Asset epics to download (default: all 9 assets)",
+                 "NVDA", "TSLA", "XAGUSD", "DE40",
+                 "SOLUSD", "ETHUSD", "BNBUSD", "DOGUSD", "DASHUSD", "ICPUSD",
+                 "NATGAS", "COPPER", "PLATINUM", "GBPUSD", "USDJPY", "NAS100"],
+        help="Asset epics to download (default: all 21 assets)",
     )
     parser.add_argument(
         "--timeframes",

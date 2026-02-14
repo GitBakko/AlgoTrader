@@ -39,6 +39,9 @@ EPIC_TO_BROKER: dict[str, str] = {
     "XAUUSD": "GOLD",
     "XAGUSD": "SILVER",
     "WTIUSD": "OIL_CRUDE",
+    "DOGUSD": "DOGEUSD",      # Dogecoin
+    "NATGAS": "NATURALGAS",   # Natural Gas
+    "NAS100": "QTEC",         # Nasdaq 100
 }
 BROKER_TO_EPIC: dict[str, str] = {v: k for k, v in EPIC_TO_BROKER.items()}
 

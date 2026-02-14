@@ -42,6 +42,7 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
             <div class="mb-3">
               <label cFormLabel class="small">Asset</label>
               <select cFormSelect [(ngModel)]="config.epic" class="form-select-sm">
+                <!-- Existing 8 assets (EURUSD excluded) -->
                 <option value="XAUUSD">Gold (XAUUSD)</option>
                 <option value="BTCUSD">Bitcoin (BTCUSD)</option>
                 <option value="US500">S&P 500 (US500)</option>
@@ -50,6 +51,19 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
                 <option value="TSLA">Tesla (TSLA)</option>
                 <option value="XAGUSD">Silver (XAGUSD)</option>
                 <option value="DE40">DAX (DE40)</option>
+                <!-- New 12 assets - Phase 12: Portfolio Expansion -->
+                <option value="SOLUSD">Solana (SOLUSD)</option>
+                <option value="ETHUSD">Ethereum (ETHUSD)</option>
+                <option value="BNBUSD">Binance Coin (BNBUSD)</option>
+                <option value="DOGUSD">Dogecoin (DOGUSD)</option>
+                <option value="DASHUSD">Dash (DASHUSD)</option>
+                <option value="ICPUSD">Internet Computer (ICPUSD)</option>
+                <option value="NATGAS">Natural Gas (NATGAS)</option>
+                <option value="COPPER">Copper (COPPER)</option>
+                <option value="PLATINUM">Platinum (PLATINUM)</option>
+                <option value="GBPUSD">GBP/USD (GBPUSD)</option>
+                <option value="USDJPY">USD/JPY (USDJPY)</option>
+                <option value="NAS100">Nasdaq 100 (NAS100)</option>
               </select>
             </div>
             <div class="mb-3">

@@ -11,7 +11,15 @@ import { MarketStatusService, MarketStatusResponse } from '../../core/services/m
 import { TvChartComponent, OhlcDataPoint } from '../../shared/components/tv-chart/tv-chart.component';
 import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
 
-const EPICS = ['XAUUSD', 'BTCUSD', 'US500', 'WTIUSD', 'NVDA', 'TSLA', 'XAGUSD', 'DE40'] as const;
+const EPICS = [
+  // Existing 8 assets (EURUSD excluded)
+  'XAUUSD', 'BTCUSD', 'US500', 'WTIUSD', 'NVDA', 'TSLA', 'XAGUSD', 'DE40',
+  // New 12 assets - Phase 12: Portfolio Expansion
+  'SOLUSD', 'ETHUSD', 'BNBUSD', 'DOGUSD', 'DASHUSD', 'ICPUSD',
+  'NATGAS', 'COPPER', 'PLATINUM',
+  'GBPUSD', 'USDJPY',
+  'NAS100',
+] as const;
 const TIMEFRAMES = [
   { value: 'HOUR', label: '1H' },
   { value: 'HOUR_4', label: '4H' },

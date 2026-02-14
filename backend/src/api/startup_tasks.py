@@ -43,9 +43,14 @@ async def initial_data_download(app_state) -> None:
 
         downloader = HistoricalDownloader(client=broker, storage=storage)
 
-        # Download 1 year of 1h, 4h, 1d for all 3 assets
+        # Download 1 year of 1h, 4h, 1d for all 21 assets (Phase 12: Portfolio Expansion)
         results = await downloader.download_all_assets(
-            assets=["XAUUSD", "BTCUSD", "US500"],
+            assets=[
+                "XAUUSD", "BTCUSD", "US500", "WTIUSD", "EURUSD",
+                "NVDA", "TSLA", "XAGUSD", "DE40",
+                "SOLUSD", "ETHUSD", "BNBUSD", "DOGUSD", "DASHUSD", "ICPUSD",
+                "NATGAS", "COPPER", "PLATINUM", "GBPUSD", "USDJPY", "NAS100",
+            ],
             timeframes=["1h", "4h", "1d"],
             days_back=365,
         )

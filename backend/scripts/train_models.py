@@ -49,8 +49,19 @@ STOCK_BARS_PER_DAY = {
     "1d": 1,
 }
 
+# Crypto assets trade 24/7 (use default BARS_PER_DAY)
+CRYPTO_EPICS = {"BTCUSD", "SOLUSD", "ETHUSD", "BNBUSD", "DOGUSD", "DASHUSD", "ICPUSD"}
+
 # Active trading assets (EURUSD excluded: tiny ATR → massive position sizes → -99% OOS)
-ACTIVE_ASSETS = ["XAUUSD", "BTCUSD", "US500", "WTIUSD", "NVDA", "TSLA", "XAGUSD", "DE40"]
+ACTIVE_ASSETS = [
+    # Existing 8 assets
+    "XAUUSD", "BTCUSD", "US500", "WTIUSD", "NVDA", "TSLA", "XAGUSD", "DE40",
+    # New 12 assets - Phase 12: Portfolio Expansion
+    "SOLUSD", "ETHUSD", "BNBUSD", "DOGUSD", "DASHUSD", "ICPUSD",
+    "NATGAS", "COPPER", "PLATINUM",
+    "GBPUSD", "USDJPY",
+    "NAS100",
+]
 ALL_ASSETS = ACTIVE_ASSETS + ["EURUSD"]
 
 # Directory to save/load tuned hyperparameters
@@ -336,7 +347,7 @@ def parse_args() -> argparse.Namespace:
         "--assets",
         nargs="+",
         default=ACTIVE_ASSETS,
-        help="Asset epics to train (default: 8 active assets, excludes EURUSD)",
+        help="Asset epics to train (default: 20 active assets, excludes EURUSD)",
     )
     parser.add_argument(
         "--timeframe",

@@ -58,6 +58,67 @@ _MODEL_REGISTRY = [
         "epic": "DE40", "status": "untrained",
         "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
     },
+    # New 12 assets - Phase 12: Portfolio Expansion
+    {
+        "id": "xgboost-solusd-v1", "name": "XGBoost Solana", "type": "xgboost",
+        "epic": "SOLUSD", "status": "untrained",
+        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+    },
+    {
+        "id": "xgboost-ethusd-v1", "name": "XGBoost Ethereum", "type": "xgboost",
+        "epic": "ETHUSD", "status": "untrained",
+        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+    },
+    {
+        "id": "xgboost-bnbusd-v1", "name": "XGBoost Binance Coin", "type": "xgboost",
+        "epic": "BNBUSD", "status": "untrained",
+        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+    },
+    {
+        "id": "xgboost-dogusd-v1", "name": "XGBoost Dogecoin", "type": "xgboost",
+        "epic": "DOGUSD", "status": "untrained",
+        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+    },
+    {
+        "id": "xgboost-dashusd-v1", "name": "XGBoost Dash", "type": "xgboost",
+        "epic": "DASHUSD", "status": "untrained",
+        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+    },
+    {
+        "id": "xgboost-icpusd-v1", "name": "XGBoost Internet Computer", "type": "xgboost",
+        "epic": "ICPUSD", "status": "untrained",
+        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+    },
+    {
+        "id": "xgboost-natgas-v1", "name": "XGBoost Natural Gas", "type": "xgboost",
+        "epic": "NATGAS", "status": "untrained",
+        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+    },
+    {
+        "id": "xgboost-copper-v1", "name": "XGBoost Copper", "type": "xgboost",
+        "epic": "COPPER", "status": "untrained",
+        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+    },
+    {
+        "id": "xgboost-platinum-v1", "name": "XGBoost Platinum", "type": "xgboost",
+        "epic": "PLATINUM", "status": "untrained",
+        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+    },
+    {
+        "id": "xgboost-gbpusd-v1", "name": "XGBoost GBP/USD", "type": "xgboost",
+        "epic": "GBPUSD", "status": "untrained",
+        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+    },
+    {
+        "id": "xgboost-usdjpy-v1", "name": "XGBoost USD/JPY", "type": "xgboost",
+        "epic": "USDJPY", "status": "untrained",
+        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+    },
+    {
+        "id": "xgboost-nas100-v1", "name": "XGBoost Nasdaq 100", "type": "xgboost",
+        "epic": "NAS100", "status": "untrained",
+        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+    },
 ]
 
 _MODEL_MAP = {m["id"]: m for m in _MODEL_REGISTRY}

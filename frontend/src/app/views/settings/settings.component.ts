@@ -2,11 +2,39 @@ import { Component, ChangeDetectionStrategy, inject, OnInit } from '@angular/cor
 import { CommonModule } from '@angular/common';
 import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
-  ColComponent, RowComponent, BadgeComponent, ProgressComponent
+  ColComponent, RowComponent, BadgeComponent, ProgressComponent,
+  FormCheckComponent, FormCheckInputDirective, FormCheckLabelDirective,
 } from '@coreui/angular';
 import { TradingService } from '../../core/services/trading.service';
 import { SystemSettings, RiskStatus } from '../../core/models';
 import { WebSocketService } from '../../core/services/websocket.service';
+import { NotificationService } from '../../shared/services/notification.service';
+
+const ASSET_INFO: { epic: string; name: string; type: string; exchange: string }[] = [
+  // Existing 9 assets
+  { epic: 'XAUUSD', name: 'Gold', type: 'Commodity', exchange: 'COMEX' },
+  { epic: 'XAGUSD', name: 'Silver', type: 'Commodity', exchange: 'COMEX' },
+  { epic: 'WTIUSD', name: 'Crude Oil WTI', type: 'Commodity', exchange: 'NYMEX' },
+  { epic: 'BTCUSD', name: 'Bitcoin', type: 'Crypto', exchange: '24/7' },
+  { epic: 'EURUSD', name: 'EUR/USD', type: 'Forex', exchange: '24/5' },
+  { epic: 'US500', name: 'S&P 500', type: 'Index', exchange: 'CME' },
+  { epic: 'DE40', name: 'DAX 40', type: 'Index', exchange: 'EUREX' },
+  { epic: 'NVDA', name: 'NVIDIA', type: 'Stock CFD', exchange: 'NASDAQ' },
+  { epic: 'TSLA', name: 'Tesla', type: 'Stock CFD', exchange: 'NASDAQ' },
+  // New 12 assets - Phase 12: Portfolio Expansion
+  { epic: 'SOLUSD', name: 'Solana', type: 'Crypto', exchange: '24/7' },
+  { epic: 'ETHUSD', name: 'Ethereum', type: 'Crypto', exchange: '24/7' },
+  { epic: 'BNBUSD', name: 'Binance Coin', type: 'Crypto', exchange: '24/7' },
+  { epic: 'DOGUSD', name: 'Dogecoin', type: 'Crypto', exchange: '24/7' },
+  { epic: 'DASHUSD', name: 'Dash', type: 'Crypto', exchange: '24/7' },
+  { epic: 'ICPUSD', name: 'Internet Computer', type: 'Crypto', exchange: '24/7' },
+  { epic: 'NATGAS', name: 'Natural Gas', type: 'Commodity', exchange: 'NYMEX' },
+  { epic: 'COPPER', name: 'Copper', type: 'Commodity', exchange: 'COMEX' },
+  { epic: 'PLATINUM', name: 'Platinum', type: 'Commodity', exchange: 'NYMEX' },
+  { epic: 'GBPUSD', name: 'GBP/USD', type: 'Forex', exchange: '24/5' },
+  { epic: 'USDJPY', name: 'USD/JPY', type: 'Forex', exchange: '24/5' },
+  { epic: 'NAS100', name: 'Nasdaq 100', type: 'Index', exchange: 'CME' },
+];
 
 @Component({
   selector: 'app-settings',
@@ -14,7 +42,8 @@ import { WebSocketService } from '../../core/services/websocket.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, CardComponent, CardBodyComponent, CardHeaderComponent,
-    ColComponent, RowComponent, BadgeComponent, ProgressComponent
+    ColComponent, RowComponent, BadgeComponent, ProgressComponent,
+    FormCheckComponent, FormCheckInputDirective, FormCheckLabelDirective,
   ],
   template: `
     <!-- Header -->
@@ -66,7 +95,7 @@ import { WebSocketService } from '../../core/services/websocket.service';
         </c-card>
       </c-col>
 
-      <!-- Risk Params -->
+      <!-- Risk Params + Notifications -->
       <c-col lg="4">
         <c-card class="mb-4">
           <c-card-header class="py-2"><strong>Parametri Rischio</strong></c-card-header>
@@ -89,6 +118,25 @@ import { WebSocketService } from '../../core/services/websocket.service';
                 <strong class="small font-monospace text-danger">{{ (settings.max_total_drawdown * 100) | number:'1.1-1' }}%</strong>
               </div>
             }
+          </c-card-body>
+        </c-card>
+
+        <!-- Notifications -->
+        <c-card class="mb-4">
+          <c-card-header class="py-2"><strong>Notifiche</strong></c-card-header>
+          <c-card-body>
+            <c-form-check class="mb-2">
+              <input cFormCheckInput type="checkbox" id="notifBrowser"
+                     [checked]="notifications.enabled()"
+                     (change)="toggleBrowserNotifications()"/>
+              <label cFormCheckLabel for="notifBrowser" class="small">Notifiche browser (trade, circuit breaker)</label>
+            </c-form-check>
+            <c-form-check>
+              <input cFormCheckInput type="checkbox" id="notifSound"
+                     [checked]="notifications.soundEnabled()"
+                     (change)="notifications.toggleSound()"/>
+              <label cFormCheckLabel for="notifSound" class="small">Suoni alert (chime su trade)</label>
+            </c-form-check>
           </c-card-body>
         </c-card>
       </c-col>
@@ -136,18 +184,65 @@ import { WebSocketService } from '../../core/services/websocket.service';
         </c-card>
       </c-col>
     </c-row>
+
+    <!-- Asset Universe -->
+    <c-card class="mb-4">
+      <c-card-header class="py-2">
+        <strong>Asset Universe</strong>
+        <c-badge color="primary" class="ms-2 badge-sm">{{ assets.length }} asset</c-badge>
+      </c-card-header>
+      <c-card-body class="p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover table-striped mb-0">
+            <thead>
+              <tr>
+                <th>Epic</th>
+                <th>Nome</th>
+                <th>Tipo</th>
+                <th>Exchange</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (a of assets; track a.epic) {
+                <tr>
+                  <td class="fw-semibold">{{ a.epic }}</td>
+                  <td>{{ a.name }}</td>
+                  <td><c-badge color="primary" class="badge-sm">{{ a.type }}</c-badge></td>
+                  <td class="text-body-secondary small">{{ a.exchange }}</td>
+                  <td>
+                    @if (a.epic === 'EURUSD') {
+                      <c-badge color="secondary" class="badge-sm">Escluso</c-badge>
+                    } @else {
+                      <c-badge color="success" class="badge-sm">Attivo</c-badge>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </c-card-body>
+    </c-card>
   `
 })
 export class SettingsComponent implements OnInit {
   private readonly trading = inject(TradingService);
   private readonly ws = inject(WebSocketService);
+  readonly notifications = inject(NotificationService);
 
   settings: SystemSettings | null = null;
   riskStatus: RiskStatus | null = null;
   readonly wsConnected = this.ws.connected;
+  readonly assets = ASSET_INFO;
 
   ngOnInit(): void {
     this.trading.getSystemSettings().subscribe(data => this.settings = data);
     this.trading.getRiskStatus().subscribe(data => this.riskStatus = data);
+  }
+
+  toggleBrowserNotifications(): void {
+    if (this.notifications.enabled()) return;
+    this.notifications.requestPermission();
   }
 }

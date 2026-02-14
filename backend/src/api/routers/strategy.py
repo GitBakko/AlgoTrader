@@ -21,7 +21,13 @@ from src.strategy.strategy_manager import StrategyManager
 router = APIRouter()
 
 SUPPORTED_EPICS = [
+    # Existing 9 assets
     "XAUUSD", "BTCUSD", "US500", "WTIUSD", "EURUSD", "NVDA", "TSLA", "XAGUSD", "DE40",
+    # New 12 assets - Phase 12: Portfolio Expansion
+    "SOLUSD", "ETHUSD", "BNBUSD", "DOGUSD", "DASHUSD", "ICPUSD",
+    "NATGAS", "COPPER", "PLATINUM",
+    "GBPUSD", "USDJPY",
+    "NAS100",
 ]
 
 

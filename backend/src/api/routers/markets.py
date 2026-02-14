@@ -15,6 +15,7 @@ router = APIRouter()
 
 # Static market list (fallback when no broker connection)
 SUPPORTED_MARKETS = [
+    # Existing 9 assets
     MarketInfo(epic="XAUUSD", name="Gold (XAU/USD)", change_pct=0.0),
     MarketInfo(epic="BTCUSD", name="Bitcoin (BTC/USD)", change_pct=0.0),
     MarketInfo(epic="US500", name="S&P 500 (US500)", change_pct=0.0),
@@ -24,6 +25,19 @@ SUPPORTED_MARKETS = [
     MarketInfo(epic="TSLA", name="Tesla Inc (TSLA)", change_pct=0.0),
     MarketInfo(epic="XAGUSD", name="Silver (XAG/USD)", change_pct=0.0),
     MarketInfo(epic="DE40", name="Germany 40 / DAX (DE40)", change_pct=0.0),
+    # New 12 assets - Phase 12: Portfolio Expansion
+    MarketInfo(epic="SOLUSD", name="Solana (SOL/USD)", change_pct=0.0),
+    MarketInfo(epic="ETHUSD", name="Ethereum (ETH/USD)", change_pct=0.0),
+    MarketInfo(epic="BNBUSD", name="Binance Coin (BNB/USD)", change_pct=0.0),
+    MarketInfo(epic="DOGUSD", name="Dogecoin (DOGE/USD)", change_pct=0.0),
+    MarketInfo(epic="DASHUSD", name="Dash (DASH/USD)", change_pct=0.0),
+    MarketInfo(epic="ICPUSD", name="Internet Computer (ICP/USD)", change_pct=0.0),
+    MarketInfo(epic="NATGAS", name="Natural Gas (NATGAS)", change_pct=0.0),
+    MarketInfo(epic="COPPER", name="Copper (COPPER)", change_pct=0.0),
+    MarketInfo(epic="PLATINUM", name="Platinum (PLATINUM)", change_pct=0.0),
+    MarketInfo(epic="GBPUSD", name="British Pound / US Dollar (GBP/USD)", change_pct=0.0),
+    MarketInfo(epic="USDJPY", name="US Dollar / Japanese Yen (USD/JPY)", change_pct=0.0),
+    MarketInfo(epic="NAS100", name="Nasdaq 100 (US TECH 100)", change_pct=0.0),
 ]
 
 _MARKET_MAP = {m.epic: m for m in SUPPORTED_MARKETS}

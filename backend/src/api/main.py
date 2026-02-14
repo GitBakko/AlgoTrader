@@ -128,8 +128,14 @@ async def lifespan(app: FastAPI):
             )
             await broker_ws.connect()
             await broker_ws.subscribe_quotes([
+                # Existing 9 assets
                 "XAUUSD", "BTCUSD", "US500", "WTIUSD", "EURUSD",
                 "NVDA", "TSLA", "XAGUSD", "DE40",
+                # New 12 assets - Phase 12: Portfolio Expansion (21/40 slots)
+                "SOLUSD", "ETHUSD", "BNBUSD", "DOGUSD", "DASHUSD", "ICPUSD",
+                "NATGAS", "COPPER", "PLATINUM",
+                "GBPUSD", "USDJPY",
+                "NAS100",
             ])
             app.state.broker_ws_client = broker_ws
             logger.info("Broker WebSocket connected, subscribed to quotes")

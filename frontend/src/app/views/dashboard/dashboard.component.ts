@@ -81,7 +81,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
   // Asset price tickers from WebSocket
   readonly priceTickers = computed(() => {
     const prices = this.ws.prices();
-    const epics = ['XAUUSD', 'BTCUSD', 'US500', 'WTIUSD', 'NVDA', 'TSLA', 'XAGUSD', 'DE40'];
+    const epics = [
+      'XAUUSD', 'BTCUSD', 'US500', 'WTIUSD', 'NVDA', 'TSLA', 'XAGUSD', 'DE40',
+      'SOLUSD', 'ETHUSD', 'BNBUSD', 'DOGUSD', 'DASHUSD', 'ICPUSD',
+      'NATGAS', 'COPPER', 'PLATINUM', 'GBPUSD', 'USDJPY', 'NAS100'
+    ];
     return epics
       .filter(e => prices[e])
       .map(e => {

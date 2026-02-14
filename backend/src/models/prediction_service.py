@@ -31,8 +31,14 @@ class PredictionService:
 
     # Active trading epics (EURUSD excluded due to unviable OOS performance)
     ACTIVE_EPICS = [
+        # Existing 8 assets (EURUSD excluded)
         "XAUUSD", "BTCUSD", "US500", "WTIUSD",
         "NVDA", "TSLA", "XAGUSD", "DE40",
+        # New 12 assets - Phase 12: Portfolio Expansion
+        "SOLUSD", "ETHUSD", "BNBUSD", "DOGUSD", "DASHUSD", "ICPUSD",
+        "NATGAS", "COPPER", "PLATINUM",
+        "GBPUSD", "USDJPY",
+        "NAS100",
     ]
 
     def __init__(

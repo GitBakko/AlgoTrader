@@ -243,8 +243,285 @@ DE40_CONFIG = AssetFeatureConfig(
 )
 
 
+# ===== Solana (SOLUSD) =====
+SOLUSD_CONFIG = AssetFeatureConfig(
+    epic="SOLUSD",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={
+        **DEFAULT_TECHNICAL_PARAMS,
+        # Crypto: high volatility, 24/7 trading
+        "ema_periods": [8, 21, 50, 200],
+        "hvol_period": 20,
+    },
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="btc_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with Bitcoin"},
+        ),
+    ],
+)
+
+
+# ===== Ethereum (ETHUSD) =====
+ETHUSD_CONFIG = AssetFeatureConfig(
+    epic="ETHUSD",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={
+        **DEFAULT_TECHNICAL_PARAMS,
+        # Ethereum: DeFi backbone, high volatility
+        "ema_periods": [8, 21, 50, 200],
+        "hvol_period": 20,
+    },
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="btc_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with Bitcoin"},
+        ),
+    ],
+)
+
+
+# ===== Binance Coin (BNBUSD) =====
+BNBUSD_CONFIG = AssetFeatureConfig(
+    epic="BNBUSD",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={
+        **DEFAULT_TECHNICAL_PARAMS,
+        # BNB: exchange token, moderate-high volatility
+        "ema_periods": [8, 21, 50, 200],
+        "hvol_period": 20,
+    },
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="btc_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with Bitcoin"},
+        ),
+    ],
+)
+
+
+# ===== Dogecoin (DOGUSD) =====
+DOGUSD_CONFIG = AssetFeatureConfig(
+    epic="DOGUSD",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={
+        **DEFAULT_TECHNICAL_PARAMS,
+        # DOGE: meme coin, very high volatility, retail momentum
+        "ema_periods": [8, 21, 50, 200],
+        "hvol_period": 20,
+    },
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="btc_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with Bitcoin"},
+        ),
+    ],
+)
+
+
+# ===== Dash (DASHUSD) =====
+DASHUSD_CONFIG = AssetFeatureConfig(
+    epic="DASHUSD",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={
+        **DEFAULT_TECHNICAL_PARAMS,
+        # DASH: privacy coin, moderate volatility
+        "ema_periods": [8, 21, 50, 200],
+        "hvol_period": 20,
+    },
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="btc_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with Bitcoin"},
+        ),
+    ],
+)
+
+
+# ===== Internet Computer (ICPUSD) =====
+ICPUSD_CONFIG = AssetFeatureConfig(
+    epic="ICPUSD",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={
+        **DEFAULT_TECHNICAL_PARAMS,
+        # ICP: deflationary protocol, moderate volatility
+        "ema_periods": [8, 21, 50, 200],
+        "hvol_period": 20,
+    },
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="btc_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with Bitcoin"},
+        ),
+    ],
+)
+
+
+# ===== Natural Gas (NATGAS) =====
+NATGAS_CONFIG = AssetFeatureConfig(
+    epic="NATGAS",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={
+        **DEFAULT_TECHNICAL_PARAMS,
+        # Natural Gas: extreme volatility (78.4% spike Jan 2026), weather-driven
+        "ema_periods": [8, 21, 50, 200],
+        "hvol_period": 20,
+    },
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="gold_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with Gold (commodities)"},
+        ),
+    ],
+)
+
+
+# ===== Copper (COPPER) =====
+COPPER_CONFIG = AssetFeatureConfig(
+    epic="COPPER",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={
+        **DEFAULT_TECHNICAL_PARAMS,
+        # Copper: industrial metal, supply deficit, moderate volatility
+        "ema_periods": [8, 21, 50, 200],
+        "rsi_period": 14,
+    },
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="gold_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with Gold (commodities)"},
+        ),
+    ],
+)
+
+
+# ===== Platinum (PLATINUM) =====
+PLATINUM_CONFIG = AssetFeatureConfig(
+    epic="PLATINUM",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={
+        **DEFAULT_TECHNICAL_PARAMS,
+        # Platinum: precious metal, automotive/industrial demand
+        "ema_periods": [8, 21, 50, 200],
+        "rsi_period": 14,
+    },
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="gold_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with Gold (precious metals)"},
+        ),
+    ],
+)
+
+
+# ===== GBP/USD Cable (GBPUSD) =====
+GBPUSD_CONFIG = AssetFeatureConfig(
+    epic="GBPUSD",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={
+        **DEFAULT_TECHNICAL_PARAMS,
+        # GBP/USD: high liquidity, tight spreads (0.8-1.2 pips), low volatility
+        "ema_periods": [8, 21, 50, 200],
+        "rsi_period": 14,
+    },
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="dxy_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Inverse correlation with DXY index"},
+        ),
+    ],
+)
+
+
+# ===== USD/JPY (USDJPY) =====
+USDJPY_CONFIG = AssetFeatureConfig(
+    epic="USDJPY",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={
+        **DEFAULT_TECHNICAL_PARAMS,
+        # USD/JPY: negative correlation with EURUSD (-0.40), safe haven flows
+        "ema_periods": [8, 21, 50, 200],
+        "rsi_period": 14,
+    },
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="dxy_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Positive correlation with DXY index"},
+        ),
+    ],
+)
+
+
+# ===== Nasdaq 100 (NAS100) =====
+NAS100_CONFIG = AssetFeatureConfig(
+    epic="NAS100",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={
+        **DEFAULT_TECHNICAL_PARAMS,
+        # Nasdaq 100: 55.4% tech composition, higher volatility than S&P500
+        "ema_periods": [8, 21, 50, 200],
+        "hvol_period": 20,
+    },
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="sp500_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with S&P 500"},
+        ),
+    ],
+)
+
+
 # Master config dict
 ASSET_FEATURE_CONFIGS: dict[str, AssetFeatureConfig] = {
+    # Existing 9 assets
     "XAUUSD": XAUUSD_CONFIG,
     "BTCUSD": BTCUSD_CONFIG,
     "US500": US500_CONFIG,
@@ -254,6 +531,19 @@ ASSET_FEATURE_CONFIGS: dict[str, AssetFeatureConfig] = {
     "TSLA": TSLA_CONFIG,
     "XAGUSD": XAGUSD_CONFIG,
     "DE40": DE40_CONFIG,
+    # New 12 assets - Phase 12: Portfolio Expansion
+    "SOLUSD": SOLUSD_CONFIG,
+    "ETHUSD": ETHUSD_CONFIG,
+    "BNBUSD": BNBUSD_CONFIG,
+    "DOGUSD": DOGUSD_CONFIG,
+    "DASHUSD": DASHUSD_CONFIG,
+    "ICPUSD": ICPUSD_CONFIG,
+    "NATGAS": NATGAS_CONFIG,
+    "COPPER": COPPER_CONFIG,
+    "PLATINUM": PLATINUM_CONFIG,
+    "GBPUSD": GBPUSD_CONFIG,
+    "USDJPY": USDJPY_CONFIG,
+    "NAS100": NAS100_CONFIG,
 }
 
 
