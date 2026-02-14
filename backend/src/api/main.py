@@ -11,7 +11,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
 
-from src.api.routers import backtest, dashboard, markets, models, positions, signals, strategy, system, trading
+from src.api.routers import (
+    backtest,
+    dashboard,
+    markets,
+    models,
+    monitoring,
+    news,
+    positions,
+    signals,
+    strategy,
+    system,
+    trading,
+)
 from src.api.websocket import prices_endpoint, trades_endpoint
 from src.database.session import DatabaseManager
 from src.monitoring.health import HealthChecker
@@ -353,11 +365,13 @@ app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"]
 app.include_router(positions.router, prefix="/api/positions", tags=["Positions"])
 app.include_router(signals.router, prefix="/api/signals", tags=["Signals"])
 app.include_router(markets.router, prefix="/api/markets", tags=["Markets"])
+app.include_router(news.router, prefix="/api/news", tags=["News"])
 app.include_router(backtest.router, prefix="/api/backtest", tags=["Backtest"])
 app.include_router(strategy.router, prefix="/api/strategy", tags=["Strategy"])
 app.include_router(models.router, prefix="/api/models", tags=["Models"])
 app.include_router(system.router, prefix="/api/system", tags=["System"])
 app.include_router(trading.router, prefix="/api/trading", tags=["Trading"])
+app.include_router(monitoring.router, prefix="/api", tags=["Monitoring"])
 
 # ===== WebSocket Endpoints =====
 app.websocket("/ws/prices")(prices_endpoint)
