@@ -274,3 +274,6 @@ export interface PaperSignal {
   strategy_name?: string;  // "ml_ensemble", "squeeze_breakout", "vwap_reversion"
   _showRaw?: boolean;  // UI-only: toggle for raw error display
 }
+
+// News and Sentiment
+export * from './news.model';

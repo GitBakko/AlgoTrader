@@ -1,0 +1,91 @@
+.news-list {
+  max-height: 700px;
+  overflow-y: auto;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: var(--cui-body-bg);
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--cui-border-color);
+    border-radius: 4px;
+
+    &:hover {
+      background: var(--cui-text-disabled);
+    }
+  }
+}
+
+.news-item {
+  transition: background-color 0.2s ease;
+  padding: 0.75rem;
+  margin-left: -0.75rem;
+  margin-right: -0.75rem;
+  border-radius: 4px;
+
+  &:hover {
+    background-color: rgba(var(--cui-primary-rgb), 0.05);
+  }
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.news-title {
+  color: var(--cui-body-color);
+  font-weight: 500;
+  line-height: 1.4;
+
+  &:hover {
+    color: var(--cui-primary);
+    text-decoration: underline !important;
+  }
+}
+
+.news-description {
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sentiment-badge {
+  font-weight: 600;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border: none;
+  color: white !important;
+}
+
+.sentiment-indicator {
+  display: flex;
+  align-items: center;
+
+  c-badge {
+    font-weight: 600;
+  }
+}
+
+.badge-sm {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.4rem;
+}
+
+// Mantis AI theme overrides
+:host-context(.mantis-theme) {
+  .news-title:hover {
+    color: #39ff14;
+  }
+
+  .sentiment-badge {
+    &.bg-success {
+      background-color: #00d97e !important;
+    }
+  }
+}

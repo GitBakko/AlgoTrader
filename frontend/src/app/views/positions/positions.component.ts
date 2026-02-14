@@ -6,6 +6,7 @@ import {
   BadgeComponent, ButtonDirective
 } from '@coreui/angular';
 import { TradingService } from '../../core/services/trading.service';
+import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
 import { ToastService } from '../../shared/services/toast.service';
 
 @Component({
@@ -15,6 +16,7 @@ import { ToastService } from '../../shared/services/toast.service';
   imports: [
     CommonModule, CardComponent, CardBodyComponent,
     TableDirective, BadgeComponent, ButtonDirective,
+    PriceFormatPipe,
   ],
   template: `
     <!-- Header -->
@@ -61,9 +63,9 @@ import { ToastService } from '../../shared/services/toast.service';
                     </c-badge>
                   </td>
                   <td class="font-monospace">{{ pos.size | number:'1.4-4' }}</td>
-                  <td class="font-monospace">{{ pos.entry_price | number:'1.2-2' }}</td>
-                  <td class="font-monospace">{{ pos.stop_loss != null ? (pos.stop_loss | number:'1.2-2') : '—' }}</td>
-                  <td class="font-monospace">{{ pos.take_profit != null ? (pos.take_profit | number:'1.2-2') : '—' }}</td>
+                  <td class="font-monospace">{{ pos.entry_price | priceFormat:pos.epic }}</td>
+                  <td class="font-monospace">{{ pos.stop_loss != null ? (pos.stop_loss | priceFormat:pos.epic) : '—' }}</td>
+                  <td class="font-monospace">{{ pos.take_profit != null ? (pos.take_profit | priceFormat:pos.epic) : '—' }}</td>
                   <td class="text-body-secondary small">{{ formatDate(pos.opened_at) }}</td>
                   <td class="text-end fw-semibold font-monospace"
                       [class.text-success]="pos.current_pnl >= 0"

@@ -1,0 +1,94 @@
+<c-row>
+  <c-col md="12">
+    <c-card class="mb-4">
+      <c-card-header class="d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-semibold">News Feed</h5>
+        <div class="d-flex gap-3 align-items-center">
+          <div class="sentiment-indicator">
+            <span class="small text-body-secondary me-2">Sentiment:</span>
+            <c-badge [color]="getSentimentBadge(sentimentScore())">
+              {{ sentimentScore() | number:'1.2-2' }} • {{ getSentimentLabel(sentimentScore()) }}
+            </c-badge>
+          </div>
+          <select
+            class="form-select form-select-sm"
+            style="width: 150px;"
+            [value]="selectedEpic()"
+            (change)="onEpicChange($any($event.target).value)">
+            @for (asset of assets; track asset) {
+              <option [value]="asset">{{ asset }}</option>
+            }
+          </select>
+        </div>
+      </c-card-header>
+      <c-card-body>
+        @if (isLoading()) {
+          <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3 text-body-secondary small">Fetching latest news...</p>
+          </div>
+        } @else if (error()) {
+          <div class="alert alert-danger mb-0" role="alert">
+            <strong>Error:</strong> {{ error() }}
+          </div>
+        } @else if (news().length === 0) {
+          <div class="text-center py-5 text-body-secondary">
+            <svg class="mb-3" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+            </svg>
+            <p class="mb-0">No news available for {{ selectedEpic() }}</p>
+            <p class="small">Try selecting a different asset or check back later</p>
+          </div>
+        } @else {
+          <div class="news-list">
+            @for (article of news(); track article.url) {
+              <div class="news-item mb-3 pb-3 border-bottom">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                  <h6 class="mb-1 flex-grow-1">
+                    <a [href]="article.url" target="_blank" rel="noopener noreferrer" class="text-decoration-none news-title">
+                      {{ article.title }}
+                    </a>
+                  </h6>
+                  <c-badge
+                    [color]="getSentimentBadge(article.sentiment)"
+                    class="ms-2 sentiment-badge"
+                    [style.background-color]="getSentimentColor(article.sentiment)">
+                    {{ article.sentiment | number:'1.2-2' }}
+                  </c-badge>
+                </div>
+
+                @if (article.description) {
+                  <p class="small text-body-secondary mb-2 news-description">{{ article.description }}</p>
+                }
+
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                  <small class="text-body-secondary">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1">
+                      <circle cx="12" cy="12" r="10"/>
+                      <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    {{ getRelativeTime(article.published_at) }}
+                  </small>
+
+                  <!-- Source Badge -->
+                  <c-badge
+                    [color]="article.source === 'finnhub' ? 'primary' : 'success'"
+                    class="badge-sm"
+                    [title]="article.source === 'finnhub' ? 'Finnhub (60/min)' : 'Marketaux (100/day)'">
+                    {{ article.source === 'finnhub' ? '📊 Finnhub' : '📈 Marketaux' }}
+                  </c-badge>
+
+                  @for (entity of article.entities; track entity) {
+                    <c-badge color="info" class="badge-sm">{{ entity }}</c-badge>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </c-card-body>
+    </c-card>
+  </c-col>
+</c-row>

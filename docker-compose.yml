@@ -4,7 +4,7 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
-    container_name: algotrader-postgres
+    container_name: mantis-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: algotrader
@@ -21,12 +21,12 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - algotrader-network
+      - mantis-network
 
   # Redis Cache & Pub/Sub
   redis:
     image: redis:7-alpine
-    container_name: algotrader-redis
+    container_name: mantis-redis
     restart: unless-stopped
     command: redis-server --appendonly yes --requirepass ""
     ports:
@@ -39,7 +39,7 @@ services:
       timeout: 3s
       retries: 5
     networks:
-      - algotrader-network
+      - mantis-network
 
   # Backend FastAPI (Development)
   backend:
@@ -47,7 +47,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: development
-    container_name: algotrader-backend
+    container_name: mantis-backend
     restart: unless-stopped
     env_file:
       - ./backend/.env
@@ -68,20 +68,35 @@ services:
         condition: service_healthy
     command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
     networks:
-      - algotrader-network
+      - mantis-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
 
+  # Frontend Angular (Production - nginx)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mantis-frontend
+    restart: unless-stopped
+    ports:
+      - "4321:4321"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - mantis-network
+
   # pgAdmin (Optional - for database management)
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: algotrader-pgadmin
+    container_name: mantis-pgadmin
     restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@algotrader.local
+      PGADMIN_DEFAULT_EMAIL: admin@mantis.local
       PGADMIN_DEFAULT_PASSWORD: admin
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     ports:
@@ -91,14 +106,14 @@ services:
     depends_on:
       - postgres
     networks:
-      - algotrader-network
+      - mantis-network
     profiles:
       - tools  # Start only with: docker-compose --profile tools up
 
   # Redis Commander (Optional - for Redis management)
   redis-commander:
     image: rediscommander/redis-commander:latest
-    container_name: algotrader-redis-commander
+    container_name: mantis-redis-commander
     restart: unless-stopped
     environment:
       - REDIS_HOSTS=local:redis:6379
@@ -107,7 +122,7 @@ services:
     depends_on:
       - redis
     networks:
-      - algotrader-network
+      - mantis-network
     profiles:
       - tools  # Start only with: docker-compose --profile tools up
 
@@ -122,5 +137,5 @@ volumes:
     driver: local
 
 networks:
-  algotrader-network:
+  mantis-network:
     driver: bridge

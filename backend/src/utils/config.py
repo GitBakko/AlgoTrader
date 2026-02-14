@@ -204,6 +204,10 @@ class Settings(BaseSettings):
     execution_mode: str = Field(default="PAPER", alias="EXECUTION_MODE")
     min_confidence_threshold: float = Field(default=0.65, alias="MIN_CONFIDENCE_THRESHOLD")
 
+    # ===== External APIs =====
+    finnhub_api_key: str = Field(default="", alias="FINNHUB_API_KEY")
+    marketaux_api_key: str = Field(default="", alias="MARKETAUX_API_KEY")
+
     # ===== Security =====
     secret_key: str = Field(default="dev_secret_key_change_in_production", alias="SECRET_KEY")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")

@@ -29,6 +29,8 @@ if TYPE_CHECKING:
         StrategyRepository,
         TradeRepository,
     )
+    from src.external.finnhub_client import FinnhubClient
+    from src.external.marketaux_client import MarketauxClient
     from src.features.builder import FeatureBuilder
     from src.models.prediction_service import PredictionService
     from src.models.versioning import ModelVersioning
@@ -75,6 +77,21 @@ def get_prediction_service(request: Request) -> PredictionService | None:
 def get_model_versioning(request: Request) -> ModelVersioning | None:
     """Get the ModelVersioning from app state."""
     return getattr(request.app.state, "model_versioning", None)
+
+
+def get_finnhub_client(request: Request) -> FinnhubClient | None:
+    """Get the FinnhubClient from app state."""
+    return getattr(request.app.state, "finnhub_client", None)
+
+
+def get_marketaux_client(request: Request) -> MarketauxClient | None:
+    """Get the MarketauxClient from app state."""
+    return getattr(request.app.state, "marketaux_client", None)
+
+
+def get_sentiment_analyzer(request: Request):
+    """Get the SentimentAnalyzer from app state."""
+    return getattr(request.app.state, "sentiment_analyzer", None)
 
 
 # ── Per-request DB dependencies ──
@@ -200,6 +217,43 @@ def init_services(app) -> None:
             logger.info("No pre-trained models found (train models first)")
     except Exception as e:
         logger.warning(f"Model loading failed: {e}")
+
+    # Initialize sentiment analyzer (lazy model loading)
+    try:
+        from src.external.sentiment_analyzer import SentimentAnalyzer
+
+        app.state.sentiment_analyzer = SentimentAnalyzer(
+            model_name="ProsusAI/finbert",
+            device="cpu",  # Auto-detects GPU if available
+            enable_cache=True,
+        )
+        logger.info("SentimentAnalyzer initialized (FinBERT lazy-loads on first predict)")
+    except Exception as e:
+        logger.warning(f"SentimentAnalyzer init failed: {e}, sentiment will be 0.0")
+        app.state.sentiment_analyzer = None
+
+    # Initialize external API clients (graceful if keys not configured)
+    try:
+        from src.external.finnhub_client import FinnhubClient
+
+        app.state.finnhub_client = FinnhubClient(
+            sentiment_analyzer=app.state.sentiment_analyzer  # Inject analyzer
+        )
+        logger.info("FinnhubClient initialized")
+    except Exception as e:
+        logger.warning(f"FinnhubClient init failed: {e}")
+        app.state.finnhub_client = None
+
+    try:
+        from src.external.marketaux_client import MarketauxClient
+
+        app.state.marketaux_client = MarketauxClient(
+            sentiment_analyzer=app.state.sentiment_analyzer  # Inject analyzer
+        )
+        logger.info("MarketauxClient initialized")
+    except Exception as e:
+        logger.warning(f"MarketauxClient init failed: {e}")
+        app.state.marketaux_client = None
 
     # Placeholders (initialized in lifespan if available)
     app.state.broker_client = None

@@ -10,10 +10,13 @@ import polars as pl
 from loguru import logger
 
 from src.data.data_access import DataAccessLayer
+from src.external.finnhub_client import FinnhubClient
+from src.external.marketaux_client import MarketauxClient
 from src.features.alignment import TimeframeAligner
 from src.features.asset_config import DEFAULT_TECHNICAL_PARAMS, get_asset_config
 from src.features.keltner import KeltnerChannel
 from src.features.market_structure import MarketStructureDetector
+from src.features.sentiment import SentimentFeatures
 from src.features.vwap_bands import VWAPBands
 from src.features.normalizer import FeatureNormalizer
 from src.features.regime import RegimeDetector
@@ -57,6 +60,7 @@ class FeatureBuilder:
         include_regime: bool = True,
         normalize: bool = True,
         multi_timeframe: bool = False,
+        include_sentiment: bool = False,
     ) -> tuple[pl.DataFrame, FeatureMatrix]:
         """
         Build complete feature matrix for an asset.
@@ -70,6 +74,7 @@ class FeatureBuilder:
             include_regime: Include regime detection
             normalize: Apply feature normalization
             multi_timeframe: Include higher-timeframe features
+            include_sentiment: Include sentiment features (NVDA/TSLA only)
 
         Returns:
             Tuple of (DataFrame with all features, FeatureMatrix metadata)
@@ -104,19 +109,25 @@ class FeatureBuilder:
         # Step 2: Compute technical indicators
         df = self._add_technical_indicators(df, params)
 
-        # Step 3: Multi-timeframe alignment (optional)
+        # Step 3: Sentiment features (async, NVDA/TSLA only)
+        if include_sentiment:
+            import asyncio
+
+            df = asyncio.run(self._add_sentiment_features(df, epic))
+
+        # Step 4: Multi-timeframe alignment (optional)
         if multi_timeframe and config.additional_timeframes:
             df = self._add_multi_timeframe_features(
                 df, epic, config.additional_timeframes, params, start_date, end_date
             )
 
-        # Step 4: Regime detection
+        # Step 5: Regime detection
         if include_regime:
             detector = RegimeDetector()
             if "adx" in df.columns and f"ema_{detector.ema_period}" in df.columns:
                 df = detector.detect(df)
 
-        # Step 5: Normalize features
+        # Step 6: Normalize features
         feature_cols = [c for c in df.columns if c not in initial_cols and c != "regime"]
 
         if normalize and feature_cols:
@@ -337,3 +348,98 @@ class FeatureBuilder:
             )
 
         return base_df
+
+    async def _add_sentiment_features(
+        self, df: pl.DataFrame, epic: str
+    ) -> pl.DataFrame:
+        """
+        Add sentiment features from external APIs (NVDA/TSLA only).
+
+        Fetches data from Finnhub (insider, analyst, earnings) and Marketaux (news)
+        and adds 5 sentiment features:
+        - insider_mspr
+        - analyst_consensus
+        - price_target_upside
+        - earnings_flag
+        - news_sentiment_avg
+
+        For non-equity assets, adds placeholder columns with default values.
+
+        Args:
+            df: DataFrame with OHLC data
+            epic: Asset ticker
+
+        Returns:
+            DataFrame with sentiment features added
+        """
+        if epic not in ["NVDA", "TSLA"]:
+            # Non-equity assets: add placeholder columns
+            return df.with_columns(
+                [
+                    pl.lit(None).alias("insider_mspr").cast(pl.Float64),
+                    pl.lit(0).alias("analyst_consensus"),
+                    pl.lit(0.0).alias("price_target_upside"),
+                    pl.lit(0).alias("earnings_flag"),
+                    pl.lit(0.0).alias("news_sentiment_avg"),
+                ]
+            )
+
+        try:
+            # Initialize API clients
+            finnhub = FinnhubClient()
+            marketaux = MarketauxClient()
+
+            # Determine date range from DataFrame
+            start_date = df["timestamp"].min()
+            end_date = df["timestamp"].max()
+
+            # Fetch data in parallel (with 180-day lookback for insider data)
+            import asyncio
+            from datetime import timedelta
+
+            insider_start = start_date - timedelta(days=180)
+
+            insider, analyst, price_target, earnings, news = await asyncio.gather(
+                finnhub.get_insider_sentiment(epic, insider_start, end_date),
+                finnhub.get_analyst_recommendations(epic),
+                finnhub.get_price_target(epic),
+                finnhub.get_earnings_calendar(
+                    epic, end_date, end_date + timedelta(days=30)
+                ),
+                marketaux.get_news_sentiment(epic, limit=100, days=30),
+                return_exceptions=True,
+            )
+
+            # Handle exceptions from parallel fetches
+            insider = insider if not isinstance(insider, Exception) else None
+            analyst = analyst if not isinstance(analyst, Exception) else None
+            price_target = price_target if not isinstance(price_target, Exception) else None
+            earnings = earnings if isinstance(earnings, list) else []
+            news = news if isinstance(news, list) else []
+
+            # Apply features using SentimentFeatures static methods
+            df = SentimentFeatures.add_insider_mspr(df, [insider] if insider else [])
+            df = SentimentFeatures.add_analyst_consensus(df, analyst)
+            df = SentimentFeatures.add_price_target_upside(df, price_target)
+            df = SentimentFeatures.add_earnings_flag(df, earnings)
+            df = SentimentFeatures.add_news_sentiment(df, news, window_days=7)
+
+            # Cleanup clients
+            await finnhub.close()
+            await marketaux.close()
+
+            logger.info(f"Added 5 sentiment features for {epic}")
+            return df
+
+        except Exception as e:
+            logger.warning(f"Sentiment features failed for {epic}: {e}, using defaults")
+            # Graceful fallback: return df with placeholder columns
+            return df.with_columns(
+                [
+                    pl.lit(None).alias("insider_mspr").cast(pl.Float64),
+                    pl.lit(0).alias("analyst_consensus"),
+                    pl.lit(0.0).alias("price_target_upside"),
+                    pl.lit(0).alias("earnings_flag"),
+                    pl.lit(0.0).alias("news_sentiment_avg"),
+                ]
+            )

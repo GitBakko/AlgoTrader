@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.angular/
+coverage/
+.env
+.env.local
+.env.production
+*.log
+.git
+.gitignore
+.editorconfig
+README.md
+Dockerfile
+.dockerignore
+karma.conf.js
+tsconfig.spec.json
+**/*.spec.ts

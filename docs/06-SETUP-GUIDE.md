@@ -1,20 +1,20 @@
-# AlgoTrader AI - Setup Guide
+# MANTIS AI - Setup Guide
 
 ## Prerequisites
 
 ### System Requirements
+
 - **Python**: 3.12+
-- **Node.js**: 20.19+ or 22.12+ (LTS recommended)
+- **Node.js**: 22+ (LTS recommended, tested with v25.2.1)
 - **npm**: 10+
-- **Docker**: 24+ with Docker Compose v2
+- **Docker**: 24+ with Docker Compose v2 (optional)
 - **Git**: 2.40+
-- **GPU** (optional): NVIDIA CUDA-compatible for ML training acceleration
 
 ### Accounts Required
+
 - **Capital.com**: Trading account (demo is sufficient to start)
   - Enable 2FA
   - Generate API key at Settings > API integrations
-- **FRED API** (optional, for macro data): Free key at https://fred.stlouisfed.org/docs/api/api_key.html
 
 ---
 
@@ -23,13 +23,12 @@
 ### 1. Clone & Configure
 
 ```bash
-cd D:\Develop\AI\_ClaudeCode\AlgoTrader
+git clone <repo-url> AlgoTrader
+cd AlgoTrader
 
-# Create environment file from template
+# Create environment file
 cp .env.example .env
-
-# Edit .env with your credentials
-# (see Environment Variables section below)
+# Edit .env with your credentials (see Environment Variables below)
 ```
 
 ### 2. Backend Setup
@@ -37,24 +36,23 @@ cp .env.example .env
 ```bash
 cd backend
 
-# Install Poetry (if not installed)
-pip install poetry
+# Create virtual environment
+python -m venv .venv
+
+# Activate (Windows)
+.venv\Scripts\activate
+
+# Activate (Linux/macOS)
+source .venv/bin/activate
 
 # Install dependencies
-poetry install
-
-# Activate virtual environment
-poetry shell
-
-# Run database migrations
-alembic upgrade head
-
-# Verify broker connection
-python -m src.broker.test_connection
+pip install -r requirements.txt
 
 # Start backend
 uvicorn src.api.main:app --reload --port 8000
 ```
+
+The backend starts with **graceful degradation**: PostgreSQL, Redis, and broker connection are all optional. Without them, the system falls back to in-memory storage and mock prices.
 
 ### 3. Frontend Setup
 
@@ -64,10 +62,10 @@ cd frontend
 # Install dependencies
 npm install
 
-# Start development server
-ng serve --port 4200
+# Start development server (port 4321)
+npx ng serve
 
-# Open browser at http://localhost:4200
+# Open browser at http://localhost:4321
 ```
 
 ### 4. Docker Setup (Alternative)
@@ -80,7 +78,7 @@ docker-compose up -d
 docker-compose ps
 
 # View logs
-docker-compose logs -f backend
+docker-compose logs -f mantis-backend
 ```
 
 ---
@@ -96,203 +94,173 @@ CAPITAL_API_PASSWORD=your_api_password_here
 CAPITAL_EMAIL=your_email@example.com
 CAPITAL_ENVIRONMENT=demo  # demo or live
 
-# ===== Database =====
+# ===== Database (optional - falls back to in-memory) =====
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
-POSTGRES_DB=algotrader
-POSTGRES_USER=algotrader
+POSTGRES_DB=mantis
+POSTGRES_USER=mantis
 POSTGRES_PASSWORD=your_secure_password
 
-# ===== Redis =====
+# ===== Redis (optional - falls back to in-memory) =====
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=
 
-# ===== FRED API (Macro Data) =====
-FRED_API_KEY=your_fred_api_key
-
 # ===== ML Settings =====
 ML_DEVICE=cpu  # cpu or cuda
 ML_MODELS_DIR=./data/models
-ML_TRAINING_WORKERS=4
 
 # ===== Risk Management =====
 RISK_MAX_PER_TRADE=0.01        # 1% max risk per trade
 RISK_MAX_TOTAL_EXPOSURE=0.10   # 10% max total exposure
 RISK_MAX_DRAWDOWN=0.15         # 15% max drawdown before halt
-RISK_DAILY_LOSS_LIMIT=0.05     # 5% daily loss circuit breaker
+RISK_DAILY_LOSS_LIMIT=0.03     # 3% daily loss circuit breaker
 
 # ===== Logging =====
 LOG_LEVEL=INFO
-LOG_FILE=./logs/algotrader.log
-
-# ===== Frontend =====
-API_BASE_URL=http://localhost:8000
-WS_BASE_URL=ws://localhost:8000
-
-# ===== Security =====
-JWT_SECRET=generate_a_secure_random_string_here
-JWT_EXPIRY_HOURS=24
-```
-
----
-
-## Python Dependencies (pyproject.toml)
-
-```toml
-[tool.poetry]
-name = "algotrader-backend"
-version = "0.1.0"
-description = "AI-powered algorithmic trading system"
-python = "^3.12"
-
-[tool.poetry.dependencies]
-# Core
-python = "^3.12"
-fastapi = "^0.115"
-uvicorn = {extras = ["standard"], version = "^0.34"}
-pydantic = "^2.10"
-pydantic-settings = "^2.7"
-
-# Database
-sqlalchemy = "^2.0"
-sqlmodel = "^0.0.22"
-alembic = "^1.14"
-asyncpg = "^0.30"             # PostgreSQL async driver
-duckdb = "^1.2"               # Analytical queries
-
-# Data & ML
-pandas = "^2.2"
-numpy = "^2.1"
-polars = "^1.20"              # Fast dataframe operations
-scikit-learn = "^1.6"
-torch = "^2.5"                # PyTorch for LSTM/Transformer
-xgboost = "^2.1"
-lightgbm = "^4.5"
-optuna = "^4.1"               # Hyperparameter optimization
-ta = "^0.11"                  # Technical analysis indicators
-transformers = "^4.47"        # FinBERT for sentiment
-
-# Broker & Networking
-httpx = "^0.28"               # Async HTTP client
-websockets = "^14.1"          # WebSocket client
-aiohttp = "^3.11"             # Alternative async HTTP
-
-# Infrastructure
-redis = {extras = ["hiredis"], version = "^5.2"}
-apscheduler = "^3.10"         # Task scheduling
-celery = "^5.4"               # Distributed tasks (optional)
-
-# Storage
-pyarrow = "^18.1"             # Parquet file support
-
-# Logging & Monitoring
-loguru = "^0.7"
-rich = "^13.9"                # Beautiful terminal output
-
-# Utilities
-python-dotenv = "^1.0"
-pyjwt = "^2.10"               # JWT auth
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.3"
-pytest-asyncio = "^0.24"
-pytest-cov = "^6.0"
-black = "^24.10"
-ruff = "^0.8"
-mypy = "^1.13"
-pre-commit = "^4.0"
-httpx = "^0.28"                # For testing FastAPI
-jupyter = "^1.1"
-matplotlib = "^3.10"
-seaborn = "^0.13"
-ipywidgets = "^8.1"
-
-[tool.ruff]
-line-length = 100
-target-version = "py312"
-
-[tool.black]
-line-length = 100
-target-version = ["py312"]
-
-[tool.mypy]
-python_version = "3.12"
-strict = true
 ```
 
 ---
 
 ## Docker Compose
 
-```yaml
-# docker-compose.yml
-version: '3.9'
+The `docker-compose.yml` at project root orchestrates all services:
 
+```yaml
 services:
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    container_name: mantis-backend
+    build: ./backend
     ports:
       - "8000:8000"
-    env_file:
-      - .env
+    env_file: .env
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - ./backend/data:/app/data
-      - ./backend/logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/system/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    container_name: mantis-frontend
+    build: ./frontend
+    ports:
+      - "4321:4321"
+    depends_on:
+      backend:
+        condition: service_healthy
 
   postgres:
+    container_name: mantis-postgres
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-mantis}
+      POSTGRES_USER: ${POSTGRES_USER:-mantis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mantis}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mantis}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
+    container_name: mantis-redis
     image: redis:7-alpine
     ports:
       - "6379:6379"
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+  pgadmin:
+    container_name: mantis-pgadmin
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@mantis.local
+      PGADMIN_DEFAULT_PASSWORD: admin
     ports:
-      - "4200:80"
+      - "5050:80"
     depends_on:
-      - backend
+      - postgres
 
 volumes:
   postgres_data:
   redis_data:
+
+networks:
+  default:
+    name: mantis-network
 ```
 
 ---
 
-## Initial Data Download
+## Data Download & Model Training
 
-After setup, download historical data for all assets:
+After setup, download historical data and train models:
 
 ```bash
 cd backend
-poetry run python scripts/download_historical_data.py
 
-# This will download:
-# - Gold (XAUUSD): DAY, HOUR_4, HOUR, MINUTE_15 (last 2-5 years)
-# - Bitcoin (BTCUSD): DAY, HOUR_4, HOUR, MINUTE_15 (last 2-5 years)
-# - S&P 500 (US500): DAY, HOUR_4, HOUR, MINUTE_15 (last 2-5 years)
-# Data saved as Parquet files in data/historical/
+# Download data for all 9 assets (3 timeframes each)
+.venv/Scripts/python.exe scripts/download_data.py
+
+# Train XGBoost models with Optuna tuning
+.venv/Scripts/python.exe scripts/train_models.py
+
+# (Optional) Walk-forward backtest with Monte Carlo validation
+.venv/Scripts/python.exe scripts/walk_forward_backtest.py --epic XAUUSD --tune --monte-carlo
+```
+
+### Supported Assets
+
+| Asset     | Epic   | Capital.com Epic | Type      |
+| --------- | ------ | ---------------- | --------- |
+| Gold      | XAUUSD | GOLD             | Commodity |
+| Silver    | XAGUSD | SILVER           | Commodity |
+| Crude Oil | WTIUSD | OIL_CRUDE        | Commodity |
+| Bitcoin   | BTCUSD | BTCUSD           | Crypto    |
+| EUR/USD   | EURUSD | EURUSD           | Forex     |
+| S&P 500   | US500  | US500            | Index     |
+| DAX 40    | DE40   | DE40             | Index     |
+| NVIDIA    | NVDA   | NVDA             | Stock CFD |
+| Tesla     | TSLA   | TSLA             | Stock CFD |
+
+> **Note**: EURUSD is excluded from active trading (ATR too small for reliable position sizing).
+
+---
+
+## Running Tests
+
+### Backend Tests (865 tests, ~80% coverage)
+
+```bash
+cd backend
+.venv/Scripts/python.exe -m pytest tests/ -v
+
+# With coverage report
+.venv/Scripts/python.exe -m pytest tests/ --cov=src --cov-report=term-missing
+```
+
+### Frontend Tests
+
+```bash
+cd frontend
+npx ng test --watch=false
 ```
 
 ---
@@ -301,13 +269,12 @@ poetry run python scripts/download_historical_data.py
 
 After setup, verify each component:
 
-- [ ] `.env` file configured with all required variables
-- [ ] `poetry install` completes without errors
-- [ ] PostgreSQL is running and accessible
-- [ ] Redis is running and accessible
+- [ ] `.env` file configured with Capital.com credentials
+- [ ] Backend starts on port 8000 (`/docs` shows Swagger UI)
 - [ ] Capital.com demo session creates successfully
-- [ ] Can fetch Gold, BTC, S&P500 prices from API
-- [ ] WebSocket connects and receives price ticks
-- [ ] FastAPI starts on port 8000 (`/docs` shows Swagger UI)
-- [ ] Angular builds and serves on port 4200
-- [ ] Frontend can reach backend API
+- [ ] Historical data downloaded (`backend/data/historical/` has parquet files)
+- [ ] ML models trained (`backend/data/models/` has `.json` model files)
+- [ ] Frontend builds and serves on port 4321
+- [ ] Frontend can reach backend API (dashboard loads data)
+- [ ] WebSocket connects (live prices appear in dashboard)
+- [ ] Paper trading starts/stops from dashboard

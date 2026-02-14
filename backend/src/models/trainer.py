@@ -56,6 +56,7 @@ class ModelTrainer:
         end_date: datetime | None = None,
         save_best: bool = True,
         multi_timeframe: bool = False,
+        include_sentiment: bool = False,
     ) -> TrainingResult:
         """
         Run the full training pipeline.
@@ -68,6 +69,7 @@ class ModelTrainer:
             end_date: Training data end
             save_best: Save the best model to disk
             multi_timeframe: Include higher-timeframe features (4h, 1d)
+            include_sentiment: Include sentiment features (NVDA/TSLA only)
 
         Returns:
             TrainingResult with all fold metrics
@@ -75,7 +77,7 @@ class ModelTrainer:
         start_time = time.time()
 
         # Step 1: Build features
-        logger.info(f"Building features for {epic}/{timeframe} (multi_tf={multi_timeframe})...")
+        logger.info(f"Building features for {epic}/{timeframe} (multi_tf={multi_timeframe}, sentiment={include_sentiment})...")
         df, feature_meta = self.feature_builder.build_features(
             epic=epic,
             timeframe=timeframe,
@@ -84,6 +86,7 @@ class ModelTrainer:
             normalize=True,
             include_regime=True,
             multi_timeframe=multi_timeframe,
+            include_sentiment=include_sentiment,
         )
 
         if df.is_empty():

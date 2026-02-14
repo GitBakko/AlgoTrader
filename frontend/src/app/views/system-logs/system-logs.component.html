@@ -7,15 +7,26 @@
           <!-- Date Range Selector -->
           <c-button-group role="group" aria-label="Date range">
             @for (option of dateRangeOptions; track option.value) {
-              <button
-                cButton
-                [color]="selectedDays() === option.value ? 'success' : 'dark'"
-                [variant]="selectedDays() === option.value ? '' : 'outline'"
-                (click)="onDateRangeChange(option.value)"
-                size="sm"
-              >
-                {{ option.label }}
-              </button>
+              @if (selectedDays() === option.value) {
+                <button
+                  cButton
+                  color="success"
+                  (click)="onDateRangeChange(option.value)"
+                  size="sm"
+                >
+                  {{ option.label }}
+                </button>
+              } @else {
+                <button
+                  cButton
+                  color="dark"
+                  variant="outline"
+                  (click)="onDateRangeChange(option.value)"
+                  size="sm"
+                >
+                  {{ option.label }}
+                </button>
+              }
             }
           </c-button-group>
 

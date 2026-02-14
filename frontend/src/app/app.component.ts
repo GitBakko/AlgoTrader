@@ -8,6 +8,7 @@ import { ColorModeService } from '@coreui/angular';
 import { IconSetService } from '@coreui/icons-angular';
 import { iconSubset } from './icons/icon-subset';
 import { WebSocketService } from './core/services/websocket.service';
+import { NotificationService } from './shared/services/notification.service';
 
 @Component({
     selector: 'app-root',
@@ -25,6 +26,7 @@ export class AppComponent implements OnInit {
   readonly #colorModeService = inject(ColorModeService);
   readonly #iconSetService = inject(IconSetService);
   readonly #ws = inject(WebSocketService);
+  readonly #notifications = inject(NotificationService);
 
   constructor() {
     this.#titleService.setTitle(this.title);
@@ -42,6 +44,10 @@ export class AppComponent implements OnInit {
     // Connect WebSocket channels for real-time prices and trade events
     this.#ws.connectPrices();
     this.#ws.connectTrades();
+
+    // Initialize browser notifications for trade events
+    this.#notifications.requestPermission();
+    this.#notifications.init();
 
     this.#router.events.pipe(
         takeUntilDestroyed(this.#destroyRef)
