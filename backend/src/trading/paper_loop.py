@@ -66,8 +66,13 @@ class PaperTradingLoop:
         self.broker = broker
         self.interval_seconds = interval_seconds
         self.epics = epics or [
+            # Original 8 assets
             "XAUUSD", "BTCUSD", "US500", "WTIUSD",
             "NVDA", "TSLA", "XAGUSD", "DE40",
+            # Phase 12: New 11 assets (EURUSD excluded, NAS100 excluded - insufficient data)
+            "SOLUSD", "ETHUSD", "BNBUSD", "DOGUSD", "DASHUSD", "ICPUSD",
+            "NATGAS", "COPPER", "PLATINUM",
+            "GBPUSD", "USDJPY",
         ]
 
         # Phase 8: trailing stop manager for open positions
