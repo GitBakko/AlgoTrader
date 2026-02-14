@@ -26,9 +26,19 @@ export const navItems: INavData[] = [
     iconComponent: { name: 'cil-chart-line' }
   },
   {
+    name: 'News Feed',
+    url: '/news',
+    iconComponent: { name: 'cil-newspaper' }
+  },
+  {
     name: 'Paper Trading',
     url: '/paper-trading',
     iconComponent: { name: 'cil-media-play' }
+  },
+  {
+    name: 'Trade Journal',
+    url: '/trade-journal',
+    iconComponent: { name: 'cil-book' }
   },
   {
     title: true,
@@ -58,5 +68,10 @@ export const navItems: INavData[] = [
     name: 'Impostazioni',
     url: '/settings',
     iconComponent: { name: 'cil-applications-settings' }
+  },
+  {
+    name: 'System Logs',
+    url: '/system-logs',
+    iconComponent: { name: 'cil-clipboard' }
   }
 ];

@@ -1,0 +1,184 @@
+// MANTIS AI Theme Colors
+$mantis-green: #39FF14;
+$mantis-muted: #00d97e;
+$dark-bg: #0d1117;
+$dark-surface: #161b22;
+
+// Health Score Card
+.health-score-card {
+  background: linear-gradient(135deg, $dark-surface 0%, lighten($dark-surface, 5%) 100%);
+  border: 1px solid rgba($mantis-green, 0.2);
+
+  .health-score-circle {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    margin: 0 auto;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle, rgba($mantis-green, 0.1) 0%, transparent 70%);
+    border: 3px solid;
+
+    &[data-score="success"] {
+      border-color: $mantis-green;
+      box-shadow: 0 0 20px rgba($mantis-green, 0.3);
+    }
+
+    &[data-score="warning"] {
+      border-color: #ffc107;
+      box-shadow: 0 0 20px rgba(#ffc107, 0.3);
+    }
+
+    &[data-score="danger"] {
+      border-color: #dc3545;
+      box-shadow: 0 0 20px rgba(#dc3545, 0.3);
+    }
+
+    .score-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      line-height: 1;
+      color: $mantis-green;
+    }
+
+    .score-max {
+      font-size: 0.875rem;
+      color: rgba(white, 0.5);
+    }
+  }
+}
+
+// Metric Cards
+.metric-card {
+  background: $dark-surface;
+  border: 1px solid rgba(white, 0.1);
+  transition: all 0.3s ease;
+
+  &:hover {
+    border-color: rgba($mantis-green, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba($mantis-green, 0.1);
+  }
+
+  h3 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: white;
+  }
+
+  .metric-detail {
+    font-size: 0.875rem;
+  }
+}
+
+// Metric Box (for risk events grid)
+.metric-box {
+  padding: 1rem;
+  background: rgba($dark-surface, 0.5);
+  border-radius: 8px;
+  border: 1px solid rgba(white, 0.1);
+  text-align: center;
+
+  .metric-label {
+    font-size: 0.75rem;
+    color: rgba(white, 0.6);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.5rem;
+  }
+
+  .metric-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+  }
+}
+
+// Table Enhancements
+table {
+  th {
+    color: rgba(white, 0.7);
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-color: rgba(white, 0.1);
+  }
+
+  td {
+    border-color: rgba(white, 0.05);
+  }
+
+  tbody tr {
+    transition: background-color 0.2s ease;
+
+    &:hover {
+      background-color: rgba($mantis-green, 0.05) !important;
+    }
+  }
+}
+
+// Cards
+c-card {
+  background: $dark-surface;
+  border-color: rgba(white, 0.1);
+}
+
+c-card-header {
+  background: rgba(black, 0.2);
+  border-bottom-color: rgba(white, 0.1);
+
+  h5, h6 {
+    color: white;
+  }
+}
+
+// Badges
+c-badge {
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+// Buttons
+button[cButton] {
+  transition: all 0.2s ease;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba($mantis-green, 0.2);
+  }
+}
+
+// Loading State
+.spinner-border {
+  width: 3rem;
+  height: 3rem;
+}
+
+// Alert
+c-alert {
+  border-radius: 8px;
+}
+
+// Responsive
+@media (max-width: 768px) {
+  .health-score-circle {
+    width: 100px;
+    height: 100px;
+
+    .score-value {
+      font-size: 2rem;
+    }
+  }
+
+  .metric-card h3 {
+    font-size: 1.5rem;
+  }
+
+  .metric-box .metric-value {
+    font-size: 1.25rem;
+  }
+}

@@ -42,16 +42,46 @@ Diario di bordo delle implementazioni effettuate e delle modifiche al progetto.
   - Risk events: 30% weight (penalità per circuit breakers, drawdown >10%)
   - Threshold-based scoring con clamping [0, 100]
 
+### 🎨 Frontend Dashboard (Phase 11.5.5)
+
+- **MonitoringService** - Service Angular per consumare API di monitoring:
+  - 4 metodi async: `getSignalLogs()`, `getExecutionLogs()`, `getRiskEventLogs()`, `getPerformanceOverview()`
+  - Reactive state con Signals: `loading`, `error`, `signalLogs`, `executionLogs`, `riskEventLogs`, `performance`
+  - Cache-friendly, error handling robusto
+  - 19 test passing (HTTP mock, error scenarios, loading state)
+
+- **SystemLogsComponent** - Dashboard visuale per System Logs:
+  - **Health Score Card** con visualizzazione circolare (0-100), color-coded (green/yellow/red)
+  - **4 Metric Cards**: Signals, Trades, Risk Events con KPI principali
+  - **Tabelle dettagliate**: Signal stats, Execution stats, Risk events breakdown
+  - **Performance by Asset**: Tabella comparativa 9 EPIC (signals, trades, P&L, win rate)
+  - **Date Range Selector**: 7/30/90 giorni (button group con highlight MANTIS green)
+  - **Refresh Button**: Manual reload con spinner
+  - **MANTIS AI Theme**: Neon green (#39FF14), dark surfaces, pulse animation market open
+  - OnPush change detection per performance ottimale
+  - 18 test passing (component logic, formatters, computed signals)
+
 ### 🧪 Testing
 
-- **49 test passing (100%)**:
-  - TradeLogger: 18 test (models, file logging, serialization)
-  - LogAnalyzer: 19 test (stats calculation, file reading, date filtering)
-  - Monitoring API: 12 test (endpoints, error handling, health score)
+#### Backend: 49 test passing (100%)
+
+- TradeLogger: 18 test (models, file logging, serialization)
+- LogAnalyzer: 19 test (stats calculation, file reading, date filtering)
+- Monitoring API: 12 test (endpoints, error handling, health score)
 - Code coverage: ~95% su moduli monitoring
-- Nessun fallimento, tutti i test verdi al primo tentativo
+
+#### Frontend: 37 test passing (100%)
+
+- MonitoringService: 19 test (HTTP requests, caching, error handling, loading state)
+- SystemLogsComponent: 18 test (rendering, computed values, formatters, user interactions)
+- Supporto animazioni CoreUI (AlertModule) con `provideNoopAnimations()`
+- Coverage ~100% su codice nuovo
+
+#### Totale: 86 test passing, nessun fallimento
 
 ### 📁 File Creati
+
+**Backend:**
 
 - `backend/src/monitoring/trade_logger.py` (394 righe)
 - `backend/src/monitoring/log_analyzer.py` (489 righe)
@@ -61,9 +91,27 @@ Diario di bordo delle implementazioni effettuate e delle modifiche al progetto.
 - `backend/tests/monitoring/test_log_analyzer.py` (19 test)
 - `backend/tests/api/test_monitoring.py` (12 test)
 
+**Frontend:**
+
+- `frontend/src/app/core/services/monitoring.service.ts` (250 righe)
+- `frontend/src/app/core/services/monitoring.service.spec.ts` (380 righe, 19 test)
+- `frontend/src/app/views/system-logs/system-logs.component.ts` (170 righe)
+- `frontend/src/app/views/system-logs/system-logs.component.html` (280 righe)
+- `frontend/src/app/views/system-logs/system-logs.component.scss` (120 righe)
+- `frontend/src/app/views/system-logs/system-logs.component.spec.ts` (290 righe, 18 test)
+- `frontend/src/app/views/system-logs/routes.ts` (10 righe)
+
 ### ✅ Risultati
 
-Sistema di logging completo e funzionante! Il backend è ora **pronto per il periodo di validazione paper trading di 1-2 settimane** richiesto. Tutti i segnali, esecuzioni e decisioni di risk verranno tracciati automaticamente per analisi post-mortem senza dover fermare il sistema.
+Sistema di logging completo end-to-end:
+
+- ✅ Backend: TradeLogger + LogAnalyzer + 4 API endpoints (49 test passing)
+- ✅ Frontend: MonitoringService + SystemLogsComponent dashboard (37 test passing)
+- ✅ Routing: Nuova pagina `/system-logs` accessibile da sidebar ("Sistema" section)
+- ✅ MANTIS AI Theme: Health score circolare, neon green cards, dark mode completo
+- ✅ Pronto per validazione: 1-2 settimane paper trading con tracking automatico completo
+
+#### Totale: 2900+ righe di codice, 86 test passing, 0 fallimenti
 
 ---
 

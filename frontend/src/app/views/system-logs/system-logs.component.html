@@ -1,0 +1,386 @@
+<c-row>
+  <c-col xs="12">
+    <c-card class="mb-4">
+      <c-card-header class="d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">System Monitoring & Logs</h5>
+        <div class="d-flex gap-2 align-items-center">
+          <!-- Date Range Selector -->
+          <c-button-group role="group" aria-label="Date range">
+            @for (option of dateRangeOptions; track option.value) {
+              <button
+                cButton
+                [color]="selectedDays() === option.value ? 'success' : 'dark'"
+                [variant]="selectedDays() === option.value ? '' : 'outline'"
+                (click)="onDateRangeChange(option.value)"
+                size="sm"
+              >
+                {{ option.label }}
+              </button>
+            }
+          </c-button-group>
+
+          <!-- Refresh Button -->
+          <button
+            cButton
+            color="primary"
+            size="sm"
+            (click)="refresh()"
+            [disabled]="loading()"
+          >
+            <svg cIcon name="cilReload" size="sm"></svg>
+            Refresh
+          </button>
+        </div>
+      </c-card-header>
+
+      <c-card-body>
+        @if (loading()) {
+          <div class="text-center py-5">
+            <div class="spinner-border text-success" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3 text-muted">Loading monitoring data...</p>
+          </div>
+        } @else if (error()) {
+          <c-alert color="danger">
+            <strong>Error:</strong> {{ error() }}
+          </c-alert>
+        } @else {
+          <!-- Health Score & Performance Overview -->
+          @if (performance(); as perf) {
+            <c-row class="mb-4">
+              <!-- Health Score Card -->
+              <c-col lg="3" md="6" class="mb-3">
+                <c-card class="text-center health-score-card">
+                  <c-card-body>
+                    <h6 class="text-muted mb-3">System Health</h6>
+                    <div class="health-score-circle" [attr.data-score]="healthScoreColor()">
+                      <div class="score-value">{{ perf.health_score }}</div>
+                      <div class="score-max">/100</div>
+                    </div>
+                    <c-badge [color]="healthScoreColor()" class="mt-3">
+                      {{ healthScoreText() }}
+                    </c-badge>
+                    <p class="text-muted small mt-2 mb-0">
+                      Period: {{ perf.period.days }} days
+                    </p>
+                  </c-card-body>
+                </c-card>
+              </c-col>
+
+              <!-- Signals Card -->
+              <c-col lg="3" md="6" class="mb-3">
+                <c-card class="metric-card">
+                  <c-card-body>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                      <h6 class="text-muted mb-0">Signals</h6>
+                      <svg cIcon name="cilBolt" class="text-warning" size="lg"></svg>
+                    </div>
+                    <h3 class="mb-1">{{ formatNumber(perf.signals.total) }}</h3>
+                    <div class="metric-detail">
+                      <span class="text-success">{{ formatPercent(perf.signals.execution_rate_pct) }}</span>
+                      <span class="text-muted small"> execution rate</span>
+                    </div>
+                    @if (perf.signals.top_strategy) {
+                      <div class="mt-2">
+                        <c-badge color="info" class="small">
+                          Top: {{ perf.signals.top_strategy }}
+                        </c-badge>
+                      </div>
+                    }
+                  </c-card-body>
+                </c-card>
+              </c-col>
+
+              <!-- Execution Card -->
+              <c-col lg="3" md="6" class="mb-3">
+                <c-card class="metric-card">
+                  <c-card-body>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                      <h6 class="text-muted mb-0">Trades</h6>
+                      <svg cIcon name="cilChart" class="text-info" size="lg"></svg>
+                    </div>
+                    <h3 class="mb-1">{{ formatNumber(perf.execution.total_trades) }}</h3>
+                    <div class="metric-detail">
+                      <span [ngClass]="perf.execution.total_pnl >= 0 ? 'text-success' : 'text-danger'">
+                        {{ formatCurrency(perf.execution.total_pnl) }}
+                      </span>
+                      <span class="text-muted small"> P&L</span>
+                    </div>
+                    <div class="mt-2">
+                      <span class="text-success small">{{ formatPercent(perf.execution.win_rate_pct) }} win rate</span>
+                      <span class="text-muted small"> · </span>
+                      <span class="text-muted small">PF: {{ perf.execution.profit_factor.toFixed(2) }}</span>
+                    </div>
+                  </c-card-body>
+                </c-card>
+              </c-col>
+
+              <!-- Risk Card -->
+              <c-col lg="3" md="6" class="mb-3">
+                <c-card class="metric-card">
+                  <c-card-body>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                      <h6 class="text-muted mb-0">Risk Events</h6>
+                      <svg cIcon name="cilShieldAlt" class="text-danger" size="lg"></svg>
+                    </div>
+                    <h3 class="mb-1">{{ formatNumber(perf.risk.circuit_breaker_triggers) }}</h3>
+                    <div class="metric-detail">
+                      <span class="text-muted small">Circuit breakers</span>
+                    </div>
+                    <div class="mt-2">
+                      <span class="text-danger small">{{ formatPercent(perf.risk.max_drawdown_pct) }} max DD</span>
+                      <span class="text-muted small"> · </span>
+                      <span [ngClass]="perf.risk.avg_daily_pnl >= 0 ? 'text-success' : 'text-danger'" class="small">
+                        {{ formatCurrency(perf.risk.avg_daily_pnl) }}/day
+                      </span>
+                    </div>
+                  </c-card-body>
+                </c-card>
+              </c-col>
+            </c-row>
+          }
+
+          <!-- Detailed Statistics -->
+          <c-row>
+            <!-- Signal Statistics -->
+            @if (signalLogs(); as signals) {
+              <c-col lg="6" class="mb-4">
+                <c-card>
+                  <c-card-header>
+                    <h6 class="mb-0">Signal Statistics</h6>
+                  </c-card-header>
+                  <c-card-body>
+                    <table cTable [striped]="true" [hover]="true" [small]="true" class="mb-3">
+                      <tbody>
+                        <tr>
+                          <td>Total Signals</td>
+                          <td class="text-end"><strong>{{ formatNumber(signals.summary.total_signals) }}</strong></td>
+                        </tr>
+                        <tr>
+                          <td>Executed</td>
+                          <td class="text-end text-success">{{ formatNumber(signals.summary.executed) }}</td>
+                        </tr>
+                        <tr>
+                          <td>Rejected</td>
+                          <td class="text-end text-danger">{{ formatNumber(signals.summary.rejected) }}</td>
+                        </tr>
+                        <tr>
+                          <td>Hold</td>
+                          <td class="text-end text-muted">{{ formatNumber(signals.summary.hold) }}</td>
+                        </tr>
+                        <tr>
+                          <td>Execution Rate</td>
+                          <td class="text-end">
+                            <c-badge color="success">{{ formatPercent(signals.summary.execution_rate_pct) }}</c-badge>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+
+                    <h6 class="mb-3">By Strategy</h6>
+                    <table cTable [striped]="true" [hover]="true" [small]="true">
+                      <thead>
+                        <tr>
+                          <th>Strategy</th>
+                          <th class="text-end">Count</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (item of strategyBreakdown(); track item.strategy) {
+                          <tr>
+                            <td>{{ item.strategy }}</td>
+                            <td class="text-end">{{ formatNumber(item.count) }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </c-card-body>
+                </c-card>
+              </c-col>
+            }
+
+            <!-- Execution Statistics -->
+            @if (executionLogs(); as exec) {
+              <c-col lg="6" class="mb-4">
+                <c-card>
+                  <c-card-header>
+                    <h6 class="mb-0">Execution Statistics</h6>
+                  </c-card-header>
+                  <c-card-body>
+                    <table cTable [striped]="true" [hover]="true" [small]="true" class="mb-0">
+                      <tbody>
+                        <tr>
+                          <td>Total Trades</td>
+                          <td class="text-end"><strong>{{ formatNumber(exec.summary.total_trades) }}</strong></td>
+                        </tr>
+                        <tr>
+                          <td>Open Positions</td>
+                          <td class="text-end text-info">{{ formatNumber(exec.summary.open_positions) }}</td>
+                        </tr>
+                        <tr>
+                          <td>Closed Trades</td>
+                          <td class="text-end">{{ formatNumber(exec.summary.closed_trades) }}</td>
+                        </tr>
+                        <tr>
+                          <td>Total P&L</td>
+                          <td class="text-end" [ngClass]="exec.summary.total_pnl >= 0 ? 'text-success' : 'text-danger'">
+                            <strong>{{ formatCurrency(exec.summary.total_pnl) }}</strong>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>Win Rate</td>
+                          <td class="text-end">
+                            <c-badge color="success">{{ formatPercent(exec.summary.win_rate_pct) }}</c-badge>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>Profit Factor</td>
+                          <td class="text-end">
+                            <c-badge [color]="exec.summary.profit_factor >= 1.5 ? 'success' : 'warning'">
+                              {{ exec.summary.profit_factor.toFixed(2) }}
+                            </c-badge>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>Avg Win</td>
+                          <td class="text-end text-success">{{ formatCurrency(exec.summary.avg_win) }}</td>
+                        </tr>
+                        <tr>
+                          <td>Avg Loss</td>
+                          <td class="text-end text-danger">{{ formatCurrency(exec.summary.avg_loss) }}</td>
+                        </tr>
+                        <tr>
+                          <td>Avg Duration</td>
+                          <td class="text-end">{{ exec.summary.avg_duration_hours.toFixed(1) }}h</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </c-card-body>
+                </c-card>
+              </c-col>
+            }
+          </c-row>
+
+          <!-- By Epic Breakdown -->
+          @if (epicBreakdown().length > 0) {
+            <c-row>
+              <c-col xs="12" class="mb-4">
+                <c-card>
+                  <c-card-header>
+                    <h6 class="mb-0">Performance by Asset</h6>
+                  </c-card-header>
+                  <c-card-body>
+                    <table cTable [striped]="true" [hover]="true">
+                      <thead>
+                        <tr>
+                          <th>Epic</th>
+                          <th class="text-end">Signals</th>
+                          <th class="text-end">Trades</th>
+                          <th class="text-end">P&L</th>
+                          <th class="text-end">Win Rate</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (item of epicBreakdown(); track item.epic) {
+                          <tr>
+                            <td><c-badge color="dark">{{ item.epic }}</c-badge></td>
+                            <td class="text-end">{{ formatNumber(item.signals) }}</td>
+                            <td class="text-end">{{ formatNumber(item.trades) }}</td>
+                            <td class="text-end" [ngClass]="item.pnl >= 0 ? 'text-success' : 'text-danger'">
+                              {{ formatCurrency(item.pnl) }}
+                            </td>
+                            <td class="text-end">
+                              @if (item.trades > 0) {
+                                {{ formatPercent(item.win_rate) }}
+                              } @else {
+                                <span class="text-muted">N/A</span>
+                              }
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </c-card-body>
+                </c-card>
+              </c-col>
+            </c-row>
+          }
+
+          <!-- Risk Events -->
+          @if (riskEventLogs(); as risk) {
+            <c-row>
+              <c-col xs="12" class="mb-4">
+                <c-card>
+                  <c-card-header>
+                    <h6 class="mb-0">Risk Management Events</h6>
+                  </c-card-header>
+                  <c-card-body>
+                    <c-row class="mb-3">
+                      <c-col md="3">
+                        <div class="metric-box">
+                          <div class="metric-label">Total Events</div>
+                          <div class="metric-value">{{ formatNumber(risk.summary.total_events) }}</div>
+                        </div>
+                      </c-col>
+                      <c-col md="3">
+                        <div class="metric-box">
+                          <div class="metric-label">Circuit Breakers</div>
+                          <div class="metric-value text-danger">{{ formatNumber(risk.summary.circuit_breaker_triggers) }}</div>
+                        </div>
+                      </c-col>
+                      <c-col md="3">
+                        <div class="metric-box">
+                          <div class="metric-label">Max Drawdown</div>
+                          <div class="metric-value text-warning">{{ formatPercent(risk.summary.max_drawdown_pct) }}</div>
+                        </div>
+                      </c-col>
+                      <c-col md="3">
+                        <div class="metric-box">
+                          <div class="metric-label">Avg Daily P&L</div>
+                          <div class="metric-value" [ngClass]="risk.summary.avg_daily_pnl >= 0 ? 'text-success' : 'text-danger'">
+                            {{ formatCurrency(risk.summary.avg_daily_pnl) }}
+                          </div>
+                        </div>
+                      </c-col>
+                    </c-row>
+
+                    @if (riskEventsBreakdown().length > 0) {
+                      <h6 class="mb-3">Events by Type</h6>
+                      <table cTable [striped]="true" [hover]="true">
+                        <thead>
+                          <tr>
+                            <th>Event Type</th>
+                            <th class="text-end">Count</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (item of riskEventsBreakdown(); track item.type) {
+                            <tr>
+                              <td>{{ item.type }}</td>
+                              <td class="text-end">
+                                <c-badge color="warning">{{ formatNumber(item.count) }}</c-badge>
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    }
+
+                    @if (risk.summary.last_event) {
+                      <div class="mt-3">
+                        <small class="text-muted">
+                          Last event: {{ risk.summary.last_event | date:'medium' }}
+                        </small>
+                      </div>
+                    }
+                  </c-card-body>
+                </c-card>
+              </c-col>
+            </c-row>
+          }
+        }
+      </c-card-body>
+    </c-card>
+  </c-col>
+</c-row>

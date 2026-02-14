@@ -28,8 +28,16 @@ export const routes: Routes = [
         loadChildren: () => import('./views/markets/routes').then(m => m.routes)
       },
       {
+        path: 'news',
+        loadChildren: () => import('./views/news/news.routes').then(m => m.routes)
+      },
+      {
         path: 'paper-trading',
         loadChildren: () => import('./views/paper-trading/routes').then(m => m.routes)
+      },
+      {
+        path: 'trade-journal',
+        loadChildren: () => import('./views/trade-journal/routes').then(m => m.routes)
       },
       {
         path: 'backtest',
@@ -46,6 +54,10 @@ export const routes: Routes = [
       {
         path: 'settings',
         loadChildren: () => import('./views/settings/routes').then(m => m.routes)
+      },
+      {
+        path: 'system-logs',
+        loadChildren: () => import('./views/system-logs/routes').then(m => m.routes)
       }
     ]
   },
