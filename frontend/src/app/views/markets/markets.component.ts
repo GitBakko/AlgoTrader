@@ -10,6 +10,7 @@ import { WebSocketService } from '../../core/services/websocket.service';
 import { MarketStatusService, MarketStatusResponse } from '../../core/services/market-status.service';
 import { TvChartComponent, OhlcDataPoint } from '../../shared/components/tv-chart/tv-chart.component';
 import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
+import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.component';
 
 const EPICS = [
   // Existing 8 assets (EURUSD excluded)
@@ -34,7 +35,7 @@ const TIMEFRAMES = [
     CommonModule, CardComponent, CardBodyComponent, CardHeaderComponent,
     ColComponent, RowComponent, TableDirective, BadgeComponent,
     ButtonGroupComponent, ButtonDirective,
-    TvChartComponent, PriceFormatPipe,
+    TvChartComponent, PriceFormatPipe, EpicLogoComponent,
   ],
   template: `
     <!-- Header -->
@@ -61,9 +62,12 @@ const TIMEFRAMES = [
                   (click)="selectAsset(p.epic)">
             <c-card-body class="py-2">
               <div class="d-flex justify-content-between align-items-start">
-                <div>
-                  <div class="fw-semibold">{{ p.epic }}</div>
-                  <div class="text-body-secondary small">Spread: {{ p.spread | priceFormat:p.epic }}</div>
+                <div class="d-flex align-items-center gap-2">
+                  <app-epic-logo [epic]="p.epic" [size]="32" [rounded]="true" />
+                  <div>
+                    <div class="fw-semibold">{{ p.epic }}</div>
+                    <div class="text-body-secondary small">Spread: {{ p.spread | priceFormat:p.epic }}</div>
+                  </div>
                 </div>
                 <div class="text-end">
                   <div class="font-monospace fw-bold" style="font-size: 1.05rem;">

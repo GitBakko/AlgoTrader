@@ -1,4 +1,4 @@
-import { ApplicationConfig } from '@angular/core';
+import { ApplicationConfig, APP_INITIALIZER } from '@angular/core';
 import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import {
@@ -13,6 +13,14 @@ import {
 import { IconSetService } from '@coreui/icons-angular';
 import { routes } from './app.routes';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
+import { LogoService } from './core/services/logo.service';
+
+/**
+ * Preload all asset logos on app initialization
+ */
+function initializeLogos(logoService: LogoService) {
+  return () => logoService.preloadAll();
+}
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -33,6 +41,12 @@ export const appConfig: ApplicationConfig = {
       withInterceptors([errorInterceptor])
     ),
     IconSetService,
-    provideAnimationsAsync()
+    provideAnimationsAsync(),
+    {
+      provide: APP_INITIALIZER,
+      useFactory: initializeLogos,
+      deps: [LogoService],
+      multi: true
+    }
   ]
 };

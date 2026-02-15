@@ -83,4 +83,14 @@ export class NewsComponent implements OnInit, OnDestroy {
     if (diffDays < 7) return `${diffDays}d ago`;
     return date.toLocaleDateString();
   }
+
+  /**
+   * Handle image load errors by hiding broken thumbnails
+   */
+  onImageError(event: Event): void {
+    const img = event.target as HTMLImageElement;
+    if (img && img.parentElement) {
+      img.parentElement.style.display = 'none';
+    }
+  }
 }

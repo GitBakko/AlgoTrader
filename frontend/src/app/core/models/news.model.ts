@@ -11,6 +11,7 @@ export interface NewsArticle {
   sentiment: number;  // -1.0 to 1.0
   entities: string[];
   source: 'marketaux' | 'finnhub';  // News provider
+  thumbnail?: string | null;  // Optional thumbnail image URL
 }
 
 export interface InsiderSentiment {

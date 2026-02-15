@@ -11,6 +11,7 @@ import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
 import { TradingService } from '../../core/services/trading.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { MarketStatusService, MarketStatusResponse } from '../../core/services/market-status.service';
+import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.component';
 
 @Component({
   templateUrl: 'dashboard.component.html',
@@ -21,7 +22,7 @@ import { MarketStatusService, MarketStatusResponse } from '../../core/services/m
     ColComponent, RowComponent, BadgeComponent, ProgressComponent,
     TableDirective, AlertComponent,
     TvChartComponent,
-    PriceFormatPipe,
+    PriceFormatPipe, EpicLogoComponent,
   ]
 })
 export class DashboardComponent implements OnInit, OnDestroy {

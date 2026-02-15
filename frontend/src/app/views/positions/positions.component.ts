@@ -8,6 +8,8 @@ import {
 import { TradingService } from '../../core/services/trading.service';
 import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
 import { ToastService } from '../../shared/services/toast.service';
+import { getEpicSymbol } from '../../shared/constants/epic-symbols';
+import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.component';
 
 @Component({
   selector: 'app-positions',
@@ -16,7 +18,7 @@ import { ToastService } from '../../shared/services/toast.service';
   imports: [
     CommonModule, CardComponent, CardBodyComponent,
     TableDirective, BadgeComponent, ButtonDirective,
-    PriceFormatPipe,
+    PriceFormatPipe, EpicLogoComponent,
   ],
   template: `
     <!-- Header -->
@@ -56,7 +58,13 @@ import { ToastService } from '../../shared/services/toast.service';
             <tbody>
               @for (pos of positions(); track pos.deal_id) {
                 <tr>
-                  <td class="fw-semibold">{{ pos.epic }}</td>
+                  <td class="fw-semibold">
+                    <div class="d-flex align-items-center gap-2">
+                      <app-epic-logo [epic]="pos.epic" [size]="24" [rounded]="true" />
+                      <span class="me-1" style="font-size: 1.1em;">{{ getSymbol(pos.epic) }}</span>
+                      {{ pos.epic }}
+                    </div>
+                  </td>
                   <td>
                     <c-badge [color]="pos.direction === 'BUY' ? 'success' : 'danger'" class="badge-sm">
                       {{ pos.direction }}
@@ -94,6 +102,9 @@ export class PositionsComponent implements OnInit {
   readonly totalPnl = computed(() =>
     this.positions().reduce((sum, p) => sum + (p.current_pnl ?? 0), 0)
   );
+
+  // Get symbol for EPIC display
+  getSymbol = getEpicSymbol;
 
   ngOnInit(): void {
     this.trading.loadPositions();
