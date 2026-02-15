@@ -597,8 +597,11 @@ class PaperTradingLoop:
         # Trailing stop: unregister
         self.trailing_stop_manager.unregister_position(deal_id)
 
-        # Phase 14: persist risk state after position close
-        asyncio.create_task(self._persist_risk_state())
+        # Phase 14: persist risk state after position close (skip if no event loop)
+        try:
+            asyncio.create_task(self._persist_risk_state())
+        except RuntimeError:
+            pass  # No event loop (called from tests)
 
         logger.debug(
             f"Position closed: deal={deal_id} pnl={pnl:.2f} "

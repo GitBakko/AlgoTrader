@@ -9,8 +9,8 @@ from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.broker.models import Direction
 from src.database.models import TrailingStopState
-from src.execution.schemas import Direction
 
 
 class TrailingStopRepository:
