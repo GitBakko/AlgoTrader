@@ -11,7 +11,9 @@ import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
 import { TradingService } from '../../core/services/trading.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { MarketStatusService, MarketStatusResponse } from '../../core/services/market-status.service';
+import { NewsService } from '../../core/services/news.service';
 import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.component';
+import { NewsWidgetComponent } from '../../shared/components/news-widget/news-widget.component';
 
 @Component({
   templateUrl: 'dashboard.component.html',
@@ -22,17 +24,21 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
     ColComponent, RowComponent, BadgeComponent, ProgressComponent,
     TableDirective, AlertComponent,
     TvChartComponent,
-    PriceFormatPipe, EpicLogoComponent,
+    PriceFormatPipe, EpicLogoComponent, NewsWidgetComponent,
   ]
 })
 export class DashboardComponent implements OnInit, OnDestroy {
   readonly trading = inject(TradingService);
   readonly ws = inject(WebSocketService);
   readonly marketStatus = inject(MarketStatusService);
+  readonly newsService = inject(NewsService);
 
   readonly overview = this.trading.overview;
   readonly riskStatus = this.trading.riskStatus;
   readonly paperStatus = this.trading.paperStatus;
+
+  // Market headlines (US500 news)
+  readonly marketNews = this.newsService.news;
 
   // Current epic for market status (default: XAUUSD)
   readonly currentEpic = signal<string>('XAUUSD');
@@ -117,6 +123,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.startSmartPolling();
     this.ws.connectPrices();
+
+    // Fetch market headlines (US500 news) - refresh every 5 minutes
+    this.newsService.getNews('US500', 5, 7);
+    setInterval(() => this.newsService.getNews('US500', 5, 7), 5 * 60 * 1000);
   }
 
   ngOnDestroy(): void {

@@ -121,6 +121,21 @@
   </c-col>
 </c-row>
 
+<!-- ═══════ ROW: Market Headlines ═══════ -->
+<c-row class="mb-4">
+  <c-col md="12">
+    <c-card>
+      <c-card-header class="d-flex align-items-center justify-content-between py-2">
+        <strong>📰 Market Headlines</strong>
+        <c-badge color="info" class="badge-sm">US500</c-badge>
+      </c-card-header>
+      <c-card-body class="p-3">
+        <app-news-widget [news]="marketNews()" [maxItems]="5" />
+      </c-card-body>
+    </c-card>
+  </c-col>
+</c-row>
+
 <!-- ═══════ ROW 3: Equity Curve + Live Prices ═══════ -->
 <c-row>
   <c-col xl="9">

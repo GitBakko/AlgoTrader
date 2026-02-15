@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy, computed, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy, computed, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
@@ -8,9 +8,11 @@ import {
 import { TradingService } from '../../core/services/trading.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { MarketStatusService, MarketStatusResponse } from '../../core/services/market-status.service';
+import { NewsService } from '../../core/services/news.service';
 import { TvChartComponent, OhlcDataPoint } from '../../shared/components/tv-chart/tv-chart.component';
 import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
 import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.component';
+import { NewsWidgetComponent } from '../../shared/components/news-widget/news-widget.component';
 
 const EPICS = [
   // Existing 8 assets (EURUSD excluded)
@@ -35,7 +37,7 @@ const TIMEFRAMES = [
     CommonModule, CardComponent, CardBodyComponent, CardHeaderComponent,
     ColComponent, RowComponent, TableDirective, BadgeComponent,
     ButtonGroupComponent, ButtonDirective,
-    TvChartComponent, PriceFormatPipe, EpicLogoComponent,
+    TvChartComponent, PriceFormatPipe, EpicLogoComponent, NewsWidgetComponent,
   ],
   template: `
     <!-- Header -->
@@ -164,12 +166,24 @@ export class MarketsComponent implements OnInit, OnDestroy {
   private readonly trading = inject(TradingService);
   private readonly ws = inject(WebSocketService);
   private readonly marketStatus = inject(MarketStatusService);
+  private readonly newsService = inject(NewsService);
   readonly markets = this.trading.markets;
   readonly wsConnected = this.ws.connected;
   readonly timeframes = TIMEFRAMES;
 
   readonly selectedEpic = signal<string>('');
   readonly selectedTimeframe = signal<string>('HOUR');
+  readonly assetNews = this.newsService.news;
+
+  constructor() {
+    // Fetch news when asset selected
+    effect(() => {
+      const epic = this.selectedEpic();
+      if (epic) {
+        this.newsService.getNews(epic, 5, 7);
+      }
+    });
+  }
   readonly chartLoading = signal(false);
   readonly rawCandles = signal<{ timestamp: string; open: number; high: number; low: number; close: number; volume: number }[]>([]);
   readonly currentMarketStatus = signal<MarketStatusResponse | null>(null);
