@@ -130,3 +130,53 @@ class PositionRepository(BaseRepository[Position]):
         await self.session.flush()
         await self.session.refresh(position)
         return position
+
+    async def mark_as_closed(self, deal_id: str, close_reason: str = "EXTERNAL") -> Position | None:
+        """
+        Mark a position as closed without P&L (for stale position cleanup).
+
+        Used by state recovery when a position exists in DB but not in broker
+        (position was closed externally or is stale).
+
+        Args:
+            deal_id: Capital.com deal ID
+            close_reason: Reason for closing (default: EXTERNAL)
+
+        Returns:
+            Updated position or None if not found
+        """
+        position = await self.get_by_deal_id(deal_id)
+        if not position or position.status != "OPEN":
+            return None
+
+        position.status = "CLOSED"
+        position.closed_at = datetime.now(timezone.utc)
+        position.close_reason = close_reason
+
+        await self.session.flush()
+        await self.session.refresh(position)
+        return position
+
+    async def update_size(self, deal_id: str, new_size: float) -> Position | None:
+        """
+        Update position size (for reconciliation with broker).
+
+        Used by state recovery when broker reports different size than DB.
+        Broker data is considered authoritative.
+
+        Args:
+            deal_id: Capital.com deal ID
+            new_size: New position size from broker
+
+        Returns:
+            Updated position or None if not found
+        """
+        position = await self.get_by_deal_id(deal_id)
+        if not position:
+            return None
+
+        position.size = new_size
+
+        await self.session.flush()
+        await self.session.refresh(position)
+        return position
