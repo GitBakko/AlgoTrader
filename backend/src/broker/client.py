@@ -289,6 +289,15 @@ class CapitalComClient:
         """
         payload = request.model_dump(by_alias=True)
         payload["epic"] = self._to_broker_epic(payload.get("epic", ""))
+
+        # 🔍 DEBUG: Log complete API payload
+        logger.info(
+            f"📤 Capital.com API payload: {payload.get('epic')} {payload.get('direction')} "
+            f"size={payload.get('size')} "
+            f"stopLevel={payload.get('stopLevel', 'NULL')} "
+            f"profitLevel={payload.get('profitLevel', 'NULL')}"
+        )
+
         response = await self._request("POST", "/api/v1/positions", json=payload)
 
         deal_ref = response.get("dealReference")
@@ -296,10 +305,25 @@ class CapitalComClient:
             # Two-step flow: fetch full confirmation
             import asyncio
             await asyncio.sleep(0.3)  # brief pause for broker to process
-            return await self.get_deal_confirmation(deal_ref)
+            confirmation = await self.get_deal_confirmation(deal_ref)
+
+            # 🔍 DEBUG: Log broker acceptance of SL/TP
+            logger.info(
+                f"📥 Broker response: dealId={confirmation.deal_id} "
+                f"status={confirmation.deal_status} "
+                f"level={confirmation.level:.2f} "
+                f"reason={confirmation.reason or 'OK'}"
+            )
+
+            return confirmation
 
         # Fallback: some API versions return full confirmation directly
-        return DealConfirmation(**response)
+        confirmation = DealConfirmation(**response)
+        logger.info(
+            f"📥 Broker response (direct): dealId={confirmation.deal_id} "
+            f"status={confirmation.deal_status}"
+        )
+        return confirmation
 
     async def close_position(self, deal_id: str) -> DealConfirmation:
         """
@@ -354,7 +378,17 @@ class CapitalComClient:
             flat = {**pos_inner}
             if "epic" not in flat and "epic" in market_inner:
                 flat["epic"] = market_inner["epic"]
-            positions.append(Position(**flat))
+            position = Position(**flat)
+            positions.append(position)
+
+            # 🔍 DEBUG: Log SL/TP values on open positions
+            logger.debug(
+                f"📊 Position {position.deal_id}: {position.epic} {position.direction.value} "
+                f"entry={position.level:.2f} "
+                f"SL={position.stop_level if position.stop_level else 'NONE'} "
+                f"TP={position.profit_level if position.profit_level else 'NONE'}"
+            )
+
         # Translate broker epics back to internal names
         for p in positions:
             p.epic = self._from_broker_epic(p.epic)

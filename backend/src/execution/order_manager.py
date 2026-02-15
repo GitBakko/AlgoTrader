@@ -145,6 +145,14 @@ class OrderManager:
                 profit_level=order.take_profit,
             )
 
+            # 🔍 DEBUG: Log SL/TP values being sent to broker
+            logger.info(
+                f"🎯 Sending to broker: {order.epic} {order.direction} "
+                f"entry={order.entry_price:.2f} "
+                f"SL={order.stop_loss if order.stop_loss else 'NONE'} "
+                f"TP={order.take_profit if order.take_profit else 'NONE'}"
+            )
+
             confirmation = await self._broker.create_position(request)
 
             # Check if broker accepted the deal
