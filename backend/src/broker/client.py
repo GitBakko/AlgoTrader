@@ -97,6 +97,11 @@ class CapitalComClient:
             requests_per_second=settings.rate_limit_requests_per_second
         )
 
+        # HIGH-2/HIGH-3 FIX: Store retry and delay settings
+        self._retry_attempts = settings.broker_retry_attempts
+        self._retry_base_delay = settings.broker_retry_base_delay
+        self._deal_confirmation_delay = settings.deal_confirmation_delay
+
         self._http_client: httpx.AsyncClient | None = None
 
     @staticmethod
@@ -130,7 +135,7 @@ class CapitalComClient:
         params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
-        Make authenticated API request with rate limiting.
+        Make authenticated API request with rate limiting and retry logic.
 
         Args:
             method: HTTP method (GET, POST, PUT, DELETE)
@@ -142,54 +147,92 @@ class CapitalComClient:
             Response JSON data
 
         Raises:
-            CapitalComError: If request fails
+            CapitalComError: If request fails after all retries
         """
-        # Rate limit
-        acquired = await self.rate_limiter.acquire(timeout=10.0)
-        if not acquired:
-            raise CapitalComError("Rate limit timeout - API too busy")
+        # HIGH-2 FIX: Add retry logic for transient 5xx errors (server-side issues)
+        import asyncio
 
-        # Get session tokens
-        tokens = await self.session_manager.get_tokens()
+        last_error: Exception | None = None
 
-        # Make request
-        client = await self._get_http_client()
-        url = f"{self.api_url}{endpoint}"
+        for attempt in range(self._retry_attempts):
+            try:
+                # Rate limit
+                acquired = await self.rate_limiter.acquire(timeout=10.0)
+                if not acquired:
+                    raise CapitalComError("Rate limit timeout - API too busy")
 
-        headers = {"CST": tokens.cst, "X-SECURITY-TOKEN": tokens.security_token}
+                # Get session tokens
+                tokens = await self.session_manager.get_tokens()
 
-        try:
-            start_time = datetime.now()
-            response = await client.request(method, url, headers=headers, json=json, params=params)
-            duration = (datetime.now() - start_time).total_seconds()
+                # Make request
+                client = await self._get_http_client()
+                url = f"{self.api_url}{endpoint}"
 
-            # Sanitize JSON for logging (remove sensitive fields)
-            safe_json = sanitize_dict(json) if json else None
-            logger.debug(
-                f"{method} {endpoint} - Status: {response.status_code} - Duration: {duration:.3f}s"
-                + (f" - Body: {safe_json}" if safe_json and method in ["POST", "PUT"] else "")
-            )
+                headers = {"CST": tokens.cst, "X-SECURITY-TOKEN": tokens.security_token}
 
-            # Handle errors
-            if response.status_code >= 400:
-                error_data = response.json() if response.text else {}
-                error_code = error_data.get("errorCode", "unknown")
-                error_message = error_data.get("errorMessage", "")
-                # Capital.com sometimes puts the full message inside errorCode
-                # (e.g., "Rejected. TSLA is currently closed. Timetable in place: ...")
-                if len(error_code) > 50 or (" " in error_code and error_code != "unknown"):
-                    error_message = error_message or error_code
-                    error_code = error_code  # keep for fuzzy matching in map_error
-                raise map_error(error_code, error_message or response.text)
+                start_time = datetime.now()
+                response = await client.request(method, url, headers=headers, json=json, params=params)
+                duration = (datetime.now() - start_time).total_seconds()
 
-            # Parse response
-            if response.text:
-                return response.json()
-            return {}
+                # Sanitize JSON for logging (remove sensitive fields)
+                safe_json = sanitize_dict(json) if json else None
+                logger.debug(
+                    f"{method} {endpoint} - Status: {response.status_code} - Duration: {duration:.3f}s"
+                    + (f" - Body: {safe_json}" if safe_json and method in ["POST", "PUT"] else "")
+                )
 
-        except httpx.HTTPError as e:
-            logger.error(f"HTTP error for {method} {endpoint}: {e}")
-            raise CapitalComError(f"HTTP error: {e}")
+                # HIGH-2 FIX: Retry on 5xx errors (server-side transient failures)
+                if response.status_code >= 500:
+                    error_data = response.json() if response.text else {}
+                    error_msg = error_data.get("errorMessage", f"HTTP {response.status_code}")
+
+                    if attempt < self._retry_attempts - 1:
+                        retry_delay = self._retry_base_delay * (2 ** attempt)  # Exponential backoff
+                        logger.warning(
+                            f"5xx error from broker ({response.status_code}): {error_msg} - "
+                            f"Retry {attempt + 1}/{self._retry_attempts} after {retry_delay:.2f}s"
+                        )
+                        await asyncio.sleep(retry_delay)
+                        continue  # Retry
+                    else:
+                        # Final attempt failed
+                        raise CapitalComError(f"Broker 5xx error (after {self._retry_attempts} retries): {error_msg}")
+
+                # Handle 4xx errors (client errors - don't retry)
+                if response.status_code >= 400:
+                    error_data = response.json() if response.text else {}
+                    error_code = error_data.get("errorCode", "unknown")
+                    error_message = error_data.get("errorMessage", "")
+                    # Capital.com sometimes puts the full message inside errorCode
+                    # (e.g., "Rejected. TSLA is currently closed. Timetable in place: ...")
+                    if len(error_code) > 50 or (" " in error_code and error_code != "unknown"):
+                        error_message = error_message or error_code
+                        error_code = error_code  # keep for fuzzy matching in map_error
+                    raise map_error(error_code, error_message or response.text)
+
+                # Success - parse response
+                if response.text:
+                    return response.json()
+                return {}
+
+            except httpx.HTTPError as e:
+                last_error = e
+                if attempt < self._retry_attempts - 1:
+                    retry_delay = self._retry_base_delay * (2 ** attempt)
+                    logger.warning(f"HTTP error for {method} {endpoint}: {e} - Retry {attempt + 1}/{self._retry_attempts} after {retry_delay:.2f}s")
+                    await asyncio.sleep(retry_delay)
+                    continue
+                else:
+                    logger.error(f"HTTP error for {method} {endpoint}: {e} (after {self._retry_attempts} retries)")
+                    raise CapitalComError(f"HTTP error: {e}")
+            except CapitalComError:
+                # Don't retry on CapitalComError (4xx client errors) - these are not transient
+                raise
+
+        # Should not reach here, but just in case
+        if last_error:
+            raise CapitalComError(f"HTTP error: {last_error}")
+        raise CapitalComError("Request failed after all retry attempts")
 
     # ===== Market Data Methods =====
 
@@ -287,21 +330,10 @@ class CapitalComClient:
         Returns:
             Deal confirmation
         """
-        # 🔍 DEBUG: Log CreatePositionRequest BEFORE model_dump
-        logger.debug(
-            f"🔍 CreatePositionRequest object: stop_level={request.stop_level} profit_level={request.profit_level}"
-        )
-
-        payload = request.model_dump(by_alias=True, exclude_none=False)
+        # CRITICAL FIX: exclude_none=True prevents sending "stopLevel": null to broker
+        # Capital.com rejects/ignores explicit null values
+        payload = request.model_dump(by_alias=True, exclude_none=True)
         payload["epic"] = self._to_broker_epic(payload.get("epic", ""))
-
-        # 🔍 DEBUG: Log complete API payload
-        logger.info(
-            f"📤 Capital.com API payload: {payload.get('epic')} {payload.get('direction')} "
-            f"size={payload.get('size')} "
-            f"stopLevel={payload.get('stopLevel', 'NULL')} "
-            f"profitLevel={payload.get('profitLevel', 'NULL')}"
-        )
 
         response = await self._request("POST", "/api/v1/positions", json=payload)
 
@@ -309,16 +341,9 @@ class CapitalComClient:
         if deal_ref:
             # Two-step flow: fetch full confirmation
             import asyncio
-            await asyncio.sleep(0.3)  # brief pause for broker to process
+            # HIGH-3 FIX: Use configurable delay instead of hardcoded 300ms
+            await asyncio.sleep(self._deal_confirmation_delay)
             confirmation = await self.get_deal_confirmation(deal_ref)
-
-            # 🔍 DEBUG: Log broker acceptance of SL/TP
-            logger.info(
-                f"📥 Broker response: dealId={confirmation.deal_id} "
-                f"status={confirmation.deal_status} "
-                f"level={confirmation.level:.2f} "
-                f"reason={confirmation.reason or 'OK'}"
-            )
 
             return confirmation
 
@@ -345,7 +370,8 @@ class CapitalComClient:
         deal_ref = response.get("dealReference")
         if deal_ref:
             import asyncio
-            await asyncio.sleep(0.3)
+            # HIGH-3 FIX: Use configurable delay instead of hardcoded 300ms
+            await asyncio.sleep(self._deal_confirmation_delay)
             return await self.get_deal_confirmation(deal_ref)
 
         return DealConfirmation(**response)

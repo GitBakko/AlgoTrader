@@ -246,10 +246,23 @@ class TrailingStopManager:
         price: float,
         atr: float | None,
     ) -> float | None:
-        """Update stop for a BUY position."""
+        """
+        Update stop for a BUY position.
+
+        CRITICAL FIX (CRIT-5): Handle gap scenarios where price jumps past multiple TP levels.
+        """
         if state.phase == TrailingPhase.INITIAL:
-            if price >= state.tp1_level:
-                # Move to breakeven
+            # CRITICAL FIX: Check TP2 first to handle gap scenarios
+            if price >= state.tp2_level:
+                # Price gapped through both TP1 and TP2 → Skip directly to TP1_LOCK
+                logger.warning(
+                    f"[{state.epic}] Gap detected: price {price:.2f} >= TP2 {state.tp2_level:.2f}, "
+                    f"skipping BREAKEVEN phase, locking at TP1 {state.tp1_level:.2f}"
+                )
+                state.phase = TrailingPhase.TP1_LOCK
+                return state.tp1_level
+            elif price >= state.tp1_level:
+                # Normal TP1 hit → Move to breakeven
                 offset = state.entry_price * self.config.breakeven_offset_pct
                 new_stop = state.entry_price + offset
                 state.phase = TrailingPhase.BREAKEVEN
@@ -284,9 +297,23 @@ class TrailingStopManager:
         price: float,
         atr: float | None,
     ) -> float | None:
-        """Update stop for a SELL position."""
+        """
+        Update stop for a SELL position.
+
+        CRITICAL FIX (CRIT-5): Handle gap scenarios where price jumps past multiple TP levels.
+        """
         if state.phase == TrailingPhase.INITIAL:
-            if price <= state.tp1_level:
+            # CRITICAL FIX: Check TP2 first to handle gap scenarios
+            if price <= state.tp2_level:
+                # Price gapped through both TP1 and TP2 → Skip directly to TP1_LOCK
+                logger.warning(
+                    f"[{state.epic}] Gap detected: price {price:.2f} <= TP2 {state.tp2_level:.2f}, "
+                    f"skipping BREAKEVEN phase, locking at TP1 {state.tp1_level:.2f}"
+                )
+                state.phase = TrailingPhase.TP1_LOCK
+                return state.tp1_level
+            elif price <= state.tp1_level:
+                # Normal TP1 hit → Move to breakeven
                 offset = state.entry_price * self.config.breakeven_offset_pct
                 new_stop = state.entry_price - offset
                 state.phase = TrailingPhase.BREAKEVEN

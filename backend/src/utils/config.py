@@ -87,6 +87,11 @@ class Settings(BaseSettings):
     rate_limit_requests_per_second: int = Field(
         default=10, alias="RATE_LIMIT_REQUESTS_PER_SECOND"
     )
+    # HIGH-2 FIX: Broker retry configuration for transient 5xx errors
+    broker_retry_attempts: int = Field(default=3, alias="BROKER_RETRY_ATTEMPTS")
+    broker_retry_base_delay: float = Field(default=0.5, alias="BROKER_RETRY_BASE_DELAY")  # seconds
+    # HIGH-3 FIX: Configurable deal confirmation delay (was hardcoded 300ms)
+    deal_confirmation_delay: float = Field(default=0.3, alias="DEAL_CONFIRMATION_DELAY")  # seconds
 
     @property
     def capital_ws_url(self) -> str:

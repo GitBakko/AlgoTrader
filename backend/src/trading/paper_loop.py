@@ -92,6 +92,11 @@ class PaperTradingLoop:
         self._trade_count = 0
         self._signal_count = 0
         self._error_count = 0
+
+        # HIGH-7 FIX: Track recently processed signals to prevent duplicates
+        # Format: (epic, direction, entry_price_rounded) -> timestamp
+        self._recent_signals: dict[tuple[str, str, float], datetime] = {}
+        self._signal_dedup_window_seconds = 60  # Ignore duplicates within 60s
         self._last_signals: dict[str, dict] = {}
         self._signal_history: deque[dict] = deque(maxlen=MAX_SIGNAL_HISTORY)
         # Track last processed candle timestamp per epic
@@ -351,6 +356,9 @@ class PaperTradingLoop:
         # Phase 8: update trailing stops for open positions
         await self._update_trailing_stops(current_positions)
 
+        # CRITICAL: Check and auto-close positions with violated stop losses
+        await self._check_stop_losses(current_positions)
+
         open_epics = {p.get("epic") for p in current_positions}
 
         epics_to_process = []
@@ -463,6 +471,32 @@ class PaperTradingLoop:
             logger.info(f"[{epic}] HOLD signal, skipping execution")
             return
 
+        # HIGH-7 FIX: Duplicate signal detection
+        signal_key = (epic, signal.direction.value, round(signal.entry_price, 2))
+        now = datetime.now(timezone.utc)
+
+        if signal_key in self._recent_signals:
+            last_time = self._recent_signals[signal_key]
+            age_seconds = (now - last_time).total_seconds()
+
+            if age_seconds < self._signal_dedup_window_seconds:
+                signal_info["status"] = "duplicate"
+                signal_info["rejection_reason"] = f"Duplicate signal (last seen {age_seconds:.1f}s ago)"
+                logger.warning(
+                    f"[{epic}] DUPLICATE signal detected: {signal.direction.value} "
+                    f"@ {signal.entry_price:.2f} (last seen {age_seconds:.1f}s ago) - SKIPPING"
+                )
+                return
+
+        # Record this signal
+        self._recent_signals[signal_key] = now
+
+        # Cleanup old signals (>5 minutes)
+        self._recent_signals = {
+            k: v for k, v in self._recent_signals.items()
+            if (now - v).total_seconds() < 300
+        }
+
         # Step 4: Risk check (Phase 8: pass trade_history for Kelly sizing)
         equity = await self._fetch_equity()
         self.risk_manager.update_equity(equity)
@@ -487,6 +521,17 @@ class PaperTradingLoop:
             f"SL={risk_result.stop_loss}, TP={risk_result.take_profit} "
             f"sizing={risk_result.sizing_method}"
         )
+
+        # HIGH-8 FIX: Refresh equity immediately before execution
+        # to catch any changes since risk check (manual trades, other systems, etc.)
+        final_equity = await self._fetch_equity()
+        if abs(final_equity - equity) > equity * 0.01:  # >1% change
+            logger.warning(
+                f"[{epic}] Equity changed since risk check: "
+                f"{equity:.2f} -> {final_equity:.2f} "
+                f"({((final_equity - equity) / equity) * 100:+.2f}%)"
+            )
+            self.risk_manager.update_equity(final_equity)
 
         # Step 5: Execute (paper mode)
         exec_result = await self.execution_engine.execute_signal(signal, risk_result)
@@ -578,6 +623,98 @@ class PaperTradingLoop:
                         logger.info(f"[{epic}] TP1 hit: closed 50% of position")
                 except Exception as e:
                     logger.warning(f"[{epic}] TP1 partial close failed: {e}")
+
+    async def _check_stop_losses(self, current_positions: list[dict]) -> None:
+        """
+        CRITICAL: Check if any open position has violated its stop loss.
+        Auto-close positions where current price <= SL (for longs) or >= SL (for shorts).
+
+        This is essential for paper trading since Capital.com won't auto-close paper positions.
+        """
+        if not current_positions:
+            return
+
+        for position in current_positions:
+            deal_id = position.get("deal_id")
+            epic = position.get("epic", "")
+            direction = position.get("direction", "")
+            stop_level = position.get("stop_level")
+
+            # Skip if no stop loss set
+            if stop_level is None or stop_level <= 0:
+                continue
+
+            # Get current market price
+            try:
+                latest = self.data_access.get_latest_price(epic, timeframe="1h")
+                if latest is None:
+                    continue
+
+                current_price = latest.get("close", 0)
+                if current_price <= 0:
+                    continue
+
+                # Check if stop loss violated
+                stop_violated = False
+                if direction == "BUY":
+                    # Long position: SL violated if price drops below stop
+                    if current_price <= stop_level:
+                        stop_violated = True
+                        logger.warning(
+                            f"🚨 [{epic}] STOP LOSS VIOLATED! "
+                            f"Price {current_price:.5f} <= SL {stop_level:.5f} (LONG)"
+                        )
+                elif direction == "SELL":
+                    # Short position: SL violated if price rises above stop
+                    if current_price >= stop_level:
+                        stop_violated = True
+                        logger.warning(
+                            f"🚨 [{epic}] STOP LOSS VIOLATED! "
+                            f"Price {current_price:.5f} >= SL {stop_level:.5f} (SHORT)"
+                        )
+
+                # Auto-close position if SL violated
+                if stop_violated:
+                    try:
+                        logger.info(f"[{epic}] Auto-closing position {deal_id} due to SL violation")
+
+                        # Close position via execution engine
+                        result = await self.execution_engine.close_position(
+                            deal_id=deal_id,
+                            reason="STOP_LOSS_HIT"
+                        )
+
+                        if result.success:
+                            pnl = result.realized_pnl or 0.0
+                            logger.info(
+                                f"✅ [{epic}] Position closed at SL: "
+                                f"P&L = ${pnl:.2f}"
+                            )
+
+                            # Record trade close for risk management
+                            self._on_position_closed(deal_id, pnl)
+
+                            # Add to signal history
+                            self._signal_history.append({
+                                "timestamp": datetime.now(timezone.utc).isoformat(),
+                                "epic": epic,
+                                "direction": direction,
+                                "confidence": 0.0,
+                                "status": "sl_hit",
+                                "reason": f"Stop loss hit at {current_price:.5f}",
+                                "deal_id": deal_id,
+                                "pnl": pnl,
+                            })
+                        else:
+                            logger.error(
+                                f"❌ [{epic}] Failed to close position at SL: {result.error}"
+                            )
+
+                    except Exception as e:
+                        logger.error(f"❌ [{epic}] Error closing position at SL: {e}")
+
+            except Exception as e:
+                logger.debug(f"[{epic}] SL check failed: {e}")
 
     def _on_position_closed(self, deal_id: str, pnl: float) -> None:
         """

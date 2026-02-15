@@ -4,6 +4,7 @@ Advanced circuit breakers for trading risk management.
 slippage anomaly, heartbeat timeout, volatility spike.
 """
 
+import threading
 import time as _time
 from enum import Enum
 
@@ -46,6 +47,10 @@ class CircuitBreakerManager:
     def __init__(self, config: CircuitBreakerConfig | None = None):
         self.config = config or CircuitBreakerConfig()
 
+        # CRITICAL FIX (CRIT-4): Thread-safety lock for shared state
+        # Using threading.Lock() (not asyncio.Lock) for compatibility with sync and async code
+        self._lock = threading.Lock()
+
         # State tracking
         self._tripped: dict[CircuitBreakerType, str] = {}
         self._tripped_at: dict[CircuitBreakerType, float] = {}
@@ -56,13 +61,15 @@ class CircuitBreakerManager:
 
     @property
     def is_tripped(self) -> bool:
-        """Check if any circuit breaker is currently tripped."""
-        return len(self._tripped) > 0
+        """Check if any circuit breaker is currently tripped (thread-safe)."""
+        with self._lock:
+            return len(self._tripped) > 0
 
     @property
     def tripped_breakers(self) -> dict[str, str]:
-        """Get dict of tripped breaker type -> reason."""
-        return {k.value: v for k, v in self._tripped.items()}
+        """Get dict of tripped breaker type -> reason (thread-safe)."""
+        with self._lock:
+            return {k.value: v for k, v in self._tripped.items()}
 
     def check_all(
         self,
@@ -161,107 +168,128 @@ class CircuitBreakerManager:
 
     def record_trade_result(self, is_win: bool) -> None:
         """
-        Record trade outcome for consecutive loss tracking.
+        Record trade outcome for consecutive loss tracking (thread-safe).
 
         Args:
             is_win: True if trade was profitable
         """
-        if is_win:
-            self._consecutive_losses = 0
-            # Auto-clear consecutive losses breaker on a win
-            self._clear(CircuitBreakerType.CONSECUTIVE_LOSSES)
-        else:
-            self._consecutive_losses += 1
+        with self._lock:
+            if is_win:
+                self._consecutive_losses = 0
+                # Auto-clear consecutive losses breaker on a win
+                # Note: _clear() has its own lock, but we're already inside one
+                # so we need to clear manually here to avoid deadlock
+                self._tripped.pop(CircuitBreakerType.CONSECUTIVE_LOSSES, None)
+                self._tripped_at.pop(CircuitBreakerType.CONSECUTIVE_LOSSES, None)
+            else:
+                self._consecutive_losses += 1
 
     def record_slippage(self, slippage_pct: float) -> None:
         """
-        Record slippage for anomaly detection.
+        Record slippage for anomaly detection (thread-safe).
 
         Args:
             slippage_pct: Absolute slippage as percentage (e.g., 0.002 = 0.2%)
         """
-        self._slippage_history.append(abs(slippage_pct))
-        # Keep only recent history
-        max_history = self.config.slippage_window * 3
-        if len(self._slippage_history) > max_history:
-            self._slippage_history = self._slippage_history[-max_history:]
+        with self._lock:
+            self._slippage_history.append(abs(slippage_pct))
+            # Keep only recent history
+            max_history = self.config.slippage_window * 3
+            if len(self._slippage_history) > max_history:
+                self._slippage_history = self._slippage_history[-max_history:]
 
     def heartbeat(self) -> None:
-        """Update heartbeat timestamp. Call at start of each iteration."""
-        self._last_heartbeat = _time.monotonic()
-        self._clear(CircuitBreakerType.HEARTBEAT_TIMEOUT)
+        """Update heartbeat timestamp. Call at start of each iteration (thread-safe)."""
+        with self._lock:
+            self._last_heartbeat = _time.monotonic()
+            # Clear manually to avoid deadlock (we already have the lock)
+            self._tripped.pop(CircuitBreakerType.HEARTBEAT_TIMEOUT, None)
+            self._tripped_at.pop(CircuitBreakerType.HEARTBEAT_TIMEOUT, None)
 
     def update_baseline_atr(self, epic: str, atr: float) -> None:
-        """Update baseline ATR for volatility spike detection."""
-        self._baseline_atr[epic] = atr
+        """Update baseline ATR for volatility spike detection (thread-safe)."""
+        with self._lock:
+            self._baseline_atr[epic] = atr
 
     def get_baseline_atr(self, epic: str) -> float | None:
-        """Get baseline ATR for an epic."""
-        return self._baseline_atr.get(epic)
+        """Get baseline ATR for an epic (thread-safe)."""
+        with self._lock:
+            return self._baseline_atr.get(epic)
 
     def reset_all(self) -> list[str]:
         """
-        Manually reset all circuit breakers.
+        Manually reset all circuit breakers (thread-safe).
 
         Returns:
             List of breaker types that were reset.
         """
-        reset_types = [cb.value for cb in self._tripped]
-        self._tripped.clear()
-        self._tripped_at.clear()
-        self._consecutive_losses = 0
-        self._slippage_history.clear()
-        self._last_heartbeat = _time.monotonic()
-        if reset_types:
-            logger.info(f"Circuit breakers manually reset: {reset_types}")
-        return reset_types
+        with self._lock:
+            reset_types = [cb.value for cb in self._tripped]
+            self._tripped.clear()
+            self._tripped_at.clear()
+            self._consecutive_losses = 0
+            self._slippage_history.clear()
+            self._last_heartbeat = _time.monotonic()
+            if reset_types:
+                logger.info(f"Circuit breakers manually reset: {reset_types}")
+            return reset_types
 
     def reset_daily(self) -> None:
-        """Reset daily-specific breakers (daily loss). Call at start of trading day."""
-        self._clear(CircuitBreakerType.DAILY_LOSS)
-        self._slippage_history.clear()
+        """Reset daily-specific breakers (daily loss). Call at start of trading day (thread-safe)."""
+        with self._lock:
+            # Clear manually to avoid deadlock
+            self._tripped.pop(CircuitBreakerType.DAILY_LOSS, None)
+            self._tripped_at.pop(CircuitBreakerType.DAILY_LOSS, None)
+            self._slippage_history.clear()
 
     def get_status(self) -> dict:
-        """Get current circuit breaker status for API/status reporting."""
-        return {
-            "is_tripped": self.is_tripped,
-            "tripped_breakers": self.tripped_breakers,
-            "consecutive_losses": self._consecutive_losses,
-            "recent_slippages": len(self._slippage_history),
-            "seconds_since_heartbeat": _time.monotonic() - self._last_heartbeat,
-        }
+        """Get current circuit breaker status for API/status reporting (thread-safe)."""
+        with self._lock:
+            return {
+                "is_tripped": len(self._tripped) > 0,
+                "tripped_breakers": {k.value: v for k, v in self._tripped.items()},
+                "consecutive_losses": self._consecutive_losses,
+                "recent_slippages": len(self._slippage_history),
+                "seconds_since_heartbeat": _time.monotonic() - self._last_heartbeat,
+            }
 
     def _trip(self, cb_type: CircuitBreakerType, reason: str) -> None:
-        """Trip a circuit breaker."""
-        if cb_type not in self._tripped:
-            self._tripped[cb_type] = reason
-            self._tripped_at[cb_type] = _time.monotonic()
-            logger.warning(f"CIRCUIT BREAKER [{cb_type.value}]: {reason}")
+        """Trip a circuit breaker (thread-safe)."""
+        with self._lock:
+            if cb_type not in self._tripped:
+                self._tripped[cb_type] = reason
+                self._tripped_at[cb_type] = _time.monotonic()
+                logger.warning(f"CIRCUIT BREAKER [{cb_type.value}]: {reason}")
 
     def _clear(self, cb_type: CircuitBreakerType) -> None:
-        """Clear a specific circuit breaker."""
-        self._tripped.pop(cb_type, None)
-        self._tripped_at.pop(cb_type, None)
+        """Clear a specific circuit breaker (thread-safe)."""
+        with self._lock:
+            self._tripped.pop(cb_type, None)
+            self._tripped_at.pop(cb_type, None)
 
     def _try_auto_reset(self) -> list[str]:
         """
-        Auto-reset breakers that have been tripped longer than the cooldown.
+        Auto-reset breakers that have been tripped longer than the cooldown (thread-safe).
 
         Returns:
             List of breaker types that were auto-reset.
         """
-        reset_types: list[str] = []
-        now = _time.monotonic()
-        cooldown = self.config.auto_reset_after_minutes * 60
+        with self._lock:
+            reset_types: list[str] = []
+            now = _time.monotonic()
+            cooldown = self.config.auto_reset_after_minutes * 60
 
-        for cb_type in list(self._tripped_at.keys()):
-            elapsed = now - self._tripped_at[cb_type]
-            if elapsed >= cooldown:
-                self._clear(cb_type)
-                reset_types.append(cb_type.value)
-                logger.info(
-                    f"Circuit breaker [{cb_type.value}] auto-reset "
-                    f"after {elapsed / 60:.0f} minutes"
-                )
+            # Iterate over copy to avoid modification during iteration
+            for cb_type in list(self._tripped_at.keys()):
+                elapsed = now - self._tripped_at[cb_type]
+                if elapsed >= cooldown:
+                    # Clear manually to avoid deadlock (we already have the lock)
+                    self._tripped.pop(cb_type, None)
+                    self._tripped_at.pop(cb_type, None)
+                    reset_types.append(cb_type.value)
+                    logger.info(
+                        f"Circuit breaker [{cb_type.value}] auto-reset "
+                        f"after {elapsed / 60:.0f} minutes"
+                    )
 
-        return reset_types
+            return reset_types

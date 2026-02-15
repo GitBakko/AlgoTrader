@@ -2,6 +2,7 @@
 Position tracking: syncs positions with broker and manages paper trading state.
 """
 
+import threading
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -26,25 +27,39 @@ class PositionTracker:
     ):
         self._broker = broker
         self._mode = mode
+
+        # CRITICAL FIX (CRIT-7): Thread-safety lock for shared state
+        self._lock = threading.Lock()
+
         # Paper trading internal state: deal_id -> position dict
         self._paper_positions: dict[str, dict] = {}
 
     def get_paper_positions_sync(self) -> list[dict]:
-        """Get paper positions synchronously (for status queries in paper mode)."""
-        return list(self._paper_positions.values())
+        """Get paper positions synchronously (for status queries in paper mode) - thread-safe."""
+        with self._lock:
+            return list(self._paper_positions.values())
 
     async def sync_positions(self) -> list[dict]:
         """
-        Get all open positions.
+        Get all open positions (thread-safe).
 
-        PAPER/DEMO: Uses local in-memory tracking (reliable, no API calls).
-        LIVE: Queries broker for authoritative state.
+        PAPER: Uses local in-memory tracking (no broker).
+        DEMO/LIVE: Queries broker for authoritative state (Capital.com is source of truth).
 
         Returns:
             List of position dicts with keys: deal_id, epic, direction, size, level
         """
-        if self._mode in (ExecutionMode.PAPER, ExecutionMode.DEMO):
-            return list(self._paper_positions.values())
+        # CRITICAL FIX: Only PAPER mode uses local tracking
+        # DEMO and LIVE must call broker to detect manual closes!
+        if self._mode == ExecutionMode.PAPER:
+            with self._lock:
+                return list(self._paper_positions.values())
+
+        # DEMO and LIVE: broker is the source of truth
+        if self._broker is None:
+            logger.warning(f"Broker not available in {self._mode.value} mode, using local positions")
+            with self._lock:
+                return list(self._paper_positions.values())
 
         positions = await self._broker.list_positions()
         return [
@@ -77,7 +92,7 @@ class PositionTracker:
 
     async def get_position(self, deal_id: str) -> dict | None:
         """
-        Get a specific position by deal ID.
+        Get a specific position by deal ID (thread-safe).
 
         Args:
             deal_id: Deal ID
@@ -86,7 +101,8 @@ class PositionTracker:
             Position dict or None
         """
         if self._mode in (ExecutionMode.PAPER, ExecutionMode.DEMO):
-            return self._paper_positions.get(deal_id)
+            with self._lock:
+                return self._paper_positions.get(deal_id)
 
         positions = await self.sync_positions()
         for p in positions:
@@ -98,7 +114,7 @@ class PositionTracker:
         self, order: ExecutionOrder, fill_price: float, deal_id: str
     ) -> dict:
         """
-        Record a paper trading position opening.
+        Record a paper trading position opening (thread-safe).
 
         Args:
             order: The executed order
@@ -108,23 +124,28 @@ class PositionTracker:
         Returns:
             Position dict
         """
-        position = {
-            "deal_id": deal_id,
-            "epic": order.epic,
-            "direction": order.direction,
-            "size": order.size,
-            "level": fill_price,
-            "stop_level": order.stop_loss,
-            "profit_level": order.take_profit,
-            "opened_at": datetime.now(timezone.utc).isoformat(),
-        }
-        self._paper_positions[deal_id] = position
-        logger.debug(f"Paper position opened: {deal_id} {order.epic} {order.direction}")
-        return position
+        with self._lock:
+            # CRITICAL: Check for duplicates to prevent race condition
+            if deal_id in self._paper_positions:
+                raise ValueError(f"Position {deal_id} already exists!")
+
+            position = {
+                "deal_id": deal_id,
+                "epic": order.epic,
+                "direction": order.direction,
+                "size": order.size,
+                "level": fill_price,
+                "stop_level": order.stop_loss,
+                "profit_level": order.take_profit,
+                "opened_at": datetime.now(timezone.utc).isoformat(),
+            }
+            self._paper_positions[deal_id] = position
+            logger.debug(f"Paper position opened: {deal_id} {order.epic} {order.direction}")
+            return position
 
     def close_paper_position(self, deal_id: str) -> dict | None:
         """
-        Remove a paper trading position.
+        Remove a paper trading position (thread-safe).
 
         Args:
             deal_id: Deal ID to close
@@ -132,14 +153,15 @@ class PositionTracker:
         Returns:
             Closed position dict or None if not found
         """
-        position = self._paper_positions.pop(deal_id, None)
-        if position:
-            logger.debug(f"Paper position closed: {deal_id}")
-        return position
+        with self._lock:
+            position = self._paper_positions.pop(deal_id, None)
+            if position:
+                logger.debug(f"Paper position closed: {deal_id}")
+            return position
 
     def reduce_paper_position(self, deal_id: str, reduce_pct: float) -> dict | None:
         """
-        Reduce a paper position's size (for partial closes).
+        Reduce a paper position's size (for partial closes) - thread-safe.
 
         Args:
             deal_id: Deal ID to reduce
@@ -148,20 +170,25 @@ class PositionTracker:
         Returns:
             Updated position dict or None if not found
         """
-        position = self._paper_positions.get(deal_id)
-        if position is None:
-            return None
+        with self._lock:
+            position = self._paper_positions.get(deal_id)
+            if position is None:
+                return None
 
-        if reduce_pct >= 1.0:
-            return self.close_paper_position(deal_id)
+            if reduce_pct >= 1.0:
+                # Full close - remove from dict
+                position = self._paper_positions.pop(deal_id, None)
+                if position:
+                    logger.debug(f"Paper position closed (100% reduction): {deal_id}")
+                return position
 
-        old_size = position["size"]
-        position["size"] = old_size * (1.0 - reduce_pct)
-        logger.debug(
-            f"Paper position reduced: {deal_id} "
-            f"{old_size:.4f} -> {position['size']:.4f} (-{reduce_pct:.0%})"
-        )
-        return position
+            old_size = position["size"]
+            position["size"] = old_size * (1.0 - reduce_pct)
+            logger.debug(
+                f"Paper position reduced: {deal_id} "
+                f"{old_size:.4f} -> {position['size']:.4f} (-{reduce_pct:.0%})"
+            )
+            return position
 
     def inject_paper_position(
         self,
@@ -174,7 +201,7 @@ class PositionTracker:
         take_profit: float | None = None,
     ) -> dict:
         """
-        Inject a position into paper trading state (for state recovery).
+        Inject a position into paper trading state (for state recovery) - thread-safe.
 
         Args:
             deal_id: Position deal identifier
@@ -188,21 +215,23 @@ class PositionTracker:
         Returns:
             Injected position dict
         """
-        position = {
-            "deal_id": deal_id,
-            "epic": epic,
-            "direction": direction,
-            "size": size,
-            "level": entry_price,
-            "stop_level": stop_loss,
-            "profit_level": take_profit,
-            "opened_at": datetime.now(timezone.utc).isoformat(),
-        }
-        self._paper_positions[deal_id] = position
-        logger.debug(f"Position injected for recovery: {deal_id} {epic} {direction}")
-        return position
+        with self._lock:
+            position = {
+                "deal_id": deal_id,
+                "epic": epic,
+                "direction": direction,
+                "size": size,
+                "level": entry_price,
+                "stop_level": stop_loss,
+                "profit_level": take_profit,
+                "opened_at": datetime.now(timezone.utc).isoformat(),
+            }
+            self._paper_positions[deal_id] = position
+            logger.debug(f"Position injected for recovery: {deal_id} {epic} {direction}")
+            return position
 
     @property
     def paper_position_count(self) -> int:
-        """Number of open paper positions."""
-        return len(self._paper_positions)
+        """Number of open paper positions (thread-safe)."""
+        with self._lock:
+            return len(self._paper_positions)

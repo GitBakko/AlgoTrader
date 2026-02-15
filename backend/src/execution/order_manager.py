@@ -2,6 +2,7 @@
 Order management: creates, closes, and modifies orders via broker or paper trading.
 """
 
+import asyncio
 import time
 from uuid import uuid4
 
@@ -113,7 +114,22 @@ class OrderManager:
                 stop_level=stop_level,
                 profit_level=profit_level,
             )
-            await self._broker.modify_position(deal_id, request)
+
+            # CRITICAL FIX (CRIT-6): Add 10-second timeout to prevent infinite hang
+            try:
+                await asyncio.wait_for(
+                    self._broker.modify_position(deal_id, request),
+                    timeout=10.0
+                )
+            except asyncio.TimeoutError:
+                logger.error(f"Broker API timeout (10s) modifying position {deal_id}")
+                return ExecutionResult(
+                    success=False,
+                    deal_id=deal_id,
+                    error="Broker API timeout (10 seconds)",
+                    error_detail={"timeout_seconds": 10.0}
+                )
+
             return ExecutionResult(success=True, deal_id=deal_id)
         except CapitalComError as e:
             logger.error(f"Failed to modify position {deal_id}: {e}")
@@ -145,15 +161,19 @@ class OrderManager:
                 profit_level=order.take_profit,
             )
 
-            # 🔍 DEBUG: Log SL/TP values being sent to broker
-            logger.info(
-                f"🎯 Sending to broker: {order.epic} {order.direction} "
-                f"entry={order.entry_price:.2f} "
-                f"SL={order.stop_loss if order.stop_loss else 'NONE'} "
-                f"TP={order.take_profit if order.take_profit else 'NONE'}"
-            )
-
-            confirmation = await self._broker.create_position(request)
+            # CRITICAL FIX (CRIT-6): Add 10-second timeout to prevent infinite hang
+            try:
+                confirmation = await asyncio.wait_for(
+                    self._broker.create_position(request),
+                    timeout=10.0
+                )
+            except asyncio.TimeoutError:
+                logger.error(f"Broker API timeout (10s) for {order.epic} {order.direction}")
+                return ExecutionResult(
+                    success=False,
+                    error="Broker API timeout (10 seconds)",
+                    error_detail={"timeout_seconds": 10.0, "epic": order.epic}
+                )
 
             # Check if broker accepted the deal
             if confirmation.deal_status == "REJECTED":
@@ -218,7 +238,21 @@ class OrderManager:
     async def _live_close(self, deal_id: str) -> ExecutionResult:
         """Close a live position via broker."""
         try:
-            confirmation = await self._broker.close_position(deal_id)
+            # CRITICAL FIX (CRIT-6): Add 10-second timeout to prevent infinite hang
+            try:
+                confirmation = await asyncio.wait_for(
+                    self._broker.close_position(deal_id),
+                    timeout=10.0
+                )
+            except asyncio.TimeoutError:
+                logger.error(f"Broker API timeout (10s) closing position {deal_id}")
+                return ExecutionResult(
+                    success=False,
+                    deal_id=deal_id,
+                    error="Broker API timeout (10 seconds)",
+                    error_detail={"timeout_seconds": 10.0}
+                )
+
             return ExecutionResult(
                 success=True,
                 deal_id=confirmation.deal_id,

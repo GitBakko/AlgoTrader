@@ -84,6 +84,16 @@ class AdaptiveKellySizer:
             return None
 
         payoff_ratio = avg_win / avg_loss
+
+        # CRITICAL FIX: Prevent division by zero in Kelly formula
+        # If payoff_ratio is 0 or negative, Kelly sizing is invalid
+        if payoff_ratio <= 0:
+            logger.warning(
+                f"Invalid payoff ratio: {payoff_ratio:.4f} "
+                f"(avg_win={avg_win:.2f}, avg_loss={avg_loss:.2f})"
+            )
+            return None
+
         kelly = win_rate - (1 - win_rate) / payoff_ratio
 
         # Cap Kelly fraction

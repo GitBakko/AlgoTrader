@@ -125,18 +125,33 @@ class ClientSentiment(BaseModel):
 class CreatePositionRequest(BaseModel):
     """Request to open a new position."""
 
+    model_config = {"populate_by_name": True}
+
     epic: str
     direction: Direction
-    size: float
+    size: float = Field(gt=0.0, le=1000.0)  # HIGH-4 FIX: Validate size (0 < size <= 1000)
     guaranteed_stop: bool = Field(default=False, alias="guaranteedStop")
     stop_level: float | None = Field(default=None, alias="stopLevel")
     profit_level: float | None = Field(default=None, alias="profitLevel")
+
+    @field_validator("size")
+    @classmethod
+    def validate_size(cls, v: float) -> float:
+        """HIGH-4 FIX: Validate position size is within reasonable bounds."""
+        if v <= 0:
+            raise ValueError(f"Position size must be positive, got {v}")
+        if v > 1000:
+            raise ValueError(f"Position size {v} exceeds maximum of 1000")
+        # Check for precision (Capital.com typically allows 2-4 decimals)
+        if round(v, 4) != v:
+            raise ValueError(f"Position size {v} has too many decimal places (max 4)")
+        return v
 
 
 class ModifyPositionRequest(BaseModel):
     """Request to modify an existing position."""
 
-    model_config = {"populate_by_name": True}
+    model_config = {"populate_by_name": True, "exclude_none": True}  # HIGH-1 FIX: Don't send None fields
 
     stop_level: float | None = Field(None, alias="stopLevel")
     profit_level: float | None = Field(None, alias="profitLevel")

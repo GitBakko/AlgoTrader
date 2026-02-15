@@ -40,7 +40,24 @@ class SlippageTracker:
             actual_price: Actual fill price
             direction: Trade direction ("BUY" or "SELL")
         """
+        # HIGH-5 FIX: Validate price bounds to prevent garbage data
+        if expected_price <= 0 or actual_price <= 0:
+            raise ValueError(
+                f"Invalid prices: expected={expected_price}, actual={actual_price} "
+                "(prices must be positive)"
+            )
+
+        # HIGH-5 FIX: Detect unrealistic slippage (>50% of price = likely data error)
         slippage = abs(actual_price - expected_price)
+        slippage_pct = (slippage / expected_price) * 100
+
+        if slippage_pct > 50.0:
+            raise ValueError(
+                f"Unrealistic slippage detected: {slippage_pct:.2f}% "
+                f"(expected={expected_price}, actual={actual_price}) - "
+                "possible data corruption"
+            )
+
         self._records.append(
             SlippageRecord(
                 epic=epic,
