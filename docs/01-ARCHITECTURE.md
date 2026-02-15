@@ -256,6 +256,37 @@ FastAPI server exposing REST + WebSocket for the frontend.
 - **Models** - ML model performance, training history, drift alerts
 - **Settings** - Broker connection, API keys, notification preferences
 
+### State Recovery System
+
+**Purpose**: Restore trading state after backend restart (crash, deployment, maintenance)
+
+**Components**:
+
+- `StateRecoveryService` - Main orchestrator for state recovery
+- `TrailingStopRepository` - Persist trailing stop phases and levels
+- `RiskStateRepository` - Persist DrawdownMonitor, CircuitBreakers, EquityCurveFilter
+- `TradeRepository.get_recent_for_kelly()` - Load trade history for Kelly sizing
+
+**Recovery Flow (DEMO/LIVE mode)**:
+
+1. Try Broker API → positions + equity
+2. If broker fails → Try PostgreSQL
+3. If both fail → Empty state + CRITICAL ERROR + circuit breaker trip
+
+**Recovery Flow (PAPER mode)**:
+
+1. Try PostgreSQL → positions + trailing stops + risk state
+2. If DB fails → Empty state + WARNING
+
+**Auto-Persistence Hooks**:
+
+- After each trading iteration: Save risk state
+- After position open: Save trailing stop state
+- After trailing stop update: Save updated state
+- After position close: Save final risk state
+
+**Monitoring**: `GET /api/system/recovery-report` endpoint provides recovery status and warnings
+
 ## Communication Patterns
 
 ### Event Types (Redis Pub/Sub)

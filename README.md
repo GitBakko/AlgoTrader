@@ -283,6 +283,7 @@ python -m pytest tests/models/ -v       # ML models
 | 8. TRADING MAGNA AI | COMPLETE | 15 improvements: circuit breakers, trailing stops, Kelly, squeeze, VWAP, pairs, Monte Carlo |
 | 9. Integration + Coverage | COMPLETE | Full wiring, 865 tests, 80% coverage |
 | 10. MANTIS AI Branding | COMPLETE | Dark theme, neon green, SVG logo, OnPush optimization |
+| 14. State Recovery | COMPLETE | Multi-source recovery, broker/DB fallback, auto-persistence, monitoring API, performance indexes |
 
 ---
 

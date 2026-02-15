@@ -278,3 +278,44 @@ After setup, verify each component:
 - [ ] Frontend can reach backend API (dashboard loads data)
 - [ ] WebSocket connects (live prices appear in dashboard)
 - [ ] Paper trading starts/stops from dashboard
+- [ ] State recovery completes successfully on startup (see below)
+
+### Verify State Recovery (Phase 14)
+
+After backend startup, check that state recovery completed successfully:
+
+```bash
+# Check recovery report
+curl http://localhost:8000/api/system/recovery-report
+
+# Expected response (no positions):
+{
+  "success": true,
+  "positions_recovered": 0,
+  "positions_source": "none",
+  "trailing_stops_restored": 0,
+  "trade_history_count": 0,
+  "risk_state_restored": false,
+  "warnings": ["PAPER mode: No positions recovered (database unavailable)"],
+  "errors": [],
+  "recovered_at": "2026-02-15T10:30:00Z"
+}
+
+# Check structured logs
+tail -f backend/logs/mantis-ai.log | grep "RECOVERY_"
+
+# Expected log entries:
+# RECOVERY_START - mode=PAPER
+# RECOVERY_POSITIONS - count=0, source=none
+# RECOVERY_TRAILING_STOPS - count=0
+# RECOVERY_TRADE_HISTORY - count=0
+# RECOVERY_RISK_STATE - restored=false
+# RECOVERY_COMPLETE or RECOVERY_WARNING
+```
+
+**What to verify**:
+
+- `success: true` - Recovery completed without critical errors
+- `positions_source` - "broker" (DEMO/LIVE), "database" (PAPER), or "none" (fresh start)
+- No entries in `errors` array - Critical errors would indicate recovery failure
+- Warnings are acceptable for fresh start (no previous state to recover)

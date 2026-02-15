@@ -331,6 +331,57 @@ CREATE TABLE backtest_runs (
 
 ---
 
+### 11. `trailing_stop_states` (Phase 14)
+
+Trailing stop manager state for position recovery.
+
+```sql
+CREATE TABLE trailing_stop_states (
+    id BIGSERIAL PRIMARY KEY,
+    deal_id VARCHAR(100) UNIQUE NOT NULL,     -- Position identifier
+    epic VARCHAR(50) NOT NULL,                -- Asset symbol
+    direction VARCHAR(10) NOT NULL,           -- BUY, SELL
+    entry_price DECIMAL(20, 5) NOT NULL,
+    current_stop DECIMAL(20, 5) NOT NULL,
+    phase INTEGER NOT NULL,                   -- Trailing stop phase (1-4)
+    tp1_level DECIMAL(20, 5),                 -- First take profit level
+    tp2_level DECIMAL(20, 5),                 -- Second take profit level
+    highest_price DECIMAL(20, 5),             -- Highest price reached (longs)
+    lowest_price DECIMAL(20, 5),              -- Lowest price reached (shorts)
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    INDEX idx_trailing_stop_states_deal_id (deal_id)
+);
+```
+
+**Purpose**: Persist trailing stop state for recovery after backend restart.
+
+---
+
+### 12. `risk_state_snapshots` (Phase 14)
+
+Risk manager internal state snapshots.
+
+```sql
+CREATE TABLE risk_state_snapshots (
+    id BIGSERIAL PRIMARY KEY,
+    peak_equity DECIMAL(20, 2) NOT NULL,
+    daily_start_equity DECIMAL(20, 2) NOT NULL,
+    current_equity DECIMAL(20, 2) NOT NULL,
+    consecutive_losses INTEGER DEFAULT 0,
+    tripped_breakers JSONB DEFAULT '{}',       -- {epic: iso_timestamp}
+    equity_curve_points JSONB DEFAULT '[]',    -- Last 50 equity points
+    snapshot_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    INDEX idx_risk_state_snapshots_snapshot_at (snapshot_at DESC)
+);
+```
+
+**Purpose**: Persist risk manager state (DrawdownMonitor, CircuitBreakers, EquityCurveFilter) for recovery.
+
+---
+
 ## Relationships
 
 ```

@@ -481,3 +481,38 @@
 - [ ] TFT model + ensemble stacking
 - [ ] FRED macro features, FinBERT sentiment
 - [ ] SHAP feature importance dashboard
+
+---
+
+## Phase 14: State Recovery System [COMPLETE]
+
+**Objective**: Restore trading state after backend restart from database and/or broker API
+
+**Key Deliverables**:
+
+- [x] Database schema (TrailingStopState, RiskStateSnapshot tables)
+- [x] Repository layer (TrailingStopRepository, RiskStateRepository)
+- [x] Auto-persistence hooks in PaperTradingLoop
+- [x] StateRecoveryService with multi-source recovery
+- [x] Startup integration in main.py
+- [x] Graceful degradation with exponential backoff retry
+- [x] Comprehensive testing (40 unit tests)
+- [x] Monitoring API endpoint (GET /api/system/recovery-report)
+- [x] Performance optimizations (N+1 fixes, indexes, deque)
+
+**Recovery Architecture**:
+
+- PAPER mode: PostgreSQL → Empty state + WARNING
+- DEMO/LIVE mode: Broker API → PostgreSQL → Empty state + ERROR
+
+**Key Features**:
+
+- Multi-source recovery with broker/database fallback chain
+- Position reconciliation (broker data wins, auto-close stale positions)
+- Trailing stop state restoration with phase tracking
+- Trade history restoration for Kelly sizing (200 trades)
+- Risk manager state restoration (drawdown monitor, circuit breakers, equity curve)
+- Exponential backoff retry (3 attempts: 1s, 2s, 4s)
+- Structured logging events (RECOVERY_START, RECOVERY_COMPLETE, etc.)
+
+**Performance**: <5s recovery time for 100 positions, indexed queries, bulk operations
