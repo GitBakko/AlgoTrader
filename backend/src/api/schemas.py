@@ -229,3 +229,17 @@ class SystemSettingsResponse(BaseModel):
     max_risk_per_trade: float
     max_daily_drawdown: float
     max_total_drawdown: float
+
+
+class RecoveryReportResponse(BaseModel):
+    """State recovery report from system startup."""
+
+    success: bool
+    positions_recovered: int
+    positions_source: str  # "broker", "database", "none"
+    trailing_stops_restored: int
+    trade_history_count: int
+    risk_state_restored: bool
+    warnings: list[str]
+    errors: list[str]
+    recovered_at: datetime

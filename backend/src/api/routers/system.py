@@ -3,10 +3,11 @@ System API router.
 Provides system settings, risk status, and event log.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from src.api.dependencies import get_risk_manager
 from src.api.schemas import (
+    RecoveryReportResponse,
     RiskStatusResponse,
     SystemSettingsResponse,
     success_response,
@@ -64,3 +65,35 @@ async def get_system_events(limit: int = 50):
     MVP: returns empty list. Full implementation with DB in Phase 5.
     """
     return success_response([])
+
+
+@router.get("/recovery-report", response_model=RecoveryReportResponse)
+async def get_recovery_report(request: Request) -> RecoveryReportResponse:
+    """
+    Get the last state recovery report from system startup.
+
+    Returns:
+        RecoveryReportResponse with recovery details and timestamp
+
+    Raises:
+        HTTPException: 404 if no recovery report available
+    """
+    report = getattr(request.app.state, "last_recovery_report", None)
+
+    if report is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No recovery report available (system not yet started or recovery failed)",
+        )
+
+    return RecoveryReportResponse(
+        success=report.success,
+        positions_recovered=report.positions_recovered,
+        positions_source=report.positions_source,
+        trailing_stops_restored=report.trailing_stops_restored,
+        trade_history_count=report.trade_history_count,
+        risk_state_restored=report.risk_state_restored,
+        warnings=report.warnings,
+        errors=report.errors,
+        recovered_at=report.recovered_at,
+    )
