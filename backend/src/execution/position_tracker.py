@@ -163,6 +163,45 @@ class PositionTracker:
         )
         return position
 
+    def inject_paper_position(
+        self,
+        deal_id: str,
+        epic: str,
+        direction: str,
+        size: float,
+        entry_price: float,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+    ) -> dict:
+        """
+        Inject a position into paper trading state (for state recovery).
+
+        Args:
+            deal_id: Position deal identifier
+            epic: Asset symbol
+            direction: BUY or SELL
+            size: Position size
+            entry_price: Entry price
+            stop_loss: Stop loss level
+            take_profit: Take profit level
+
+        Returns:
+            Injected position dict
+        """
+        position = {
+            "deal_id": deal_id,
+            "epic": epic,
+            "direction": direction,
+            "size": size,
+            "level": entry_price,
+            "stop_level": stop_loss,
+            "profit_level": take_profit,
+            "opened_at": datetime.now(timezone.utc).isoformat(),
+        }
+        self._paper_positions[deal_id] = position
+        logger.debug(f"Position injected for recovery: {deal_id} {epic} {direction}")
+        return position
+
     @property
     def paper_position_count(self) -> int:
         """Number of open paper positions."""

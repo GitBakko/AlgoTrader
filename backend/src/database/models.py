@@ -351,3 +351,75 @@ class BacktestRun(SQLModel, table=True):
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
+
+
+class TrailingStopState(SQLModel, table=True):
+    """
+    Persistent state for trailing stops.
+    Enables recovery of trailing stop phase and price levels after restart.
+    """
+
+    __tablename__ = "trailing_stop_states"
+
+    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    deal_id: str = Field(max_length=100, nullable=False, unique=True, index=True)
+    epic: str = Field(max_length=50, nullable=False)
+    direction: str = Field(max_length=4, nullable=False)  # BUY, SELL
+
+    # Price levels
+    entry_price: Decimal = Field(max_digits=15, decimal_places=4, nullable=False)
+    current_stop: Decimal = Field(max_digits=15, decimal_places=4, nullable=False)
+    tp1_level: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=4)
+    tp2_level: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=4)
+
+    # Tracking state
+    phase: int = Field(default=1, nullable=False)  # 1-4
+    highest_price: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=4)
+    lowest_price: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=4)
+
+    # Metadata
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        nullable=False,
+        sa_column_kwargs={"server_default": text("NOW()")},
+    )
+    updated_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        nullable=False,
+        sa_column_kwargs={"server_default": text("NOW()"), "onupdate": text("NOW()")},
+    )
+
+
+class RiskStateSnapshot(SQLModel, table=True):
+    """
+    Periodic snapshots of RiskManager internal state.
+    Enables recovery of risk monitoring state after restart.
+    """
+
+    __tablename__ = "risk_state_snapshots"
+
+    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+
+    # DrawdownMonitor state
+    peak_equity: Decimal = Field(max_digits=15, decimal_places=2, nullable=False)
+    daily_start_equity: Decimal = Field(max_digits=15, decimal_places=2, nullable=False)
+    current_equity: Decimal = Field(max_digits=15, decimal_places=2, nullable=False)
+
+    # CircuitBreakerManager state
+    consecutive_losses: int = Field(default=0, nullable=False)
+    tripped_breakers: dict = Field(
+        default={}, sa_column=Column(JSONB, nullable=False)
+    )  # {epic: timestamp_iso}
+
+    # EquityCurveFilter state
+    equity_curve_points: list = Field(
+        default=[], sa_column=Column(JSONB, nullable=False)
+    )  # Last 50 equity points
+
+    # Metadata
+    snapshot_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        nullable=False,
+        index=True,
+        sa_column_kwargs={"server_default": text("NOW()")},
+    )

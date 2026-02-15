@@ -75,3 +75,25 @@ class TradeRepository(BaseRepository[Trade]):
             "trade_count": int(row.trade_count or 0),
             "avg_pnl": float(row.avg_pnl or 0),
         }
+
+    async def get_recent_for_kelly(self, limit: int = 200) -> list[Trade]:
+        """
+        Get recent CLOSE trades with P&L for Kelly criterion calculation.
+
+        Only returns CLOSE trades (not OPEN/MODIFY) ordered by execution time
+        descending (most recent first).
+
+        Args:
+            limit: Maximum number of trades to retrieve (default 200)
+
+        Returns:
+            List of Trade objects with profit_loss data
+        """
+        result = await self.session.execute(
+            select(Trade)
+            .where(Trade.trade_type == "CLOSE")
+            .where(Trade.profit_loss.is_not(None))
+            .order_by(Trade.executed_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())

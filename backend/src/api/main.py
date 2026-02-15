@@ -153,6 +153,53 @@ async def lifespan(app: FastAPI):
         app.state.broker_client = None
         app.state.broker_ws_client = None
 
+    # ══════════════════════════════════════════════════════════
+    # 🔄 STATE RECOVERY PHASE (Phase 14)
+    # ══════════════════════════════════════════════════════════
+    logger.info("🔄 Starting state recovery...")
+
+    from src.execution.state_recovery import StateRecoveryService
+    from src.risk.trailing_stop_manager import TrailingStopManager
+
+    # Create temporary trailing stop manager for recovery
+    temp_trailing_stop_manager = TrailingStopManager()
+
+    recovery_service = StateRecoveryService(
+        execution_engine=app.state.execution_engine,
+        risk_manager=app.state.risk_manager,
+        trailing_stop_manager=temp_trailing_stop_manager,
+        broker=app.state.broker_client,
+        db_session_factory=getattr(app.state, 'db_session_factory', None),
+    )
+
+    recovery_report = await recovery_service.recover_all_state()
+    app.state.last_recovery_report = recovery_report  # Store for /api/system/recovery-report
+
+    if recovery_report.errors:
+        logger.error(
+            f"❌ State recovery completed with ERRORS: "
+            f"{recovery_report.positions_recovered} positions from {recovery_report.positions_source}, "
+            f"{recovery_report.trailing_stops_restored} stops, "
+            f"{recovery_report.trade_history_count} trades — ERRORS: {recovery_report.errors}"
+        )
+    elif recovery_report.warnings:
+        logger.warning(
+            f"⚠️  State recovery completed with warnings: "
+            f"{recovery_report.positions_recovered} positions from {recovery_report.positions_source}, "
+            f"{recovery_report.trailing_stops_restored} stops, "
+            f"{recovery_report.trade_history_count} trades — WARNINGS: {recovery_report.warnings}"
+        )
+    else:
+        logger.success(
+            f"✅ State recovery successful: "
+            f"{recovery_report.positions_recovered} positions from {recovery_report.positions_source}, "
+            f"{recovery_report.trailing_stops_restored} stops, "
+            f"{recovery_report.trade_history_count} trades"
+        )
+
+    # Store recovered trailing stop manager for PaperTradingLoop
+    app.state.recovered_trailing_stop_manager = temp_trailing_stop_manager
+
     # Initialize Redis event bus (graceful degradation)
     try:
         from src.utils.event_bus import event_bus
@@ -195,10 +242,19 @@ async def lifespan(app: FastAPI):
         execution_engine=app.state.execution_engine,
         data_access=app.state.data_access,
         broker=app.state.broker_client,
+        db_session_factory=getattr(app.state, "db_session_factory", None),
+        trailing_stop_manager=app.state.recovered_trailing_stop_manager,
     )
+
+    # Phase 14: Inject recovered trade history for Kelly sizing
+    if recovery_report.trade_history_count > 0:
+        trade_history = await recovery_service._restore_trade_history_list()
+        app.state.paper_loop._trade_history = trade_history
+        logger.info(f"Injected {len(trade_history)} trades into Kelly history")
+
     logger.info(
         f"Trading loop initialized in {mode_label} mode "
-        f"(use POST /api/trading/start to begin)"
+        f"(use POST /api/trading/start to begin, state persistence: {'enabled' if app.state.db_session_factory else 'disabled'})"
     )
 
     logger.success("✅ Application startup complete")

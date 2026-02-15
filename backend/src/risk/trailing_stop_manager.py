@@ -167,6 +167,74 @@ class TrailingStopManager:
         """Get current stop state for a position."""
         return self._positions.get(deal_id)
 
+    def restore_state(
+        self,
+        deal_id: str,
+        epic: str,
+        direction: str,
+        entry_price: float,
+        current_stop: float,
+        phase: int,
+        tp1_level: float | None = None,
+        tp2_level: float | None = None,
+        highest_price: float | None = None,
+        lowest_price: float | None = None,
+    ) -> PositionStopState:
+        """
+        Restore a trailing stop state from persisted data (for recovery).
+
+        Args:
+            deal_id: Position deal identifier
+            epic: Asset symbol
+            direction: BUY or SELL
+            entry_price: Entry price
+            current_stop: Current stop-loss level
+            phase: Current trailing phase (0-3)
+            tp1_level: First take profit level
+            tp2_level: Second take profit level
+            highest_price: Highest price reached (for longs)
+            lowest_price: Lowest price reached (for shorts)
+
+        Returns:
+            Restored PositionStopState
+        """
+        risk_distance = abs(entry_price - current_stop)
+
+        # Use provided TP levels or calculate from entry
+        if tp1_level is None:
+            if direction == "BUY":
+                tp1_level = entry_price + risk_distance * self.config.tp1_risk_multiple
+            else:
+                tp1_level = entry_price - risk_distance * self.config.tp1_risk_multiple
+
+        if tp2_level is None:
+            if direction == "BUY":
+                tp2_level = entry_price + risk_distance * self.config.tp2_risk_multiple
+            else:
+                tp2_level = entry_price - risk_distance * self.config.tp2_risk_multiple
+
+        state = PositionStopState(
+            deal_id=deal_id,
+            epic=epic,
+            direction=direction,
+            entry_price=entry_price,
+            initial_stop=current_stop,  # Assume initial = current for recovery
+            current_stop=current_stop,
+            tp1_level=tp1_level,
+            tp2_level=tp2_level,
+            risk_distance=risk_distance,
+            phase=phase,
+            highest_price=highest_price or entry_price,
+            lowest_price=lowest_price or entry_price,
+        )
+
+        self._positions[deal_id] = state
+        logger.debug(
+            f"[{epic}] Trailing stop state restored: {direction} phase={phase} "
+            f"entry={entry_price:.2f} SL={current_stop:.2f}"
+        )
+        return state
+
     @property
     def tracked_positions(self) -> list[str]:
         """List of tracked deal IDs."""
