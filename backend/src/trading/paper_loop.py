@@ -57,6 +57,8 @@ class PaperTradingLoop:
         interval_seconds: int = CHECK_INTERVAL,
         epics: list[str] | None = None,
         trailing_stop_config: TrailingStopConfig | None = None,
+        db_session_factory = None,
+        trailing_stop_manager: TrailingStopManager | None = None,
     ):
         self.prediction_service = prediction_service
         self.strategy_manager = strategy_manager
@@ -75,10 +77,12 @@ class PaperTradingLoop:
             "GBPUSD", "USDJPY",
         ]
 
-        # Phase 8: trailing stop manager for open positions
-        self.trailing_stop_manager = TrailingStopManager(trailing_stop_config)
-        # In-memory trade history for Kelly sizing (per-epic, last 100 trades)
-        self._trade_history: list[dict] = []
+        # Phase 8/14: trailing stop manager (use recovered one or create new)
+        self.trailing_stop_manager = trailing_stop_manager or TrailingStopManager(trailing_stop_config)
+        # In-memory trade history for Kelly sizing (last 200 trades, auto-discards old entries)
+        self._trade_history: deque[dict] = deque(maxlen=200)
+        # Phase 14: database session factory for state persistence
+        self._db_session_factory = db_session_factory
 
         self._running = False
         self._task: asyncio.Task | None = None
@@ -135,6 +139,89 @@ class PaperTradingLoop:
     def get_signal_history(self) -> list[dict]:
         """Get signal history as a list (public accessor, defensive copy)."""
         return list(self._signal_history)
+
+    async def _persist_risk_state(self) -> None:
+        """
+        Persist current RiskManager state to database.
+        Saves DrawdownMonitor, CircuitBreakers, and EquityCurveFilter state.
+        """
+        if self._db_session_factory is None:
+            return  # No database available, skip persistence
+
+        try:
+            from decimal import Decimal
+
+            from src.database.repositories import RiskStateRepository
+
+            async with self._db_session_factory() as session:
+                repo = RiskStateRepository(session)
+
+                # Extract state from RiskManager components
+                dm_state = self.risk_manager.drawdown_monitor.state
+                cb_state = self.risk_manager.circuit_breakers
+                ec_state = self.risk_manager.equity_curve_filter
+
+                # Tripped breakers: {epic: datetime} → {epic: iso_string}
+                tripped_breakers_serialized = {
+                    epic: ts.isoformat() if hasattr(ts, "isoformat") else str(ts)
+                    for epic, ts in cb_state.tripped_breakers.items()
+                }
+
+                # Equity curve: keep last 50 points
+                equity_curve_points = list(ec_state.equity_curve)[-50:]
+
+                await repo.create_snapshot(
+                    peak_equity=Decimal(str(dm_state.peak_equity)),
+                    daily_start_equity=Decimal(str(dm_state.daily_start_equity)),
+                    current_equity=Decimal(str(dm_state.current_equity)),
+                    consecutive_losses=cb_state.consecutive_losses,
+                    tripped_breakers=tripped_breakers_serialized,
+                    equity_curve_points=equity_curve_points,
+                )
+                await session.commit()
+                logger.debug("Persisted risk state to database")
+        except Exception as e:
+            logger.warning(f"Risk state persistence failed: {e}")
+
+    async def _persist_trailing_stop_state(self, deal_id: str) -> None:
+        """
+        Persist trailing stop state for a specific position.
+
+        Args:
+            deal_id: Position deal identifier
+        """
+        if self._db_session_factory is None:
+            return  # No database available, skip persistence
+
+        try:
+            from decimal import Decimal
+
+            from src.database.repositories import TrailingStopRepository
+            from src.execution.schemas import Direction
+
+            state = self.trailing_stop_manager.get_state(deal_id)
+            if state is None:
+                return  # Position not tracked
+
+            async with self._db_session_factory() as session:
+                repo = TrailingStopRepository(session)
+
+                await repo.upsert(
+                    deal_id=deal_id,
+                    epic=state.epic,
+                    direction=Direction(state.direction),
+                    entry_price=Decimal(str(state.entry_price)),
+                    current_stop=Decimal(str(state.current_stop)),
+                    phase=state.phase,
+                    tp1_level=Decimal(str(state.tp1_level)) if state.tp1_level else None,
+                    tp2_level=Decimal(str(state.tp2_level)) if state.tp2_level else None,
+                    highest_price=Decimal(str(state.highest_price)) if state.highest_price else None,
+                    lowest_price=Decimal(str(state.lowest_price)) if state.lowest_price else None,
+                )
+                await session.commit()
+                logger.debug(f"Persisted trailing stop state for {deal_id}")
+        except Exception as e:
+            logger.warning(f"Trailing stop persistence failed for {deal_id}: {e}")
 
     def start(self) -> None:
         """Start the paper trading loop."""
@@ -295,6 +382,9 @@ class PaperTradingLoop:
                 self._error_count += 1
                 logger.error(f"Error processing {epic} (total errors: {self._error_count}): {e}")
 
+        # Phase 14: persist risk state after iteration
+        await self._persist_risk_state()
+
     async def _fetch_equity(self) -> float:
         """Get current equity. DEMO/LIVE: from broker. PAPER: from risk manager."""
         if self.broker and self.execution_engine.mode != ExecutionMode.PAPER:
@@ -418,6 +508,8 @@ class PaperTradingLoop:
                     stop_loss=risk_result.stop_loss,
                     atr=market_data["atr"],
                 )
+                # Phase 14: persist trailing stop state
+                await self._persist_trailing_stop_state(exec_result.deal_id)
         else:
             signal_info["status"] = "exec_failed"
             signal_info["rejection_reason"] = exec_result.error
@@ -471,6 +563,8 @@ class PaperTradingLoop:
             if new_stop is not None:
                 try:
                     await self.execution_engine.update_stops(deal_id, new_stop)
+                    # Phase 14: persist updated trailing stop state
+                    await self._persist_trailing_stop_state(deal_id)
                 except Exception as e:
                     logger.debug(f"[{epic}] Stop update failed: {e}")
 
@@ -497,13 +591,14 @@ class PaperTradingLoop:
         equity = self.risk_manager.drawdown_monitor.state.current_equity
         self.risk_manager.equity_curve_filter.record_trade_close(equity)
 
-        # Kelly: add to trade history (capped at 200)
+        # Kelly: add to trade history (deque auto-discards oldest when maxlen=200 reached)
         self._trade_history.append({"pnl": pnl})
-        if len(self._trade_history) > 200:
-            self._trade_history = self._trade_history[-200:]
 
         # Trailing stop: unregister
         self.trailing_stop_manager.unregister_position(deal_id)
+
+        # Phase 14: persist risk state after position close
+        asyncio.create_task(self._persist_risk_state())
 
         logger.debug(
             f"Position closed: deal={deal_id} pnl={pnl:.2f} "
