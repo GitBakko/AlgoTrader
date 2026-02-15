@@ -287,7 +287,12 @@ class CapitalComClient:
         Returns:
             Deal confirmation
         """
-        payload = request.model_dump(by_alias=True)
+        # 🔍 DEBUG: Log CreatePositionRequest BEFORE model_dump
+        logger.debug(
+            f"🔍 CreatePositionRequest object: stop_level={request.stop_level} profit_level={request.profit_level}"
+        )
+
+        payload = request.model_dump(by_alias=True, exclude_none=False)
         payload["epic"] = self._to_broker_epic(payload.get("epic", ""))
 
         # 🔍 DEBUG: Log complete API payload

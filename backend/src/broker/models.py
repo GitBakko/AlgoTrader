@@ -129,8 +129,8 @@ class CreatePositionRequest(BaseModel):
     direction: Direction
     size: float
     guaranteed_stop: bool = Field(default=False, alias="guaranteedStop")
-    stop_level: float | None = Field(None, alias="stopLevel")
-    profit_level: float | None = Field(None, alias="profitLevel")
+    stop_level: float | None = Field(default=None, alias="stopLevel")
+    profit_level: float | None = Field(default=None, alias="profitLevel")
 
 
 class ModifyPositionRequest(BaseModel):
