@@ -1,0 +1,68 @@
+// Grouped positions table styles
+.grouped-positions-table {
+  .group-header {
+    background-color: var(--cui-table-bg);
+    transition: background-color 0.2s ease;
+
+    &:hover {
+      background-color: var(--cui-table-hover-bg);
+    }
+
+    &.group-expanded {
+      border-bottom: 2px solid var(--cui-primary);
+    }
+
+    td {
+      font-size: 0.95rem;
+      padding: 0.75rem 0.5rem;
+    }
+  }
+
+  .detail-row {
+    background-color: rgba(var(--cui-emphasis-color-rgb), 0.02);
+    border-left: 3px solid var(--cui-primary);
+    font-size: 0.875rem;
+
+    td {
+      padding: 0.5rem 0.5rem;
+    }
+
+    &:hover {
+      background-color: rgba(var(--cui-emphasis-color-rgb), 0.05);
+    }
+  }
+
+  .chevron-icon {
+    transition: transform 0.2s ease;
+    color: var(--cui-body-color);
+
+    &.rotated {
+      transform: rotate(90deg);
+    }
+  }
+}
+
+// Badge size adjustments
+.badge-sm {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.4rem;
+}
+
+// Pulse animation for market open indicator
+.pulse-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: currentColor;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}

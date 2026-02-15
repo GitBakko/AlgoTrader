@@ -133,11 +133,14 @@ class RiskManager:
         )
 
         # Use signal's suggested stop if tighter
+        # CRITICAL FIX: Inverted logic was causing SL above entry for longs!
+        # For BUY: SL must be BELOW entry, so we want the MIN (closer to entry)
+        # For SELL: SL must be ABOVE entry, so we want the MAX (closer to entry)
         if signal.suggested_stop is not None:
             if signal.direction.value == "BUY":
-                stop_loss = max(stop_loss, signal.suggested_stop)
-            else:
                 stop_loss = min(stop_loss, signal.suggested_stop)
+            else:
+                stop_loss = max(stop_loss, signal.suggested_stop)
             adjustments.append("Using tighter suggested stop-loss")
 
         # 4. Calculate take-profit

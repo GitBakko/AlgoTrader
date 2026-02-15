@@ -12,7 +12,7 @@ import { NewsArticle } from '../../../core/models/news.model';
   selector: 'app-news-widget',
   standalone: true,
   imports: [CommonModule, BadgeComponent],
-  template: \`
+  template: `
     <div class="news-widget">
       @if (news.length === 0) {
         <div class="text-center py-3 text-body-secondary small">
@@ -58,8 +58,8 @@ import { NewsArticle } from '../../../core/models/news.model';
         }
       }
     </div>
-  \`,
-  styles: [\`
+  `,
+  styles: [`
     .news-widget-item {
       padding: 0.5rem 0;
 
@@ -109,7 +109,7 @@ import { NewsArticle } from '../../../core/models/news.model';
         color: #39ff14;
       }
     }
-  \`],
+  `],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class NewsWidgetComponent {
@@ -147,9 +147,9 @@ export class NewsWidgetComponent {
     const diffDays = Math.floor(diffHours / 24);
 
     if (diffMins < 1) return 'Ora';
-    if (diffMins < 60) return \`\${diffMins}m fa\`;
-    if (diffHours < 24) return \`\${diffHours}h fa\`;
-    if (diffDays < 7) return \`\${diffDays}g fa\`;
+    if (diffMins < 60) return `${diffMins}m fa`;
+    if (diffHours < 24) return `${diffHours}h fa`;
+    if (diffDays < 7) return `${diffDays}g fa`;
     return date.toLocaleDateString('it-IT', { month: 'short', day: 'numeric' });
   }
 }

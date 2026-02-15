@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, OnInit, computed } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, OnInit, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
@@ -7,6 +7,9 @@ import {
   TableDirective,
 } from '@coreui/angular';
 import { TradingService } from '../../core/services/trading.service';
+import { NewsService } from '../../core/services/news.service';
+import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.component';
+import { NewsWidgetComponent } from '../../shared/components/news-widget/news-widget.component';
 
 @Component({
   selector: 'app-ai-models',
@@ -17,6 +20,8 @@ import { TradingService } from '../../core/services/trading.service';
     ColComponent, RowComponent, BadgeComponent,
     ProgressComponent, ProgressBarComponent,
     TableDirective,
+    EpicLogoComponent,
+    NewsWidgetComponent,
   ],
   template: `
     <!-- Header -->
@@ -45,7 +50,10 @@ import { TradingService } from '../../core/services/trading.service';
                     [class.border-top-danger]="model.f1_score < 0.3">
               <c-card-header class="d-flex align-items-center justify-content-between py-2">
                 <div class="d-flex align-items-center gap-2">
-                  <strong>{{ model.epic }}</strong>
+                  <div class="d-flex align-items-center gap-2" style="cursor: pointer;" (click)="onEpicClick(model.epic)">
+                    <app-epic-logo [epic]="model.epic" [size]="28"></app-epic-logo>
+                    <strong>{{ model.epic }}</strong>
+                  </div>
                   <c-badge [color]="model.status === 'active' ? 'success' : 'secondary'" class="badge-sm">
                     {{ model.status === 'active' ? 'Attivo' : model.status }}
                   </c-badge>
@@ -121,7 +129,12 @@ import { TradingService } from '../../core/services/trading.service';
             <tbody>
               @for (model of models(); track model.id) {
                 <tr>
-                  <td class="fw-semibold">{{ model.epic }}</td>
+                  <td class="fw-semibold">
+                    <div class="d-flex align-items-center gap-2" style="cursor: pointer;" (click)="onEpicClick(model.epic)">
+                      <app-epic-logo [epic]="model.epic" [size]="24"></app-epic-logo>
+                      <span>{{ model.epic }}</span>
+                    </div>
+                  </td>
                   <td><c-badge color="primary" class="badge-sm">{{ model.type }}</c-badge></td>
                   <td>
                     <c-badge [color]="model.status === 'active' ? 'success' : 'secondary'" class="badge-sm">
@@ -144,11 +157,35 @@ import { TradingService } from '../../core/services/trading.service';
         </c-card-body>
       </c-card>
     }
+
+    <!-- ═══════ NEWS MODAL ═══════ -->
+    @if (showNewsModal() && selectedEpic()) {
+      <div class="modal d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);" (click)="closeNewsModal()">
+        <div class="modal-dialog modal-lg" (click)="$event.stopPropagation()">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title d-flex align-items-center gap-2">
+                <app-epic-logo [epic]="selectedEpic()!" [size]="32"></app-epic-logo>
+                <span>{{ selectedEpic() }} - Top News</span>
+              </h5>
+              <button type="button" class="btn-close" (click)="closeNewsModal()"></button>
+            </div>
+            <div class="modal-body">
+              <app-news-widget [news]="newsService.news()" [maxItems]="10" />
+            </div>
+          </div>
+        </div>
+      </div>
+    }
   `
 })
 export class AiModelsComponent implements OnInit {
   private readonly trading = inject(TradingService);
+  readonly newsService = inject(NewsService);
   readonly models = this.trading.models;
+
+  readonly selectedEpic = signal<string | null>(null);
+  readonly showNewsModal = signal(false);
 
   readonly avgF1 = computed(() => {
     const m = this.models();
@@ -168,5 +205,16 @@ export class AiModelsComponent implements OnInit {
         hour: '2-digit', minute: '2-digit',
       });
     } catch { return iso; }
+  }
+
+  onEpicClick(epic: string): void {
+    this.selectedEpic.set(epic);
+    this.showNewsModal.set(true);
+    this.newsService.getNews(epic, 10, 7);
+  }
+
+  closeNewsModal(): void {
+    this.showNewsModal.set(false);
+    this.selectedEpic.set(null);
   }
 }

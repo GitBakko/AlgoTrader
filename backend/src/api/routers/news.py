@@ -3,7 +3,7 @@ News and sentiment API endpoints.
 Provides access to news articles, insider sentiment, and aggregated sentiment scores.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query
 from loguru import logger
@@ -49,8 +49,8 @@ async def get_news(
     # Fetch from Finnhub (company news)
     if finnhub is not None:
         try:
-            start_date = datetime.now() - timedelta(days=days)
-            end_date = datetime.now()
+            start_date = datetime.now(timezone.utc) - timedelta(days=days)
+            end_date = datetime.now(timezone.utc)
             finnhub_articles = await finnhub.get_company_news(epic, start_date, end_date)
             logger.info(f"Got {len(finnhub_articles)} articles from Finnhub")
             all_articles.extend(finnhub_articles)
@@ -108,12 +108,12 @@ async def get_insider_sentiment(
     try:
         # Parse dates or use defaults (last 180 days)
         if start_date is None:
-            start = datetime.now() - timedelta(days=180)
+            start = datetime.now(timezone.utc) - timedelta(days=180)
         else:
             start = datetime.fromisoformat(start_date)
 
         if end_date is None:
-            end = datetime.now()
+            end = datetime.now(timezone.utc)
         else:
             end = datetime.fromisoformat(end_date)
 

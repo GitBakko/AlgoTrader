@@ -10,18 +10,32 @@ import {
 import { TradingService } from '../../core/services/trading.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { MarketStatusService, MarketStatusResponse } from '../../core/services/market-status.service';
+import { NewsService } from '../../core/services/news.service';
 import { ToastService } from '../../shared/services/toast.service';
 import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
+import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.component';
+import { NewsWidgetComponent } from '../../shared/components/news-widget/news-widget.component';
 import { PaperPosition, PaperSignal } from '../../core/models';
 
 interface LivePosition extends PaperPosition {
   live_pnl: number;
 }
 
+interface GroupedPosition {
+  epic: string;
+  positions: LivePosition[];
+  totalSize: number;
+  totalPnl: number;
+  avgEntry: number;
+  netDirection: 'LONG' | 'SHORT' | 'NEUTRAL';
+  expanded: boolean;
+}
+
 @Component({
   selector: 'app-paper-trading',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  styleUrls: ['./paper-trading.component.scss'],
   imports: [
     CommonModule, DecimalPipe,
     CardComponent, CardBodyComponent, CardHeaderComponent,
@@ -29,6 +43,8 @@ interface LivePosition extends PaperPosition {
     ButtonDirective, SpinnerComponent,
     TableDirective, AlertComponent,
     PriceFormatPipe,
+    EpicLogoComponent,
+    NewsWidgetComponent,
   ],
   template: `
     <!-- ═══════ ROW 1: Status Bar ═══════ -->
@@ -232,48 +248,95 @@ interface LivePosition extends PaperPosition {
             }
           </c-card-header>
           <c-card-body class="p-0">
-            @if (livePositions().length > 0) {
-              <table cTable [small]="true" [hover]="true" [striped]="true" class="mb-0">
+            @if (groupedPositions().length > 0) {
+              <table cTable [small]="true" class="mb-0 grouped-positions-table">
                 <thead>
                   <tr>
+                    <th style="width: 30px;"></th>
                     <th>Asset</th>
-                    <th>Dir</th>
-                    <th>Size</th>
-                    <th>Entry</th>
-                    <th>SL</th>
-                    <th>TP</th>
-                    <th>Trailing</th>
-                    <th class="text-end">P&amp;L (USD)</th>
+                    <th>Esposizione</th>
+                    <th>Entry Medio</th>
+                    <th class="text-end">P&amp;L Totale</th>
                   </tr>
                 </thead>
                 <tbody>
-                  @for (pos of livePositions(); track pos.deal_id) {
-                    <tr>
-                      <td class="fw-semibold">{{ pos.epic }}</td>
-                      <td>
-                        <c-badge [color]="directionColor(pos.direction)" class="badge-sm">
-                          {{ pos.direction }}
-                        </c-badge>
+                  @for (group of groupedPositions(); track group.epic) {
+                    <!-- GROUP HEADER ROW -->
+                    <tr class="group-header" [class.group-expanded]="group.expanded"
+                        (click)="toggleGroup(group.epic)" style="cursor: pointer;">
+                      <td class="text-center">
+                        <svg width="16" height="16" fill="currentColor" class="chevron-icon"
+                             [class.rotated]="group.expanded">
+                          <path d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+                        </svg>
                       </td>
-                      <td class="font-monospace">{{ pos.size | number:'1.4-4' }}</td>
-                      <td class="font-monospace">{{ pos.level | priceFormat:pos.epic }}</td>
-                      <td class="font-monospace">{{ pos.stop_level !== null ? (pos.stop_level | priceFormat:pos.epic) : '—' }}</td>
-                      <td class="font-monospace">{{ pos.profit_level !== null ? (pos.profit_level | priceFormat:pos.epic) : '—' }}</td>
+                      <td class="fw-bold">
+                        <div class="d-flex align-items-center gap-2">
+                          <app-epic-logo [epic]="group.epic" [size]="28"></app-epic-logo>
+                          <span>{{ group.epic }}</span>
+                          @if (group.positions.length > 1) {
+                            <c-badge color="primary" class="badge-sm ms-1">{{ group.positions.length }}x</c-badge>
+                          }
+                        </div>
+                      </td>
                       <td>
-                        @if (pos.trailing_stop_phase) {
-                          <c-badge [color]="trailingPhaseColor(pos.trailing_stop_phase)" class="badge-sm">
-                            {{ pos.trailing_stop_phase }}
+                        <div class="d-flex align-items-center gap-2">
+                          <c-badge [color]="directionColor(group.netDirection)" class="badge-sm">
+                            {{ group.netDirection }}
                           </c-badge>
-                        } @else {
-                          <span class="text-body-secondary">-</span>
-                        }
+                          <span class="font-monospace">{{ group.totalSize | number:'1.4-4' }}</span>
+                        </div>
                       </td>
-                      <td class="text-end fw-semibold font-monospace"
-                          [class.text-success]="pos.live_pnl >= 0"
-                          [class.text-danger]="pos.live_pnl < 0">
-                        $ {{ pos.live_pnl >= 0 ? '+' : '' }}{{ pos.live_pnl | number:'1.2-2' }}
+                      <td class="font-monospace">{{ group.avgEntry | priceFormat:group.epic }}</td>
+                      <td class="text-end fw-bold font-monospace"
+                          [class.text-success]="group.totalPnl >= 0"
+                          [class.text-danger]="group.totalPnl < 0">
+                        $ {{ group.totalPnl >= 0 ? '+' : '' }}{{ group.totalPnl | number:'1.2-2' }}
                       </td>
                     </tr>
+
+                    <!-- DETAIL ROWS (shown when expanded) -->
+                    @if (group.expanded) {
+                      @for (pos of group.positions; track pos.deal_id) {
+                        <tr class="detail-row">
+                          <td></td>
+                          <td class="ps-4">
+                            <c-badge [color]="directionColor(pos.direction)" class="badge-sm">
+                              {{ pos.direction }}
+                            </c-badge>
+                          </td>
+                          <td class="font-monospace small">{{ pos.size | number:'1.4-4' }}</td>
+                          <td class="font-monospace small">{{ pos.level | priceFormat:pos.epic }}</td>
+                          <td>
+                            <div class="d-flex justify-content-end gap-2 small">
+                              @if (getCurrentPrice(pos); as currentPrice) {
+                                <span class="font-monospace fw-semibold"
+                                      [class.text-success]="pos.live_pnl >= 0"
+                                      [class.text-danger]="pos.live_pnl < 0">
+                                  {{ currentPrice | priceFormat:pos.epic }}
+                                </span>
+                              }
+                              <span class="text-body-secondary">|</span>
+                              <span class="font-monospace">SL: {{ pos.stop_level !== null ? (pos.stop_level | priceFormat:pos.epic) : '—' }}</span>
+                              <span class="text-body-secondary">|</span>
+                              <span class="font-monospace">TP: {{ pos.profit_level !== null ? (pos.profit_level | priceFormat:pos.epic) : '—' }}</span>
+                              @if (pos.trailing_stop_phase) {
+                                <span class="text-body-secondary">|</span>
+                                <c-badge [color]="trailingPhaseColor(pos.trailing_stop_phase)" class="badge-sm">
+                                  {{ pos.trailing_stop_phase }}
+                                </c-badge>
+                              }
+                              <span class="text-body-secondary">|</span>
+                              <span class="font-monospace fw-semibold"
+                                    [class.text-success]="pos.live_pnl >= 0"
+                                    [class.text-danger]="pos.live_pnl < 0">
+                                $ {{ pos.live_pnl >= 0 ? '+' : '' }}{{ pos.live_pnl | number:'1.2-2' }}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      }
+                    }
                   }
                 </tbody>
               </table>
@@ -304,7 +367,12 @@ interface LivePosition extends PaperPosition {
                 <tbody>
                   @for (s of signalEntries(); track s.epic) {
                     <tr>
-                      <td class="fw-semibold">{{ s.epic }}</td>
+                      <td class="fw-semibold">
+                        <div class="d-flex align-items-center gap-2" style="cursor: pointer;" (click)="onEpicClick(s.epic)">
+                          <app-epic-logo [epic]="s.epic" [size]="24"></app-epic-logo>
+                          <span>{{ s.epic }}</span>
+                        </div>
+                      </td>
                       <td>
                         <c-badge [color]="directionColor(s.info.direction)" class="badge-sm">
                           {{ s.info.direction }}
@@ -420,7 +488,12 @@ interface LivePosition extends PaperPosition {
                   <tr [class.table-danger]="sig.status === 'rejected' || sig.status === 'exec_failed'"
                       [class.table-secondary]="sig.status === 'market_closed'">
                     <td class="small text-body-secondary text-nowrap">{{ formatTime(sig.timestamp) }}</td>
-                    <td class="fw-semibold">{{ sig.epic }}</td>
+                    <td class="fw-semibold">
+                      <div class="d-flex align-items-center gap-2" style="cursor: pointer;" (click)="onEpicClick(sig.epic)">
+                        <app-epic-logo [epic]="sig.epic" [size]="20"></app-epic-logo>
+                        <span>{{ sig.epic }}</span>
+                      </div>
+                    </td>
                     <td>
                       @if (sig.strategy_name) {
                         <c-badge [color]="strategyColor(sig.strategy_name)" class="badge-sm">
@@ -486,6 +559,26 @@ interface LivePosition extends PaperPosition {
         }
       </c-card-body>
     </c-card>
+
+    <!-- ═══════ NEWS MODAL ═══════ -->
+    @if (showNewsModal() && selectedEpic()) {
+      <div class="modal d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);" (click)="closeNewsModal()">
+        <div class="modal-dialog modal-lg" (click)="$event.stopPropagation()">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title d-flex align-items-center gap-2">
+                <app-epic-logo [epic]="selectedEpic()!" [size]="32"></app-epic-logo>
+                <span>{{ selectedEpic() }} - Top News</span>
+              </h5>
+              <button type="button" class="btn-close" (click)="closeNewsModal()"></button>
+            </div>
+            <div class="modal-body">
+              <app-news-widget [news]="newsService.news()" [maxItems]="10" />
+            </div>
+          </div>
+        </div>
+      </div>
+    }
   `
 })
 export class PaperTradingComponent implements OnInit, OnDestroy {
@@ -493,10 +586,14 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   readonly ws = inject(WebSocketService);
   readonly marketStatus = inject(MarketStatusService);
   readonly toast = inject(ToastService);
+  readonly newsService = inject(NewsService);
 
   readonly actionInProgress = signal(false);
   readonly currentEpic = signal<string>('XAUUSD');
   readonly currentMarketStatus = signal<MarketStatusResponse | null>(null);
+  readonly selectedEpic = signal<string | null>(null);
+  readonly showNewsModal = signal(false);
+  readonly expandedGroups = signal<Set<string>>(new Set());
 
   readonly status = this.trading.paperStatus;
   readonly statusLoaded = computed(() => this.status() !== null);
@@ -549,6 +646,53 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   // Total P&L across all positions
   readonly totalPnl = computed(() => {
     return this.livePositions().reduce((sum, pos) => sum + pos.live_pnl, 0);
+  });
+
+  // Grouped positions by epic
+  readonly groupedPositions = computed<GroupedPosition[]>(() => {
+    const positions = this.livePositions();
+    const groups = new Map<string, LivePosition[]>();
+
+    // Group by epic
+    positions.forEach(pos => {
+      if (!groups.has(pos.epic)) {
+        groups.set(pos.epic, []);
+      }
+      groups.get(pos.epic)!.push(pos);
+    });
+
+    // Convert to GroupedPosition array
+    return Array.from(groups.entries()).map(([epic, epicPositions]) => {
+      const totalSize = epicPositions.reduce((sum, p) => {
+        return sum + (p.direction === 'BUY' ? p.size : -p.size);
+      }, 0);
+
+      const totalPnl = epicPositions.reduce((sum, p) => sum + p.live_pnl, 0);
+
+      const buySize = epicPositions.filter(p => p.direction === 'BUY').reduce((sum, p) => sum + p.size, 0);
+      const sellSize = epicPositions.filter(p => p.direction === 'SELL').reduce((sum, p) => sum + p.size, 0);
+
+      const netDirection: 'LONG' | 'SHORT' | 'NEUTRAL' =
+        Math.abs(buySize - sellSize) < 0.0001 ? 'NEUTRAL' :
+        buySize > sellSize ? 'LONG' : 'SHORT';
+
+      // Weighted average entry price
+      const totalValue = epicPositions.reduce((sum, p) => sum + (p.level * p.size), 0);
+      const totalVolume = epicPositions.reduce((sum, p) => sum + p.size, 0);
+      const avgEntry = totalVolume > 0 ? totalValue / totalVolume : 0;
+
+      const expanded = this.expandedGroups().has(epic);
+
+      return {
+        epic,
+        positions: epicPositions,
+        totalSize: Math.abs(totalSize),
+        totalPnl,
+        avgEntry,
+        netDirection,
+        expanded
+      };
+    }).sort((a, b) => b.totalPnl - a.totalPnl); // Sort by P&L descending
   });
 
   // Recent signals (latest 50)
@@ -640,6 +784,17 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     });
   }
 
+  toggleGroup(epic: string): void {
+    const current = this.expandedGroups();
+    const newSet = new Set(current);
+    if (newSet.has(epic)) {
+      newSet.delete(epic);
+    } else {
+      newSet.add(epic);
+    }
+    this.expandedGroups.set(newSet);
+  }
+
   directionColor(direction: string): string {
     return direction === 'BUY' ? 'success' : direction === 'SELL' ? 'danger' : 'secondary';
   }
@@ -729,5 +884,22 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
       return `${days}d ${hours % 24}h`;
     }
     return `${hours}h ${minutes}m`;
+  }
+
+  onEpicClick(epic: string): void {
+    this.selectedEpic.set(epic);
+    this.showNewsModal.set(true);
+    this.newsService.getNews(epic, 10, 7);
+  }
+
+  closeNewsModal(): void {
+    this.showNewsModal.set(false);
+    this.selectedEpic.set(null);
+  }
+
+  getCurrentPrice(pos: LivePosition): number | null {
+    const tick = this.ws.prices()[pos.epic];
+    if (!tick) return null;
+    return pos.direction === 'BUY' ? tick.bid : tick.offer;
   }
 }

@@ -8,7 +8,10 @@ import {
   TableDirective,
 } from '@coreui/angular';
 import { TradingService } from '../../core/services/trading.service';
+import { NewsService } from '../../core/services/news.service';
 import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
+import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.component';
+import { NewsWidgetComponent } from '../../shared/components/news-widget/news-widget.component';
 import { PaperSignal } from '../../core/models';
 
 type SortField = 'timestamp' | 'epic' | 'confidence' | 'entry_price';
@@ -25,6 +28,8 @@ type SortDir = 'asc' | 'desc';
     ButtonDirective, FormControlDirective, FormLabelDirective,
     TableDirective,
     PriceFormatPipe,
+    EpicLogoComponent,
+    NewsWidgetComponent,
   ],
   template: `
     <!-- Header -->
@@ -161,7 +166,12 @@ type SortDir = 'asc' | 'desc';
                   <tr [class.table-danger]="sig.status === 'rejected' || sig.status === 'exec_failed'"
                       [class.table-secondary]="sig.status === 'market_closed'">
                     <td class="small text-body-secondary text-nowrap">{{ formatDateTime(sig.timestamp) }}</td>
-                    <td class="fw-semibold">{{ sig.epic }}</td>
+                    <td class="fw-semibold">
+                      <div class="d-flex align-items-center gap-2" style="cursor: pointer;" (click)="onEpicClick(sig.epic)">
+                        <app-epic-logo [epic]="sig.epic" [size]="20"></app-epic-logo>
+                        <span>{{ sig.epic }}</span>
+                      </div>
+                    </td>
                     <td>
                       <c-badge [color]="directionColor(sig.direction)" class="badge-sm">{{ sig.direction }}</c-badge>
                     </td>
@@ -215,6 +225,26 @@ type SortDir = 'asc' | 'desc';
         }
       </c-card-body>
     </c-card>
+
+    <!-- ═══════ NEWS MODAL ═══════ -->
+    @if (showNewsModal() && selectedEpic()) {
+      <div class="modal d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);" (click)="closeNewsModal()">
+        <div class="modal-dialog modal-lg" (click)="$event.stopPropagation()">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title d-flex align-items-center gap-2">
+                <app-epic-logo [epic]="selectedEpic()!" [size]="32"></app-epic-logo>
+                <span>{{ selectedEpic() }} - Top News</span>
+              </h5>
+              <button type="button" class="btn-close" (click)="closeNewsModal()"></button>
+            </div>
+            <div class="modal-body">
+              <app-news-widget [news]="newsService.news()" [maxItems]="10" />
+            </div>
+          </div>
+        </div>
+      </div>
+    }
   `,
   styles: [`
     .cursor-pointer { cursor: pointer; user-select: none; }
@@ -223,6 +253,10 @@ type SortDir = 'asc' | 'desc';
 })
 export class TradeJournalComponent implements OnInit {
   private readonly trading = inject(TradingService);
+  readonly newsService = inject(NewsService);
+
+  readonly selectedEpic = signal<string | null>(null);
+  readonly showNewsModal = signal(false);
 
   // Filter signals
   readonly filterEpic = signal('');
@@ -376,5 +410,16 @@ export class TradeJournalComponent implements OnInit {
         hour: '2-digit', minute: '2-digit', second: '2-digit',
       });
     } catch { return iso; }
+  }
+
+  onEpicClick(epic: string): void {
+    this.selectedEpic.set(epic);
+    this.showNewsModal.set(true);
+    this.newsService.getNews(epic, 10, 7);
+  }
+
+  closeNewsModal(): void {
+    this.showNewsModal.set(false);
+    this.selectedEpic.set(null);
   }
 }
