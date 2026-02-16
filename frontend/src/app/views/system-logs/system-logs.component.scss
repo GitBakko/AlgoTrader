@@ -1,3 +1,5 @@
+@use 'sass:color';
+
 // MANTIS AI Theme Colors
 $mantis-green: #39FF14;
 $mantis-muted: #00d97e;
@@ -6,7 +8,7 @@ $dark-surface: #161b22;
 
 // Health Score Card
 .health-score-card {
-  background: linear-gradient(135deg, $dark-surface 0%, lighten($dark-surface, 5%) 100%);
+  background: linear-gradient(135deg, $dark-surface 0%, color.adjust($dark-surface, $lightness: 5%) 100%);
   border: 1px solid rgba($mantis-green, 0.2);
 
   .health-score-circle {

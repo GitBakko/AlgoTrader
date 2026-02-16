@@ -214,6 +214,10 @@ async def get_market_status(
     try:
         if broker:
             details = await broker.get_market_details(epic)
+            # Defensive: ensure details is a dict
+            if not isinstance(details, dict):
+                logger.warning(f"Broker returned non-dict response for {epic}: {type(details)}")
+                raise ValueError(f"Unexpected response type: {type(details)}")
             market_status = details.get("snapshot", {}).get("marketStatus", "TRADEABLE")
             is_open = market_status == "TRADEABLE"
 

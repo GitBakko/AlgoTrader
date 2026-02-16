@@ -136,29 +136,29 @@ class LogAnalyzer:
         # Group by epic
         by_epic = (
             df.group_by("epic")
-            .agg(pl.count())
-            .select(["epic", "count"])
+            .agg(pl.len())
+            .select(["epic", "len"])
             .to_dicts()
         )
-        by_epic_dict = {row["epic"]: row["count"] for row in by_epic}
+        by_epic_dict = {row["epic"]: row["len"] for row in by_epic}
 
         # Group by strategy
         by_strategy = (
             df.group_by("strategy")
-            .agg(pl.count())
-            .select(["strategy", "count"])
+            .agg(pl.len())
+            .select(["strategy", "len"])
             .to_dicts()
         )
-        by_strategy_dict = {row["strategy"]: row["count"] for row in by_strategy}
+        by_strategy_dict = {row["strategy"]: row["len"] for row in by_strategy}
 
         # Group by direction
         by_direction = (
             df.group_by("direction")
-            .agg(pl.count())
-            .select(["direction", "count"])
+            .agg(pl.len())
+            .select(["direction", "len"])
             .to_dicts()
         )
-        by_direction_dict = {row["direction"]: row["count"] for row in by_direction}
+        by_direction_dict = {row["direction"]: row["len"] for row in by_direction}
 
         return SignalStats(
             total_signals=total,
@@ -343,11 +343,11 @@ class LogAnalyzer:
         # Group by event type
         by_type = (
             df.group_by("event_type")
-            .agg(pl.count())
-            .select(["event_type", "count"])
+            .agg(pl.len())
+            .select(["event_type", "len"])
             .to_dicts()
         )
-        by_type_dict = {row["event_type"]: row["count"] for row in by_type}
+        by_type_dict = {row["event_type"]: row["len"] for row in by_type}
 
         last_event = df.select(pl.col("timestamp").max()).item()
 

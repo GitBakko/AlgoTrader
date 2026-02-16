@@ -9,7 +9,7 @@ from enum import Enum
 from typing import Any
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from loguru import logger
 
 from ..database.session import DatabaseManager
@@ -68,26 +68,25 @@ class SignalLog(BaseModel):
     execution_status: ExecutionStatus | None = None
     rejection_reason: str | None = None
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "timestamp": "2026-02-14T10:30:00Z",
-                "epic": "XAUUSD",
-                "direction": "LONG",
-                "confidence": 0.72,
-                "strategy": "ml_strategy",
-                "features": {
-                    "rsi_14": 45.2,
-                    "macd_signal": 0.8,
-                    "bb_position": 0.3,
-                    "regime": "trending"
-                },
-                "model_version": "xgb_v1.2.0",
-                "model_proba": {"LONG": 0.72, "SHORT": 0.15, "HOLD": 0.13},
-                "execution_status": "executed",
-                "rejection_reason": None
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "timestamp": "2026-02-14T10:30:00Z",
+            "epic": "XAUUSD",
+            "direction": "LONG",
+            "confidence": 0.72,
+            "strategy": "ml_strategy",
+            "features": {
+                "rsi_14": 45.2,
+                "macd_signal": 0.8,
+                "bb_position": 0.3,
+                "regime": "trending"
+            },
+            "model_version": "xgb_v1.2.0",
+            "model_proba": {"LONG": 0.72, "SHORT": 0.15, "HOLD": 0.13},
+            "execution_status": "executed",
+            "rejection_reason": None
         }
+    })
 
 
 class ExecutionLog(BaseModel):
@@ -115,27 +114,26 @@ class ExecutionLog(BaseModel):
     exit_timestamp: datetime | None = None
     realized_pnl: float | None = None
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "timestamp": "2026-02-14T10:30:05Z",
-                "deal_id": "DEAL123456",
-                "epic": "XAUUSD",
-                "direction": "BUY",
-                "size": 0.5,
-                "entry_price": 2050.25,
-                "stop_loss": 2045.00,
-                "take_profit": 2060.00,
-                "status": "executed",
-                "error_message": None,
-                "kelly_fraction": 0.15,
-                "risk_pct": 2.0,
-                "equity_at_entry": 10000.0,
-                "exit_price": None,
-                "exit_timestamp": None,
-                "realized_pnl": None
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "timestamp": "2026-02-14T10:30:05Z",
+            "deal_id": "DEAL123456",
+            "epic": "XAUUSD",
+            "direction": "BUY",
+            "size": 0.5,
+            "entry_price": 2050.25,
+            "stop_loss": 2045.00,
+            "take_profit": 2060.00,
+            "status": "executed",
+            "error_message": None,
+            "kelly_fraction": 0.15,
+            "risk_pct": 2.0,
+            "equity_at_entry": 10000.0,
+            "exit_price": None,
+            "exit_timestamp": None,
+            "realized_pnl": None
         }
+    })
 
 
 class RiskEventLog(BaseModel):
@@ -156,22 +154,21 @@ class RiskEventLog(BaseModel):
     # Action taken
     action: str = Field(description="Action taken (e.g., 'rejected_trade', 'halved_size', 'stopped_trading')")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "timestamp": "2026-02-14T10:30:10Z",
-                "event_type": "circuit_breaker",
-                "epic": "BTCUSD",
-                "description": "Daily loss limit exceeded (-5.2%)",
-                "current_equity": 9480.0,
-                "peak_equity": 10000.0,
-                "current_drawdown_pct": 5.2,
-                "daily_pnl": -520.0,
-                "open_positions": 2,
-                "consecutive_losses": 4,
-                "action": "stopped_trading"
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "timestamp": "2026-02-14T10:30:10Z",
+            "event_type": "circuit_breaker",
+            "epic": "BTCUSD",
+            "description": "Daily loss limit exceeded (-5.2%)",
+            "current_equity": 9480.0,
+            "peak_equity": 10000.0,
+            "current_drawdown_pct": 5.2,
+            "daily_pnl": -520.0,
+            "open_positions": 2,
+            "consecutive_losses": 4,
+            "action": "stopped_trading"
         }
+    })
 
 
 # ═══════════════════════════════════════════════════════════════════════════

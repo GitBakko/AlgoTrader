@@ -1,0 +1,203 @@
+/**
+ * User Dropdown Component Styles
+ * MANTIS AI Theme - Professional & Elegant
+ */
+
+.user-dropdown {
+  // Ensure dropdown is vertically aligned with other header items
+  display: flex;
+  align-items: center;
+
+  // Toggle button
+  &__toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--cui-border-radius);
+    color: var(--cui-body-color);
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+    height: 100%; // Match header height
+
+    &:hover {
+      background: var(--cui-tertiary-bg);
+      border-color: var(--mantis-green-muted, #00d97e);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--mantis-green, #39ff14);
+      outline-offset: 2px;
+    }
+
+    // Active state when dropdown is open
+    &[aria-expanded="true"] {
+      background: var(--cui-tertiary-bg);
+      border-color: var(--mantis-green, #39ff14);
+    }
+  }
+
+  // Avatar in toggle
+  &__avatar {
+    background: linear-gradient(135deg, var(--mantis-green, #39ff14) 0%, var(--mantis-green-muted, #00d97e) 100%);
+    color: var(--cui-dark, #0d1117) !important;
+    font-weight: 600;
+    font-size: 0.875rem;
+    box-shadow: 0 0 0 2px var(--cui-body-bg);
+  }
+
+  // Username text
+  &__username {
+    font-weight: 500;
+    font-size: 0.875rem;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  // Dropdown menu
+  &__menu {
+    min-width: 280px;
+    border: 1px solid var(--cui-border-color);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    animation: slideDown 0.2s ease-out;
+
+    @media (prefers-reduced-motion: reduce) {
+      animation: none;
+    }
+  }
+
+  // User info header
+  &__header {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--cui-border-color);
+    margin-bottom: 0.5rem;
+  }
+
+  &__header-avatar {
+    background: linear-gradient(135deg, var(--mantis-green, #39ff14) 0%, var(--mantis-green-muted, #00d97e) 100%);
+    color: var(--cui-dark, #0d1117) !important;
+    font-weight: 700;
+    font-size: 1.125rem;
+    flex-shrink: 0;
+  }
+
+  // Role badge
+  &__role-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+
+    svg {
+      opacity: 0.9;
+    }
+  }
+
+  // Menu items
+  &__item {
+    display: flex;
+    align-items: center;
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    color: var(--cui-body-color);
+    transition: all 0.15s ease-in-out;
+
+    svg {
+      flex-shrink: 0;
+      opacity: 0.7;
+      transition: opacity 0.15s ease-in-out;
+    }
+
+    span {
+      flex-grow: 1;
+    }
+
+    &:hover {
+      background: var(--cui-tertiary-bg);
+      color: var(--mantis-green, #39ff14);
+
+      svg {
+        opacity: 1;
+      }
+    }
+
+    &:active {
+      background: var(--cui-secondary-bg);
+    }
+
+    // Logout item special styling
+    &--logout {
+      color: var(--cui-danger);
+
+      &:hover {
+        background: rgba(var(--cui-danger-rgb), 0.1);
+        color: var(--cui-danger);
+      }
+
+      svg {
+        opacity: 0.8;
+      }
+
+      &:hover svg {
+        opacity: 1;
+      }
+    }
+  }
+}
+
+// Slide down animation for dropdown
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Dark mode adjustments
+@media (prefers-color-scheme: dark) {
+  .user-dropdown {
+    &__toggle {
+      &:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+    }
+
+    &__menu {
+      box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.5);
+    }
+
+    &__item {
+      &:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      &--logout:hover {
+        background: rgba(220, 53, 69, 0.15);
+      }
+    }
+  }
+}
+
+// Responsive adjustments
+@media (max-width: 991.98px) {
+  .user-dropdown {
+    &__toggle {
+      padding: 0.375rem;
+    }
+
+    &__menu {
+      min-width: 260px;
+    }
+  }
+}

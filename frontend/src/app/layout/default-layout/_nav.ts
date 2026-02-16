@@ -57,7 +57,7 @@ export const navItems: INavData[] = [
   {
     name: 'Modelli AI',
     url: '/models',
-    iconComponent: { name: 'cil-brain' }
+    iconComponent: { name: 'cil-puzzle' }
   },
   {
     title: true,

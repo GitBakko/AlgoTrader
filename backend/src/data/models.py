@@ -6,7 +6,7 @@ Extends broker models with storage-specific fields.
 from datetime import datetime, timezone
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DataSource(str, Enum):
@@ -33,8 +33,7 @@ class OHLCBar(BaseModel):
     timeframe: str  # 1min, 5min, 15min, 1h, 4h, 1d
     source: DataSource = DataSource.HISTORICAL
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class DataQualityReport(BaseModel):

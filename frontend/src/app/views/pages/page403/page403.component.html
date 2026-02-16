@@ -1,0 +1,40 @@
+<div class="bg-light dark:bg-transparent min-vh-100 d-flex flex-row align-items-center">
+  <c-container>
+    <c-row class="justify-content-center">
+      <c-col md="6">
+        <c-card class="text-center">
+          <c-card-body class="p-5">
+            <div class="mb-4">
+              <svg cIcon name="cilLockLocked" size="5xl" class="text-danger mantis-brand-text"></svg>
+            </div>
+            <h1 class="display-1 fw-bold mantis-brand-text">403</h1>
+            <h2 class="mb-4">Accesso Negato</h2>
+            <p class="text-body-secondary mb-4">
+              Non hai i permessi necessari per accedere a questa risorsa.
+              Contatta l'amministratore se ritieni che questo sia un errore.
+            </p>
+            <div class="d-flex gap-2 justify-content-center">
+              <button
+                cButton
+                color="primary"
+                routerLink="/dashboard"
+                class="mantis-btn-primary"
+              >
+                <svg cIcon name="cilHome" class="me-2"></svg>
+                Torna alla Dashboard
+              </button>
+              <button
+                cButton
+                color="secondary"
+                routerLink="/profile"
+              >
+                <svg cIcon name="cilUser" class="me-2"></svg>
+                Vedi Profilo
+              </button>
+            </div>
+          </c-card-body>
+        </c-card>
+      </c-col>
+    </c-row>
+  </c-container>
+</div>

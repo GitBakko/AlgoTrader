@@ -1,4 +1,6 @@
 import { Routes } from '@angular/router';
+import { authGuard } from './core/guards/auth.guard';
+import { permissionGuard } from './core/guards/permission.guard';
 
 export const routes: Routes = [
   {
@@ -6,9 +8,22 @@ export const routes: Routes = [
     redirectTo: 'dashboard',
     pathMatch: 'full'
   },
+  // Public routes (no authentication required)
+  {
+    path: 'login',
+    loadComponent: () => import('./views/pages/login/login.component').then(m => m.LoginComponent),
+    data: { title: 'Login' }
+  },
+  {
+    path: 'register',
+    loadComponent: () => import('./views/pages/register/register.component').then(m => m.RegisterComponent),
+    data: { title: 'Register' }
+  },
+  // Protected routes (authentication required)
   {
     path: '',
     loadComponent: () => import('./layout').then(m => m.DefaultLayoutComponent),
+    canActivate: [authGuard],
     data: { title: 'Home' },
     children: [
       {
@@ -16,8 +31,14 @@ export const routes: Routes = [
         loadChildren: () => import('./views/dashboard/routes').then(m => m.routes)
       },
       {
+        path: 'profile',
+        loadChildren: () => import('./views/user-profile/routes').then(m => m.routes)
+      },
+      {
         path: 'positions',
-        loadChildren: () => import('./views/positions/routes').then(m => m.routes)
+        loadChildren: () => import('./views/positions/routes').then(m => m.routes),
+        canActivate: [permissionGuard],
+        data: { resource: 'positions', action: 'read' }
       },
       {
         path: 'signals',
@@ -33,7 +54,9 @@ export const routes: Routes = [
       },
       {
         path: 'paper-trading',
-        loadChildren: () => import('./views/paper-trading/routes').then(m => m.routes)
+        loadChildren: () => import('./views/paper-trading/routes').then(m => m.routes),
+        canActivate: [permissionGuard],
+        data: { resource: 'trading', action: 'execute' }
       },
       {
         path: 'trade-journal',
@@ -53,13 +76,21 @@ export const routes: Routes = [
       },
       {
         path: 'settings',
-        loadChildren: () => import('./views/settings/routes').then(m => m.routes)
+        loadChildren: () => import('./views/settings/routes').then(m => m.routes),
+        canActivate: [permissionGuard],
+        data: { resource: 'settings', action: 'write' }
       },
       {
         path: 'system-logs',
         loadChildren: () => import('./views/system-logs/routes').then(m => m.routes)
       }
     ]
+  },
+  // Error pages
+  {
+    path: '403',
+    loadComponent: () => import('./views/pages/page403/page403.component').then(m => m.Page403Component),
+    data: { title: 'Page 403' }
   },
   {
     path: '404',

@@ -55,7 +55,7 @@
     <c-card class="mb-4 border-top border-top-3 border-top-primary">
       <c-card-body class="pb-0">
         <div class="text-body-secondary text-uppercase small fw-semibold mb-1">Equity (USD)</div>
-        <div class="fs-4 fw-bold">
+        <div class="fs-4 fw-bold mantis-kpi">
           {{ overview() ? '$ ' + (overview()!.equity | number:'1.2-2') : '...' }}
         </div>
       </c-card-body>
@@ -74,7 +74,7 @@
             [class.border-top-danger]="totalUnrealizedPnl() < 0">
       <c-card-body class="pb-0">
         <div class="text-body-secondary text-uppercase small fw-semibold mb-1">P&amp;L Non Realizzato</div>
-        <div class="fs-4 fw-bold"
+        <div class="fs-4 fw-bold mantis-kpi"
              [class.text-success]="totalUnrealizedPnl() >= 0"
              [class.text-danger]="totalUnrealizedPnl() < 0">
           $ {{ totalUnrealizedPnl() >= 0 ? '+' : '' }}{{ totalUnrealizedPnl() | number:'1.2-2' }}
@@ -94,7 +94,7 @@
     <c-card class="mb-4 border-top border-top-3 border-top-warning">
       <c-card-body class="pb-0">
         <div class="text-body-secondary text-uppercase small fw-semibold mb-1">Posizioni Aperte</div>
-        <div class="fs-4 fw-bold">{{ openPositionCount() }}</div>
+        <div class="fs-4 fw-bold mantis-kpi">{{ openPositionCount() }}</div>
       </c-card-body>
       <div class="px-3 pb-3">
         <div class="text-body-secondary small">
@@ -110,7 +110,7 @@
             [class.border-top-success]="drawdownPct() <= 5">
       <c-card-body class="pb-0">
         <div class="text-body-secondary text-uppercase small fw-semibold mb-1">Drawdown</div>
-        <div class="fs-4 fw-bold" [class.text-danger]="drawdownPct() > 5">
+        <div class="fs-4 fw-bold mantis-kpi" [class.text-danger]="drawdownPct() > 5">
           {{ drawdownPct() | number:'1.2-2' }}%
         </div>
       </c-card-body>
@@ -136,25 +136,37 @@
   </c-col>
 </c-row>
 
-<!-- ═══════ ROW 3: Equity Curve + Live Prices ═══════ -->
+<!-- ═══════ ROW 3: Equity Curve (full width) ═══════ -->
 <c-row>
-  <c-col xl="9">
+  <c-col md="12">
     <c-card class="mb-4">
       <c-card-header class="d-flex align-items-center justify-content-between py-2">
         <strong>Equity Curve</strong>
-        @if (overview(); as ov) {
-          <div class="d-flex align-items-center gap-3 small">
-            <span>Win Rate: <strong>{{ (ov.win_rate * 100) | number:'1.0-0' }}%</strong></span>
-            <span>Sharpe: <strong>{{ ov.sharpe_ratio | number:'1.2-2' }}</strong></span>
-          </div>
-        }
+        <div class="d-flex align-items-center gap-3 small">
+          @if (overview(); as ov) {
+            <span>Win Rate: <strong class="mantis-mono">{{ (ov.win_rate * 100) | number:'1.0-0' }}%</strong></span>
+            <span>Sharpe: <strong class="mantis-mono">{{ ov.sharpe_ratio | number:'1.2-2' }}</strong></span>
+          }
+          @if (riskStatus(); as rs) {
+            <span class="ms-2">Circuit Breaker:
+              <c-badge [color]="rs.circuit_breaker_active ? 'danger' : 'success'" class="badge-sm">
+                {{ rs.circuit_breaker_active ? 'ATTIVO' : 'OK' }}
+              </c-badge>
+            </span>
+            <span>Daily P&amp;L:
+              <strong class="mantis-mono" [class.text-success]="rs.daily_pnl >= 0" [class.text-danger]="rs.daily_pnl < 0">
+                $ {{ rs.daily_pnl | number:'1.2-2' }}
+              </strong>
+            </span>
+          }
+        </div>
       </c-card-header>
       <c-card-body class="p-0">
         @if (equityLineData().length > 0) {
           <app-tv-chart
             mode="area"
             [lineData]="equityLineData()"
-            [height]="300"
+            [height]="340"
             lineColor="#00d97e"
             areaTopColor="rgba(0, 217, 126, 0.25)"
             areaBottomColor="rgba(0, 217, 126, 0.01)"
@@ -168,64 +180,37 @@
       </c-card-body>
     </c-card>
   </c-col>
-
-  <!-- Live Price Tickers -->
-  <c-col xl="3">
-    <c-card class="mb-4">
-      <c-card-header class="py-2"><strong>Prezzi Live</strong></c-card-header>
-      <c-card-body class="p-0">
-        @if (priceTickers().length > 0) {
-          <table cTable [small]="true" [hover]="true" class="mb-0">
-            <tbody>
-              @for (t of priceTickers(); track t.epic) {
-                <tr>
-                  <td class="fw-semibold">
-                    <div class="d-flex align-items-center gap-2">
-                      <app-epic-logo [epic]="t.epic" [size]="20" [rounded]="true" />
-                      {{ t.epic }}
-                    </div>
-                  </td>
-                  <td class="text-end font-monospace">{{ t.bid | priceFormat:t.epic }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        } @else {
-          <div class="text-center py-4 text-body-secondary small">
-            WebSocket non connesso
-          </div>
-        }
-      </c-card-body>
-    </c-card>
-
-    <!-- Risk Mini-Panel -->
-    <c-card class="mb-4">
-      <c-card-header class="py-2"><strong>Risk Status</strong></c-card-header>
-      <c-card-body>
-        @if (riskStatus(); as rs) {
-          <div class="d-flex justify-content-between mb-2 small">
-            <span>Circuit Breaker</span>
-            <c-badge [color]="rs.circuit_breaker_active ? 'danger' : 'success'" class="badge-sm">
-              {{ rs.circuit_breaker_active ? 'ATTIVO' : 'OK' }}
-            </c-badge>
-          </div>
-          <div class="d-flex justify-content-between mb-2 small">
-            <span>Drawdown</span>
-            <strong class="text-danger">{{ (rs.current_drawdown_pct * 100) | number:'1.2-2' }}%</strong>
-          </div>
-          <div class="d-flex justify-content-between small">
-            <span>Daily P&amp;L</span>
-            <strong [class.text-success]="rs.daily_pnl >= 0" [class.text-danger]="rs.daily_pnl < 0">
-              $ {{ rs.daily_pnl | number:'1.2-2' }}
-            </strong>
-          </div>
-        } @else {
-          <div class="text-body-secondary small">Caricamento...</div>
-        }
-      </c-card-body>
-    </c-card>
-  </c-col>
 </c-row>
+
+<!-- ═══════ ROW 3b: Live Prices (block grid) ═══════ -->
+<c-card class="mb-4">
+  <c-card-header class="d-flex align-items-center justify-content-between py-2">
+    <strong>Prezzi Live</strong>
+    <span class="text-body-secondary small">{{ priceTickers().length }} assets</span>
+  </c-card-header>
+  <c-card-body class="p-3">
+    @if (priceTickers().length > 0) {
+      <div class="price-grid">
+        @for (t of priceTickers(); track t.epic) {
+          <div class="price-block">
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <app-epic-logo [epic]="t.epic" [size]="22" [rounded]="true" />
+              <span class="fw-semibold small">{{ t.epic }}</span>
+            </div>
+            <div class="mantis-kpi" style="font-size: 1.05rem;">{{ t.bid | priceFormat:t.epic }}</div>
+            <div class="text-body-secondary" style="font-size: 0.65rem;">
+              spread: <span class="mantis-mono">{{ t.spread | number:'1.2-5' }}</span>
+            </div>
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="text-center py-4 text-body-secondary small">
+        WebSocket non connesso
+      </div>
+    }
+  </c-card-body>
+</c-card>
 
 <!-- ═══════ ROW 4: Open Positions + Recent Activity ═══════ -->
 <c-row>

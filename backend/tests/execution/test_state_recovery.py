@@ -159,7 +159,7 @@ class TestPositionRecovery:
 
     @pytest.mark.asyncio
     async def test_recover_positions_from_database_paper_mode(
-        self, sample_positions, mock_db_session
+        self, sample_positions, async_db_session_factory
     ):
         """Test recovering positions from database in PAPER mode."""
         # Setup mocks
@@ -170,15 +170,12 @@ class TestPositionRecovery:
         risk_manager = MagicMock()
         trailing_stop_manager = MagicMock()
 
-        async def mock_db_factory():
-            return mock_db_session
-
         service = StateRecoveryService(
             execution_engine=execution_engine,
             risk_manager=risk_manager,
             trailing_stop_manager=trailing_stop_manager,
             broker=None,
-            db_session_factory=lambda: mock_db_factory(),
+            db_session_factory=async_db_session_factory,
         )
 
         # Mock _load_positions_from_db to return sample positions
@@ -442,7 +439,9 @@ class TestReconciliation:
         assert reconciled[0]["size"] == 2.0  # Broker wins
 
     @pytest.mark.asyncio
-    async def test_reconcile_positions_detects_stale_db_positions(self):
+    async def test_reconcile_positions_detects_stale_db_positions(
+        self, async_db_session_factory
+    ):
         """Test detection of stale DB-only positions (closed externally)."""
         execution_engine = MagicMock()
         execution_engine.mode = ExecutionMode.DEMO
@@ -452,7 +451,7 @@ class TestReconciliation:
             risk_manager=MagicMock(),
             trailing_stop_manager=MagicMock(),
             broker=None,
-            db_session_factory=None,
+            db_session_factory=async_db_session_factory,
         )
 
         broker_positions = [{"deal_id": "DEAL123", "epic": "XAUUSD", "size": 1.0}]
@@ -462,8 +461,13 @@ class TestReconciliation:
             {"deal_id": "DEAL456", "epic": "BTCUSD", "size": 0.5},  # Stale (not in broker)
         ]
 
-        with patch("src.execution.state_recovery.logger") as mock_logger:
-            reconciled = await service._reconcile_positions(broker_positions, db_positions)
+        # Mock PositionRepository to return db_positions
+        with patch("src.database.repositories.PositionRepository") as MockRepo:
+            mock_repo_instance = MockRepo.return_value
+            mock_repo_instance.get_all_open = AsyncMock(return_value=db_positions)
+
+            with patch("src.execution.state_recovery.logger") as mock_logger:
+                reconciled = await service._reconcile_positions(broker_positions, db_positions)
 
         # Should log warning about stale position
         assert any(
@@ -624,7 +628,7 @@ class TestTrailingStopRestore:
 
     @pytest.mark.asyncio
     async def test_restore_trailing_stops_for_all_positions(
-        self, sample_positions, sample_trailing_stop_states
+        self, sample_positions, sample_trailing_stop_states, async_db_session_factory
     ):
         """Test trailing stops are restored for all recovered positions."""
         execution_engine = MagicMock()
@@ -638,7 +642,7 @@ class TestTrailingStopRestore:
             risk_manager=MagicMock(),
             trailing_stop_manager=trailing_stop_manager,
             broker=None,
-            db_session_factory=None,
+            db_session_factory=async_db_session_factory,
         )
 
         # Mock TrailingStopRepository
@@ -649,7 +653,7 @@ class TestTrailingStopRestore:
                 setattr(mock_state, key, value)
             mock_states.append(mock_state)
 
-        with patch("src.database.repositories.trailing_stop_repository.TrailingStopRepository") as MockRepo:
+        with patch("src.database.repositories.TrailingStopRepository") as MockRepo:
             mock_repo_instance = MockRepo.return_value
             mock_repo_instance.get_all_active = AsyncMock(return_value=mock_states)
 
@@ -659,7 +663,7 @@ class TestTrailingStopRestore:
         assert trailing_stop_manager.restore_state.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_restore_trailing_stops_removes_stale_states(self, sample_positions):
+    async def test_restore_trailing_stops_removes_stale_states(self, sample_positions, async_db_session_factory):
         """Test stale trailing stop states (no matching position) are removed."""
         execution_engine = MagicMock()
         execution_engine.mode = ExecutionMode.PAPER
@@ -671,14 +675,14 @@ class TestTrailingStopRestore:
             risk_manager=MagicMock(),
             trailing_stop_manager=trailing_stop_manager,
             broker=None,
-            db_session_factory=None,
+            db_session_factory=async_db_session_factory,
         )
 
         # Create stale state (deal_id not in positions)
         stale_state = MagicMock()
         stale_state.deal_id = "STALE999"
 
-        with patch("src.database.repositories.trailing_stop_repository.TrailingStopRepository") as MockRepo:
+        with patch("src.database.repositories.TrailingStopRepository") as MockRepo:
             mock_repo_instance = MockRepo.return_value
             mock_repo_instance.get_all_active = AsyncMock(return_value=[stale_state])
             mock_repo_instance.bulk_delete = AsyncMock()
@@ -690,20 +694,21 @@ class TestTrailingStopRestore:
 
     @pytest.mark.asyncio
     async def test_restore_trailing_stops_calls_manager_restore_state(
-        self, sample_positions, sample_trailing_stop_states
+        self, sample_positions, sample_trailing_stop_states, async_db_session_factory
     ):
-        """Test restore_state is called on TrailingStopManager with correct params."""
+        """Test trailing_stop_manager.restore_state() called with correct args."""
         execution_engine = MagicMock()
         execution_engine.mode = ExecutionMode.PAPER
 
         trailing_stop_manager = MagicMock()
+        trailing_stop_manager.restore_state = MagicMock()
 
         service = StateRecoveryService(
             execution_engine=execution_engine,
             risk_manager=MagicMock(),
             trailing_stop_manager=trailing_stop_manager,
             broker=None,
-            db_session_factory=None,
+            db_session_factory=async_db_session_factory,
         )
 
         mock_state = MagicMock()
@@ -718,7 +723,7 @@ class TestTrailingStopRestore:
         mock_state.highest_price = Decimal("2085.00")
         mock_state.lowest_price = None
 
-        with patch("src.database.repositories.trailing_stop_repository.TrailingStopRepository") as MockRepo:
+        with patch("src.database.repositories.TrailingStopRepository") as MockRepo:
             mock_repo_instance = MockRepo.return_value
             mock_repo_instance.get_all_active = AsyncMock(return_value=[mock_state])
             mock_repo_instance.bulk_delete = AsyncMock()
@@ -733,7 +738,7 @@ class TestTrailingStopRestore:
 
     @pytest.mark.asyncio
     async def test_restore_trailing_stops_handles_missing_optional_fields(
-        self, sample_positions
+        self, sample_positions, async_db_session_factory
     ):
         """Test restoration handles None values for optional fields."""
         execution_engine = MagicMock()
@@ -746,7 +751,7 @@ class TestTrailingStopRestore:
             risk_manager=MagicMock(),
             trailing_stop_manager=trailing_stop_manager,
             broker=None,
-            db_session_factory=None,
+            db_session_factory=async_db_session_factory,
         )
 
         # State with None optional fields
@@ -762,7 +767,7 @@ class TestTrailingStopRestore:
         mock_state.highest_price = None  # Optional
         mock_state.lowest_price = None  # Optional
 
-        with patch("src.database.repositories.trailing_stop_repository.TrailingStopRepository") as MockRepo:
+        with patch("src.database.repositories.TrailingStopRepository") as MockRepo:
             mock_repo_instance = MockRepo.return_value
             mock_repo_instance.get_all_active = AsyncMock(return_value=[mock_state])
 
@@ -787,7 +792,7 @@ class TestTrailingStopRestore:
             db_session_factory=None,
         )
 
-        with patch("src.database.repositories.trailing_stop_repository.TrailingStopRepository") as MockRepo:
+        with patch("src.database.repositories.TrailingStopRepository") as MockRepo:
             mock_repo_instance = MockRepo.return_value
             mock_repo_instance.get_all_active = AsyncMock(return_value=[])
 
@@ -809,7 +814,7 @@ class TestTrailingStopRestore:
             db_session_factory=None,
         )
 
-        with patch("src.database.repositories.trailing_stop_repository.TrailingStopRepository") as MockRepo:
+        with patch("src.database.repositories.TrailingStopRepository") as MockRepo:
             MockRepo.side_effect = Exception("Database connection failed")
 
             count = await service._restore_trailing_stops(sample_positions)
@@ -826,7 +831,7 @@ class TestTradeHistoryRestore:
     """Tests for trade history restoration for Kelly sizing."""
 
     @pytest.mark.asyncio
-    async def test_restore_trade_history_returns_pnl_list(self, sample_trade_history):
+    async def test_restore_trade_history_returns_pnl_list(self, sample_trade_history, async_db_session_factory):
         """Test trade history is returned as list of dicts with pnl key."""
         execution_engine = MagicMock()
         execution_engine.mode = ExecutionMode.PAPER
@@ -836,7 +841,7 @@ class TestTradeHistoryRestore:
             risk_manager=MagicMock(),
             trailing_stop_manager=MagicMock(),
             broker=None,
-            db_session_factory=None,
+            db_session_factory=async_db_session_factory,
         )
 
         # Mock trades from DB
@@ -846,7 +851,7 @@ class TestTradeHistoryRestore:
             mock_trade.profit_loss = Decimal(str(trade_data["pnl"]))
             mock_trades.append(mock_trade)
 
-        with patch("src.database.repositories.trade_repository.TradeRepository") as MockRepo:
+        with patch("src.database.repositories.TradeRepository") as MockRepo:
             mock_repo_instance = MockRepo.return_value
             mock_repo_instance.get_recent_for_kelly = AsyncMock(
                 return_value=mock_trades
@@ -859,7 +864,7 @@ class TestTradeHistoryRestore:
         assert trade_history[0]["pnl"] == 50.00
 
     @pytest.mark.asyncio
-    async def test_restore_trade_history_limits_to_200(self):
+    async def test_restore_trade_history_limits_to_200(self, async_db_session_factory):
         """Test trade history is limited to last 200 trades."""
         execution_engine = MagicMock()
         execution_engine.mode = ExecutionMode.PAPER
@@ -869,10 +874,10 @@ class TestTradeHistoryRestore:
             risk_manager=MagicMock(),
             trailing_stop_manager=MagicMock(),
             broker=None,
-            db_session_factory=None,
+            db_session_factory=async_db_session_factory,
         )
 
-        with patch("src.database.repositories.trade_repository.TradeRepository") as MockRepo:
+        with patch("src.database.repositories.TradeRepository") as MockRepo:
             mock_repo_instance = MockRepo.return_value
 
             # Verify get_recent_for_kelly is called with limit=200
@@ -882,7 +887,7 @@ class TestTradeHistoryRestore:
             mock_repo_instance.get_recent_for_kelly.assert_called_once_with(limit=200)
 
     @pytest.mark.asyncio
-    async def test_restore_trade_history_skips_null_pnl(self):
+    async def test_restore_trade_history_skips_null_pnl(self, async_db_session_factory):
         """Test trades with null profit_loss are skipped."""
         execution_engine = MagicMock()
         execution_engine.mode = ExecutionMode.PAPER
@@ -892,7 +897,7 @@ class TestTradeHistoryRestore:
             risk_manager=MagicMock(),
             trailing_stop_manager=MagicMock(),
             broker=None,
-            db_session_factory=None,
+            db_session_factory=async_db_session_factory,
         )
 
         # Mock trades with some null P&L
@@ -905,7 +910,7 @@ class TestTradeHistoryRestore:
         mock_trade_3 = MagicMock()
         mock_trade_3.profit_loss = Decimal("25.00")
 
-        with patch("src.database.repositories.trade_repository.TradeRepository") as MockRepo:
+        with patch("src.database.repositories.TradeRepository") as MockRepo:
             mock_repo_instance = MockRepo.return_value
             mock_repo_instance.get_recent_for_kelly = AsyncMock(
                 return_value=[mock_trade_1, mock_trade_2, mock_trade_3]
@@ -931,7 +936,7 @@ class TestTradeHistoryRestore:
             db_session_factory=None,
         )
 
-        with patch("src.database.repositories.trade_repository.TradeRepository") as MockRepo:
+        with patch("src.database.repositories.TradeRepository") as MockRepo:
             MockRepo.side_effect = Exception("Database error")
 
             trade_history = await service._restore_trade_history_list()
@@ -948,32 +953,24 @@ class TestRiskStateRestore:
     """Tests for risk manager state restoration."""
 
     @pytest.mark.asyncio
-    async def test_restore_risk_state_from_snapshot(self, sample_risk_snapshot):
+    async def test_restore_risk_state_from_snapshot(self, sample_risk_snapshot, mock_risk_manager_with_state, async_db_session_factory):
         """Test risk state is restored from database snapshot."""
         execution_engine = MagicMock()
         execution_engine.mode = ExecutionMode.PAPER
 
-        risk_manager = MagicMock()
-        risk_manager.drawdown_monitor = MagicMock()
-        risk_manager.drawdown_monitor.state = MagicMock()
-        risk_manager.circuit_breakers = MagicMock()
-        risk_manager.circuit_breakers.tripped_breakers = {}
-        risk_manager.equity_curve_filter = MagicMock()
-        risk_manager.equity_curve_filter.equity_curve = []
-
         service = StateRecoveryService(
             execution_engine=execution_engine,
-            risk_manager=risk_manager,
+            risk_manager=mock_risk_manager_with_state,
             trailing_stop_manager=MagicMock(),
             broker=None,
-            db_session_factory=None,
+            db_session_factory=async_db_session_factory,
         )
 
         mock_snapshot = MagicMock()
         for key, value in sample_risk_snapshot.items():
             setattr(mock_snapshot, key, value)
 
-        with patch("src.database.repositories.risk_state_repository.RiskStateRepository") as MockRepo:
+        with patch("src.database.repositories.RiskStateRepository") as MockRepo:
             mock_repo_instance = MockRepo.return_value
             mock_repo_instance.get_latest = AsyncMock(return_value=mock_snapshot)
 
@@ -983,116 +980,92 @@ class TestRiskStateRestore:
 
     @pytest.mark.asyncio
     async def test_restore_risk_state_restores_drawdown_monitor(
-        self, sample_risk_snapshot
+        self, sample_risk_snapshot, mock_risk_manager_with_state, async_db_session_factory
     ):
         """Test DrawdownMonitor state is correctly restored."""
         execution_engine = MagicMock()
         execution_engine.mode = ExecutionMode.PAPER
 
-        risk_manager = MagicMock()
-        risk_manager.drawdown_monitor = MagicMock()
-        risk_manager.drawdown_monitor.state = MagicMock()
-        risk_manager.circuit_breakers = MagicMock()
-        risk_manager.circuit_breakers.tripped_breakers = {}
-        risk_manager.equity_curve_filter = MagicMock()
-        risk_manager.equity_curve_filter.equity_curve = []
-
         service = StateRecoveryService(
             execution_engine=execution_engine,
-            risk_manager=risk_manager,
+            risk_manager=mock_risk_manager_with_state,
             trailing_stop_manager=MagicMock(),
             broker=None,
-            db_session_factory=None,
+            db_session_factory=async_db_session_factory,
         )
 
         mock_snapshot = MagicMock()
         for key, value in sample_risk_snapshot.items():
             setattr(mock_snapshot, key, value)
 
-        with patch("src.database.repositories.risk_state_repository.RiskStateRepository") as MockRepo:
+        with patch("src.database.repositories.RiskStateRepository") as MockRepo:
             mock_repo_instance = MockRepo.return_value
             mock_repo_instance.get_latest = AsyncMock(return_value=mock_snapshot)
 
             await service._restore_risk_state()
 
         # Verify DrawdownMonitor state was restored
-        dm_state = risk_manager.drawdown_monitor.state
+        dm_state = mock_risk_manager_with_state.drawdown_monitor.state
         assert dm_state.peak_equity == float(sample_risk_snapshot["peak_equity"])
         assert dm_state.current_equity == float(sample_risk_snapshot["current_equity"])
 
     @pytest.mark.asyncio
     async def test_restore_risk_state_restores_circuit_breakers(
-        self, sample_risk_snapshot
+        self, sample_risk_snapshot, mock_risk_manager_with_state, async_db_session_factory
     ):
         """Test CircuitBreakers state is correctly restored."""
         execution_engine = MagicMock()
         execution_engine.mode = ExecutionMode.PAPER
 
-        risk_manager = MagicMock()
-        risk_manager.drawdown_monitor = MagicMock()
-        risk_manager.drawdown_monitor.state = MagicMock()
-        risk_manager.circuit_breakers = MagicMock()
-        risk_manager.circuit_breakers.tripped_breakers = {}
-        risk_manager.equity_curve_filter = MagicMock()
-        risk_manager.equity_curve_filter.equity_curve = []
-
         service = StateRecoveryService(
             execution_engine=execution_engine,
-            risk_manager=risk_manager,
+            risk_manager=mock_risk_manager_with_state,
             trailing_stop_manager=MagicMock(),
             broker=None,
-            db_session_factory=None,
+            db_session_factory=async_db_session_factory,
         )
 
         mock_snapshot = MagicMock()
         for key, value in sample_risk_snapshot.items():
             setattr(mock_snapshot, key, value)
 
-        with patch("src.database.repositories.risk_state_repository.RiskStateRepository") as MockRepo:
+        with patch("src.database.repositories.RiskStateRepository") as MockRepo:
             mock_repo_instance = MockRepo.return_value
             mock_repo_instance.get_latest = AsyncMock(return_value=mock_snapshot)
 
             await service._restore_risk_state()
 
         # Verify CircuitBreakers state was restored
-        cb = risk_manager.circuit_breakers
+        cb = mock_risk_manager_with_state.circuit_breakers
         assert cb.consecutive_losses == sample_risk_snapshot["consecutive_losses"]
         assert len(cb.tripped_breakers) == 1  # US500
 
     @pytest.mark.asyncio
-    async def test_restore_risk_state_restores_equity_curve(self, sample_risk_snapshot):
+    async def test_restore_risk_state_restores_equity_curve(self, sample_risk_snapshot, mock_risk_manager_with_state, async_db_session_factory):
         """Test EquityCurveFilter state is correctly restored."""
         execution_engine = MagicMock()
         execution_engine.mode = ExecutionMode.PAPER
 
-        risk_manager = MagicMock()
-        risk_manager.drawdown_monitor = MagicMock()
-        risk_manager.drawdown_monitor.state = MagicMock()
-        risk_manager.circuit_breakers = MagicMock()
-        risk_manager.circuit_breakers.tripped_breakers = {}
-        risk_manager.equity_curve_filter = MagicMock()
-        risk_manager.equity_curve_filter.equity_curve = []
-
         service = StateRecoveryService(
             execution_engine=execution_engine,
-            risk_manager=risk_manager,
+            risk_manager=mock_risk_manager_with_state,
             trailing_stop_manager=MagicMock(),
             broker=None,
-            db_session_factory=None,
+            db_session_factory=async_db_session_factory,
         )
 
         mock_snapshot = MagicMock()
         for key, value in sample_risk_snapshot.items():
             setattr(mock_snapshot, key, value)
 
-        with patch("src.database.repositories.risk_state_repository.RiskStateRepository") as MockRepo:
+        with patch("src.database.repositories.RiskStateRepository") as MockRepo:
             mock_repo_instance = MockRepo.return_value
             mock_repo_instance.get_latest = AsyncMock(return_value=mock_snapshot)
 
             await service._restore_risk_state()
 
         # Verify EquityCurveFilter state was restored
-        ec = risk_manager.equity_curve_filter
+        ec = mock_risk_manager_with_state.equity_curve_filter
         assert len(ec.equity_curve) == 4  # 4 equity points
 
     @pytest.mark.asyncio
@@ -1111,7 +1084,7 @@ class TestRiskStateRestore:
             db_session_factory=None,
         )
 
-        with patch("src.database.repositories.risk_state_repository.RiskStateRepository") as MockRepo:
+        with patch("src.database.repositories.RiskStateRepository") as MockRepo:
             mock_repo_instance = MockRepo.return_value
             mock_repo_instance.get_latest = AsyncMock(return_value=None)
 

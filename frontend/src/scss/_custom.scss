@@ -1,58 +1,138 @@
 // ═══════════════════════════════════════════════════════════
-// MANTIS AI — Brand Theme
+// MANTIS AI — Brand Theme (Clean Reset)
 // ═══════════════════════════════════════════════════════════
 
-// @use rules must be first (SCSS requirement)
+@use "palette" as *;
 @use "charts";
 
-// Brand palette
-$mantis-neon: #39FF14;
-$mantis-green: #00d97e;
-$mantis-green-rgb: 0, 217, 126;
-$mantis-dark: #0a2e1a;
-$mantis-surface: #161b22;
-$mantis-bg: #0d1117;
+// ═══════════════════════════════════════════════════════════
+// 1. FONTS & TYPOGRAPHY
+// ═══════════════════════════════════════════════════════════
 
-// ───── Dark Mode Overrides ─────
+:root {
+  --mantis-font-ui: #{$mantis-font-ui};
+  --mantis-font-mono: #{$mantis-font-mono};
+}
+
+body {
+  font-family: var(--mantis-font-ui);
+  font-size: 0.875rem;
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6 {
+  font-family: var(--mantis-font-ui);
+  font-weight: 600;
+}
+
+.font-monospace,
+.mantis-mono {
+  font-family: var(--mantis-font-mono) !important;
+  font-feature-settings: "tnum" 1, "zero" 1;
+  letter-spacing: -0.01em;
+}
+
+.mantis-kpi {
+  font-family: var(--mantis-font-mono);
+  font-feature-settings: "tnum" 1;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.sidebar-nav .nav-link {
+  font-family: var(--mantis-font-ui);
+  font-weight: 500;
+  font-size: 0.8125rem;
+}
+
+// ═══════════════════════════════════════════════════════════
+// 2. DARK THEME VARIABLES
+// ═══════════════════════════════════════════════════════════
+
 [data-coreui-theme="dark"] {
-  // Primary → Mantis Green
+  // CoreUI Primary
   --cui-primary: #{$mantis-green};
   --cui-primary-rgb: #{$mantis-green-rgb};
 
-  // Deeper dark backgrounds
+  // MANTIS Extended Palette
+  --mantis-neon: #{$mantis-neon};
+  --mantis-green: #{$mantis-green};
+  --mantis-cyan: #{$mantis-cyan};
+  --mantis-profit: #{$mantis-profit};
+  --mantis-loss: #{$mantis-loss};
+  --mantis-warning: #{$mantis-warning};
+  --mantis-neutral: #{$mantis-neutral};
+
+  // Surface Elevation
+  --mantis-surface-0: #{$mantis-surface-0};
+  --mantis-surface-1: #{$mantis-surface-1};
+  --mantis-surface-2: #{$mantis-surface-2};
+  --mantis-surface-3: #{$mantis-surface-3};
+  --mantis-surface-4: #{$mantis-surface-4};
+  --mantis-surface-5: #{$mantis-surface-5};
+
+  // Text Colors
+  --mantis-text-primary: rgba(255, 255, 255, 0.92);
+  --mantis-text-secondary: rgba(255, 255, 255, 0.65);
+  --mantis-text-muted: rgba(255, 255, 255, 0.45);
+  --mantis-text-disabled: rgba(255, 255, 255, 0.25);
+
+  // Borders
+  --mantis-border-subtle: #{$mantis-border-subtle};
+  --mantis-border-default: #{$mantis-border-default};
+  --mantis-border-accent: #{$mantis-border-accent};
+  --mantis-border-strong: #{$mantis-border-strong};
+
+  // Shadows
+  --mantis-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --mantis-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --mantis-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+  // Radii
+  --mantis-radius-sm: 4px;
+  --mantis-radius-md: 8px;
+  --mantis-radius-lg: 12px;
+
+  // CoreUI Background Overrides
   --cui-body-bg: #{$mantis-bg};
-  --cui-dark-bg-subtle: #0b0f14;
-  --cui-tertiary-bg: #0f1318;
+  --cui-dark-bg-subtle: #{$mantis-surface-0};
+  --cui-tertiary-bg: #{$mantis-surface-0};
 
-  // Card surfaces
+  // Cards
   --cui-card-bg: #{$mantis-surface};
-  --cui-card-border-color: rgba($mantis-green, 0.08);
+  --cui-card-border-color: #{$mantis-border-accent};
 
-  // Table
+  // Tables
   --cui-table-bg: transparent;
   --cui-table-striped-bg: rgba(255, 255, 255, 0.015);
-  --cui-table-hover-bg: rgba($mantis-green, 0.04);
+  --cui-table-hover-bg: #{$mantis-green-ghost};
 
   // Sidebar
-  --cui-sidebar-bg: #0c1015;
-  --cui-sidebar-border-color: rgba($mantis-green, 0.1);
-  --cui-sidebar-nav-link-active-color: #{$mantis-green};
-  --cui-sidebar-nav-link-active-bg: rgba($mantis-green, 0.08);
+  --cui-sidebar-bg: #{$mantis-surface-0};
+  --cui-sidebar-border-color: #{$mantis-border-accent};
+  --cui-sidebar-nav-link-active-color: #{$mantis-neon};
+  --cui-sidebar-nav-link-active-bg: #{$mantis-green-ghost};
   --cui-sidebar-nav-link-hover-bg: rgba($mantis-green, 0.05);
 
   // Header
   --cui-header-bg: rgba(13, 17, 23, 0.85);
 
   // Footer
-  --cui-footer-bg: #0c1015;
-  --cui-footer-border-color: rgba($mantis-green, 0.08);
+  --cui-footer-bg: #{$mantis-surface-0};
+  --cui-footer-border-color: #{$mantis-border-accent};
 
   // Links
   --cui-link-color: #{$mantis-green};
   --cui-link-hover-color: #{$mantis-neon};
 }
 
-// ───── Sidebar Brand ─────
+// ═══════════════════════════════════════════════════════════
+// 3. SIDEBAR BRAND
+// ═══════════════════════════════════════════════════════════
+
 .sidebar-brand-full {
   margin-left: 3px;
   display: flex !important;
@@ -65,6 +145,7 @@ $mantis-bg: #0d1117;
 }
 
 .mantis-brand-text {
+  font-family: var(--mantis-font-ui);
   font-size: 1.15rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -82,20 +163,24 @@ $mantis-bg: #0d1117;
   }
 }
 
-// ───── Header ─────
+// ═══════════════════════════════════════════════════════════
+// 4. GLOBAL COMPONENT STYLES
+// ═══════════════════════════════════════════════════════════
+
+// Header glass effect
 .header {
   backdrop-filter: blur(12px) saturate(1.2);
   -webkit-backdrop-filter: blur(12px) saturate(1.2);
 }
 
-// ───── Badge utilities ─────
+// Badge sizes
 .badge-sm {
   font-size: 0.65rem;
   padding: 0.2em 0.5em;
   font-weight: 600;
 }
 
-// ───── Neon glow accents ─────
+// Utility classes
 .glow-green {
   box-shadow: 0 0 8px rgba($mantis-green, 0.3);
 }
@@ -104,12 +189,15 @@ $mantis-bg: #0d1117;
   border-color: rgba($mantis-green, 0.2) !important;
 }
 
-// Card accent override: border-top-primary = mantis green
+.border-start-3 {
+  border-left-width: 3px !important;
+}
+
 [data-coreui-theme="dark"] .border-top-primary {
   border-top-color: #{$mantis-green} !important;
 }
 
-// ───── Live pulse dot ─────
+// Pulse dot (live indicators)
 .pulse-dot {
   display: inline-block;
   width: 8px;
@@ -134,40 +222,18 @@ $mantis-bg: #0d1117;
   50% { box-shadow: 0 0 12px rgba(229, 83, 83, 0.9); }
 }
 
-// ───── Font monospace feature ─────
-.font-monospace {
-  font-feature-settings: "tnum" 1;
+// Animated badge
+.mantis-badge-animated {
+  animation: badge-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
-// ───── P&L flash animations ─────
-@keyframes flash-green {
-  0% { background-color: rgba($mantis-green, 0.3); }
-  100% { background-color: transparent; }
+@keyframes badge-pop {
+  0%   { transform: scale(0.5); opacity: 0; }
+  70%  { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
 }
 
-@keyframes flash-red {
-  0% { background-color: rgba(229, 83, 83, 0.3); }
-  100% { background-color: transparent; }
-}
-
-.pnl-flash-positive {
-  animation: flash-green 0.6s ease-out;
-}
-
-.pnl-flash-negative {
-  animation: flash-red 0.6s ease-out;
-}
-
-// ───── Card hover effect ─────
-[data-coreui-theme="dark"] .card {
-  transition: border-color 0.2s ease;
-
-  &:hover {
-    border-color: rgba($mantis-green, 0.15);
-  }
-}
-
-// ───── Sidebar active item glow ─────
+// Sidebar active item glow bar
 [data-coreui-theme="dark"] .sidebar-nav .nav-link.active {
   position: relative;
 
@@ -184,7 +250,7 @@ $mantis-bg: #0d1117;
   }
 }
 
-// ───── Scrollbar (mantis-themed) — replaces _scrollbar ─────
+// Scrollbar theming
 @supports (scrollbar-width: thin) {
   * {
     scrollbar-width: thin;
@@ -208,40 +274,710 @@ $mantis-bg: #0d1117;
   background: rgba($mantis-green, 0.5);
 }
 
-// ───── Market Status Indicators ─────
-
-// Pulse animation for live market indicator
-.pulse-dot {
-  width: 8px;
-  height: 8px;
-  background: var(--cui-success);
-  border-radius: 50%;
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-// Market status indicator styling
-.market-status-indicator {
-  font-weight: 600;
-  letter-spacing: 0.5px;
-}
-
-// ───── Inherited from CoreUI template ─────
-
-// custom calendar today cell color
+// Calendar/select inherited from CoreUI template
 .calendar-cell.today {
   --cui-calendar-cell-today-color: var(--cui-primary) !important;
 }
 
-// custom select week cursor pointer
 .select-week .calendar-row.current {
   cursor: pointer;
+}
+
+// Reduced motion
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 5. UI COMPONENTS (used across pages)
+// ═══════════════════════════════════════════════════════════
+
+// Section Dividers
+.section-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.5rem 0 1rem;
+
+  &__label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    white-space: nowrap;
+    color: rgba($mantis-neon, 0.4);
+  }
+
+  &__line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgba($mantis-green, 0.15), transparent);
+  }
+}
+
+// Direction Indicators (BUY/SELL)
+.dir-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+
+  &--buy {
+    color: $mantis-green;
+    background: rgba($mantis-green, 0.1);
+    border-left: 3px solid $mantis-green;
+  }
+
+  &--sell {
+    color: $mantis-loss;
+    background: rgba($mantis-loss, 0.1);
+    border-left: 3px solid $mantis-loss;
+  }
+}
+
+// Signal Status Badges
+.signal-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+
+  &__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  &--executed {
+    color: $mantis-green;
+    background: rgba($mantis-green, 0.1);
+    .signal-status__dot { background: $mantis-green; }
+  }
+
+  &--rejected, &--exec_failed {
+    color: #ef5350;
+    background: rgba(#ef5350, 0.1);
+    .signal-status__dot { background: #ef5350; }
+  }
+
+  &--predicted {
+    color: #0dcaf0;
+    background: rgba(#0dcaf0, 0.08);
+    .signal-status__dot { background: #0dcaf0; }
+  }
+
+  &--hold {
+    color: #ffc107;
+    background: rgba(#ffc107, 0.08);
+    .signal-status__dot { background: #ffc107; }
+  }
+}
+
+// Empty States
+.empty-state {
+  padding: 3rem 1rem;
+  text-align: center;
+
+  &__icon {
+    font-size: 3rem;
+    opacity: 0.12;
+    margin-bottom: 1rem;
+    color: $mantis-green;
+  }
+
+  &__text {
+    color: var(--mantis-text-muted, rgba(255, 255, 255, 0.45));
+    font-size: 0.9375rem;
+  }
+
+  &__hint {
+    color: var(--mantis-text-disabled, rgba(255, 255, 255, 0.25));
+    font-size: 0.8125rem;
+    margin-top: 0.5rem;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 6. AUTH PAGES — Glassmorphism Design
+// ═══════════════════════════════════════════════════════════
+
+// Auth form validation
+[data-coreui-theme="dark"] {
+  .form-control.is-invalid {
+    border-color: var(--cui-danger);
+
+    &:focus {
+      border-color: var(--cui-danger);
+      box-shadow: 0 0 0 0.2rem rgba(229, 83, 83, 0.25);
+    }
+  }
+
+  .invalid-feedback {
+    color: var(--cui-danger);
+    font-size: 0.875rem;
+  }
+}
+
+// Keyframe Animations (Auth only)
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes float-blob {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -50px) scale(1.1); }
+  66% { transform: translate(-20px, 30px) scale(0.9); }
+}
+
+@keyframes grid-move {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(50px, 50px); }
+}
+
+@keyframes pulse-orb {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { text-shadow: 0 0 20px rgba($mantis-neon, 0.4); }
+  50% { text-shadow: 0 0 30px rgba($mantis-neon, 0.6); }
+}
+
+// Auth Page Container
+.auth-page {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background: linear-gradient(135deg,
+    $mantis-bg 0%, #0a1217 25%, #0d1117 50%, #0a0f14 75%, $mantis-bg 100%
+  );
+  background-size: 400% 400%;
+  animation: gradient-shift 15s ease infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+// Floating Background Blobs
+.auth-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.15;
+  pointer-events: none;
+  z-index: 0;
+
+  &.blob-1 {
+    width: 500px; height: 500px;
+    top: -10%; left: -10%;
+    background: radial-gradient(circle, $mantis-neon, transparent);
+    animation: float-blob 20s ease-in-out infinite;
+  }
+
+  &.blob-2 {
+    width: 400px; height: 400px;
+    top: 50%; right: -5%;
+    background: radial-gradient(circle, $mantis-green, transparent);
+    animation: float-blob 25s ease-in-out infinite reverse;
+  }
+
+  &.blob-3 {
+    width: 350px; height: 350px;
+    bottom: -5%; left: 30%;
+    background: radial-gradient(circle, #00ff88, transparent);
+    animation: float-blob 30s ease-in-out infinite;
+  }
+}
+
+// Split-Screen Container
+.auth-split-container {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  max-width: 1200px;
+  width: 100%;
+  min-height: 600px;
+  background: rgba(22, 27, 34, 0.4);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border-radius: 24px;
+  border: 1px solid rgba($mantis-green, 0.15);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    0 0 40px rgba($mantis-green, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+
+  @media (max-width: 991px) {
+    grid-template-columns: 1fr;
+    max-width: 520px;
+  }
+}
+
+// Hero Section (Left)
+.auth-hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  background: linear-gradient(135deg, rgba($mantis-dark, 0.6) 0%, rgba($mantis-bg, 0.8) 100%);
+  border-right: 1px solid rgba($mantis-green, 0.1);
+  overflow: hidden;
+
+  @media (max-width: 991px) {
+    border-right: none;
+    border-bottom: 1px solid rgba($mantis-green, 0.1);
+    padding: 2rem 1.5rem;
+  }
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba($mantis-green, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba($mantis-green, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+    animation: grid-move 20s linear infinite;
+    opacity: 0.3;
+  }
+
+  &__logo {
+    width: 120px; height: 120px;
+    margin-bottom: 2rem;
+    filter: drop-shadow(0 0 20px rgba($mantis-neon, 0.5));
+    animation: pulse-orb 3s ease-in-out infinite;
+    z-index: 1;
+
+    @media (max-width: 991px) { width: 80px; height: 80px; margin-bottom: 1rem; }
+  }
+
+  &__title {
+    font-size: 3rem;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    color: $mantis-neon;
+    margin-bottom: 1rem;
+    animation: glow-pulse 3s ease-in-out infinite;
+    z-index: 1;
+
+    @media (max-width: 991px) { font-size: 2rem; }
+  }
+
+  &__subtitle {
+    font-size: 1.125rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 2.5rem;
+    text-align: center;
+    z-index: 1;
+
+    @media (max-width: 991px) { font-size: 1rem; margin-bottom: 1.5rem; }
+  }
+
+  &__features {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    width: 100%;
+    max-width: 400px;
+    z-index: 1;
+
+    @media (max-width: 991px) { gap: 0.75rem; }
+  }
+}
+
+.auth-feature {
+  padding: 0.75rem 1rem;
+  background: rgba($mantis-green, 0.08);
+  border: 1px solid rgba($mantis-green, 0.2);
+  border-radius: 8px;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: $mantis-green;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: rgba($mantis-green, 0.15);
+    border-color: rgba($mantis-green, 0.4);
+  }
+
+  @media (max-width: 991px) { padding: 0.5rem 0.75rem; font-size: 0.75rem; }
+}
+
+// Form Section (Right)
+.auth-form-section {
+  padding: 3rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: rgba(22, 27, 34, 0.6);
+
+  @media (max-width: 991px) { padding: 2rem 1.5rem; }
+
+  form { width: 100%; max-width: 400px; margin: 0 auto; }
+  h1 { font-size: 2rem; font-weight: 700; color: $mantis-neon; margin-bottom: 0.5rem; letter-spacing: 0.05em; }
+  p { color: rgba(255, 255, 255, 0.6); margin-bottom: 2rem; font-size: 0.9375rem; }
+
+  .alert {
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+
+    &.alert-danger { background: rgba(220, 53, 69, 0.15); border-color: rgba(220, 53, 69, 0.3); color: #ff6b7a; }
+    &.alert-success { background: rgba($mantis-green, 0.15); border-color: rgba($mantis-green, 0.3); color: $mantis-neon; }
+  }
+
+  .invalid-feedback { margin-top: 0.5rem; font-size: 0.8125rem; color: #ff6b7a; }
+}
+
+// Enhanced Input Groups
+.auth-input-group {
+  position: relative;
+  margin-bottom: 1.25rem;
+
+  .input-group {
+    background: rgba(13, 17, 23, 0.6);
+    border: 1px solid rgba($mantis-green, 0.15);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+
+    &:focus-within {
+      border-color: rgba($mantis-neon, 0.5);
+      box-shadow: 0 0 0 3px rgba($mantis-neon, 0.1), 0 0 20px rgba($mantis-neon, 0.15);
+    }
+  }
+
+  .input-group-text { background: transparent; border: none; color: rgba($mantis-green, 0.7); }
+
+  input, select {
+    background: transparent;
+    border: none;
+    color: #ffffff;
+    font-size: 0.9375rem;
+
+    &::placeholder { color: rgba(255, 255, 255, 0.4); }
+    &:focus { background: transparent; box-shadow: none; }
+  }
+}
+
+// Password Strength Meter
+.password-strength-meter {
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+
+  &__label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    font-size: 0.8125rem;
+
+    span:first-child { color: rgba(255, 255, 255, 0.6); }
+  }
+
+  &__bars {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.25rem;
+    height: 4px;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  &__bar {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    transition: all 0.3s ease;
+
+    &.active { background: var(--bar-color, rgba(255, 255, 255, 0.3)); }
+  }
+
+  &.weak { --bar-color: #dc3545; .password-strength-meter__label span:last-child { color: #dc3545; font-weight: 600; } }
+  &.medium { --bar-color: #ffc107; .password-strength-meter__label span:last-child { color: #ffc107; font-weight: 600; } }
+  &.strong { --bar-color: #{$mantis-neon}; .password-strength-meter__label span:last-child { color: $mantis-neon; font-weight: 600; } }
+}
+
+// Auth Buttons
+.auth-btn-primary {
+  width: 100%;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0d1117;
+  background: linear-gradient(135deg, $mantis-neon 0%, $mantis-green 100%);
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba($mantis-neon, 0.3), 0 0 20px rgba($mantis-neon, 0.2);
+  transition: all 0.3s ease;
+
+  &:hover:not(:disabled) { box-shadow: 0 6px 20px rgba($mantis-neon, 0.4), 0 0 30px rgba($mantis-neon, 0.3); }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+}
+
+.auth-btn-secondary {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: $mantis-neon;
+  background: transparent;
+  border: 2px solid $mantis-green;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+
+  &:hover { background: rgba($mantis-green, 0.1); border-color: $mantis-neon; color: $mantis-neon; }
+}
+
+.mantis-btn-primary {
+  background-color: $mantis-green !important;
+  border-color: $mantis-green !important;
+  color: #000 !important;
+  font-weight: 600;
+
+  &:hover { background-color: $mantis-neon !important; border-color: $mantis-neon !important; box-shadow: 0 0 12px rgba($mantis-green, 0.4); }
+  &:disabled { background-color: rgba($mantis-green, 0.4) !important; border-color: rgba($mantis-green, 0.4) !important; opacity: 0.6; }
+}
+
+.mantis-btn-secondary {
+  background-color: transparent !important;
+  border: 2px solid $mantis-green !important;
+  color: $mantis-green !important;
+  font-weight: 600;
+
+  &:hover { background-color: rgba($mantis-green, 0.1) !important; border-color: $mantis-neon !important; color: $mantis-neon !important; }
+}
+
+.mantis-card-gradient {
+  background: linear-gradient(135deg, rgba($mantis-green, 0.15) 0%, rgba($mantis-neon, 0.05) 100%);
+  border: 1px solid rgba($mantis-green, 0.2);
+}
+
+// Auth Link
+.auth-link {
+  color: $mantis-green;
+  text-decoration: none;
+  transition: color 0.2s ease;
+
+  &:hover { color: $mantis-neon; text-decoration: underline; }
+}
+
+// Responsive Auth
+@media (max-width: 767px) {
+  .auth-page { padding: 1rem 0.5rem; }
+
+  .auth-split-container { border-radius: 16px; min-height: auto; }
+
+  .auth-form-section {
+    padding: 1.5rem 1rem;
+    h1 { font-size: 1.5rem; }
+    form { max-width: 100%; }
+  }
+}
+
+// Single Card Auth Pages (Register)
+.auth-page-single {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background: linear-gradient(135deg, $mantis-bg 0%, #0a1217 25%, #0d1117 50%, #0a0f14 75%, $mantis-bg 100%);
+  background-size: 400% 400%;
+  animation: gradient-shift 15s ease infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+
+  .auth-card {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 560px;
+    background: rgba(22, 27, 34, 0.6);
+    backdrop-filter: blur(20px) saturate(1.5);
+    -webkit-backdrop-filter: blur(20px) saturate(1.5);
+    border-radius: 24px;
+    border: 1px solid rgba($mantis-green, 0.15);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba($mantis-green, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    padding: 3rem 2.5rem;
+
+    @media (max-width: 767px) { padding: 2rem 1.5rem; border-radius: 16px; }
+
+    h1 { font-size: 2rem; font-weight: 700; color: $mantis-neon; margin-bottom: 0.5rem; letter-spacing: 0.05em; text-align: center; }
+    p { color: rgba(255, 255, 255, 0.6); margin-bottom: 2rem; font-size: 0.9375rem; text-align: center; }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 7. BOTTOM NAVIGATION (Mobile)
+// ═══════════════════════════════════════════════════════════
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1030;
+  display: flex;
+  align-items: stretch;
+  background: rgba(12, 16, 21, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid rgba($mantis-green, 0.1);
+  padding-bottom: env(safe-area-inset-bottom);
+  height: calc(#{$bottom-nav-height} + env(safe-area-inset-bottom));
+
+  &__item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 0;
+    min-height: $bottom-nav-height;
+    color: rgba(255, 255, 255, 0.5);
+    text-decoration: none;
+    font-size: 0.625rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    transition: color 0.15s ease;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+
+    svg, c-icon { width: 22px; height: 22px; }
+
+    &--active, &:active { color: $mantis-neon; }
+  }
+
+  &__label {
+    font-size: 0.625rem;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 8. MOBILE & RESPONSIVE
+// ═══════════════════════════════════════════════════════════
+
+// Touch-Friendly Targets
+@media (max-width: 991.98px) {
+  .btn, button[cButton], [cDropdownToggle] {
+    min-height: $touch-target-min;
+  }
+
+  .sidebar-nav .nav-link {
+    padding: 0.75rem 1rem;
+    min-height: $touch-target-min;
+  }
+
+  .dropdown-item, [cDropdownItem] {
+    padding: 0.625rem 1rem;
+    min-height: $touch-target-min;
+  }
+}
+
+// iOS Zoom Prevention
+@media (max-width: 991.98px) {
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  select,
+  textarea,
+  .form-control,
+  .form-select {
+    font-size: 16px !important;
+  }
+}
+
+// Bottom Nav: Body padding on mobile
+@media (max-width: 767.98px) {
+  .wrapper > .body {
+    padding-bottom: calc(#{$bottom-nav-height} + env(safe-area-inset-bottom) + 0.5rem);
+  }
+}
+
+// Scroll Strips (KPI, Asset cards)
+.kpi-scroll-strip,
+.asset-scroll-strip {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-bottom: 0.5rem;
+
+  &::-webkit-scrollbar { display: none; }
+}
+
+.kpi-mobile-card {
+  scroll-snap-align: start;
+  min-width: calc(50vw - 24px);
+  padding: 1rem;
+  background: var(--cui-card-bg);
+  border-radius: 8px;
+  border: 1px solid var(--cui-card-border-color);
+  border-top: 3px solid $mantis-green;
+}
+
+.price-card-mobile {
+  scroll-snap-align: start;
+  min-width: 140px;
+  max-width: 160px;
+  background: var(--cui-card-bg);
+}
+
+// Responsive Tables
+.table-responsive-mobile {
+  @media (max-width: 767.98px) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+
+    table { min-width: 600px; }
+  }
+}
+
+// Mobile Column Hiding
+.d-mobile-none {
+  @media (max-width: 767.98px) { display: none !important; }
+}
+
+// Landscape Mobile
+@media (max-height: 500px) and (orientation: landscape) {
+  .header.header-sticky { position: relative !important; }
+
+  .bottom-nav {
+    height: 44px;
+    padding-bottom: 0;
+
+    &__item {
+      min-height: 44px;
+      span { display: none; }
+    }
+  }
 }

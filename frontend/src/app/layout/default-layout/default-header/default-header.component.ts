@@ -21,16 +21,18 @@ import {
 
 import { IconDirective } from '@coreui/icons-angular';
 import { WebSocketService } from '../../../core/services/websocket.service';
+import { UserDropdownComponent } from './user-dropdown/user-dropdown.component';
 
 @Component({
   selector: 'app-default-header',
   templateUrl: './default-header.component.html',
+  styleUrl: './default-header.component.scss',
   imports: [
     ContainerComponent, HeaderTogglerDirective, SidebarToggleDirective,
     IconDirective, HeaderNavComponent, NavItemComponent, NavLinkDirective,
     RouterLink, RouterLinkActive, NgTemplateOutlet, BreadcrumbRouterComponent,
     DropdownComponent, DropdownToggleDirective, DropdownMenuDirective,
-    DropdownItemDirective, TooltipDirective
+    DropdownItemDirective, TooltipDirective, UserDropdownComponent
   ]
 })
 export class DefaultHeaderComponent extends HeaderComponent {

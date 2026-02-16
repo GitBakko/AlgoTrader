@@ -1,0 +1,184 @@
+<c-container class="mt-4">
+  <c-row class="justify-content-center">
+    <c-col lg="8">
+      @if (user(); as currentUser) {
+        <!-- Avatar Section Card -->
+        <c-card class="mb-4">
+          <c-card-header>
+            <strong class="mantis-brand-text">Avatar</strong>
+          </c-card-header>
+          <c-card-body class="text-center">
+            <!-- Display Current Avatar -->
+            <div class="mb-3">
+              <app-avatar
+                [username]="currentUser.username"
+                [avatarUrl]="currentUser.avatar_url"
+                size="xl"
+                [showGlow]="true"
+              ></app-avatar>
+            </div>
+
+            <!-- Avatar Actions -->
+            <div class="d-flex gap-2 justify-content-center mb-3">
+              <button
+                cButton
+                color="primary"
+                size="sm"
+                (click)="toggleAvatarUpload()"
+              >
+                <svg cIcon [name]="showAvatarUpload() ? 'cilX' : 'cilCloudUpload'" class="me-1"></svg>
+                {{ showAvatarUpload() ? 'Annulla' : (currentUser.avatar_url ? 'Cambia Avatar' : 'Carica Avatar') }}
+              </button>
+
+              @if (currentUser.avatar_url) {
+                <button
+                  cButton
+                  color="danger"
+                  size="sm"
+                  (click)="deleteAvatar()"
+                  [disabled]="deletingAvatar()"
+                >
+                  @if (deletingAvatar()) {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                  } @else {
+                    <svg cIcon name="cilTrash" class="me-1"></svg>
+                  }
+                  Elimina
+                </button>
+              }
+            </div>
+
+            <!-- Upload Component -->
+            @if (showAvatarUpload()) {
+              <app-avatar-upload
+                (uploaded)="onAvatarUploaded()"
+              ></app-avatar-upload>
+            }
+          </c-card-body>
+        </c-card>
+
+        <!-- User Information Card -->
+        <c-card class="mb-4">
+          <c-card-header class="d-flex justify-content-between align-items-center">
+            <strong class="mantis-brand-text">Profilo Utente</strong>
+            <button
+              cButton
+              size="sm"
+              color="primary"
+              (click)="refreshProfile()"
+              [disabled]="loading()"
+            >
+              @if (loading()) {
+                <span class="spinner-border spinner-border-sm me-2"></span>
+              }
+              <svg cIcon name="cilReload" class="me-1"></svg>
+              Aggiorna
+            </button>
+          </c-card-header>
+          <c-card-body>
+            <c-row class="mb-3">
+              <c-col sm="4" class="fw-bold">Username:</c-col>
+              <c-col sm="8">{{ currentUser.username }}</c-col>
+            </c-row>
+            <c-row class="mb-3">
+              <c-col sm="4" class="fw-bold">Email:</c-col>
+              <c-col sm="8">{{ currentUser.email }}</c-col>
+            </c-row>
+            <c-row class="mb-3">
+              <c-col sm="4" class="fw-bold">Ruolo:</c-col>
+              <c-col sm="8">
+                <c-badge [color]="getRoleBadgeColor(currentUser.role_name)">
+                  {{ currentUser.role_name }}
+                </c-badge>
+              </c-col>
+            </c-row>
+            <c-row class="mb-3">
+              <c-col sm="4" class="fw-bold">Stato:</c-col>
+              <c-col sm="8">
+                <c-badge [color]="currentUser.is_active ? 'success' : 'danger'">
+                  {{ currentUser.is_active ? 'Attivo' : 'Inattivo' }}
+                </c-badge>
+              </c-col>
+            </c-row>
+            <c-row class="mb-3">
+              <c-col sm="4" class="fw-bold">Ultimo accesso:</c-col>
+              <c-col sm="8">{{ formatDate(currentUser.last_login) }}</c-col>
+            </c-row>
+            <c-row class="mb-3">
+              <c-col sm="4" class="fw-bold">ID:</c-col>
+              <c-col sm="8">{{ currentUser.id }}</c-col>
+            </c-row>
+          </c-card-body>
+        </c-card>
+
+        <!-- Permissions Card -->
+        @if (currentUser.permissions && currentUser.permissions.length > 0) {
+          <c-card class="mb-4">
+            <c-card-header>
+              <strong>Permessi</strong>
+              <span class="badge bg-secondary ms-2">{{ currentUser.permissions.length }}</span>
+            </c-card-header>
+            <c-card-body>
+              <ul cListGroup class="list-group-flush">
+                @for (permission of currentUser.permissions; track permission.resource + permission.action) {
+                  <li cListGroupItem class="d-flex justify-content-between align-items-center">
+                    <span>
+                      <strong>{{ permission.resource }}</strong>:{{ permission.action }}
+                    </span>
+                    <c-badge color="primary">
+                      <svg cIcon name="cilCheckAlt"></svg>
+                    </c-badge>
+                  </li>
+                }
+              </ul>
+            </c-card-body>
+          </c-card>
+        }
+
+        <!-- Actions Card -->
+        <c-card>
+          <c-card-header>
+            <strong>Azioni</strong>
+          </c-card-header>
+          <c-card-body class="d-flex gap-2">
+            <button
+              cButton
+              color="secondary"
+              routerLink="/dashboard"
+            >
+              <svg cIcon name="cilHome" class="me-2"></svg>
+              Vai alla Dashboard
+            </button>
+            <button
+              cButton
+              color="secondary"
+              routerLink="/settings"
+            >
+              <svg cIcon name="cilSettings" class="me-2"></svg>
+              Impostazioni
+            </button>
+            <button
+              cButton
+              color="danger"
+              (click)="logout()"
+              class="ms-auto"
+            >
+              <svg cIcon name="cilAccountLogout" class="me-2"></svg>
+              Logout
+            </button>
+          </c-card-body>
+        </c-card>
+      } @else {
+        <!-- Loading State -->
+        <c-card>
+          <c-card-body class="text-center">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Caricamento...</span>
+            </div>
+            <p class="mt-3">Caricamento profilo...</p>
+          </c-card-body>
+        </c-card>
+      }
+    </c-col>
+  </c-row>
+</c-container>

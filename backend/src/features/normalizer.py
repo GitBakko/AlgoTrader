@@ -39,12 +39,12 @@ class FeatureNormalizer:
                 continue
 
             norm_col = f"{col}_zscore"
-            rolling_std = pl.col(col).rolling_std(window_size=window, min_periods=min_periods)
+            rolling_std = pl.col(col).rolling_std(window_size=window, min_samples=min_periods)
             # Replace zero std with NaN to avoid inf, then fill_nan handles both cases
             safe_std = pl.when(rolling_std.abs() < 1e-10).then(None).otherwise(rolling_std)
             df = df.with_columns(
                 (
-                    (pl.col(col) - pl.col(col).rolling_mean(window_size=window, min_periods=min_periods))
+                    (pl.col(col) - pl.col(col).rolling_mean(window_size=window, min_samples=min_periods))
                     / safe_std
                 )
                 .fill_nan(0.0)
@@ -100,8 +100,8 @@ class FeatureNormalizer:
 
             df = df.with_columns(
                 [
-                    pl.col(col).rolling_mean(window_size=window, min_periods=2).alias("_clip_mean"),
-                    pl.col(col).rolling_std(window_size=window, min_periods=2).alias("_clip_std"),
+                    pl.col(col).rolling_mean(window_size=window, min_samples=2).alias("_clip_mean"),
+                    pl.col(col).rolling_std(window_size=window, min_samples=2).alias("_clip_std"),
                 ]
             )
 
@@ -145,8 +145,8 @@ class FeatureNormalizer:
                 continue
 
             # Compute rolling stats once
-            rm = pl.col(col).rolling_mean(window_size=window, min_periods=min_periods)
-            rs = pl.col(col).rolling_std(window_size=window, min_periods=min_periods)
+            rm = pl.col(col).rolling_mean(window_size=window, min_samples=min_periods)
+            rs = pl.col(col).rolling_std(window_size=window, min_samples=min_periods)
             df = df.with_columns([rm.alias("_rm"), rs.alias("_rs")])
 
             # Clip outliers

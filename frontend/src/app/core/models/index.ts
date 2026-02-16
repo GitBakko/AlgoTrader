@@ -267,6 +267,9 @@ export interface PaperSignal {
   direction: string;
   confidence: number;
   entry_price: number;
+  suggested_stop?: number | null;
+  suggested_tp?: number | null;
+  regime?: string | null;
   timestamp: string;
   status: string;  // predicted, executed, rejected, exec_failed, hold, market_closed
   rejection_reason?: string;
@@ -277,3 +280,6 @@ export interface PaperSignal {
 
 // News and Sentiment
 export * from './news.model';
+
+// Authentication and Authorization
+export * from './auth.models';

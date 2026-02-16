@@ -6,7 +6,7 @@ Defines schemas for predictions, training results, model metadata, and signal cl
 from datetime import datetime, timezone
 from enum import Enum, IntEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SignalClass(IntEnum):
@@ -37,8 +37,7 @@ class PredictionResult(BaseModel):
     probabilities: dict[str, float]  # Class name -> probability
     timestamp: datetime | None = None
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class FoldResult(BaseModel):

@@ -1,0 +1,59 @@
+// ═══════════════════════════════════════════════════════════
+// MANTIS AI — Color Palette & Design Tokens
+// ═══════════════════════════════════════════════════════════
+// Pure variables file — no CSS output. Used by all other partials.
+
+// ── Hero Accent: Neon Green ──
+$mantis-neon:        #39FF14;
+$mantis-green:       #00d97e;
+$mantis-green-rgb:   0, 217, 126;
+$mantis-dark:        #0a2e1a;
+$mantis-surface:     #161b22;
+$mantis-bg:          #0d1117;
+
+// ── Secondary Accent: Cyan ──
+$mantis-cyan:        #00E5FF;
+$mantis-cyan-dim:    #0097A7;
+
+// ── Semantic: Profit / Loss / Warning ──
+$mantis-profit:      #39FF14;
+$mantis-profit-bg:   rgba(57, 255, 20, 0.1);
+$mantis-loss:        #FF3D57;
+$mantis-loss-dim:    #CC3148;
+$mantis-loss-bg:     rgba(255, 61, 87, 0.1);
+$mantis-warning:     #FFB020;
+$mantis-warning-bg:  rgba(255, 176, 32, 0.1);
+$mantis-neutral:     #8B949E;
+$mantis-neutral-dim: #484F58;
+
+// ── Surface Elevation System (6 levels) ──
+$mantis-surface-0:   #010409;   // void / deepest
+$mantis-surface-1:   #0d1117;   // body background
+$mantis-surface-2:   #161b22;   // cards, sidebar
+$mantis-surface-3:   #1c2128;   // dropdowns, popovers
+$mantis-surface-4:   #21262d;   // modals, toasts
+$mantis-surface-5:   #2d333b;   // tooltips
+
+// ── Border System ──
+$mantis-border-subtle:  rgba(255, 255, 255, 0.06);
+$mantis-border-default: rgba(255, 255, 255, 0.10);
+$mantis-border-accent:  rgba($mantis-green, 0.15);
+$mantis-border-strong:  rgba($mantis-green, 0.30);
+
+// ── Ghost / Tint Backgrounds ──
+$mantis-green-ghost: rgba(57, 255, 20, 0.08);
+$mantis-cyan-ghost:  rgba(0, 229, 255, 0.08);
+
+// ── Font Stacks ──
+$mantis-font-ui:      'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+$mantis-font-mono:    'IBM Plex Mono', 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+
+// ── Timing ──
+$mantis-duration-fast:    120ms;
+$mantis-duration-normal:  250ms;
+$mantis-duration-slow:    400ms;
+$mantis-duration-reveal:  600ms;
+
+// ── Touch targets ──
+$touch-target-min: 44px;
+$bottom-nav-height: 56px;

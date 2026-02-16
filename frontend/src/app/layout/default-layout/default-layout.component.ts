@@ -16,6 +16,7 @@ import {
 
 import { DefaultFooterComponent, DefaultHeaderComponent } from './';
 import { ToastContainerComponent } from '../../shared/components/toast-container/toast-container.component';
+import { BottomNavComponent } from '../../shared/components/bottom-nav/bottom-nav.component';
 import { navItems } from './_nav';
 
 @Component({
@@ -37,7 +38,8 @@ import { navItems } from './_nav';
     RouterOutlet,
     RouterLink,
     ShadowOnScrollDirective,
-    ToastContainerComponent
+    ToastContainerComponent,
+    BottomNavComponent
   ]
 })
 export class DefaultLayoutComponent {

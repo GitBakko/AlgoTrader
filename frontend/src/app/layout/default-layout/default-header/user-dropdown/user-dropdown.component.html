@@ -1,0 +1,102 @@
+@if (isAuthenticated() && user(); as currentUser) {
+  <c-dropdown alignment="end" variant="nav-item" class="user-dropdown">
+    <button
+      [caret]="false"
+      cDropdownToggle
+      class="user-dropdown__toggle"
+      aria-label="User menu"
+    >
+      <app-avatar
+        [username]="currentUser.username"
+        [avatarUrl]="currentUser.avatar_url"
+        size="md"
+        class="user-dropdown__avatar"
+      ></app-avatar>
+      <span class="user-dropdown__username d-none d-lg-inline">
+        {{ currentUser.username }}
+      </span>
+      <svg cIcon name="cilChevronBottom" size="sm" class="ms-1"></svg>
+    </button>
+
+    <div cDropdownMenu class="user-dropdown__menu pt-0">
+      <!-- User Info Header -->
+      <div cDropdownHeader class="user-dropdown__header bg-body-secondary">
+        <div class="d-flex align-items-center gap-3 py-2">
+          <app-avatar
+            [username]="currentUser.username"
+            [avatarUrl]="currentUser.avatar_url"
+            size="lg"
+            [showGlow]="true"
+            class="user-dropdown__header-avatar"
+          ></app-avatar>
+          <div class="flex-grow-1 min-w-0">
+            <div class="fw-semibold text-truncate mb-1">
+              {{ currentUser.username }}
+            </div>
+            <div class="small text-body-secondary text-truncate mb-1">
+              {{ displayEmail() }}
+            </div>
+            <c-badge
+              [color]="roleBadgeColor()"
+              class="user-dropdown__role-badge"
+            >
+              <svg cIcon [name]="roleDisplay().icon" size="sm" class="me-1"></svg>
+              {{ roleDisplay().text }}
+            </c-badge>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation Items -->
+      <button
+        cDropdownItem
+        routerLink="/profile"
+        class="user-dropdown__item"
+      >
+        <svg cIcon name="cilUser" class="me-2"></svg>
+        <span>Profilo Utente</span>
+      </button>
+
+      <button
+        cDropdownItem
+        routerLink="/settings"
+        class="user-dropdown__item"
+      >
+        <svg cIcon name="cilSettings" class="me-2"></svg>
+        <span>Impostazioni</span>
+      </button>
+
+      <button
+        cDropdownItem
+        routerLink="/dashboard"
+        class="user-dropdown__item"
+      >
+        <svg cIcon name="cilSpeedometer" class="me-2"></svg>
+        <span>Dashboard</span>
+      </button>
+
+      <!-- Divider -->
+      <div cDropdownDivider></div>
+
+      <!-- Logout -->
+      <button
+        cDropdownItem
+        (click)="onLogout()"
+        class="user-dropdown__item user-dropdown__item--logout"
+      >
+        <svg cIcon name="cilAccountLogout" class="me-2"></svg>
+        <span>Logout</span>
+      </button>
+    </div>
+  </c-dropdown>
+} @else {
+  <!-- Guest state (should not happen in protected routes) -->
+  <button
+    class="btn btn-link text-decoration-none"
+    routerLink="/login"
+    aria-label="Login"
+  >
+    <svg cIcon name="cilUser" size="lg"></svg>
+    <span class="d-none d-lg-inline ms-2">Login</span>
+  </button>
+}

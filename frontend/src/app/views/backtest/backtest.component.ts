@@ -193,7 +193,7 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
                 {{ (detail()!.summary.total_return_pct ?? 0) >= 0 ? '+' : '' }}{{ detail()!.summary.total_return_pct ?? 0 | number:'1.2-2' }}%
               </div>
               <div class="text-body-secondary small">
-                Ann: {{ (detail()!.metrics['annualized_return'] ?? 0) * 100 | number:'1.1-1' }}%
+                Ann: {{ detail()!.metrics['annualized_return'] * 100 | number:'1.1-1' }}%
               </div>
             </c-col>
           </c-row>
@@ -303,8 +303,8 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
         <c-card-header class="d-flex align-items-center justify-content-between py-2">
           <div class="d-flex align-items-center">
             <strong>Lista Trade</strong>
-            <c-badge color="success" class="ms-2">{{ detail()!.trade_metrics['winning_trades'] ?? 0 }} W</c-badge>
-            <c-badge color="danger" class="ms-1">{{ detail()!.trade_metrics['losing_trades'] ?? 0 }} L</c-badge>
+            <c-badge color="success" class="ms-2">{{ detail()!.trade_metrics['winning_trades'] }} W</c-badge>
+            <c-badge color="danger" class="ms-1">{{ detail()!.trade_metrics['losing_trades'] }} L</c-badge>
           </div>
           <span class="text-body-secondary small">Fees: $ {{ getTotalFees() | number:'1.2-2' }}</span>
         </c-card-header>

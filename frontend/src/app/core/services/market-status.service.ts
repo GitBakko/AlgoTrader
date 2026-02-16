@@ -22,7 +22,7 @@ interface CachedStatus extends MarketStatusResponse {
 @Injectable({ providedIn: 'root' })
 export class MarketStatusService {
   private http = inject(HttpClient);
-  private baseUrl = `${environment.apiUrl}/markets`;
+  private baseUrl = `${environment.apiUrl}/api/markets`;
 
   // Cache with timestamp (60s TTL)
   private statusCache = signal<Record<string, CachedStatus>>({});

@@ -241,6 +241,33 @@ def sample_risk_snapshot():
 
 
 @pytest.fixture
+def mock_risk_manager_with_state():
+    """Mock RiskManager with fully initialized state for recovery tests."""
+    from unittest.mock import MagicMock
+    from decimal import Decimal
+
+    risk_manager = MagicMock()
+
+    # DrawdownMonitor with state
+    risk_manager.drawdown_monitor = MagicMock()
+    risk_manager.drawdown_monitor.state = MagicMock()
+    risk_manager.drawdown_monitor.state.peak_equity = Decimal("10500.00")
+    risk_manager.drawdown_monitor.state.daily_start_equity = Decimal("10000.00")
+    risk_manager.drawdown_monitor.state.current_equity = Decimal("10150.00")
+    risk_manager.drawdown_monitor.check_all = MagicMock(return_value=[])
+
+    # CircuitBreakers
+    risk_manager.circuit_breakers = MagicMock()
+    risk_manager.circuit_breakers.tripped_breakers = {}
+
+    # EquityCurveFilter
+    risk_manager.equity_curve_filter = MagicMock()
+    risk_manager.equity_curve_filter.equity_curve = []
+
+    return risk_manager
+
+
+@pytest.fixture
 def sample_trade_history():
     """Sample trade history for Kelly sizing recovery testing."""
     return [
@@ -310,3 +337,19 @@ async def mock_db_session():
     session.flush = AsyncMock()
 
     return session
+
+
+@pytest.fixture
+def async_db_session_factory(mock_db_session):
+    """
+    Factory that returns async context manager yielding mock DB session.
+    Required for StateRecoveryService and repository tests.
+    """
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def factory():
+        """Async context manager that yields mock DB session."""
+        yield mock_db_session
+
+    return factory

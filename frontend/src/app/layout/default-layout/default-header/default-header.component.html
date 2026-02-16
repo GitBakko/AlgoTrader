@@ -28,16 +28,12 @@
     <c-header-nav class="ms-auto ms-md-0">
       <!-- WS Status -->
       <c-nav-item>
-        <span
-          class="nav-link d-flex align-items-center gap-1"
-          [cTooltip]="wsConnected() ? 'WebSocket connesso' : 'WebSocket disconnesso'"
-        >
-          <span
-            [class]="wsConnected() ? 'pulse-dot' : 'pulse-dot pulse-dot--danger'"
-          ></span>
-          <small class="d-none d-lg-inline" style="font-weight: 500;">
-            {{ wsConnected() ? 'Live' : 'Offline' }}
-          </small>
+        <span class="ws-status-pill"
+          [class.ws-status-pill--connected]="wsConnected()"
+          [class.ws-status-pill--disconnected]="!wsConnected()"
+          [cTooltip]="wsConnected() ? 'WebSocket connesso' : 'WebSocket disconnesso'">
+          <span [class]="wsConnected() ? 'pulse-dot' : 'pulse-dot pulse-dot--danger'"></span>
+          <span class="d-none d-lg-inline">{{ wsConnected() ? 'Live' : 'Offline' }}</span>
         </span>
       </c-nav-item>
       <div class="nav-item py-1">
@@ -45,6 +41,11 @@
       </div>
       <!-- Theme Toggle -->
       <ng-container *ngTemplateOutlet="themeDropdown" />
+      <div class="nav-item py-1">
+        <div class="vr h-100 mx-2 text-body text-opacity-75"></div>
+      </div>
+      <!-- User Dropdown -->
+      <app-user-dropdown />
     </c-header-nav>
   </c-container>
   <c-container [fluid]="true" class="px-4">

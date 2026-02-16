@@ -18,6 +18,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from src.api.routers import (
+    auth,
     backtest,
     dashboard,
     markets,
@@ -424,9 +425,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Configure audit logging middleware
+from src.audit.middleware import AuditMiddleware
+
+app.add_middleware(AuditMiddleware)
+
 # Configure rate limiter
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Configure Prometheus metrics
+from prometheus_fastapi_instrumentator import Instrumentator
+
+from src.monitoring.metrics import MetricsCollector
+
+instrumentator = Instrumentator(
+    should_group_status_codes=True,
+    should_ignore_untemplated=False,
+    should_respect_env_var=True,
+    should_instrument_requests_inprogress=True,
+    excluded_handlers=["/metrics", "/health", "/ws/.*"],
+    env_var_name="ENABLE_METRICS",
+    inprogress_name="mantis_http_requests_inprogress",
+    inprogress_labels=True,
+)
+
+instrumentator.instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
+
+# Initialize system info metrics
+MetricsCollector.update_system_info(
+    app_name=settings.app_name,
+    version=settings.app_version,
+    environment=settings.environment,
+)
 
 
 # Paths excluded from request logging (high-frequency / internal)
@@ -529,6 +560,7 @@ async def root():
 
 
 # ===== API Routers =====
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(positions.router, prefix="/api/positions", tags=["Positions"])
 app.include_router(signals.router, prefix="/api/signals", tags=["Signals"])

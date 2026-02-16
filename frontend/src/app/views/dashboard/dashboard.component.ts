@@ -17,6 +17,7 @@ import { NewsWidgetComponent } from '../../shared/components/news-widget/news-wi
 
 @Component({
   templateUrl: 'dashboard.component.html',
+  styleUrl: 'dashboard.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, RouterLink,

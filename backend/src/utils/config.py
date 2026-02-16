@@ -220,6 +220,36 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = Field(
         default=60, alias="ACCESS_TOKEN_EXPIRE_MINUTES"
     )
+    encryption_key: str = Field(
+        default="", alias="ENCRYPTION_KEY", description="Fernet encryption key (32 bytes base64)"
+    )
+    encryption_enabled: bool = Field(
+        default=False, alias="ENCRYPTION_ENABLED", description="Enable secrets encryption"
+    )
+
+    # ===== Alerting =====
+    alerts_enabled: bool = Field(default=False, alias="ALERTS_ENABLED")
+    alert_email_enabled: bool = Field(default=False, alias="ALERT_EMAIL_ENABLED")
+    alert_email_smtp_host: str = Field(default="", alias="ALERT_EMAIL_SMTP_HOST")
+    alert_email_smtp_port: int = Field(default=587, alias="ALERT_EMAIL_SMTP_PORT")
+    alert_email_smtp_user: str = Field(default="", alias="ALERT_EMAIL_SMTP_USER")
+    alert_email_smtp_password: str = Field(default="", alias="ALERT_EMAIL_SMTP_PASSWORD")
+    alert_email_from: str = Field(default="alerts@mantis.ai", alias="ALERT_EMAIL_FROM")
+    alert_email_to: str = Field(default="", alias="ALERT_EMAIL_TO")  # Comma-separated
+    alert_slack_enabled: bool = Field(default=False, alias="ALERT_SLACK_ENABLED")
+    alert_slack_webhook_url: str = Field(default="", alias="ALERT_SLACK_WEBHOOK_URL")
+    alert_webhook_enabled: bool = Field(default=False, alias="ALERT_WEBHOOK_ENABLED")
+    alert_webhook_url: str = Field(default="", alias="ALERT_WEBHOOK_URL")
+    alert_drawdown_threshold_pct: float = Field(default=10.0, alias="ALERT_DRAWDOWN_THRESHOLD_PCT")
+    alert_consecutive_losses_threshold: int = Field(
+        default=5, alias="ALERT_CONSECUTIVE_LOSSES_THRESHOLD"
+    )
+
+    # ===== Database Backups =====
+    backup_enabled: bool = Field(default=False, alias="BACKUP_ENABLED")
+    backup_dir: str = Field(default="data/backups", alias="BACKUP_DIR")
+    backup_schedule_cron: str = Field(default="0 2 * * *", alias="BACKUP_SCHEDULE_CRON")  # 2 AM daily
+    backup_retention_days: int = Field(default=30, alias="BACKUP_RETENTION_DAYS")
 
     # ===== Rate Limiting =====
     rate_limit_enabled: bool = Field(default=True, alias="RATE_LIMIT_ENABLED")

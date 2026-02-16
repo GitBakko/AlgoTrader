@@ -4,7 +4,6 @@
   class="d-print-none sidebar sidebar-fixed border-end"
   colorScheme="dark"
   id="sidebar1"
-  visible
 >
   <c-sidebar-header class="border-bottom">
     <c-sidebar-brand [routerLink]="[]">
@@ -48,11 +47,12 @@
   />
   <!--app-body-->
   <div class="body flex-grow-1">
-    <c-container breakpoint="lg" class="h-auto px-4">
+    <c-container breakpoint="lg" class="h-auto px-2 px-sm-3 px-lg-4">
       <router-outlet />
     </c-container>
   </div>
   <!--app footer-->
   <app-default-footer />
 </div>
+<app-bottom-nav />
 <app-toast-container />

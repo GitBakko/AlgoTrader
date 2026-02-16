@@ -1,41 +1,183 @@
-<div class="bg-light dark:bg-transparent min-vh-100 d-flex flex-row align-items-center">
-  <c-container>
-    <c-row class="justify-content-center">
-      <c-col lg="7" md="9" xl="6">
-        <c-card class="mx-4">
-          <c-card-body class="p-4">
-            <form cForm>
-              <h1>Register</h1>
-              <p class="text-body-secondary">Create your account</p>
-              <c-input-group class="mb-3">
-                <span cInputGroupText>
-                  <svg cIcon name="cilUser"></svg>
-                </span>
-                <input autoComplete="name" cFormControl placeholder="Username" />
-              </c-input-group>
-              <c-input-group class="mb-3">
-                <span cInputGroupText>&#64;</span>
-                <input autoComplete="email" cFormControl placeholder="Email" />
-              </c-input-group>
-              <c-input-group class="mb-3">
-                <span cInputGroupText>
-                  <svg cIcon name="cilLockLocked"></svg>
-                </span>
-                <input autoComplete="new-password" cFormControl placeholder="Password" type="password" />
-              </c-input-group>
-              <c-input-group class="mb-4">
-                <span cInputGroupText>
-                  <svg cIcon name="cilLockLocked"></svg>
-                </span>
-                <input autoComplete="new-password" cFormControl placeholder="Repeat password" type="password" />
-              </c-input-group>
-              <div class="d-grid">
-                <button cButton color="success">Create Account</button>
-              </div>
-            </form>
-          </c-card-body>
-        </c-card>
-      </c-col>
-    </c-row>
-  </c-container>
+<div class="auth-page-single">
+  <!-- Floating Background Blobs -->
+  <div class="auth-blob blob-1"></div>
+  <div class="auth-blob blob-2"></div>
+  <div class="auth-blob blob-3"></div>
+
+  <!-- Registration Card -->
+  <div class="auth-card">
+    <form [formGroup]="registerForm" (ngSubmit)="onSubmit()">
+      <!-- Mantis Logo SVG -->
+      <svg class="auth-hero__logo mx-auto d-block" style="width: 80px; height: 80px; margin-bottom: 1.5rem;" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M50 15L65 30L50 45L35 30Z" fill="#39FF14" opacity="0.8"/>
+        <path d="M50 45L65 60L50 75L35 60Z" fill="#00d97e" opacity="0.9"/>
+        <circle cx="50" cy="30" r="8" fill="#39FF14"/>
+        <path d="M30 70L40 85L30 95" stroke="#39FF14" stroke-width="3" stroke-linecap="round"/>
+        <path d="M70 70L60 85L70 95" stroke="#39FF14" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+
+      <h1>MANTIS AI</h1>
+      <p>Crea il tuo account</p>
+
+      <!-- Success Alert -->
+      @if (successMessage()) {
+        <div class="alert alert-success" role="alert">
+          <strong>Successo!</strong> {{ successMessage() }}
+        </div>
+      }
+
+      <!-- Error Alert -->
+      @if (errorMessage()) {
+        <div class="alert alert-danger" role="alert">
+          <strong>Errore:</strong> {{ errorMessage() }}
+        </div>
+      }
+
+      <!-- Username Input -->
+      <div class="auth-input-group">
+        <c-input-group>
+          <span cInputGroupText>
+            <svg cIcon name="cilUser"></svg>
+          </span>
+          <input
+            autoComplete="username"
+            cFormControl
+            formControlName="username"
+            placeholder="Username"
+            type="text"
+            [class.is-invalid]="usernameControl?.invalid && usernameControl?.touched"
+          />
+        </c-input-group>
+        @if (usernameControl?.invalid && usernameControl?.touched) {
+          <div class="invalid-feedback d-block">
+            Username richiesto (3-50 caratteri)
+          </div>
+        }
+      </div>
+
+      <!-- Email Input -->
+      <div class="auth-input-group">
+        <c-input-group>
+          <span cInputGroupText>&#64;</span>
+          <input
+            autoComplete="email"
+            cFormControl
+            formControlName="email"
+            placeholder="Email"
+            type="email"
+            [class.is-invalid]="emailControl?.invalid && emailControl?.touched"
+          />
+        </c-input-group>
+        @if (emailControl?.invalid && emailControl?.touched) {
+          <div class="invalid-feedback d-block">
+            Email valida richiesta
+          </div>
+        }
+      </div>
+
+      <!-- Password Input -->
+      <div class="auth-input-group">
+        <c-input-group>
+          <span cInputGroupText>
+            <svg cIcon name="cilLockLocked"></svg>
+          </span>
+          <input
+            autoComplete="new-password"
+            cFormControl
+            formControlName="password"
+            placeholder="Password"
+            type="password"
+            [class.is-invalid]="passwordControl?.invalid && passwordControl?.touched"
+          />
+        </c-input-group>
+
+        <!-- Password Strength Meter -->
+        @if (passwordControl?.value && passwordStrength()) {
+          <div class="password-strength-meter" [class]="passwordStrength()">
+            <div class="password-strength-meter__label">
+              <span>Sicurezza Password</span>
+              <span>{{ passwordStrengthLabel() }}</span>
+            </div>
+            <div class="password-strength-meter__bars">
+              @for (active of passwordStrengthBars(); track $index) {
+                <div class="password-strength-meter__bar" [class.active]="active"></div>
+              }
+            </div>
+          </div>
+        }
+
+        @if (passwordControl?.invalid && passwordControl?.touched) {
+          <div class="invalid-feedback d-block">
+            @if (passwordControl?.errors?.['required']) {
+              Password richiesta
+            }
+            @if (passwordControl?.errors?.['minlength']) {
+              Password troppo corta (min 6 caratteri)
+            }
+            @if (passwordControl?.errors?.['passwordStrength']) {
+              Password deve contenere maiuscole, minuscole e numeri
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Confirm Password Input -->
+      <div class="auth-input-group">
+        <c-input-group>
+          <span cInputGroupText>
+            <svg cIcon name="cilLockLocked"></svg>
+          </span>
+          <input
+            autoComplete="new-password"
+            cFormControl
+            formControlName="confirmPassword"
+            placeholder="Conferma Password"
+            type="password"
+            [class.is-invalid]="(confirmPasswordControl?.invalid && confirmPasswordControl?.touched) || (registerForm.errors?.['passwordMismatch'] && confirmPasswordControl?.touched)"
+          />
+        </c-input-group>
+        @if (registerForm.errors?.['passwordMismatch'] && confirmPasswordControl?.touched) {
+          <div class="invalid-feedback d-block">
+            Le password non coincidono
+          </div>
+        }
+      </div>
+
+      <!-- Role Selection -->
+      <div class="auth-input-group">
+        <c-input-group>
+          <span cInputGroupText>
+            <svg cIcon name="cilShieldAlt"></svg>
+          </span>
+          <select
+            cFormControl
+            formControlName="role_name"
+            [class.is-invalid]="roleControl?.invalid && roleControl?.touched"
+          >
+            @for (role of roles; track role.value) {
+              <option [value]="role.value">{{ role.name }} - {{ role.description }}</option>
+            }
+          </select>
+        </c-input-group>
+      </div>
+
+      <!-- Register Button -->
+      <button
+        type="submit"
+        class="auth-btn-primary"
+        [disabled]="loading()"
+      >
+        @if (loading()) {
+          <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+        }
+        Crea Account
+      </button>
+
+      <!-- Login Link -->
+      <div class="text-center mt-4">
+        <span class="text-muted small">Hai già un account? </span>
+        <a routerLink="/login" class="auth-link">Accedi</a>
+      </div>
+    </form>
+  </div>
 </div>

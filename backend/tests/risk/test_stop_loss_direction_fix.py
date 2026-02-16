@@ -4,7 +4,7 @@ CRITICAL BUG: Stop losses were being set ABOVE entry for longs!
 """
 
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
 from src.risk.risk_manager import RiskManager
 from src.risk.schemas import RiskCheckResult
@@ -13,8 +13,12 @@ from src.models.schemas import SignalClass
 from src.broker.models import Direction
 
 
-def test_buy_position_sl_below_entry():
+@patch("src.risk.risk_manager.CorrelationGuard.check_exposure")
+def test_buy_position_sl_below_entry(mock_check_exposure):
     """Test that BUY positions have SL BELOW entry price."""
+
+    # Mock static method for correlation check
+    mock_check_exposure.return_value = (1.0, [])  # No correlation warnings
 
     # Create RiskManager
     risk_manager = RiskManager()
@@ -22,14 +26,27 @@ def test_buy_position_sl_below_entry():
     # Mock dependencies
     risk_manager.circuit_breakers = MagicMock()
     risk_manager.circuit_breakers.check_epic.return_value = (True, None)
+    risk_manager.circuit_breakers.check_all.return_value = (True, [])  # No breakers tripped
+
+    # Properly mock drawdown_monitor state with real numeric values
+    state_mock = Mock()
+    state_mock.daily_start_equity = 10000.0
+    state_mock.max_daily_drawdown_pct = 0.05
+    state_mock.circuit_breaker_reason = None
     risk_manager.drawdown_monitor = MagicMock()
-    risk_manager.drawdown_monitor.state.max_daily_drawdown_pct = 0.05
+    risk_manager.drawdown_monitor.state = state_mock
+    risk_manager.drawdown_monitor.is_circuit_breaker_active.return_value = False
+    risk_manager.drawdown_monitor.check_all.return_value = []  # No drawdown issues
+    risk_manager.drawdown_monitor.check_limits.return_value = (True, None)  # No limit breaches
+    risk_manager.drawdown_monitor.update.return_value = None  # Update method called but returns nothing
+
     risk_manager.correlation_guard = MagicMock()
     risk_manager.correlation_guard.calculate_correlation_multiplier.return_value = 1.0
     risk_manager.equity_curve_filter = MagicMock()
     risk_manager.equity_curve_filter.get_size_multiplier.return_value = 1.0
 
     # Create BUY signal
+    atr = 10.0  # Define ATR as local variable for later use
     signal = TradingSignal(
         epic="XAUUSD",
         direction=Direction.BUY,
@@ -44,7 +61,7 @@ def test_buy_position_sl_below_entry():
     result = risk_manager.check_trade(
         signal=signal,
         equity=10000.0,
-        atr=10.0,  # ATR = 10
+        atr=atr,  # Use local ATR variable
         open_positions=[],
         trade_history=[],
     )
@@ -64,8 +81,12 @@ def test_buy_position_sl_below_entry():
     assert abs(result.stop_loss - expected_sl) < 0.01
 
 
-def test_sell_position_sl_above_entry():
+@patch("src.risk.risk_manager.CorrelationGuard.check_exposure")
+def test_sell_position_sl_above_entry(mock_check_exposure):
     """Test that SELL positions have SL ABOVE entry price."""
+
+    # Mock static method for correlation check
+    mock_check_exposure.return_value = (1.0, [])  # No correlation warnings
 
     # Create RiskManager
     risk_manager = RiskManager()
@@ -73,14 +94,27 @@ def test_sell_position_sl_above_entry():
     # Mock dependencies
     risk_manager.circuit_breakers = MagicMock()
     risk_manager.circuit_breakers.check_epic.return_value = (True, None)
+    risk_manager.circuit_breakers.check_all.return_value = (True, [])  # No breakers tripped
+
+    # Properly mock drawdown_monitor state with real numeric values
+    state_mock = Mock()
+    state_mock.daily_start_equity = 10000.0
+    state_mock.max_daily_drawdown_pct = 0.05
+    state_mock.circuit_breaker_reason = None
     risk_manager.drawdown_monitor = MagicMock()
-    risk_manager.drawdown_monitor.state.max_daily_drawdown_pct = 0.05
+    risk_manager.drawdown_monitor.state = state_mock
+    risk_manager.drawdown_monitor.is_circuit_breaker_active.return_value = False
+    risk_manager.drawdown_monitor.check_all.return_value = []  # No drawdown issues
+    risk_manager.drawdown_monitor.check_limits.return_value = (True, None)  # No limit breaches
+    risk_manager.drawdown_monitor.update.return_value = None  # Update method called but returns nothing
+
     risk_manager.correlation_guard = MagicMock()
     risk_manager.correlation_guard.calculate_correlation_multiplier.return_value = 1.0
     risk_manager.equity_curve_filter = MagicMock()
     risk_manager.equity_curve_filter.get_size_multiplier.return_value = 1.0
 
     # Create SELL signal
+    atr = 10.0  # Define ATR as local variable for later use
     signal = TradingSignal(
         epic="XAUUSD",
         direction=Direction.SELL,
@@ -95,7 +129,7 @@ def test_sell_position_sl_above_entry():
     result = risk_manager.check_trade(
         signal=signal,
         equity=10000.0,
-        atr=10.0,  # ATR = 10
+        atr=atr,  # Use local ATR variable
         open_positions=[],
         trade_history=[],
     )
@@ -115,8 +149,12 @@ def test_sell_position_sl_above_entry():
     assert abs(result.stop_loss - expected_sl) < 0.01
 
 
-def test_buy_with_suggested_stop_chooses_min():
+@patch("src.risk.risk_manager.CorrelationGuard.check_exposure")
+def test_buy_with_suggested_stop_chooses_min(mock_check_exposure):
     """Test that BUY with suggested stop chooses the MIN (tighter stop)."""
+
+    # Mock static method for correlation check
+    mock_check_exposure.return_value = (1.0, [])  # No correlation warnings
 
     # Create RiskManager
     risk_manager = RiskManager()
@@ -124,8 +162,20 @@ def test_buy_with_suggested_stop_chooses_min():
     # Mock dependencies
     risk_manager.circuit_breakers = MagicMock()
     risk_manager.circuit_breakers.check_epic.return_value = (True, None)
+    risk_manager.circuit_breakers.check_all.return_value = (True, [])  # No breakers tripped
+
+    # Properly mock drawdown_monitor state with real numeric values
+    state_mock = Mock()
+    state_mock.daily_start_equity = 10000.0
+    state_mock.max_daily_drawdown_pct = 0.05
+    state_mock.circuit_breaker_reason = None
     risk_manager.drawdown_monitor = MagicMock()
-    risk_manager.drawdown_monitor.state.max_daily_drawdown_pct = 0.05
+    risk_manager.drawdown_monitor.state = state_mock
+    risk_manager.drawdown_monitor.is_circuit_breaker_active.return_value = False
+    risk_manager.drawdown_monitor.check_all.return_value = []  # No drawdown issues
+    risk_manager.drawdown_monitor.check_limits.return_value = (True, None)  # No limit breaches
+    risk_manager.drawdown_monitor.update.return_value = None  # Update method called but returns nothing
+
     risk_manager.correlation_guard = MagicMock()
     risk_manager.correlation_guard.calculate_correlation_multiplier.return_value = 1.0
     risk_manager.equity_curve_filter = MagicMock()
@@ -209,16 +259,32 @@ def test_buy_with_suggested_stop_chooses_min():
     assert result.stop_loss < signal.entry_price
 
 
-def test_sell_with_suggested_stop_chooses_max():
+@patch("src.risk.risk_manager.CorrelationGuard.check_exposure")
+def test_sell_with_suggested_stop_chooses_max(mock_check_exposure):
     """Test that SELL with suggested stop chooses the MAX (tighter stop)."""
+
+    # Mock static method for correlation check
+    mock_check_exposure.return_value = (1.0, [])  # No correlation warnings
 
     risk_manager = RiskManager()
 
     # Mock dependencies
     risk_manager.circuit_breakers = MagicMock()
     risk_manager.circuit_breakers.check_epic.return_value = (True, None)
+    risk_manager.circuit_breakers.check_all.return_value = (True, [])  # No breakers tripped
+
+    # Properly mock drawdown_monitor state with real numeric values
+    state_mock = Mock()
+    state_mock.daily_start_equity = 10000.0
+    state_mock.max_daily_drawdown_pct = 0.05
+    state_mock.circuit_breaker_reason = None
     risk_manager.drawdown_monitor = MagicMock()
-    risk_manager.drawdown_monitor.state.max_daily_drawdown_pct = 0.05
+    risk_manager.drawdown_monitor.state = state_mock
+    risk_manager.drawdown_monitor.is_circuit_breaker_active.return_value = False
+    risk_manager.drawdown_monitor.check_all.return_value = []  # No drawdown issues
+    risk_manager.drawdown_monitor.check_limits.return_value = (True, None)  # No limit breaches
+    risk_manager.drawdown_monitor.update.return_value = None  # Update method called but returns nothing
+
     risk_manager.correlation_guard = MagicMock()
     risk_manager.correlation_guard.calculate_correlation_multiplier.return_value = 1.0
     risk_manager.equity_curve_filter = MagicMock()

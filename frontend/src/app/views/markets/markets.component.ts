@@ -56,7 +56,7 @@ const TIMEFRAMES = [
     <!-- Asset Cards Grid -->
     <c-row class="mb-4">
       @for (p of livePrices(); track p.epic) {
-        <c-col sm="6" md="4" lg="3" class="mb-3">
+        <c-col xs="6" md="4" lg="3" class="mb-3">
           <c-card class="h-100 asset-card"
                   [class.border-start-3]="selectedEpic() === p.epic"
                   [class.border-start-success]="selectedEpic() === p.epic"
@@ -118,6 +118,14 @@ const TIMEFRAMES = [
               Nessun dato disponibile. Connetti il backend per caricare i prezzi storici.
             </div>
           }
+        </c-card-body>
+      </c-card>
+
+      <!-- News Widget for Selected Asset -->
+      <c-card class="mb-4">
+        <c-card-header class="py-2"><strong>Notizie {{ selectedEpic() }}</strong></c-card-header>
+        <c-card-body class="p-3">
+          <app-news-widget [news]="assetNews()" [maxItems]="5"></app-news-widget>
         </c-card-body>
       </c-card>
     }

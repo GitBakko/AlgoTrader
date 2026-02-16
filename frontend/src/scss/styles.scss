@@ -11,13 +11,8 @@
 // Custom styles for this theme
 @use "theme";
 
-// Some temp fixes
-//@use "fixes";
-
-// If you want to add custom CSS you can put it here.
+// Brand-specific customizations
 @use "custom";
 
 // Examples
-// We use those styles to show code examples, you should remove them in your application.
 @use "examples";
-

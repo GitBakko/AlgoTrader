@@ -19,10 +19,10 @@ import { ToastService } from '../../shared/services/toast.service';
   ],
   template: `
     <!-- Header -->
-    <div class="d-flex align-items-center justify-content-between mb-3 px-1">
+    <div class="d-flex align-items-center justify-content-between mb-3">
       <div class="d-flex align-items-center gap-2">
-        <h5 class="mb-0 fw-semibold">Segnali</h5>
-        <c-badge color="info">{{ signals().length }}</c-badge>
+        <h5 class="mb-0 fw-bold">Segnali</h5>
+        <c-badge color="info" class="mantis-badge-animated">{{ signals().length }}</c-badge>
       </div>
       <button cButton color="primary" size="sm" (click)="generateTestSignal()">
         Test Signal
@@ -32,8 +32,10 @@ import { ToastService } from '../../shared/services/toast.service';
     <c-card class="mb-4">
       <c-card-body class="p-0">
         @if (signals().length === 0) {
-          <div class="text-center py-5 text-body-secondary small">
-            Nessun segnale generato
+          <div class="empty-state">
+            <div class="empty-state__icon">🔔</div>
+            <div class="empty-state__text">Nessun segnale generato</div>
+            <div class="empty-state__hint">I segnali di trading appariranno qui</div>
           </div>
         } @else {
           <div style="max-height: 600px; overflow-y: auto;">
@@ -56,9 +58,9 @@ import { ToastService } from '../../shared/services/toast.service';
                   <tr>
                     <td class="fw-semibold">{{ sig.epic }}</td>
                     <td>
-                      <c-badge [color]="directionColor(sig.direction)" class="badge-sm">
+                      <span class="dir-indicator" [class.dir-indicator--buy]="sig.direction === 'BUY'" [class.dir-indicator--sell]="sig.direction === 'SELL'">
                         {{ sig.direction }}
-                      </c-badge>
+                      </span>
                     </td>
                     <td>
                       <div class="d-flex align-items-center gap-1">
@@ -98,17 +100,17 @@ import { ToastService } from '../../shared/services/toast.service';
 export class SignalsComponent implements OnInit {
   private readonly trading = inject(TradingService);
   private readonly toast = inject(ToastService);
-  readonly signals = this.trading.signals;
+  readonly signals = this.trading.paperSignals;
 
   ngOnInit(): void {
-    this.trading.loadSignals();
+    this.trading.loadPaperSignals();
   }
 
   generateTestSignal(): void {
     this.trading.generateSignal('XAUUSD').subscribe({
       next: () => {
         this.toast.success('Segnale test generato');
-        this.trading.loadSignals();
+        this.trading.loadPaperSignals();
       },
       error: () => this.toast.error('Errore generazione segnale')
     });

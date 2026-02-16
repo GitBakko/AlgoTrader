@@ -6,6 +6,7 @@ import {
   BadgeComponent, ButtonDirective
 } from '@coreui/angular';
 import { TradingService } from '../../core/services/trading.service';
+import { WebSocketService } from '../../core/services/websocket.service';
 import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
 import { ToastService } from '../../shared/services/toast.service';
 import { getEpicSymbol } from '../../shared/constants/epic-symbols';
@@ -22,23 +23,25 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
   ],
   template: `
     <!-- Header -->
-    <div class="d-flex align-items-center justify-content-between mb-3 px-1">
+    <div class="d-flex align-items-center justify-content-between mb-3">
       <div class="d-flex align-items-center gap-2">
-        <h5 class="mb-0 fw-semibold">Posizioni</h5>
-        <c-badge color="info">{{ positions().length }}</c-badge>
+        <h5 class="mb-0 fw-bold">Posizioni</h5>
+        <c-badge color="info" class="mantis-badge-animated">{{ livePositions().length }}</c-badge>
       </div>
       @if (totalPnl() !== 0) {
-        <c-badge [color]="totalPnl() >= 0 ? 'success' : 'danger'" class="fs-6">
-          P&amp;L: $ {{ totalPnl() >= 0 ? '+' : '' }}{{ totalPnl() | number:'1.2-2' }}
-        </c-badge>
+        <span class="mantis-kpi" [class.text-success]="totalPnl() >= 0" [class.text-danger]="totalPnl() < 0" style="font-size: 1.125rem;">
+          $ {{ totalPnl() >= 0 ? '+' : '' }}{{ totalPnl() | number:'1.2-2' }}
+        </span>
       }
     </div>
 
     <c-card class="mb-4">
       <c-card-body class="p-0">
-        @if (positions().length === 0) {
-          <div class="text-center py-5 text-body-secondary small">
-            Nessuna posizione aperta
+        @if (livePositions().length === 0) {
+          <div class="empty-state">
+            <div class="empty-state__icon">📊</div>
+            <div class="empty-state__text">Nessuna posizione aperta</div>
+            <div class="empty-state__hint">Le posizioni aperte appariranno qui</div>
           </div>
         } @else {
           <table cTable [small]="true" [hover]="true" [striped]="true" class="mb-0">
@@ -56,7 +59,7 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
               </tr>
             </thead>
             <tbody>
-              @for (pos of positions(); track pos.deal_id) {
+              @for (pos of livePositions(); track pos.deal_id) {
                 <tr>
                   <td class="fw-semibold">
                     <div class="d-flex align-items-center gap-2">
@@ -66,19 +69,19 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
                     </div>
                   </td>
                   <td>
-                    <c-badge [color]="pos.direction === 'BUY' ? 'success' : 'danger'" class="badge-sm">
+                    <span class="dir-indicator" [class.dir-indicator--buy]="pos.direction === 'BUY'" [class.dir-indicator--sell]="pos.direction === 'SELL'">
                       {{ pos.direction }}
-                    </c-badge>
+                    </span>
                   </td>
                   <td class="font-monospace">{{ pos.size | number:'1.4-4' }}</td>
-                  <td class="font-monospace">{{ pos.entry_price | priceFormat:pos.epic }}</td>
-                  <td class="font-monospace">{{ pos.stop_loss != null ? (pos.stop_loss | priceFormat:pos.epic) : '—' }}</td>
-                  <td class="font-monospace">{{ pos.take_profit != null ? (pos.take_profit | priceFormat:pos.epic) : '—' }}</td>
+                  <td class="font-monospace">{{ pos.level | priceFormat:pos.epic }}</td>
+                  <td class="font-monospace">{{ pos.stop_level != null ? (pos.stop_level | priceFormat:pos.epic) : '—' }}</td>
+                  <td class="font-monospace">{{ pos.profit_level != null ? (pos.profit_level | priceFormat:pos.epic) : '—' }}</td>
                   <td class="text-body-secondary small">{{ formatDate(pos.opened_at) }}</td>
                   <td class="text-end fw-semibold font-monospace"
-                      [class.text-success]="pos.current_pnl >= 0"
-                      [class.text-danger]="pos.current_pnl < 0">
-                    $ {{ pos.current_pnl >= 0 ? '+' : '' }}{{ pos.current_pnl | number:'1.2-2' }}
+                      [class.text-success]="pos.live_pnl >= 0"
+                      [class.text-danger]="pos.live_pnl < 0">
+                    $ {{ pos.live_pnl >= 0 ? '+' : '' }}{{ pos.live_pnl | number:'1.2-2' }}
                   </td>
                   <td class="text-end">
                     <button cButton color="danger" size="sm" (click)="closePosition(pos.deal_id)">
@@ -96,25 +99,39 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
 })
 export class PositionsComponent implements OnInit {
   private readonly trading = inject(TradingService);
+  private readonly ws = inject(WebSocketService);
   private readonly toast = inject(ToastService);
-  readonly positions = this.trading.positions;
+  readonly positions = this.trading.paperPositions;
+
+  // Calculate live P&L using WebSocket prices
+  readonly livePositions = computed(() => {
+    const positions = this.positions();
+    const prices = this.ws.prices();
+    return positions.map(pos => {
+      const tick = prices[pos.epic];
+      if (!tick) return { ...pos, live_pnl: 0 };
+      const currentPrice = pos.direction === 'BUY' ? tick.bid : tick.offer;
+      const diff = pos.direction === 'BUY' ? currentPrice - pos.level : pos.level - currentPrice;
+      return { ...pos, live_pnl: Math.round(diff * pos.size * 100) / 100 };
+    });
+  });
 
   readonly totalPnl = computed(() =>
-    this.positions().reduce((sum, p) => sum + (p.current_pnl ?? 0), 0)
+    this.livePositions().reduce((sum, p) => sum + (p.live_pnl ?? 0), 0)
   );
 
   // Get symbol for EPIC display
   getSymbol = getEpicSymbol;
 
   ngOnInit(): void {
-    this.trading.loadPositions();
+    this.trading.loadPaperPositions();
   }
 
   closePosition(dealId: string): void {
     this.trading.closePosition(dealId).subscribe({
       next: () => {
         this.toast.success('Posizione chiusa');
-        this.trading.loadPositions();
+        this.trading.loadPaperPositions();
       },
       error: (err) => {
         this.toast.error(err?.error?.error || 'Errore nella chiusura');
