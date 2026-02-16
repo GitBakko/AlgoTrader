@@ -6,9 +6,11 @@ Monitors PostgreSQL, Redis, and Capital.com API connectivity.
 import asyncio
 from datetime import datetime, timezone
 from enum import Enum
+from pathlib import Path
 from typing import Any
 
 import httpx
+import psutil
 from loguru import logger
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -66,27 +68,47 @@ class HealthChecker:
             System health status
         """
         # Run all checks in parallel
-        db_check, redis_check, api_check, data_check = await asyncio.gather(
+        results = await asyncio.gather(
             self.check_database(),
             self.check_redis(),
             self.check_capital_com(),
             self.check_data_freshness(),
+            self.check_system_resources(),  # NEW
+            self.check_websocket(),         # NEW
+            self.check_ml_models(),          # NEW
+            return_exceptions=True,
         )
+
+        db_check, redis_check, api_check, data_check, system_check, ws_check, ml_check = results
 
         components: dict[str, ComponentHealth] = {
             "database": db_check,
             "redis": redis_check,
             "capital_com_api": api_check,
             "data_freshness": data_check,
+            "system_resources": system_check,  # NEW
+            "websocket": ws_check,             # NEW
+            "ml_models": ml_check,              # NEW
         }
 
         # Determine overall status
-        unhealthy = [c for c in components.values() if c.status == HealthStatus.UNHEALTHY]
-        degraded = [c for c in components.values() if c.status == HealthStatus.DEGRADED]
+        # Critical components: database, redis, capital_com_api, system_resources
+        critical_components = ["database", "redis", "capital_com_api", "system_resources"]
+        critical_unhealthy = any(
+            components[k].status == HealthStatus.UNHEALTHY
+            for k in critical_components
+            if k in components and isinstance(components[k], ComponentHealth)
+        )
 
-        if unhealthy:
+        any_degraded = any(
+            c.status == HealthStatus.DEGRADED
+            for c in components.values()
+            if isinstance(c, ComponentHealth)
+        )
+
+        if critical_unhealthy:
             overall_status = HealthStatus.UNHEALTHY
-        elif degraded:
+        elif any_degraded:
             overall_status = HealthStatus.DEGRADED
         else:
             overall_status = HealthStatus.HEALTHY
@@ -335,4 +357,94 @@ class HealthChecker:
                 status=HealthStatus.UNHEALTHY,
                 message=f"API check failed: {str(e)}",
                 response_time_ms=response_time_ms,
+            )
+
+    async def check_system_resources(self) -> ComponentHealth:
+        """Check memory and CPU usage."""
+        try:
+            memory = psutil.virtual_memory()
+            cpu_percent = psutil.cpu_percent(interval=0.1)  # 100ms sample
+
+            status = HealthStatus.HEALTHY
+            if memory.percent > 90 or cpu_percent > 90:
+                status = HealthStatus.DEGRADED
+            if memory.percent > 95 or cpu_percent > 95:
+                status = HealthStatus.UNHEALTHY
+
+            return ComponentHealth(
+                name="System Resources",
+                status=status,
+                message=f"Memory: {memory.percent:.1f}%, CPU: {cpu_percent:.1f}%",
+                details={
+                    "memory_percent": round(memory.percent, 1),
+                    "memory_available_gb": round(memory.available / (1024**3), 2),
+                    "memory_total_gb": round(memory.total / (1024**3), 2),
+                    "memory_used_gb": round(memory.used / (1024**3), 2),
+                    "cpu_percent": round(cpu_percent, 1),
+                },
+            )
+        except Exception as e:
+            logger.error(f"System resources check failed: {e}")
+            return ComponentHealth(
+                name="System Resources",
+                status=HealthStatus.UNHEALTHY,
+                message=f"Check failed: {str(e)}",
+            )
+
+    async def check_websocket(self) -> ComponentHealth:
+        """Check WebSocket connection health (placeholder for now)."""
+        try:
+            # Note: Actual WebSocket check would require app state access
+            # This is a basic implementation
+            return ComponentHealth(
+                name="WebSocket",
+                status=HealthStatus.HEALTHY,
+                message="WebSocket check not fully implemented (app state required)",
+                details={
+                    "note": "Full check requires app state from main.py",
+                },
+            )
+        except Exception as e:
+            logger.error(f"WebSocket check failed: {e}")
+            return ComponentHealth(
+                name="WebSocket",
+                status=HealthStatus.UNHEALTHY,
+                message=f"Check failed: {str(e)}",
+            )
+
+    async def check_ml_models(self) -> ComponentHealth:
+        """Check if ML models are loaded and accessible."""
+        try:
+            model_dir = Path("data/models")
+            if not model_dir.exists():
+                return ComponentHealth(
+                    name="ML Models",
+                    status=HealthStatus.DEGRADED,
+                    message="Model directory not found (normal for fresh installs)",
+                )
+
+            # Check for XGBoost models (.pkl) and PyTorch models (.pt)
+            xgb_models = list(model_dir.glob("*.pkl"))
+            pt_models = list(model_dir.glob("*.pt"))
+            total_models = len(xgb_models) + len(pt_models)
+
+            status = HealthStatus.HEALTHY if total_models > 0 else HealthStatus.DEGRADED
+
+            return ComponentHealth(
+                name="ML Models",
+                status=status,
+                message=f"Found {total_models} models ({len(xgb_models)} XGBoost, {len(pt_models)} PyTorch)",
+                details={
+                    "models_found": total_models,
+                    "xgboost_models": len(xgb_models),
+                    "pytorch_models": len(pt_models),
+                    "model_files": [f.name for f in (xgb_models + pt_models)[:5]],  # First 5
+                },
+            )
+        except Exception as e:
+            logger.error(f"ML models check failed: {e}")
+            return ComponentHealth(
+                name="ML Models",
+                status=HealthStatus.UNHEALTHY,
+                message=f"Check failed: {str(e)}",
             )

@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 from src.risk.risk_manager import RiskManager
 from src.risk.schemas import RiskCheckResult
 from src.strategy.schemas import TradingSignal
+from src.models.schemas import SignalClass
 from src.broker.models import Direction
 
 
@@ -36,6 +37,7 @@ def test_buy_position_sl_below_entry():
         confidence=0.65,
         suggested_stop=None,  # Will use ATR-based SL
         suggested_tp=None,
+        signal_class=SignalClass.BUY,
     )
 
     # Check trade
@@ -86,6 +88,7 @@ def test_sell_position_sl_above_entry():
         confidence=0.65,
         suggested_stop=None,  # Will use ATR-based SL
         suggested_tp=None,
+        signal_class=SignalClass.SELL,
     )
 
     # Check trade
@@ -137,6 +140,7 @@ def test_buy_with_suggested_stop_chooses_min():
         confidence=0.65,
         suggested_stop=1990.0,  # Tighter than ATR-based
         suggested_tp=None,
+        signal_class=SignalClass.BUY,
     )
 
     result = risk_manager.check_trade(
@@ -229,6 +233,7 @@ def test_sell_with_suggested_stop_chooses_max():
         confidence=0.65,
         suggested_stop=2010.0,  # Tighter than ATR-based
         suggested_tp=None,
+        signal_class=SignalClass.SELL,
     )
 
     result = risk_manager.check_trade(

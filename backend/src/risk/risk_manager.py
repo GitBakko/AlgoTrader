@@ -104,7 +104,19 @@ class RiskManager:
                 },
             )
 
-        # 1b. Check legacy drawdown circuit breaker
+        # 1b. Check max total open positions
+        total_open = len(open_positions)
+        if total_open >= self.limits.max_total_open_positions:
+            reason = (
+                f"Max total positions reached: {total_open}/{self.limits.max_total_open_positions}"
+            )
+            logger.warning(f"Trade rejected: {reason}")
+            return RiskCheckResult(
+                approved=False,
+                rejection_reason=reason,
+            )
+
+        # 1c. Check legacy drawdown circuit breaker
         if self.drawdown_monitor.is_circuit_breaker_active():
             reason = self.drawdown_monitor.state.circuit_breaker_reason or "Circuit breaker active"
             logger.warning(f"Trade rejected: {reason}")

@@ -10,11 +10,21 @@ class TestListModels:
         body = resp.json()
         assert body["success"] is True
         data = body["data"]
-        assert len(data) == 9
+        assert len(data) == 21  # Expanded asset coverage (21 total assets)
         epics = {m["epic"] for m in data}
         assert epics == {
-            "XAUUSD", "BTCUSD", "US500", "WTIUSD", "EURUSD",
-            "NVDA", "TSLA", "XAGUSD", "DE40",
+            # Crypto
+            "BTCUSD", "ETHUSD", "SOLUSD", "DOGUSD", "DASHUSD", "ICPUSD", "BNBUSD",
+            # Metals
+            "XAUUSD", "XAGUSD", "COPPER", "PLATINUM",
+            # Indices
+            "US500", "DE40", "NAS100",
+            # Commodities/Energy
+            "WTIUSD", "NATGAS",
+            # Forex
+            "EURUSD", "GBPUSD", "USDJPY",
+            # Stocks
+            "NVDA", "TSLA",
         }
 
 

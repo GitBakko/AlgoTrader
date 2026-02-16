@@ -3,6 +3,9 @@ AlgoTrader AI - FastAPI Application
 Main entry point for the backend API.
 """
 
+import asyncio
+import signal
+import sys
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
@@ -10,6 +13,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from src.api.routers import (
     backtest,
@@ -36,6 +42,14 @@ settings = get_settings()
 # Setup logging
 setup_logger()
 
+# Initialize rate limiter with Redis backend
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["100/minute", "10/second"],  # Global default
+    storage_uri=f"redis://{settings.redis_host}:{settings.redis_port}/{settings.redis_db}",
+    strategy="moving-window",  # More accurate than fixed-window
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -50,6 +64,9 @@ async def lifespan(app: FastAPI):
     logger.info(f"Using {'DEMO' if settings.use_demo else 'LIVE'} Capital.com account")
     logger.info(f"Trading Enabled: {settings.trading_enabled}")
     logger.info(f"Paper Trading: {settings.paper_trading}")
+
+    # Initialize shutdown flag
+    app.state.is_shutting_down = False
 
     # Initialize database connections
     DatabaseManager.initialize()
@@ -257,6 +274,12 @@ async def lifespan(app: FastAPI):
         f"(use POST /api/trading/start to begin, state persistence: {'enabled' if app.state.db_session_factory else 'disabled'})"
     )
 
+    # Register signal handlers for graceful shutdown
+    try:
+        setup_signal_handlers(app)
+    except Exception as e:
+        logger.warning(f"Signal handlers registration failed (Windows compatibility): {e}")
+
     logger.success("✅ Application startup complete")
 
     yield
@@ -303,6 +326,85 @@ async def lifespan(app: FastAPI):
     logger.success("✅ Application shutdown complete")
 
 
+async def shutdown_handler(signum, frame, app_instance):
+    """Handle graceful shutdown on SIGTERM/SIGINT."""
+    logger.warning(f"Received signal {signum}, initiating graceful shutdown...")
+
+    # 1. Stop accepting new requests
+    app_instance.state.is_shutting_down = True
+    logger.info("Stopped accepting new requests")
+
+    # 2. Close WebSocket connections
+    if hasattr(app_instance.state, "broker_ws_client") and app_instance.state.broker_ws_client:
+        try:
+            await app_instance.state.broker_ws_client.disconnect()
+            logger.info("WebSocket connections closed")
+        except Exception as e:
+            logger.error(f"WebSocket disconnect failed: {e}")
+
+    # 3. Stop paper trading loop
+    if hasattr(app_instance.state, "paper_loop") and app_instance.state.paper_loop.is_running:
+        try:
+            app_instance.state.paper_loop.stop()
+            logger.info("Paper trading loop stopped")
+        except Exception as e:
+            logger.error(f"Paper loop stop failed: {e}")
+
+    # 4. Close open positions (paper mode only)
+    if settings.execution_mode == "PAPER":
+        try:
+            open_positions = []
+            if hasattr(app_instance.state, "paper_loop"):
+                open_positions = app_instance.state.paper_loop.get_paper_positions()
+
+            logger.info(f"Closing {len(open_positions)} open positions before shutdown")
+
+            for pos in open_positions:
+                try:
+                    await app_instance.state.paper_loop.close_paper_position(
+                        deal_id=pos.get("deal_id", ""),
+                        reason="Graceful shutdown",
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to close position {pos.get('deal_id')}: {e}")
+
+            if open_positions:
+                logger.success(f"Closed {len(open_positions)} positions")
+        except Exception as e:
+            logger.error(f"Position closure failed: {e}")
+
+    # 5. Disconnect broker
+    if hasattr(app_instance.state, "broker_client") and app_instance.state.broker_client:
+        try:
+            await app_instance.state.broker_client.close()
+            logger.info("Broker disconnected")
+        except Exception as e:
+            logger.error(f"Broker disconnect failed: {e}")
+
+    # 6. Close database connections
+    try:
+        await DatabaseManager.close()
+        logger.info("Database connections closed")
+    except Exception as e:
+        logger.error(f"Database close failed: {e}")
+
+    logger.success("Graceful shutdown complete")
+    sys.exit(0)
+
+
+def setup_signal_handlers(app_instance):
+    """Register signal handlers for graceful shutdown."""
+    loop = asyncio.get_event_loop()
+
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(
+            sig,
+            lambda s=sig: asyncio.create_task(shutdown_handler(s, None, app_instance)),
+        )
+
+    logger.info("Signal handlers registered (SIGTERM, SIGINT)")
+
+
 # Create FastAPI application
 app = FastAPI(
     title=settings.app_name,
@@ -321,6 +423,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Configure rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 # Paths excluded from request logging (high-frequency / internal)

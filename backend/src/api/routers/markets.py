@@ -4,14 +4,17 @@ Provides market search, OHLC price data, and market info.
 Uses broker client when available, falls back to static data.
 """
 
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Depends, Path, Query, Request
 from loguru import logger
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from src.api.dependencies import get_broker_client, get_data_access
 from src.api.schemas import MarketInfo, OHLCResponse, error_response, success_response
 from src.data.utils import calculate_next_market_open
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 # Static market list (fallback when no broker connection)
 SUPPORTED_MARKETS = [
@@ -66,7 +69,9 @@ _RESOLUTION_TO_TIMEFRAME = {
 
 
 @router.get("/search")
+@limiter.limit("30/minute")  # Higher limit for read-only operations
 async def search_markets(
+    request: Request,
     q: str = Query(default="", min_length=0),
     broker=Depends(get_broker_client),
 ):

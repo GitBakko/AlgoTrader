@@ -7,6 +7,8 @@ import asyncio
 
 from fastapi import APIRouter, Request
 from loguru import logger
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from src.api.schemas import error_response, success_response
 
@@ -14,6 +16,7 @@ from src.api.schemas import error_response, success_response
 _BROKER_TIMEOUT = 8.0
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 
 def _get_loop(request: Request):
@@ -22,8 +25,15 @@ def _get_loop(request: Request):
 
 
 @router.post("/start")
+@limiter.limit("5/minute")  # Max 5 start commands per minute
 async def start_trading(request: Request):
     """Start the trading loop (idempotent: returns success if already running)."""
+    # Check if shutting down
+    if getattr(request.app.state, "is_shutting_down", False):
+        return error_response(
+            "Service is shutting down, not accepting new commands", 503
+        )
+
     loop = _get_loop(request)
     if loop is None:
         return error_response("Trading loop not initialized", 503)
@@ -48,6 +58,7 @@ async def start_trading(request: Request):
 
 
 @router.post("/stop")
+@limiter.limit("5/minute")  # Max 5 stop commands per minute
 async def stop_trading(request: Request):
     """Stop the trading loop (idempotent: returns success if already stopped)."""
     loop = _get_loop(request)

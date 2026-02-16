@@ -208,6 +208,7 @@ class Settings(BaseSettings):
     paper_trading: bool = Field(default=True, alias="PAPER_TRADING")
     execution_mode: str = Field(default="PAPER", alias="EXECUTION_MODE")
     min_confidence_threshold: float = Field(default=0.65, alias="MIN_CONFIDENCE_THRESHOLD")
+    max_total_open_positions: int = Field(default=5, alias="MAX_TOTAL_OPEN_POSITIONS")
 
     # ===== External APIs =====
     finnhub_api_key: str = Field(default="", alias="FINNHUB_API_KEY")
@@ -219,6 +220,12 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = Field(
         default=60, alias="ACCESS_TOKEN_EXPIRE_MINUTES"
     )
+
+    # ===== Rate Limiting =====
+    rate_limit_enabled: bool = Field(default=True, alias="RATE_LIMIT_ENABLED")
+    rate_limit_per_minute: int = Field(default=100, alias="RATE_LIMIT_PER_MINUTE")
+    rate_limit_per_second: int = Field(default=10, alias="RATE_LIMIT_PER_SECOND")
+    rate_limit_trade_per_minute: int = Field(default=5, alias="RATE_LIMIT_TRADE_PER_MINUTE")
 
 
 @lru_cache

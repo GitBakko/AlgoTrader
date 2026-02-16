@@ -91,3 +91,28 @@ class TestRiskManager:
         )
         result2 = rm2.check_trade(signal, equity=10000.0, atr=0.5)
         assert result.position_size < result2.position_size
+
+    def test_max_total_positions_limit(self):
+        """Test that RiskManager rejects new positions when total limit reached."""
+        limits = RiskLimits(max_total_open_positions=3)
+        rm = RiskManager(initial_equity=10000.0, limits=limits)
+
+        # Simulate 3 open positions
+        open_positions = [
+            {"epic": "XAUUSD", "direction": "BUY", "size": 1.0},
+            {"epic": "BTCUSD", "direction": "BUY", "size": 0.5},
+            {"epic": "US500", "direction": "SELL", "size": 2.0},
+        ]
+
+        # 4th position should be rejected
+        signal = _make_signal(epic="NVDA", direction=SignalDirection.BUY)
+        result = rm.check_trade(
+            signal=signal,
+            equity=10000.0,
+            atr=5.0,
+            open_positions=open_positions,
+        )
+
+        assert result.approved is False
+        assert "Max total positions reached" in result.rejection_reason
+        assert "3/3" in result.rejection_reason
