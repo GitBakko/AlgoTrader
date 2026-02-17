@@ -1,0 +1,56 @@
+// ═══════════════════════════════════════════════════════════
+// Markets Component Styles
+// Uses CSS custom properties (no SCSS palette import needed)
+// ═══════════════════════════════════════════════════════════
+
+:host {
+  // Asset Cards
+  .asset-card {
+    cursor: pointer;
+    border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.1));
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+
+    &:hover {
+      border-color: var(--mantis-border-accent, rgba(0, 217, 126, 0.15));
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+      transform: translateY(-1px);
+    }
+
+    &--selected {
+      border-left: 3px solid var(--mantis-green, #00d97e) !important;
+      box-shadow: 0 0 12px rgba(0, 217, 126, 0.1);
+    }
+  }
+
+  // Mid price styling
+  .asset-mid-price {
+    font-family: var(--mantis-font-mono);
+    font-feature-settings: "tnum" 1;
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+
+  // Clickable table rows
+  .markets-table-row {
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+
+    &:hover {
+      background: rgba(0, 217, 126, 0.03);
+    }
+  }
+
+  // Chart placeholder
+  .chart-placeholder {
+    padding: 3rem 1rem;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.4);
+  }
+
+  // Mobile table min-width
+  @media (max-width: 991.98px) {
+    table[cTable] {
+      min-width: 520px;
+    }
+  }
+}

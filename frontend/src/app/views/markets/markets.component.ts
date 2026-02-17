@@ -33,6 +33,7 @@ const TIMEFRAMES = [
   selector: 'app-markets',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  styleUrl: './markets.component.scss',
   imports: [
     CommonModule, CardComponent, CardBodyComponent, CardHeaderComponent,
     ColComponent, RowComponent, TableDirective, BadgeComponent,
@@ -58,9 +59,7 @@ const TIMEFRAMES = [
       @for (p of livePrices(); track p.epic) {
         <c-col xs="6" md="4" lg="3" class="mb-3">
           <c-card class="h-100 asset-card"
-                  [class.border-start-3]="selectedEpic() === p.epic"
-                  [class.border-start-success]="selectedEpic() === p.epic"
-                  style="cursor: pointer;"
+                  [class.asset-card--selected]="selectedEpic() === p.epic"
                   (click)="selectAsset(p.epic)">
             <c-card-body class="py-2">
               <div class="d-flex justify-content-between align-items-start">
@@ -72,10 +71,10 @@ const TIMEFRAMES = [
                   </div>
                 </div>
                 <div class="text-end">
-                  <div class="font-monospace fw-bold" style="font-size: 1.05rem;">
+                  <div class="asset-mid-price">
                     {{ p.mid | priceFormat:p.epic }}
                   </div>
-                  <div class="text-body-secondary small font-monospace">
+                  <div class="text-body-secondary small mantis-mono">
                     {{ p.bid | priceFormat:p.epic }} / {{ p.offer | priceFormat:p.epic }}
                   </div>
                 </div>
@@ -88,9 +87,9 @@ const TIMEFRAMES = [
 
     <!-- Candlestick Chart -->
     @if (selectedEpic()) {
-      <c-card class="mb-4">
+      <c-card class="mb-4 border-top border-top-3 border-top-primary">
         <c-card-header class="d-flex align-items-center justify-content-between py-2">
-          <strong>{{ selectedEpic() }} - Grafico</strong>
+          <span class="fw-semibold small text-body-secondary">{{ selectedEpic() }} — Grafico</span>
           <c-button-group size="sm">
             @for (tf of timeframes; track tf.value) {
               <button cButton [color]="selectedTimeframe() === tf.value ? 'primary' : 'secondary'"
@@ -109,12 +108,12 @@ const TIMEFRAMES = [
               [height]="420"
             ></app-tv-chart>
           } @else if (chartLoading()) {
-            <div class="text-center py-5 text-body-secondary">
+            <div class="chart-placeholder">
               <div class="spinner-border spinner-border-sm me-2" role="status"></div>
               Caricamento dati {{ selectedEpic() }} {{ selectedTimeframe() }}...
             </div>
           } @else {
-            <div class="text-center py-5 text-body-secondary small">
+            <div class="chart-placeholder small">
               Nessun dato disponibile. Connetti il backend per caricare i prezzi storici.
             </div>
           }
@@ -122,8 +121,10 @@ const TIMEFRAMES = [
       </c-card>
 
       <!-- News Widget for Selected Asset -->
-      <c-card class="mb-4">
-        <c-card-header class="py-2"><strong>Notizie {{ selectedEpic() }}</strong></c-card-header>
+      <c-card class="mb-4 border-top border-top-3 border-top-primary">
+        <c-card-header class="py-2">
+          <span class="fw-semibold small text-body-secondary">Notizie {{ selectedEpic() }}</span>
+        </c-card-header>
         <c-card-body class="p-3">
           <app-news-widget [news]="assetNews()" [maxItems]="5"></app-news-widget>
         </c-card-body>
@@ -132,39 +133,43 @@ const TIMEFRAMES = [
 
     <!-- Markets Table (from API) -->
     @if (markets().length > 0) {
-      <c-card class="mb-4">
-        <c-card-header class="py-2"><strong>Dettagli Mercati</strong></c-card-header>
+      <c-card class="mb-4 border-top border-top-3 border-top-primary">
+        <c-card-header class="py-2">
+          <span class="fw-semibold small text-body-secondary">Dettagli Mercati</span>
+        </c-card-header>
         <c-card-body class="p-0">
-          <table cTable [small]="true" [hover]="true" [striped]="true" class="mb-0">
-            <thead>
-              <tr>
-                <th>Epic</th>
-                <th>Nome</th>
-                <th class="text-end">Bid</th>
-                <th class="text-end">Offer</th>
-                <th class="text-end">High</th>
-                <th class="text-end">Low</th>
-                <th class="text-end">Change %</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (m of markets(); track m.epic) {
-                <tr style="cursor: pointer;" (click)="selectAsset(m.epic)">
-                  <td class="fw-semibold">{{ m.epic }}</td>
-                  <td>{{ m.name }}</td>
-                  <td class="text-end font-monospace">{{ m.bid != null ? (m.bid | priceFormat:m.epic) : '\u2014' }}</td>
-                  <td class="text-end font-monospace">{{ m.offer != null ? (m.offer | priceFormat:m.epic) : '\u2014' }}</td>
-                  <td class="text-end font-monospace">{{ m.high != null ? (m.high | priceFormat:m.epic) : '\u2014' }}</td>
-                  <td class="text-end font-monospace">{{ m.low != null ? (m.low | priceFormat:m.epic) : '\u2014' }}</td>
-                  <td class="text-end font-monospace"
-                      [class.text-success]="m.change_pct != null && m.change_pct >= 0"
-                      [class.text-danger]="m.change_pct != null && m.change_pct < 0">
-                    {{ m.change_pct != null ? ((m.change_pct >= 0 ? '+' : '') + (m.change_pct | number:'1.2-2') + '%') : '\u2014' }}
-                  </td>
+          <div class="table-responsive-mobile">
+            <table cTable [small]="true" [hover]="true" [striped]="true" class="mb-0">
+              <thead>
+                <tr class="text-body-secondary">
+                  <th class="fw-semibold small">Epic</th>
+                  <th class="fw-semibold small d-mobile-none">Nome</th>
+                  <th class="fw-semibold small text-end">Bid</th>
+                  <th class="fw-semibold small text-end">Offer</th>
+                  <th class="fw-semibold small text-end d-mobile-none">High</th>
+                  <th class="fw-semibold small text-end d-mobile-none">Low</th>
+                  <th class="fw-semibold small text-end">Change %</th>
                 </tr>
-              }
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                @for (m of markets(); track m.epic) {
+                  <tr class="markets-table-row" (click)="selectAsset(m.epic)">
+                    <td class="fw-semibold">{{ m.epic }}</td>
+                    <td class="d-mobile-none">{{ m.name }}</td>
+                    <td class="text-end mantis-mono">{{ m.bid != null ? (m.bid | priceFormat:m.epic) : '\u2014' }}</td>
+                    <td class="text-end mantis-mono">{{ m.offer != null ? (m.offer | priceFormat:m.epic) : '\u2014' }}</td>
+                    <td class="text-end mantis-mono d-mobile-none">{{ m.high != null ? (m.high | priceFormat:m.epic) : '\u2014' }}</td>
+                    <td class="text-end mantis-mono d-mobile-none">{{ m.low != null ? (m.low | priceFormat:m.epic) : '\u2014' }}</td>
+                    <td class="text-end mantis-mono"
+                        [class.text-success]="m.change_pct != null && m.change_pct >= 0"
+                        [class.text-danger]="m.change_pct != null && m.change_pct < 0">
+                      {{ m.change_pct != null ? ((m.change_pct >= 0 ? '+' : '') + (m.change_pct | number:'1.2-2') + '%') : '\u2014' }}
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         </c-card-body>
       </c-card>
     }
