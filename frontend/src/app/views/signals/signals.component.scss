@@ -1,0 +1,33 @@
+// ═══════════════════════════════════════════════════════════
+// Signals Component Styles
+// Uses CSS custom properties (no SCSS palette import needed)
+// ═══════════════════════════════════════════════════════════
+
+:host {
+  // Scrollable signal container
+  .signals-scroll-container {
+    max-height: 600px;
+    overflow-y: auto;
+  }
+
+  // Sticky thead within scroll container
+  .signals-sticky-thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--cui-card-bg, var(--mantis-surface-1, #0d1117));
+  }
+
+  // 4px confidence bar override
+  .conf-progress {
+    height: 4px;
+    min-width: 40px;
+  }
+
+  // Mobile table min-width
+  @media (max-width: 991.98px) {
+    table[cTable] {
+      min-width: 560px;
+    }
+  }
+}
