@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
   ColComponent, RowComponent, TableDirective,
-  ButtonDirective, FormControlDirective, FormSelectDirective,
+  ButtonDirective, FormControlDirective,
   BadgeComponent, SpinnerComponent,
 } from '@coreui/angular';
 import { TvChartComponent, LineDataPoint } from '../../shared/components/tv-chart/tv-chart.component';
@@ -21,7 +21,7 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
     CommonModule, FormsModule, DecimalPipe,
     CardComponent, CardBodyComponent, CardHeaderComponent,
     ColComponent, RowComponent, TableDirective, ButtonDirective,
-    FormControlDirective, FormSelectDirective,
+    FormControlDirective,
     BadgeComponent, SpinnerComponent,
     TvChartComponent
   ],
