@@ -3,7 +3,6 @@ import { Component, computed, inject, input } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 
 import {
-  BreadcrumbRouterComponent,
   ColorModeService,
   ContainerComponent,
   DropdownComponent,
@@ -30,7 +29,7 @@ import { UserDropdownComponent } from './user-dropdown/user-dropdown.component';
   imports: [
     ContainerComponent, HeaderTogglerDirective, SidebarToggleDirective,
     IconDirective, HeaderNavComponent, NavItemComponent, NavLinkDirective,
-    RouterLink, RouterLinkActive, NgTemplateOutlet, BreadcrumbRouterComponent,
+    RouterLink, RouterLinkActive, NgTemplateOutlet,
     DropdownComponent, DropdownToggleDirective, DropdownMenuDirective,
     DropdownItemDirective, TooltipDirective, UserDropdownComponent
   ]

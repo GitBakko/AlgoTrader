@@ -1,11 +1,10 @@
 <ng-container>
-  <c-container [fluid]="true" class="border-bottom px-4">
+  <c-container [fluid]="true" class="px-4">
     <button
       [cSidebarToggle]="sidebarId()"
       cHeaderToggler
-      class="btn"
+      class="header-action-btn d-lg-none"
       toggle="visible"
-      style="margin-inline-start: -14px;"
       aria-label="Toggle sidebar navigation"
     >
       <svg cIcon name="cilMenu" size="lg"></svg>
@@ -22,10 +21,7 @@
       </c-nav-item>
     </c-header-nav>
 
-    <c-header-nav class="d-none d-md-flex ms-auto">
-    </c-header-nav>
-
-    <c-header-nav class="ms-auto ms-md-0">
+    <c-header-nav class="ms-auto">
       <!-- WS Status -->
       <c-nav-item>
         <span class="ws-status-pill"
@@ -47,9 +43,6 @@
       <!-- User Dropdown -->
       <app-user-dropdown />
     </c-header-nav>
-  </c-container>
-  <c-container [fluid]="true" class="px-4">
-    <c-breadcrumb-router />
   </c-container>
 </ng-container>
 
