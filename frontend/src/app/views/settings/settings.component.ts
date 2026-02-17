@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, OnInit, signal, computed } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
@@ -274,10 +274,11 @@ const TYPE_BADGE_COLORS: Record<string, string> = {
     </c-card>
   `
 })
-export class SettingsComponent implements OnInit {
+export class SettingsComponent implements OnInit, OnDestroy {
   private readonly trading = inject(TradingService);
   private readonly ws = inject(WebSocketService);
   readonly notifications = inject(NotificationService);
+  private trainTimers: ReturnType<typeof setTimeout>[] = [];
 
   readonly settings = signal<SystemSettings | null>(null);
   readonly riskStatus = signal<RiskStatus | null>(null);
@@ -301,6 +302,11 @@ export class SettingsComponent implements OnInit {
     this.trading.getSystemSettings().subscribe(data => this.settings.set(data));
     this.trading.getRiskStatus().subscribe(data => this.riskStatus.set(data));
     this.trading.loadPaperPositions();
+  }
+
+  ngOnDestroy(): void {
+    this.trainTimers.forEach(t => clearTimeout(t));
+    this.trainTimers = [];
   }
 
   toggleBrowserNotifications(): void {
@@ -331,11 +337,12 @@ export class SettingsComponent implements OnInit {
     this.trading.trainModel(epic).subscribe({
       next: () => {
         // Training started as background subprocess — spinner stays for 3s then clears
-        setTimeout(() => {
+        const timer = setTimeout(() => {
           const t = new Set(this.trainingEpics());
           t.delete(epic);
           this.trainingEpics.set(t);
         }, 3000);
+        this.trainTimers.push(timer);
       },
       error: () => {
         const t = new Set(this.trainingEpics());

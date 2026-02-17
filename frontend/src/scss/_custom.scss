@@ -554,6 +554,12 @@ h1, h2, h3, h4, h5, h6,
     background: rgba($mantis-loss, 0.1);
     border-left: 3px solid $mantis-loss;
   }
+
+  &--sm {
+    padding: 0.15rem 0.4rem;
+    font-size: 0.625rem;
+    gap: 0.25rem;
+  }
 }
 
 // Signal Status Badges
@@ -595,6 +601,12 @@ h1, h2, h3, h4, h5, h6,
     color: #ffc107;
     background: rgba(#ffc107, 0.08);
     .signal-status__dot { background: #ffc107; }
+  }
+
+  &--market_closed {
+    color: #6c757d;
+    background: rgba(#6c757d, 0.08);
+    .signal-status__dot { background: #6c757d; }
   }
 }
 

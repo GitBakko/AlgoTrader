@@ -21,7 +21,7 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
     CommonModule, FormsModule, DecimalPipe,
     CardComponent, CardBodyComponent, CardHeaderComponent,
     ColComponent, RowComponent, TableDirective, ButtonDirective,
-    FormControlDirective,
+    FormControlDirective, FormSelectDirective,
     BadgeComponent, SpinnerComponent,
     TvChartComponent
   ],
