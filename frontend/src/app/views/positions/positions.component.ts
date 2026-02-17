@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
-  CardComponent, CardBodyComponent,
+  CardComponent, CardBodyComponent, CardHeaderComponent,
   TableDirective,
   BadgeComponent, ButtonDirective,
   TooltipDirective
@@ -16,26 +16,29 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
   selector: 'app-positions',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  styleUrl: './positions.component.scss',
   imports: [
-    CommonModule, CardComponent, CardBodyComponent,
+    CommonModule, CardComponent, CardBodyComponent, CardHeaderComponent,
     TableDirective, BadgeComponent, ButtonDirective, TooltipDirective,
     PriceFormatPipe, EpicLogoComponent,
   ],
   template: `
-    <!-- Header -->
-    <div class="d-flex align-items-center justify-content-between mb-3">
-      <div class="d-flex align-items-center gap-2">
-        <h5 class="mb-0 fw-bold">Posizioni</h5>
-        <c-badge color="info" class="mantis-badge-animated">{{ livePositions().length }}</c-badge>
-      </div>
-      @if (totalPnl() !== 0) {
-        <span class="mantis-kpi" [class.text-success]="totalPnl() >= 0" [class.text-danger]="totalPnl() < 0" style="font-size: 1.125rem;">
-          $ {{ totalPnl() >= 0 ? '+' : '' }}{{ totalPnl() | number:'1.2-2' }}
-        </span>
-      }
-    </div>
-
-    <c-card class="mb-4">
+    <c-card class="mb-4 border-top border-top-3 border-top-primary">
+      <c-card-header>
+        <div class="d-flex align-items-center justify-content-between">
+          <div class="d-flex align-items-center gap-2">
+            <span class="fw-semibold small text-body-secondary">Posizioni Aperte</span>
+            <c-badge color="info" class="mantis-badge-animated">{{ livePositions().length }}</c-badge>
+          </div>
+          @if (totalPnl() !== 0) {
+            <span class="pos-total-pnl"
+                  [class.text-success]="totalPnl() >= 0"
+                  [class.text-danger]="totalPnl() < 0">
+              $ {{ totalPnl() >= 0 ? '+' : '' }}{{ totalPnl() | number:'1.2-2' }}
+            </span>
+          }
+        </div>
+      </c-card-header>
       <c-card-body class="p-0">
         @if (livePositions().length === 0) {
           <div class="empty-state">
@@ -44,72 +47,89 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
             <div class="empty-state__hint">Le posizioni aperte appariranno qui</div>
           </div>
         } @else {
-          <table cTable [small]="true" [hover]="true" [striped]="true" class="mb-0">
-            <thead>
-              <tr>
-                <th>Asset</th>
-                <th>Dir</th>
-                <th>Size</th>
-                <th>Entry</th>
-                <th>SL</th>
-                <th>TP</th>
-                <th>Risk</th>
-                <th>Aperta</th>
-                <th class="text-end">P&amp;L (USD)</th>
-                <th class="text-end">Azioni</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (pos of livePositions(); track pos.deal_id) {
-                <tr>
-                  <td class="fw-semibold">
-                    <div class="d-flex align-items-center gap-2">
-                      <app-epic-logo [epic]="pos.epic" [size]="24" [rounded]="true" />
-                      {{ pos.epic }}
-                    </div>
-                  </td>
-                  <td>
-                    <span class="dir-indicator" [class.dir-indicator--buy]="pos.direction === 'BUY'" [class.dir-indicator--sell]="pos.direction === 'SELL'">
-                      {{ pos.direction }}
-                    </span>
-                  </td>
-                  <td class="font-monospace">{{ pos.size | number:'1.4-4' }}</td>
-                  <td class="font-monospace">{{ pos.level | priceFormat:pos.epic }}</td>
-                  <td class="font-monospace">{{ pos.stop_level != null ? (pos.stop_level | priceFormat:pos.epic) : '—' }}</td>
-                  <td class="font-monospace">{{ pos.profit_level != null ? (pos.profit_level | priceFormat:pos.epic) : '—' }}</td>
-                  <td>
-                    @if (pos.risk_managed_locally) {
-                      <span class="risk-badge risk-badge--local"
-                            cTooltip="SL/TP gestito localmente dal sistema MANTIS (non dal broker)">
-                        LOCAL
-                      </span>
-                    } @else if (pos.stop_level != null) {
-                      <span class="risk-badge risk-badge--broker"
-                            cTooltip="SL/TP gestito dal broker Capital.com">
-                        BROKER
-                      </span>
-                    } @else {
-                      <span class="risk-badge risk-badge--none"
-                            cTooltip="Nessun risk management attivo!">
-                        NONE
-                      </span>
-                    }
-                  </td>
-                  <td class="text-body-secondary small">{{ formatDate(pos.opened_at) }}</td>
-                  <td class="text-end fw-semibold font-monospace"
-                      [class.text-success]="pos.live_pnl >= 0"
-                      [class.text-danger]="pos.live_pnl < 0">
-                    $ {{ pos.live_pnl >= 0 ? '+' : '' }}{{ pos.live_pnl | number:'1.2-2' }}
-                  </td>
-                  <td class="text-end">
-                    <button cButton color="danger" size="sm" (click)="closePosition(pos.deal_id)">
-                      Chiudi
-                    </button>
-                  </td>
+          <div class="table-responsive-mobile">
+            <table cTable [small]="true" [hover]="true" [striped]="true" class="mb-0">
+              <thead>
+                <tr class="text-body-secondary">
+                  <th class="fw-semibold small">Asset</th>
+                  <th class="fw-semibold small">Dir</th>
+                  <th class="fw-semibold small d-mobile-none">Size</th>
+                  <th class="fw-semibold small d-mobile-none">Entry</th>
+                  <th class="fw-semibold small d-mobile-none">SL</th>
+                  <th class="fw-semibold small d-mobile-none">TP</th>
+                  <th class="fw-semibold small">Risk</th>
+                  <th class="fw-semibold small d-mobile-none">Trailing</th>
+                  <th class="fw-semibold small d-mobile-none">Aperta</th>
+                  <th class="fw-semibold small text-end">P&amp;L</th>
+                  <th class="fw-semibold small text-end">Azioni</th>
                 </tr>
-              }
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                @for (pos of livePositions(); track pos.deal_id) {
+                  <tr>
+                    <td class="fw-semibold">
+                      <div class="d-flex align-items-center gap-2">
+                        <app-epic-logo [epic]="pos.epic" [size]="24" [rounded]="true" />
+                        {{ pos.epic }}
+                      </div>
+                    </td>
+                    <td>
+                      <span class="dir-indicator" [class.dir-indicator--buy]="pos.direction === 'BUY'" [class.dir-indicator--sell]="pos.direction === 'SELL'">
+                        {{ pos.direction }}
+                      </span>
+                    </td>
+                    <td class="mantis-mono d-mobile-none">{{ pos.size | number:'1.4-4' }}</td>
+                    <td class="mantis-mono d-mobile-none">{{ pos.level | priceFormat:pos.epic }}</td>
+                    <td class="mantis-mono d-mobile-none">{{ pos.stop_level != null ? (pos.stop_level | priceFormat:pos.epic) : '—' }}</td>
+                    <td class="mantis-mono d-mobile-none">{{ pos.profit_level != null ? (pos.profit_level | priceFormat:pos.epic) : '—' }}</td>
+                    <td>
+                      @if (pos.risk_managed_locally) {
+                        <span class="risk-badge risk-badge--slim risk-badge--local"
+                              cTooltip="SL/TP gestito localmente dal sistema MANTIS (non dal broker)">
+                          LOCAL
+                        </span>
+                      } @else if (pos.stop_level != null) {
+                        <span class="risk-badge risk-badge--slim risk-badge--broker"
+                              cTooltip="SL/TP gestito dal broker Capital.com">
+                          BROKER
+                        </span>
+                      } @else {
+                        <span class="risk-badge risk-badge--slim risk-badge--none"
+                              cTooltip="Nessun risk management attivo!">
+                          NONE
+                        </span>
+                      }
+                    </td>
+                    <td class="d-mobile-none">
+                      @if (pos.trailing_stop_phase) {
+                        <span class="trailing-phase"
+                              [class.trailing-phase--initial]="pos.trailing_stop_phase === 'INITIAL'"
+                              [class.trailing-phase--breakeven]="pos.trailing_stop_phase === 'BREAKEVEN'"
+                              [class.trailing-phase--tp1_lock]="pos.trailing_stop_phase === 'TP1_LOCK'"
+                              [class.trailing-phase--trailing]="pos.trailing_stop_phase === 'TRAILING'"
+                              [cTooltip]="trailingPhaseTooltip(pos.trailing_stop_phase)">
+                          {{ pos.trailing_stop_phase }}
+                        </span>
+                      } @else {
+                        <span class="text-body-secondary small">—</span>
+                      }
+                    </td>
+                    <td class="text-body-secondary small d-mobile-none">{{ formatDate(pos.opened_at) }}</td>
+                    <td class="text-end fw-semibold mantis-mono"
+                        [class.text-success]="pos.live_pnl >= 0"
+                        [class.text-danger]="pos.live_pnl < 0">
+                      $ {{ pos.live_pnl >= 0 ? '+' : '' }}{{ pos.live_pnl | number:'1.2-2' }}
+                    </td>
+                    <td class="text-end">
+                      <button cButton color="danger" size="sm" (click)="closePosition(pos.deal_id)">
+                        Chiudi
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         }
       </c-card-body>
     </c-card>
@@ -165,6 +185,16 @@ export class PositionsComponent implements OnInit, OnDestroy {
         this.toast.error(err?.error?.error || 'Errore nella chiusura');
       }
     });
+  }
+
+  trailingPhaseTooltip(phase: string): string {
+    switch (phase) {
+      case 'INITIAL': return 'Stop loss iniziale, non ancora spostato';
+      case 'BREAKEVEN': return 'Stop spostato a breakeven (entry price)';
+      case 'TP1_LOCK': return 'Profitto parziale preso, stop bloccato a TP1';
+      case 'TRAILING': return 'Trailing stop attivo, segue il prezzo';
+      default: return phase;
+    }
   }
 
   formatDate(iso: string | null): string {

@@ -2,7 +2,7 @@
   <c-col xs="12">
     <c-card class="mb-4">
       <c-card-header class="d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">System Monitoring & Logs</h5>
+        <span class="fw-semibold text-body-secondary">System Monitoring & Logs</span>
         <div class="d-flex gap-2 align-items-center">
           <!-- Date Range Selector -->
           <c-button-group role="group" aria-label="Date range">
@@ -157,9 +157,9 @@
             <!-- Signal Statistics -->
             @if (signalLogs(); as signals) {
               <c-col lg="6" class="mb-4">
-                <c-card>
+                <c-card class="border-top border-top-3 border-top-primary">
                   <c-card-header>
-                    <h6 class="mb-0">Signal Statistics</h6>
+                    <span class="fw-semibold small text-body-secondary">Signal Statistics</span>
                   </c-card-header>
                   <c-card-body>
                     <table cTable [striped]="true" [hover]="true" [small]="true" class="mb-3">
@@ -214,9 +214,9 @@
             <!-- Execution Statistics -->
             @if (executionLogs(); as exec) {
               <c-col lg="6" class="mb-4">
-                <c-card>
+                <c-card class="border-top border-top-3 border-top-primary">
                   <c-card-header>
-                    <h6 class="mb-0">Execution Statistics</h6>
+                    <span class="fw-semibold small text-body-secondary">Execution Statistics</span>
                   </c-card-header>
                   <c-card-body>
                     <table cTable [striped]="true" [hover]="true" [small]="true" class="mb-0">
@@ -277,9 +277,9 @@
           @if (epicBreakdown().length > 0) {
             <c-row>
               <c-col xs="12" class="mb-4">
-                <c-card>
+                <c-card class="border-top border-top-3 border-top-primary">
                   <c-card-header>
-                    <h6 class="mb-0">Performance by Asset</h6>
+                    <span class="fw-semibold small text-body-secondary">Performance by Asset</span>
                   </c-card-header>
                   <c-card-body>
                     <table cTable [striped]="true" [hover]="true">
@@ -322,9 +322,9 @@
           @if (riskEventLogs(); as risk) {
             <c-row>
               <c-col xs="12" class="mb-4">
-                <c-card>
+                <c-card class="border-top border-top-3 border-top-primary">
                   <c-card-header>
-                    <h6 class="mb-0">Risk Management Events</h6>
+                    <span class="fw-semibold small text-body-secondary">Risk Management Events</span>
                   </c-card-header>
                   <c-card-body>
                     <c-row class="mb-3">

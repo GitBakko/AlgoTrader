@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
-  ColComponent, RowComponent, BadgeComponent, ProgressComponent,
+  ColComponent, RowComponent, BadgeComponent,
   TableDirective, AlertComponent, TooltipDirective,
 } from '@coreui/angular';
 import { TvChartComponent, LineDataPoint } from '../../shared/components/tv-chart/tv-chart.component';
@@ -22,7 +22,7 @@ import { NewsWidgetComponent } from '../../shared/components/news-widget/news-wi
   imports: [
     CommonModule, RouterLink,
     CardComponent, CardBodyComponent, CardHeaderComponent,
-    ColComponent, RowComponent, BadgeComponent, ProgressComponent,
+    ColComponent, RowComponent, BadgeComponent,
     TableDirective, AlertComponent, TooltipDirective,
     TvChartComponent,
     PriceFormatPipe, EpicLogoComponent, NewsWidgetComponent,

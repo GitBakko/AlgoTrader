@@ -1,0 +1,59 @@
+// ═══════════════════════════════════════════════════════════
+// Positions Component Styles
+// Uses CSS custom properties (no SCSS palette import needed)
+// ═══════════════════════════════════════════════════════════
+
+:host {
+  // Total P&L display
+  .pos-total-pnl {
+    font-family: var(--mantis-font-mono);
+    font-feature-settings: "tnum" 1;
+    font-size: 1.125rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  // Trailing stop phase badges
+  .trailing-phase {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+
+    &--initial {
+      color: var(--mantis-neutral, #8B949E);
+      background: rgba(139, 148, 158, 0.1);
+      border: 1px solid rgba(139, 148, 158, 0.2);
+    }
+
+    &--breakeven {
+      color: var(--mantis-cyan, #00E5FF);
+      background: rgba(0, 229, 255, 0.1);
+      border: 1px solid rgba(0, 229, 255, 0.2);
+    }
+
+    &--tp1_lock {
+      color: var(--mantis-warning, #FFB020);
+      background: rgba(255, 176, 32, 0.1);
+      border: 1px solid rgba(255, 176, 32, 0.2);
+    }
+
+    &--trailing {
+      color: var(--mantis-neon, #39FF14);
+      background: rgba(57, 255, 20, 0.1);
+      border: 1px solid rgba(57, 255, 20, 0.2);
+    }
+  }
+
+  // Mobile table min-width
+  @media (max-width: 991.98px) {
+    table[cTable] {
+      min-width: 600px;
+    }
+  }
+}

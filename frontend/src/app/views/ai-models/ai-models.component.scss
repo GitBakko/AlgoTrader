@@ -1,0 +1,106 @@
+// ═══════════════════════════════════════════════════════════
+// AI Models Component Styles
+// Uses CSS custom properties (no SCSS palette import needed)
+// ═══════════════════════════════════════════════════════════
+
+:host {
+  // Model card hover
+  .am-model-card {
+    cursor: default;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+    &:hover {
+      border-color: var(--mantis-border-accent, rgba(0, 217, 126, 0.15));
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+    }
+  }
+
+  // Clickable epic links
+  .am-epic-link {
+    cursor: pointer;
+    transition: color 0.15s ease;
+
+    &:hover {
+      color: var(--mantis-green, #00d97e);
+    }
+  }
+
+  // Progress bar heights
+  .am-progress-sm {
+    height: 6px;
+  }
+
+  .am-progress-xs {
+    height: 4px;
+  }
+
+  // Scoped modal
+  .am-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1050;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .am-modal {
+    width: 90%;
+    max-width: 800px;
+    max-height: 80vh;
+    border-radius: var(--mantis-radius-md, 8px);
+    border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.1));
+    background: var(--cui-card-bg, var(--mantis-surface-1, #0d1117));
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+
+    &__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--mantis-border-subtle, rgba(255, 255, 255, 0.06));
+    }
+
+    &__title {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 600;
+    }
+
+    &__body {
+      padding: 1rem 1.25rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    &__close {
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 1.25rem;
+      cursor: pointer;
+      padding: 0.25rem;
+      line-height: 1;
+      transition: color 0.15s ease;
+
+      &:hover {
+        color: white;
+      }
+    }
+  }
+
+  // Mobile table min-width
+  @media (max-width: 991.98px) {
+    table[cTable] {
+      min-width: 560px;
+    }
+  }
+}

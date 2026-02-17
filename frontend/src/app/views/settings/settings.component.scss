@@ -1,0 +1,32 @@
+// ═══════════════════════════════════════════════════════════
+// Settings Component Styles
+// Uses CSS custom properties (no SCSS palette import needed)
+// ═══════════════════════════════════════════════════════════
+
+:host {
+  // Asset row hover + excluded state
+  .settings-asset-row {
+    transition: background-color 0.1s ease;
+
+    &:hover {
+      background: rgba(0, 217, 126, 0.03);
+    }
+
+    &--excluded {
+      opacity: 0.5;
+    }
+  }
+
+  // Train button spinner size
+  .settings-train-spinner {
+    width: 0.75rem;
+    height: 0.75rem;
+  }
+
+  // Mobile table min-width
+  @media (max-width: 991.98px) {
+    table[cTable] {
+      min-width: 600px;
+    }
+  }
+}

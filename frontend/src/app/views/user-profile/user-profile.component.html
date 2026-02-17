@@ -3,9 +3,9 @@
     <c-col lg="8">
       @if (user(); as currentUser) {
         <!-- Avatar Section Card -->
-        <c-card class="mb-4">
+        <c-card class="mb-4 border-top border-top-3 border-top-primary">
           <c-card-header>
-            <strong class="mantis-brand-text">Avatar</strong>
+            <span class="fw-semibold small text-body-secondary">Avatar</span>
           </c-card-header>
           <c-card-body class="text-center">
             <!-- Display Current Avatar -->
@@ -58,9 +58,9 @@
         </c-card>
 
         <!-- User Information Card -->
-        <c-card class="mb-4">
+        <c-card class="mb-4 border-top border-top-3 border-top-primary">
           <c-card-header class="d-flex justify-content-between align-items-center">
-            <strong class="mantis-brand-text">Profilo Utente</strong>
+            <span class="fw-semibold small text-body-secondary">Profilo Utente</span>
             <button
               cButton
               size="sm"
@@ -113,10 +113,10 @@
 
         <!-- Permissions Card -->
         @if (currentUser.permissions && currentUser.permissions.length > 0) {
-          <c-card class="mb-4">
+          <c-card class="mb-4 border-top border-top-3 border-top-primary">
             <c-card-header>
-              <strong>Permessi</strong>
-              <span class="badge bg-secondary ms-2">{{ currentUser.permissions.length }}</span>
+              <span class="fw-semibold small text-body-secondary">Permessi</span>
+              <c-badge color="info" class="ms-2 badge-sm">{{ currentUser.permissions.length }}</c-badge>
             </c-card-header>
             <c-card-body>
               <ul cListGroup class="list-group-flush">
@@ -136,9 +136,9 @@
         }
 
         <!-- Actions Card -->
-        <c-card>
+        <c-card class="border-top border-top-3 border-top-primary">
           <c-card-header>
-            <strong>Azioni</strong>
+            <span class="fw-semibold small text-body-secondary">Azioni</span>
           </c-card-header>
           <c-card-body class="d-flex gap-2">
             <button

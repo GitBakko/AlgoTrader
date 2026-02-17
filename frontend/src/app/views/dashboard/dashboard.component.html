@@ -1,132 +1,205 @@
-<!-- ═══════ ROW 1: System Status Bar ═══════ -->
-<div class="d-flex align-items-center justify-content-between mb-3 px-1">
-  <div class="d-flex align-items-center gap-2">
+<!-- ═══════ STATUS STRIP (glassmorphism) ═══════ -->
+<div class="dash-status-strip mb-4">
+  <div class="dash-status-strip__left">
     <h5 class="mb-0 fw-semibold">Dashboard</h5>
     @if (paperStatus()?.running) {
-      <c-badge color="success" class="ms-2">TRADING ATTIVO</c-badge>
+      <span class="dash-status-chip dash-status-chip--active">
+        <span class="pulse-dot"></span> TRADING ATTIVO
+      </span>
     } @else {
-      <c-badge color="secondary" class="ms-2">INATTIVO</c-badge>
+      <span class="dash-status-chip dash-status-chip--inactive">INATTIVO</span>
     }
     @if (paperStatus()?.execution_mode; as mode) {
-      <c-badge [color]="mode === 'LIVE' ? 'danger' : mode === 'DEMO' ? 'warning' : 'info'">
+      <span class="dash-status-chip"
+            [class.dash-status-chip--live]="mode === 'LIVE'"
+            [class.dash-status-chip--demo]="mode === 'DEMO'"
+            [class.dash-status-chip--paper]="mode === 'PAPER'">
         {{ mode }}
-      </c-badge>
-    }
-    @if (currentMarketStatus(); as status) {
-      <div class="market-status-indicator">
-        @if (status.is_open) {
-          <c-badge color="success" class="d-flex align-items-center gap-1">
-            <span class="pulse-dot"></span>
-            MARKET OPEN
-          </c-badge>
-        } @else {
-          <c-badge color="danger">
-            MARKET CLOSED
-            @if (status.next_open) {
-              <span class="ms-1">Opens in {{ getCountdown(status.next_open) }}</span>
-            }
-          </c-badge>
-        }
-      </div>
+      </span>
     }
   </div>
-  <div class="d-flex align-items-center gap-3 text-body-secondary small">
-    @if (riskStatus()?.circuit_breaker_active) {
-      <c-badge color="danger">CIRCUIT BREAKER ATTIVO</c-badge>
+  <div class="dash-status-strip__right">
+    @if (currentMarketStatus(); as status) {
+      @if (status.is_open) {
+        <span class="dash-status-chip dash-status-chip--active">
+          <span class="pulse-dot"></span> MARKET OPEN
+        </span>
+      } @else {
+        <span class="dash-status-chip dash-status-chip--closed">
+          CLOSED
+          @if (status.next_open) {
+            <span class="ms-1 fw-normal">{{ getCountdown(status.next_open) }}</span>
+          }
+        </span>
+      }
     }
-    <span>Aggiornamento: {{ (pollingInterval() / 1000) }}s</span>
+    @if (riskStatus()?.circuit_breaker_active) {
+      <span class="dash-status-chip dash-status-chip--danger">CIRCUIT BREAKER</span>
+    }
+    <span class="dash-status-chip dash-status-chip--muted">
+      <span class="mantis-mono">{{ (pollingInterval() / 1000) }}s</span> poll
+    </span>
   </div>
 </div>
 
 <!-- Market Closed Alert -->
 @if (currentMarketStatus(); as status) {
   @if (!status.is_open) {
-    <c-alert color="warning" class="mb-3">
-      <strong>Using Last Available Data</strong>
-      <br>
-      <small>Market is currently closed. Showing most recent historical data.</small>
+    <c-alert color="warning" class="mb-3 dash-alert-compact">
+      <strong>Using Last Available Data</strong> &mdash;
+      <small>Market closed. Showing most recent historical data.</small>
     </c-alert>
   }
 }
 
-<!-- ═══════ ROW 2: KPI Cards ═══════ -->
-<c-row>
+<!-- ═══════ KPI CARDS ROW ═══════ -->
+<c-row class="g-3 mb-4">
+  <!-- Equity -->
   <c-col sm="6" xl="3">
-    <c-card class="mb-4 border-top border-top-3 border-top-primary">
-      <c-card-body class="pb-0">
-        <div class="text-body-secondary text-uppercase small fw-semibold mb-1">Equity (USD)</div>
-        <div class="fs-4 fw-bold mantis-kpi">
+    <c-card class="dash-kpi-card h-100">
+      <c-card-body class="p-3">
+        <div class="dash-kpi-card__label">Equity (USD)</div>
+        <div class="dash-kpi-card__value">
           {{ overview() ? '$ ' + (overview()!.equity | number:'1.2-2') : '...' }}
         </div>
+        <div class="dash-kpi-card__detail">
+          @if (riskStatus(); as rs) {
+            Peak: <span class="mantis-mono">$ {{ rs.peak_equity | number:'1.2-2' }}</span>
+          }
+        </div>
       </c-card-body>
-      <div class="px-3 pb-3">
-        @if (riskStatus(); as rs) {
-          <div class="text-body-secondary small">
-            Peak: $ {{ rs.peak_equity | number:'1.2-2' }}
-          </div>
-        }
-      </div>
+      <div class="dash-kpi-card__accent dash-kpi-card__accent--primary"></div>
     </c-card>
   </c-col>
+
+  <!-- Unrealized P&L -->
   <c-col sm="6" xl="3">
-    <c-card class="mb-4 border-top border-top-3"
-            [class.border-top-success]="totalUnrealizedPnl() >= 0"
-            [class.border-top-danger]="totalUnrealizedPnl() < 0">
-      <c-card-body class="pb-0">
-        <div class="text-body-secondary text-uppercase small fw-semibold mb-1">P&amp;L Non Realizzato</div>
-        <div class="fs-4 fw-bold mantis-kpi"
+    <c-card class="dash-kpi-card h-100">
+      <c-card-body class="p-3">
+        <div class="dash-kpi-card__label">P&amp;L Non Realizzato</div>
+        <div class="dash-kpi-card__value"
              [class.text-success]="totalUnrealizedPnl() >= 0"
              [class.text-danger]="totalUnrealizedPnl() < 0">
           $ {{ totalUnrealizedPnl() >= 0 ? '+' : '' }}{{ totalUnrealizedPnl() | number:'1.2-2' }}
         </div>
-      </c-card-body>
-      <div class="px-3 pb-3">
-        <div class="text-body-secondary small">
-          Realizzato: <span [class.text-success]="overview() && overview()!.total_pnl >= 0"
+        <div class="dash-kpi-card__detail">
+          Realizzato: <span class="mantis-mono"
+                            [class.text-success]="overview() && overview()!.total_pnl >= 0"
                             [class.text-danger]="overview() && overview()!.total_pnl < 0">
             $ {{ overview() ? (overview()!.total_pnl | number:'1.2-2') : '-' }}
           </span>
         </div>
-      </div>
-    </c-card>
-  </c-col>
-  <c-col sm="6" xl="3">
-    <c-card class="mb-4 border-top border-top-3 border-top-warning">
-      <c-card-body class="pb-0">
-        <div class="text-body-secondary text-uppercase small fw-semibold mb-1">Posizioni Aperte</div>
-        <div class="fs-4 fw-bold mantis-kpi">{{ openPositionCount() }}</div>
       </c-card-body>
-      <div class="px-3 pb-3">
-        <div class="text-body-secondary small">
-          Segnali: {{ paperStatus()?.signal_count ?? 0 }} |
-          Trade: {{ paperStatus()?.trade_count ?? 0 }}
-        </div>
-      </div>
+      <div class="dash-kpi-card__accent"
+           [class.dash-kpi-card__accent--profit]="totalUnrealizedPnl() >= 0"
+           [class.dash-kpi-card__accent--loss]="totalUnrealizedPnl() < 0"></div>
     </c-card>
   </c-col>
+
+  <!-- Open Positions -->
   <c-col sm="6" xl="3">
-    <c-card class="mb-4 border-top border-top-3"
-            [class.border-top-danger]="drawdownPct() > 5"
-            [class.border-top-success]="drawdownPct() <= 5">
-      <c-card-body class="pb-0">
-        <div class="text-body-secondary text-uppercase small fw-semibold mb-1">Drawdown</div>
-        <div class="fs-4 fw-bold mantis-kpi" [class.text-danger]="drawdownPct() > 5">
+    <c-card class="dash-kpi-card h-100">
+      <c-card-body class="p-3">
+        <div class="dash-kpi-card__label">Posizioni Aperte</div>
+        <div class="dash-kpi-card__value">{{ openPositionCount() }}</div>
+        <div class="dash-kpi-card__detail">
+          Segnali: <span class="mantis-mono">{{ paperStatus()?.signal_count ?? 0 }}</span>
+          <span class="mx-1">|</span>
+          Trade: <span class="mantis-mono">{{ paperStatus()?.trade_count ?? 0 }}</span>
+        </div>
+      </c-card-body>
+      <div class="dash-kpi-card__accent dash-kpi-card__accent--warning"></div>
+    </c-card>
+  </c-col>
+
+  <!-- Drawdown -->
+  <c-col sm="6" xl="3">
+    <c-card class="dash-kpi-card h-100">
+      <c-card-body class="p-3">
+        <div class="dash-kpi-card__label">Drawdown</div>
+        <div class="dash-kpi-card__value" [class.text-danger]="drawdownPct() > 5">
           {{ drawdownPct() | number:'1.2-2' }}%
         </div>
+        <div class="mt-auto pt-2">
+          <div class="dash-drawdown-bar">
+            <div class="dash-drawdown-bar__fill"
+                 [style.width.%]="(drawdownPct() / 20) * 100"
+                 [class.dash-drawdown-bar__fill--danger]="drawdownPct() > 5"></div>
+          </div>
+        </div>
       </c-card-body>
-      <div class="px-3 pb-3">
-        <c-progress [value]="drawdownPct()" [max]="20" color="danger" style="height: 4px;"></c-progress>
-      </div>
+      <div class="dash-kpi-card__accent"
+           [class.dash-kpi-card__accent--loss]="drawdownPct() > 5"
+           [class.dash-kpi-card__accent--primary]="drawdownPct() <= 5"></div>
     </c-card>
   </c-col>
 </c-row>
 
-<!-- ═══════ ROW: Market Headlines ═══════ -->
+<!-- ═══════ SECTION: Performance ═══════ -->
+<div class="section-divider">
+  <span class="section-divider__label">Performance</span>
+  <div class="section-divider__line"></div>
+</div>
+
+<!-- Equity Curve -->
+<c-card class="mb-4 border-top border-top-3 border-top-primary">
+  <c-card-header class="d-flex align-items-center justify-content-between py-2">
+    <span class="fw-semibold small text-body-secondary">Equity Curve</span>
+    <div class="d-flex align-items-center gap-3 small">
+      @if (overview(); as ov) {
+        <span class="text-body-secondary">Win Rate:
+          <strong class="mantis-mono">{{ (ov.win_rate * 100) | number:'1.0-0' }}%</strong>
+        </span>
+        <span class="text-body-secondary">Sharpe:
+          <strong class="mantis-mono">{{ ov.sharpe_ratio | number:'1.2-2' }}</strong>
+        </span>
+      }
+      @if (riskStatus(); as rs) {
+        <span class="text-body-secondary">CB:
+          <c-badge [color]="rs.circuit_breaker_active ? 'danger' : 'success'" class="badge-sm">
+            {{ rs.circuit_breaker_active ? 'ATTIVO' : 'OK' }}
+          </c-badge>
+        </span>
+        <span class="text-body-secondary">Daily:
+          <strong class="mantis-mono" [class.text-success]="rs.daily_pnl >= 0" [class.text-danger]="rs.daily_pnl < 0">
+            $ {{ rs.daily_pnl | number:'1.2-2' }}
+          </strong>
+        </span>
+      }
+    </div>
+  </c-card-header>
+  <c-card-body class="p-0">
+    @if (equityLineData().length > 0) {
+      <app-tv-chart
+        mode="area"
+        [lineData]="equityLineData()"
+        [height]="340"
+        lineColor="#00d97e"
+        areaTopColor="rgba(0, 217, 126, 0.25)"
+        areaBottomColor="rgba(0, 217, 126, 0.01)"
+      ></app-tv-chart>
+    } @else {
+      <div class="empty-state">
+        <div class="empty-state__icon">&#x1F4C8;</div>
+        <div class="empty-state__text">Equity curve non disponibile</div>
+        <div class="empty-state__hint">Avvia il paper trading per raccogliere dati</div>
+      </div>
+    }
+  </c-card-body>
+</c-card>
+
+<!-- ═══════ SECTION: Markets ═══════ -->
+<div class="section-divider">
+  <span class="section-divider__label">Markets</span>
+  <div class="section-divider__line"></div>
+</div>
+
+<!-- Market Headlines -->
 <c-row class="mb-4">
   <c-col md="12">
-    <c-card>
+    <c-card class="border-top border-top-3 border-top-primary">
       <c-card-header class="d-flex align-items-center justify-content-between py-2">
-        <strong>📰 Market Headlines</strong>
+        <span class="fw-semibold small text-body-secondary">Market Headlines</span>
         <c-badge color="info" class="badge-sm">US500</c-badge>
       </c-card-header>
       <c-card-body class="p-3">
@@ -136,57 +209,11 @@
   </c-col>
 </c-row>
 
-<!-- ═══════ ROW 3: Equity Curve (full width) ═══════ -->
-<c-row>
-  <c-col md="12">
-    <c-card class="mb-4">
-      <c-card-header class="d-flex align-items-center justify-content-between py-2">
-        <strong>Equity Curve</strong>
-        <div class="d-flex align-items-center gap-3 small">
-          @if (overview(); as ov) {
-            <span>Win Rate: <strong class="mantis-mono">{{ (ov.win_rate * 100) | number:'1.0-0' }}%</strong></span>
-            <span>Sharpe: <strong class="mantis-mono">{{ ov.sharpe_ratio | number:'1.2-2' }}</strong></span>
-          }
-          @if (riskStatus(); as rs) {
-            <span class="ms-2">Circuit Breaker:
-              <c-badge [color]="rs.circuit_breaker_active ? 'danger' : 'success'" class="badge-sm">
-                {{ rs.circuit_breaker_active ? 'ATTIVO' : 'OK' }}
-              </c-badge>
-            </span>
-            <span>Daily P&amp;L:
-              <strong class="mantis-mono" [class.text-success]="rs.daily_pnl >= 0" [class.text-danger]="rs.daily_pnl < 0">
-                $ {{ rs.daily_pnl | number:'1.2-2' }}
-              </strong>
-            </span>
-          }
-        </div>
-      </c-card-header>
-      <c-card-body class="p-0">
-        @if (equityLineData().length > 0) {
-          <app-tv-chart
-            mode="area"
-            [lineData]="equityLineData()"
-            [height]="340"
-            lineColor="#00d97e"
-            areaTopColor="rgba(0, 217, 126, 0.25)"
-            areaBottomColor="rgba(0, 217, 126, 0.01)"
-          ></app-tv-chart>
-        } @else {
-          <div class="text-center py-5 text-body-secondary">
-            <div class="mb-2" style="font-size: 2rem; opacity: 0.3;">&#x1F4C8;</div>
-            Equity curve non disponibile. Avvia il paper trading per raccogliere dati.
-          </div>
-        }
-      </c-card-body>
-    </c-card>
-  </c-col>
-</c-row>
-
-<!-- ═══════ ROW 3b: Live Prices (block grid) ═══════ -->
-<c-card class="mb-4">
+<!-- Live Prices Grid -->
+<c-card class="mb-4 border-top border-top-3 border-top-primary">
   <c-card-header class="d-flex align-items-center justify-content-between py-2">
-    <strong>Prezzi Live</strong>
-    <span class="text-body-secondary small">{{ priceTickers().length }} assets</span>
+    <span class="fw-semibold small text-body-secondary">Prezzi Live</span>
+    <span class="text-body-secondary small mantis-mono">{{ priceTickers().length }} assets</span>
   </c-card-header>
   <c-card-body class="p-3">
     @if (priceTickers().length > 0) {
@@ -205,75 +232,83 @@
         }
       </div>
     } @else {
-      <div class="text-center py-4 text-body-secondary small">
-        WebSocket non connesso
+      <div class="empty-state">
+        <div class="empty-state__text">WebSocket non connesso</div>
       </div>
     }
   </c-card-body>
 </c-card>
 
-<!-- ═══════ ROW 4: Open Positions + Recent Activity ═══════ -->
-<c-row>
+<!-- ═══════ SECTION: Trading ═══════ -->
+<div class="section-divider">
+  <span class="section-divider__label">Trading</span>
+  <div class="section-divider__line"></div>
+</div>
+
+<!-- Open Positions + Recent Signals -->
+<c-row class="g-3">
   <!-- Open Positions -->
   <c-col lg="7">
-    <c-card class="mb-4">
+    <c-card class="mb-4 border-top border-top-3 border-top-primary">
       <c-card-header class="d-flex align-items-center py-2">
-        <strong>Posizioni Aperte</strong>
-        <c-badge color="info" class="ms-2">{{ livePositions().length }}</c-badge>
-        <a routerLink="/paper-trading" class="ms-auto text-body-secondary small" style="text-decoration: none;">
+        <span class="fw-semibold small text-body-secondary">Posizioni Aperte</span>
+        <c-badge color="info" class="ms-2 badge-sm">{{ livePositions().length }}</c-badge>
+        <a routerLink="/paper-trading" class="ms-auto small dash-link">
           Vedi tutto &rarr;
         </a>
       </c-card-header>
       <c-card-body class="p-0">
         @if (livePositions().length > 0) {
-          <table cTable [small]="true" [hover]="true" [striped]="true" class="mb-0">
-            <thead>
-              <tr>
-                <th>Asset</th>
-                <th>Dir</th>
-                <th>Size</th>
-                <th>Entry</th>
-                <th>Risk</th>
-                <th class="text-end">P&amp;L (USD)</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (pos of livePositions(); track pos.deal_id) {
-                <tr>
-                  <td class="fw-semibold">
-                    <div class="d-flex align-items-center gap-1">
-                      <app-epic-logo [epic]="pos.epic" [size]="20" [rounded]="true" />
-                      {{ pos.epic }}
-                    </div>
-                  </td>
-                  <td>
-                    <span class="dir-indicator" [class.dir-indicator--buy]="pos.direction === 'BUY'" [class.dir-indicator--sell]="pos.direction === 'SELL'">
-                      {{ pos.direction }}
-                    </span>
-                  </td>
-                  <td class="font-monospace">{{ pos.size | number:'1.2-4' }}</td>
-                  <td class="font-monospace">{{ pos.level | priceFormat:pos.epic }}</td>
-                  <td>
-                    @if (pos.risk_managed_locally) {
-                      <span class="risk-badge risk-badge--local" cTooltip="SL/TP gestito da MANTIS">LOCAL</span>
-                    } @else if (pos.stop_level != null) {
-                      <span class="risk-badge risk-badge--broker" cTooltip="SL/TP gestito dal broker">BROKER</span>
-                    } @else {
-                      <span class="risk-badge risk-badge--none" cTooltip="Nessun risk management!">NONE</span>
-                    }
-                  </td>
-                  <td class="text-end fw-semibold font-monospace"
-                      [class.text-success]="pos.live_pnl >= 0"
-                      [class.text-danger]="pos.live_pnl < 0">
-                    $ {{ pos.live_pnl >= 0 ? '+' : '' }}{{ pos.live_pnl | number:'1.2-2' }}
-                  </td>
+          <div class="table-responsive-mobile">
+            <table cTable [small]="true" [hover]="true" [striped]="true" class="mb-0">
+              <thead>
+                <tr class="text-body-secondary">
+                  <th class="fw-semibold small">Asset</th>
+                  <th class="fw-semibold small">Dir</th>
+                  <th class="fw-semibold small d-mobile-none">Size</th>
+                  <th class="fw-semibold small d-mobile-none">Entry</th>
+                  <th class="fw-semibold small">Risk</th>
+                  <th class="fw-semibold small text-end">P&amp;L (USD)</th>
                 </tr>
-              }
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                @for (pos of livePositions(); track pos.deal_id) {
+                  <tr>
+                    <td class="fw-semibold">
+                      <div class="d-flex align-items-center gap-1">
+                        <app-epic-logo [epic]="pos.epic" [size]="20" [rounded]="true" />
+                        {{ pos.epic }}
+                      </div>
+                    </td>
+                    <td>
+                      <span class="dir-indicator" [class.dir-indicator--buy]="pos.direction === 'BUY'" [class.dir-indicator--sell]="pos.direction === 'SELL'">
+                        {{ pos.direction }}
+                      </span>
+                    </td>
+                    <td class="mantis-mono d-mobile-none">{{ pos.size | number:'1.2-4' }}</td>
+                    <td class="mantis-mono d-mobile-none">{{ pos.level | priceFormat:pos.epic }}</td>
+                    <td>
+                      @if (pos.risk_managed_locally) {
+                        <span class="risk-badge risk-badge--local risk-badge--slim" cTooltip="SL/TP gestito da MANTIS">L</span>
+                      } @else if (pos.stop_level != null) {
+                        <span class="risk-badge risk-badge--broker risk-badge--slim" cTooltip="SL/TP gestito dal broker">B</span>
+                      } @else {
+                        <span class="risk-badge risk-badge--none risk-badge--slim" cTooltip="Nessun risk management!">!</span>
+                      }
+                    </td>
+                    <td class="text-end fw-semibold mantis-mono"
+                        [class.text-success]="pos.live_pnl >= 0"
+                        [class.text-danger]="pos.live_pnl < 0">
+                      $ {{ pos.live_pnl >= 0 ? '+' : '' }}{{ pos.live_pnl | number:'1.2-2' }}
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         } @else {
-          <div class="text-center py-4 text-body-secondary small">
-            Nessuna posizione aperta
+          <div class="empty-state">
+            <div class="empty-state__text">Nessuna posizione aperta</div>
           </div>
         }
       </c-card-body>
@@ -282,10 +317,10 @@
 
   <!-- Recent Signals -->
   <c-col lg="5">
-    <c-card class="mb-4">
+    <c-card class="mb-4 border-top border-top-3 border-top-primary">
       <c-card-header class="d-flex align-items-center py-2">
-        <strong>Segnali Recenti</strong>
-        <a routerLink="/paper-trading" class="ms-auto text-body-secondary small" style="text-decoration: none;">
+        <span class="fw-semibold small text-body-secondary">Segnali Recenti</span>
+        <a routerLink="/paper-trading" class="ms-auto small dash-link">
           Vedi tutto &rarr;
         </a>
       </c-card-header>
@@ -295,26 +330,34 @@
             <tbody>
               @for (sig of recentSignals(); track sig.timestamp + sig.epic) {
                 <tr>
-                  <td class="small text-body-secondary" style="width: 50px;">{{ formatTime(sig.timestamp) }}</td>
-                  <td class="fw-semibold">{{ sig.epic }}</td>
-                  <td>
-                    <c-badge [color]="directionColor(sig.direction)" class="badge-sm">
-                      {{ sig.direction }}
-                    </c-badge>
+                  <td class="mantis-mono text-body-secondary small" style="width: 50px;">{{ formatTime(sig.timestamp) }}</td>
+                  <td class="fw-semibold small">
+                    <div class="d-flex align-items-center gap-1">
+                      <app-epic-logo [epic]="sig.epic" [size]="16" [rounded]="true" />
+                      {{ sig.epic }}
+                    </div>
                   </td>
-                  <td class="small">{{ (sig.confidence * 100).toFixed(0) }}%</td>
                   <td>
-                    <c-badge [color]="statusColor(sig.status)" class="badge-sm">
+                    <span class="dir-indicator dir-indicator--sm"
+                          [class.dir-indicator--buy]="sig.direction === 'BUY'"
+                          [class.dir-indicator--sell]="sig.direction === 'SELL'">
+                      {{ sig.direction }}
+                    </span>
+                  </td>
+                  <td class="mantis-mono small">{{ (sig.confidence * 100).toFixed(0) }}%</td>
+                  <td>
+                    <span class="signal-status signal-status--{{ sig.status }}">
+                      <span class="signal-status__dot"></span>
                       {{ sig.status }}
-                    </c-badge>
+                    </span>
                   </td>
                 </tr>
               }
             </tbody>
           </table>
         } @else {
-          <div class="text-center py-4 text-body-secondary small">
-            Nessun segnale recente
+          <div class="empty-state">
+            <div class="empty-state__text">Nessun segnale recente</div>
           </div>
         }
       </c-card-body>

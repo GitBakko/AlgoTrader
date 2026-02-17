@@ -184,3 +184,11 @@ c-alert {
     font-size: 1.25rem;
   }
 }
+
+// Numeric values — mono font
+.score-value,
+.metric-value,
+.metric-detail {
+  font-family: var(--mantis-font-mono);
+  font-feature-settings: "tnum" 1;
+}

@@ -16,6 +16,7 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
   selector: 'app-backtest',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  styleUrl: './backtest.component.scss',
   imports: [
     CommonModule, FormsModule, DecimalPipe,
     CardComponent, CardBodyComponent, CardHeaderComponent,
@@ -36,8 +37,8 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
     <c-row>
       <!-- ═══════ Config Panel ═══════ -->
       <c-col lg="3">
-        <c-card class="mb-4">
-          <c-card-header class="py-2"><strong>Configurazione</strong></c-card-header>
+        <c-card class="mb-4 border-top border-top-3 border-top-primary">
+          <c-card-header class="py-2"><span class="fw-semibold small text-body-secondary">Configurazione</span></c-card-header>
           <c-card-body>
             <div class="mb-3">
               <label cFormLabel class="small">Asset</label>
@@ -104,12 +105,13 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
 
       <!-- ═══════ Results List ═══════ -->
       <c-col lg="9">
-        <c-card class="mb-4">
-          <c-card-header class="py-2"><strong>Risultati</strong></c-card-header>
+        <c-card class="mb-4 border-top border-top-3 border-top-primary">
+          <c-card-header class="py-2"><span class="fw-semibold small text-body-secondary">Risultati</span></c-card-header>
           <c-card-body class="p-0">
             @if (runs().length === 0 && !running()) {
-              <div class="text-center py-5 text-body-secondary small">
-                Nessun backtest eseguito. Configura i parametri e avvia un backtest.
+              <div class="empty-state">
+                <div class="empty-state__text">Nessun backtest eseguito</div>
+                <div class="empty-state__hint">Configura i parametri e avvia un backtest.</div>
               </div>
             } @else if (runs().length === 0 && running()) {
               <div class="text-center py-4">
@@ -117,36 +119,38 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
                 <p class="text-body-secondary mt-2 mb-0 small">Generazione segnali ML e simulazione...</p>
               </div>
             } @else {
-              <table cTable [small]="true" [hover]="true" class="mb-0">
-                <thead>
-                  <tr>
-                    <th>Asset</th>
-                    <th>TF</th>
-                    <th>Periodo</th>
-                    <th class="text-end">Return</th>
-                    <th class="text-end">Sharpe</th>
-                    <th class="text-end">Trades</th>
-                    <th class="text-end">Win Rate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (run of runs(); track run.id) {
-                    <tr (click)="selectRun(run)" [class.table-active]="selectedRun()?.id === run.id" style="cursor: pointer;">
-                      <td class="fw-semibold">{{ run.epic }}</td>
-                      <td>{{ getRunTimeframe(run) }}</td>
-                      <td class="text-body-secondary small">{{ getRunPeriod(run) }}</td>
-                      <td class="text-end fw-semibold font-monospace"
-                          [class.text-success]="(run.total_return_pct ?? 0) >= 0"
-                          [class.text-danger]="(run.total_return_pct ?? 0) < 0">
-                        {{ (run.total_return_pct ?? 0) >= 0 ? '+' : '' }}{{ run.total_return_pct ?? 0 | number:'1.2-2' }}%
-                      </td>
-                      <td class="text-end font-monospace">{{ run.sharpe_ratio ?? 0 | number:'1.2-2' }}</td>
-                      <td class="text-end">{{ run.total_trades ?? 0 }}</td>
-                      <td class="text-end font-monospace">{{ run.win_rate ?? 0 | number:'1.1-1' }}%</td>
+              <div class="table-responsive-mobile">
+                <table cTable [small]="true" [hover]="true" class="mb-0">
+                  <thead>
+                    <tr>
+                      <th>Asset</th>
+                      <th class="d-mobile-none">TF</th>
+                      <th class="d-mobile-none">Periodo</th>
+                      <th class="text-end">Return</th>
+                      <th class="text-end d-mobile-none">Sharpe</th>
+                      <th class="text-end">Trades</th>
+                      <th class="text-end">Win Rate</th>
                     </tr>
-                  }
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    @for (run of runs(); track run.id) {
+                      <tr class="bt-result-row" (click)="selectRun(run)" [class.table-active]="selectedRun()?.id === run.id">
+                        <td class="fw-semibold">{{ run.epic }}</td>
+                        <td class="d-mobile-none">{{ getRunTimeframe(run) }}</td>
+                        <td class="text-body-secondary small d-mobile-none">{{ getRunPeriod(run) }}</td>
+                        <td class="text-end fw-semibold mantis-mono"
+                            [class.text-success]="(run.total_return_pct ?? 0) >= 0"
+                            [class.text-danger]="(run.total_return_pct ?? 0) < 0">
+                          {{ (run.total_return_pct ?? 0) >= 0 ? '+' : '' }}{{ run.total_return_pct ?? 0 | number:'1.2-2' }}%
+                        </td>
+                        <td class="text-end mantis-mono d-mobile-none">{{ run.sharpe_ratio ?? 0 | number:'1.2-2' }}</td>
+                        <td class="text-end">{{ run.total_trades ?? 0 }}</td>
+                        <td class="text-end mantis-mono">{{ run.win_rate ?? 0 | number:'1.1-1' }}%</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
             }
           </c-card-body>
         </c-card>
@@ -187,9 +191,9 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
               </div>
             </c-col>
             <c-col md="3" class="text-end">
-              <div [class.text-success]="(detail()!.summary.total_return_pct ?? 0) >= 0"
-                   [class.text-danger]="(detail()!.summary.total_return_pct ?? 0) < 0"
-                   style="font-size: 1.6rem; font-weight: 700; line-height: 1;">
+              <div class="bt-hero-value"
+                   [class.text-success]="(detail()!.summary.total_return_pct ?? 0) >= 0"
+                   [class.text-danger]="(detail()!.summary.total_return_pct ?? 0) < 0">
                 {{ (detail()!.summary.total_return_pct ?? 0) >= 0 ? '+' : '' }}{{ detail()!.summary.total_return_pct ?? 0 | number:'1.2-2' }}%
               </div>
               <div class="text-body-secondary small">
@@ -206,7 +210,7 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
           <c-col lg="2" md="3" sm="4" class="col-6">
             <c-card class="mb-3">
               <c-card-body class="text-center py-2">
-                <div class="text-body-secondary small text-uppercase" style="font-size: 0.7rem;">{{ card.label }}</div>
+                <div class="bt-stat-label">{{ card.label }}</div>
                 <div class="fs-5 fw-semibold" [class]="card.colorClass">{{ card.value }}</div>
               </c-card-body>
             </c-card>
@@ -218,7 +222,7 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
       @if (detail()!.monte_carlo) {
         <c-card class="mb-4 border-top border-top-3 border-top-info">
           <c-card-header class="d-flex align-items-center justify-content-between py-2">
-            <strong>Monte Carlo Validation</strong>
+            <span class="fw-semibold small text-body-secondary">Monte Carlo Validation</span>
             <span class="text-body-secondary small">
               {{ detail()!.monte_carlo!.n_simulations | number:'1.0-0' }} sim,
               {{ detail()!.monte_carlo!.n_trades | number:'1.0-0' }} trade
@@ -227,7 +231,7 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
           <c-card-body class="py-3">
             <c-row>
               <c-col md="3" sm="6" class="mb-2 mb-md-0">
-                <div class="text-body-secondary small text-uppercase mb-1" style="font-size: 0.7rem;">Equity 95% CI</div>
+                <div class="bt-stat-label mb-1">Equity 95% CI</div>
                 <div class="fw-semibold">
                   $ {{ detail()!.monte_carlo!.final_equity.p5 | number:'1.0-0' }}
                   &mdash; $ {{ detail()!.monte_carlo!.final_equity.p95 | number:'1.0-0' }}
@@ -237,21 +241,21 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
                 </div>
               </c-col>
               <c-col md="3" sm="6" class="mb-2 mb-md-0">
-                <div class="text-body-secondary small text-uppercase mb-1" style="font-size: 0.7rem;">Max DD 95% CI</div>
+                <div class="bt-stat-label mb-1">Max DD 95% CI</div>
                 <div class="fw-semibold text-danger">
                   {{ (detail()!.monte_carlo!.max_drawdown.p5 * 100) | number:'1.1-1' }}%
                   &mdash; {{ (detail()!.monte_carlo!.max_drawdown.p95 * 100) | number:'1.1-1' }}%
                 </div>
               </c-col>
               <c-col md="2" sm="4" class="mb-2 mb-md-0">
-                <div class="text-body-secondary small text-uppercase mb-1" style="font-size: 0.7rem;">Sharpe CI</div>
+                <div class="bt-stat-label mb-1">Sharpe CI</div>
                 <div class="fw-semibold">
                   {{ detail()!.monte_carlo!.sharpe_ratio.p5 | number:'1.2-2' }}
                   &mdash; {{ detail()!.monte_carlo!.sharpe_ratio.p95 | number:'1.2-2' }}
                 </div>
               </c-col>
               <c-col md="2" sm="4">
-                <div class="text-body-secondary small text-uppercase mb-1" style="font-size: 0.7rem;">P-Value</div>
+                <div class="bt-stat-label mb-1">P-Value</div>
                 <c-badge [color]="pValueColor(detail()!.monte_carlo!.p_value_return)">
                   {{ detail()!.monte_carlo!.p_value_return | number:'1.4-4' }}
                 </c-badge>
@@ -260,7 +264,7 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
                 </div>
               </c-col>
               <c-col md="2" sm="4">
-                <div class="text-body-secondary small text-uppercase mb-1" style="font-size: 0.7rem;">Risk of Ruin</div>
+                <div class="bt-stat-label mb-1">Risk of Ruin</div>
                 <div class="fs-5 fw-semibold"
                      [class.text-danger]="detail()!.monte_carlo!.risk_of_ruin > 0.1"
                      [class.text-success]="detail()!.monte_carlo!.risk_of_ruin <= 0.1">
@@ -273,9 +277,9 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
       }
 
       <!-- Equity Curve (TradingView) -->
-      <c-card class="mb-4">
+      <c-card class="mb-4 border-top border-top-3 border-top-primary">
         <c-card-header class="d-flex align-items-center justify-content-between py-2">
-          <strong>Equity Curve</strong>
+          <span class="fw-semibold small text-body-secondary">Equity Curve</span>
           <span class="text-body-secondary small">
             {{ formatDate(getStartDate()) }} &mdash; {{ formatDate(getEndDate()) }}
           </span>
@@ -291,18 +295,18 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
               areaBottomColor="rgba(0, 217, 126, 0.01)"
             ></app-tv-chart>
           } @else {
-            <div class="text-center py-5 text-body-secondary small">
-              Nessun dato equity disponibile
+            <div class="empty-state">
+              <div class="empty-state__text">Nessun dato equity disponibile</div>
             </div>
           }
         </c-card-body>
       </c-card>
 
       <!-- Trades Table -->
-      <c-card class="mb-4">
+      <c-card class="mb-4 border-top border-top-3 border-top-primary">
         <c-card-header class="d-flex align-items-center justify-content-between py-2">
           <div class="d-flex align-items-center">
-            <strong>Lista Trade</strong>
+            <span class="fw-semibold small text-body-secondary">Lista Trade</span>
             <c-badge color="success" class="ms-2">{{ detail()!.trade_metrics['winning_trades'] }} W</c-badge>
             <c-badge color="danger" class="ms-1">{{ detail()!.trade_metrics['losing_trades'] }} L</c-badge>
           </div>
@@ -310,61 +314,63 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
         </c-card-header>
         <c-card-body class="p-0">
           @if (detail()!.trades.length > 0) {
-            <div style="max-height: 400px; overflow-y: auto;">
-              <table cTable [small]="true" [hover]="true" class="mb-0">
-                <thead class="position-sticky top-0" style="z-index: 1;">
-                  <tr>
-                    <th>#</th>
-                    <th>Dir</th>
-                    <th>Entry</th>
-                    <th>Exit</th>
-                    <th>Size</th>
-                    <th>Status</th>
-                    <th class="text-end">Net P&amp;L (USD)</th>
-                    <th class="text-end">Bars</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (trade of detail()!.trades; track trade.trade_id) {
+            <div class="bt-trades-scroll">
+              <div class="table-responsive-mobile">
+                <table cTable [small]="true" [hover]="true" class="mb-0">
+                  <thead class="bt-sticky-thead">
                     <tr>
-                      <td class="text-body-secondary">{{ trade.trade_id }}</td>
-                      <td>
-                        <c-badge [color]="trade.direction === 'LONG' ? 'success' : 'danger'" class="badge-sm">
-                          {{ trade.direction === 'LONG' ? 'BUY' : 'SELL' }}
-                        </c-badge>
-                      </td>
-                      <td class="small">
-                        <div class="font-monospace">{{ trade.entry_price | number:'1.2-2' }}</div>
-                        <div class="text-body-secondary" style="font-size: 0.7rem;">{{ formatDateTime(trade.entry_time) }}</div>
-                      </td>
-                      <td class="small">
-                        @if (trade.exit_price) {
-                          <div class="font-monospace">{{ trade.exit_price | number:'1.2-2' }}</div>
-                          <div class="text-body-secondary" style="font-size: 0.7rem;">{{ formatDateTime(trade.exit_time!) }}</div>
-                        } @else {
-                          <span class="text-body-secondary">-</span>
-                        }
-                      </td>
-                      <td class="font-monospace small">{{ trade.size | number:'1.4-4' }}</td>
-                      <td>
-                        <c-badge [color]="getStatusColor(trade.status)" class="badge-sm">
-                          {{ getStatusLabel(trade.status) }}
-                        </c-badge>
-                      </td>
-                      <td class="text-end fw-semibold font-monospace"
-                          [class.text-success]="trade.net_pnl >= 0"
-                          [class.text-danger]="trade.net_pnl < 0">
-                        $ {{ trade.net_pnl >= 0 ? '+' : '' }}{{ trade.net_pnl | number:'1.2-2' }}
-                      </td>
-                      <td class="text-end text-body-secondary small">{{ trade.bars_held }}</td>
+                      <th>#</th>
+                      <th>Dir</th>
+                      <th class="d-mobile-none">Entry Time</th>
+                      <th>Entry</th>
+                      <th class="d-mobile-none">Exit Time</th>
+                      <th>Exit</th>
+                      <th class="d-mobile-none">Size</th>
+                      <th>Status</th>
+                      <th class="text-end">Net P&amp;L</th>
+                      <th class="text-end d-mobile-none">Bars</th>
                     </tr>
-                  }
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    @for (trade of detail()!.trades; track trade.trade_id) {
+                      <tr>
+                        <td class="text-body-secondary">{{ trade.trade_id }}</td>
+                        <td>
+                          <span class="dir-indicator" [class.dir-indicator--buy]="trade.direction === 'LONG'" [class.dir-indicator--sell]="trade.direction !== 'LONG'">
+                            {{ trade.direction === 'LONG' ? 'BUY' : 'SELL' }}
+                          </span>
+                        </td>
+                        <td class="small text-body-secondary d-mobile-none">{{ formatDateTime(trade.entry_time) }}</td>
+                        <td class="mantis-mono">{{ trade.entry_price | number:'1.2-2' }}</td>
+                        <td class="small text-body-secondary d-mobile-none">{{ formatDateTime(trade.exit_time!) }}</td>
+                        <td class="mantis-mono">
+                          @if (trade.exit_price) {
+                            {{ trade.exit_price | number:'1.2-2' }}
+                          } @else {
+                            <span class="text-body-secondary">-</span>
+                          }
+                        </td>
+                        <td class="mantis-mono small d-mobile-none">{{ trade.size | number:'1.4-4' }}</td>
+                        <td>
+                          <c-badge [color]="getStatusColor(trade.status)" class="badge-sm">
+                            {{ getStatusLabel(trade.status) }}
+                          </c-badge>
+                        </td>
+                        <td class="text-end fw-semibold mantis-mono"
+                            [class.text-success]="trade.net_pnl >= 0"
+                            [class.text-danger]="trade.net_pnl < 0">
+                          $ {{ trade.net_pnl >= 0 ? '+' : '' }}{{ trade.net_pnl | number:'1.2-2' }}
+                        </td>
+                        <td class="text-end text-body-secondary small d-mobile-none">{{ trade.bars_held }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
             </div>
           } @else {
-            <div class="text-center py-4 text-body-secondary small">
-              Nessun trade generato in questo backtest
+            <div class="empty-state">
+              <div class="empty-state__text">Nessun trade generato in questo backtest</div>
             </div>
           }
         </c-card-body>

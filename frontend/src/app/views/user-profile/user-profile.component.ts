@@ -27,6 +27,7 @@ import { AvatarUploadComponent } from '../../shared/components/avatar-upload/ava
 @Component({
   selector: 'app-user-profile',
   templateUrl: './user-profile.component.html',
+  styleUrl: './user-profile.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,

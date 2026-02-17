@@ -21,6 +21,7 @@ type SortDir = 'asc' | 'desc';
   selector: 'app-trade-journal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  styleUrl: './trade-journal.component.scss',
   imports: [
     CommonModule, FormsModule,
     CardComponent, CardBodyComponent, CardHeaderComponent,
@@ -42,7 +43,7 @@ type SortDir = 'asc' | 'desc';
     </div>
 
     <!-- Filters -->
-    <c-card class="mb-4">
+    <c-card class="mb-4 border-top border-top-3 border-top-primary">
       <c-card-body class="py-2">
         <c-row class="g-2 align-items-end">
           <c-col sm="3" lg="2">
@@ -129,36 +130,37 @@ type SortDir = 'asc' | 'desc';
     </c-row>
 
     <!-- Trade Table -->
-    <c-card class="mb-4">
+    <c-card class="mb-4 border-top border-top-3 border-top-primary">
       <c-card-header class="py-2">
-        <strong>Storico Segnali</strong>
+        <span class="fw-semibold small text-body-secondary">Storico Segnali</span>
       </c-card-header>
       <c-card-body class="p-0">
         @if (filteredSignals().length === 0) {
-          <div class="text-center py-5 text-body-secondary small">
-            Nessun segnale corrisponde ai filtri selezionati.
+          <div class="empty-state">
+            <div class="empty-state__text">Nessun segnale corrisponde ai filtri selezionati</div>
           </div>
         } @else {
-          <div style="max-height: 600px; overflow-y: auto;">
-            <table cTable [small]="true" [hover]="true" [striped]="true" class="mb-0">
-              <thead class="position-sticky top-0" style="z-index: 1;">
+          <div class="tj-scroll-container">
+            <div class="table-responsive-mobile">
+              <table cTable [small]="true" [hover]="true" [striped]="true" class="mb-0">
+                <thead class="tj-sticky-thead">
                 <tr>
-                  <th class="cursor-pointer" (click)="toggleSort('timestamp')">
+                  <th class="tj-sortable" (click)="toggleSort('timestamp')">
                     Data/Ora {{ sortIcon('timestamp') }}
                   </th>
-                  <th class="cursor-pointer" (click)="toggleSort('epic')">
+                  <th class="tj-sortable" (click)="toggleSort('epic')">
                     Asset {{ sortIcon('epic') }}
                   </th>
                   <th>Dir</th>
-                  <th>Strategia</th>
-                  <th class="cursor-pointer" (click)="toggleSort('confidence')">
+                  <th class="d-mobile-none">Strategia</th>
+                  <th class="tj-sortable d-mobile-none" (click)="toggleSort('confidence')">
                     Conf {{ sortIcon('confidence') }}
                   </th>
-                  <th class="cursor-pointer" (click)="toggleSort('entry_price')">
+                  <th class="tj-sortable d-mobile-none" (click)="toggleSort('entry_price')">
                     Prezzo {{ sortIcon('entry_price') }}
                   </th>
                   <th>Stato</th>
-                  <th>Dettaglio</th>
+                  <th class="d-mobile-none">Dettaglio</th>
                 </tr>
               </thead>
               <tbody>
@@ -167,7 +169,7 @@ type SortDir = 'asc' | 'desc';
                       [class.table-secondary]="sig.status === 'market_closed'">
                     <td class="small text-body-secondary text-nowrap">{{ formatDateTime(sig.timestamp) }}</td>
                     <td class="fw-semibold">
-                      <div class="d-flex align-items-center gap-2" style="cursor: pointer;" (click)="onEpicClick(sig.epic)">
+                      <div class="d-flex align-items-center gap-2 tj-epic-link" (click)="onEpicClick(sig.epic)">
                         <app-epic-logo [epic]="sig.epic" [size]="20"></app-epic-logo>
                         <span>{{ sig.epic }}</span>
                       </div>
@@ -175,7 +177,7 @@ type SortDir = 'asc' | 'desc';
                     <td>
                       <c-badge [color]="directionColor(sig.direction)" class="badge-sm">{{ sig.direction }}</c-badge>
                     </td>
-                    <td>
+                    <td class="d-mobile-none">
                       @if (sig.strategy_name) {
                         <c-badge [color]="strategyColor(sig.strategy_name)" class="badge-sm">
                           {{ strategyLabel(sig.strategy_name) }}
@@ -184,12 +186,12 @@ type SortDir = 'asc' | 'desc';
                         <span class="text-body-secondary">-</span>
                       }
                     </td>
-                    <td class="font-monospace">{{ (sig.confidence * 100).toFixed(0) }}%</td>
-                    <td class="font-monospace">{{ sig.entry_price | priceFormat:sig.epic }}</td>
+                    <td class="mantis-mono d-mobile-none">{{ (sig.confidence * 100).toFixed(0) }}%</td>
+                    <td class="mantis-mono d-mobile-none">{{ sig.entry_price | priceFormat:sig.epic }}</td>
                     <td>
                       <c-badge [color]="statusColor(sig.status)" class="badge-sm">{{ statusLabel(sig.status) }}</c-badge>
                     </td>
-                    <td class="small" style="max-width: 200px;">
+                    <td class="small tj-detail-cell d-mobile-none">
                       @if (sig.error_detail) {
                         <span class="text-danger">{{ sig.error_detail.summary }}</span>
                       } @else if (sig.rejection_reason) {
@@ -204,6 +206,7 @@ type SortDir = 'asc' | 'desc';
                 }
               </tbody>
             </table>
+            </div>
           </div>
 
           <!-- Pagination -->
@@ -228,28 +231,22 @@ type SortDir = 'asc' | 'desc';
 
     <!-- ═══════ NEWS MODAL ═══════ -->
     @if (showNewsModal() && selectedEpic()) {
-      <div class="modal d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);" (click)="closeNewsModal()">
-        <div class="modal-dialog modal-lg" (click)="$event.stopPropagation()">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title d-flex align-items-center gap-2">
-                <app-epic-logo [epic]="selectedEpic()!" [size]="32"></app-epic-logo>
-                <span>{{ selectedEpic() }} - Top News</span>
-              </h5>
-              <button type="button" class="btn-close" (click)="closeNewsModal()"></button>
+      <div class="tj-modal-backdrop" (click)="closeNewsModal()">
+        <div class="tj-modal" (click)="$event.stopPropagation()">
+          <div class="tj-modal__header">
+            <div class="tj-modal__title">
+              <app-epic-logo [epic]="selectedEpic()!" [size]="32"></app-epic-logo>
+              {{ selectedEpic() }} — Top News
             </div>
-            <div class="modal-body">
-              <app-news-widget [news]="newsService.news()" [maxItems]="10" />
-            </div>
+            <button class="tj-modal__close" (click)="closeNewsModal()">&times;</button>
+          </div>
+          <div class="tj-modal__body">
+            <app-news-widget [news]="newsService.news()" [maxItems]="10" />
           </div>
         </div>
       </div>
     }
   `,
-  styles: [`
-    .cursor-pointer { cursor: pointer; user-select: none; }
-    .cursor-pointer:hover { color: var(--cui-primary); }
-  `]
 })
 export class TradeJournalComponent implements OnInit {
   private readonly trading = inject(TradingService);
