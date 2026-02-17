@@ -1,0 +1,56 @@
+// ═══════════════════════════════════════════════════════════
+// Backtest Component Styles
+// Uses CSS custom properties (no SCSS palette import needed)
+// ═══════════════════════════════════════════════════════════
+
+:host {
+  // Clickable result rows
+  .bt-result-row {
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+
+    &:hover {
+      background: rgba(0, 217, 126, 0.03);
+    }
+  }
+
+  // Hero return value
+  .bt-hero-value {
+    font-family: var(--mantis-font-mono);
+    font-feature-settings: "tnum" 1;
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  // Stat labels (repeated small labels in metric cards / MC)
+  .bt-stat-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 0.25rem;
+  }
+
+  // Trades scroll container
+  .bt-trades-scroll {
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  // Sticky thead within scroll
+  .bt-sticky-thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--cui-card-bg, var(--mantis-surface-1, #0d1117));
+  }
+
+  // Mobile table min-width
+  @media (max-width: 991.98px) {
+    table[cTable] {
+      min-width: 560px;
+    }
+  }
+}
