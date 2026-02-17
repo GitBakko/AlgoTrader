@@ -4,6 +4,7 @@ import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
   ColComponent, RowComponent, BadgeComponent, ProgressComponent,
   FormCheckComponent, FormCheckInputDirective, FormCheckLabelDirective,
+  TableDirective,
 } from '@coreui/angular';
 import { TradingService } from '../../core/services/trading.service';
 import { SystemSettings, RiskStatus } from '../../core/models';
@@ -49,10 +50,12 @@ const TYPE_BADGE_COLORS: Record<string, string> = {
   selector: 'app-settings',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  styleUrl: './settings.component.scss',
   imports: [
     CommonModule, CardComponent, CardBodyComponent, CardHeaderComponent,
     ColComponent, RowComponent, BadgeComponent, ProgressComponent,
     FormCheckComponent, FormCheckInputDirective, FormCheckLabelDirective,
+    TableDirective,
     EpicLogoComponent,
   ],
   template: `
@@ -62,8 +65,8 @@ const TYPE_BADGE_COLORS: Record<string, string> = {
     <c-row>
       <!-- System Info -->
       <c-col lg="4">
-        <c-card class="mb-4">
-          <c-card-header class="py-2"><strong>Configurazione</strong></c-card-header>
+        <c-card class="mb-4 border-top border-top-3 border-top-primary">
+          <c-card-header class="py-2"><span class="fw-semibold small text-body-secondary">Configurazione</span></c-card-header>
           <c-card-body class="p-0">
             @if (settings(); as s) {
               <div class="px-3 py-2 d-flex justify-content-between border-bottom">
@@ -107,33 +110,33 @@ const TYPE_BADGE_COLORS: Record<string, string> = {
 
       <!-- Risk Params + Notifications -->
       <c-col lg="4">
-        <c-card class="mb-4">
-          <c-card-header class="py-2"><strong>Parametri Rischio</strong></c-card-header>
+        <c-card class="mb-4 border-top border-top-3 border-top-primary">
+          <c-card-header class="py-2"><span class="fw-semibold small text-body-secondary">Parametri Rischio</span></c-card-header>
           <c-card-body class="p-0">
             @if (settings(); as s) {
               <div class="px-3 py-2 d-flex justify-content-between border-bottom">
                 <span class="text-body-secondary small">Min Confidence</span>
-                <strong class="small font-monospace">{{ (s.min_confidence_threshold * 100) | number:'1.0-0' }}%</strong>
+                <strong class="small mantis-mono">{{ (s.min_confidence_threshold * 100) | number:'1.0-0' }}%</strong>
               </div>
               <div class="px-3 py-2 d-flex justify-content-between border-bottom">
                 <span class="text-body-secondary small">Max Risk/Trade</span>
-                <strong class="small font-monospace">{{ (s.max_risk_per_trade * 100) | number:'1.1-1' }}%</strong>
+                <strong class="small mantis-mono">{{ (s.max_risk_per_trade * 100) | number:'1.1-1' }}%</strong>
               </div>
               <div class="px-3 py-2 d-flex justify-content-between border-bottom">
                 <span class="text-body-secondary small">Max Daily DD</span>
-                <strong class="small font-monospace text-warning">{{ (s.max_daily_drawdown * 100) | number:'1.1-1' }}%</strong>
+                <strong class="small mantis-mono text-warning">{{ (s.max_daily_drawdown * 100) | number:'1.1-1' }}%</strong>
               </div>
               <div class="px-3 py-2 d-flex justify-content-between">
                 <span class="text-body-secondary small">Max Total DD</span>
-                <strong class="small font-monospace text-danger">{{ (s.max_total_drawdown * 100) | number:'1.1-1' }}%</strong>
+                <strong class="small mantis-mono text-danger">{{ (s.max_total_drawdown * 100) | number:'1.1-1' }}%</strong>
               </div>
             }
           </c-card-body>
         </c-card>
 
         <!-- Notifications -->
-        <c-card class="mb-4">
-          <c-card-header class="py-2"><strong>Notifiche</strong></c-card-header>
+        <c-card class="mb-4 border-top border-top-3 border-top-primary">
+          <c-card-header class="py-2"><span class="fw-semibold small text-body-secondary">Notifiche</span></c-card-header>
           <c-card-body>
             <c-form-check class="mb-2">
               <input cFormCheckInput type="checkbox" id="notifBrowser"
@@ -156,7 +159,7 @@ const TYPE_BADGE_COLORS: Record<string, string> = {
         <c-card class="mb-4 border-top border-top-3"
                 [class.border-top-danger]="riskStatus()?.circuit_breaker_active"
                 [class.border-top-success]="riskStatus() && !riskStatus()?.circuit_breaker_active">
-          <c-card-header class="py-2"><strong>Risk Status Live</strong></c-card-header>
+          <c-card-header class="py-2"><span class="fw-semibold small text-body-secondary">Risk Status Live</span></c-card-header>
           <c-card-body>
             @if (riskStatus(); as rs) {
               <div class="d-flex justify-content-between mb-3">
@@ -196,28 +199,28 @@ const TYPE_BADGE_COLORS: Record<string, string> = {
     </c-row>
 
     <!-- Asset Universe -->
-    <c-card class="mb-4">
+    <c-card class="mb-4 border-top border-top-3 border-top-primary">
       <c-card-header class="py-2">
-        <strong>Asset Universe</strong>
+        <span class="fw-semibold small text-body-secondary">Asset Universe</span>
         <c-badge color="primary" class="ms-2 badge-sm">{{ assets.length }} asset</c-badge>
       </c-card-header>
       <c-card-body class="p-0">
-        <div class="table-responsive">
-          <table class="table table-sm table-hover table-striped mb-0 align-middle">
+        <div class="table-responsive-mobile">
+          <table cTable [small]="true" [hover]="true" [striped]="true" class="mb-0 align-middle">
             <thead>
               <tr>
                 <th>Epic</th>
                 <th>Nome</th>
-                <th>Tipo</th>
-                <th>Exchange</th>
-                <th class="text-center">Posizioni</th>
+                <th class="d-mobile-none">Tipo</th>
+                <th class="d-mobile-none">Exchange</th>
+                <th class="text-center d-mobile-none">Posizioni</th>
                 <th>Status</th>
                 <th class="text-center">Azioni</th>
               </tr>
             </thead>
             <tbody>
               @for (a of assets; track a.epic) {
-                <tr [class.opacity-50]="excludedEpics().has(a.epic)">
+                <tr class="settings-asset-row" [class.settings-asset-row--excluded]="excludedEpics().has(a.epic)">
                   <td>
                     <div class="d-flex align-items-center gap-2">
                       <app-epic-logo [epic]="a.epic" [size]="20"></app-epic-logo>
@@ -225,9 +228,9 @@ const TYPE_BADGE_COLORS: Record<string, string> = {
                     </div>
                   </td>
                   <td>{{ a.name }}</td>
-                  <td><c-badge [color]="getTypeBadgeColor(a.type)" class="badge-sm">{{ a.type }}</c-badge></td>
-                  <td class="text-body-secondary small">{{ a.exchange }}</td>
-                  <td class="text-center font-monospace">
+                  <td class="d-mobile-none"><c-badge [color]="getTypeBadgeColor(a.type)" class="badge-sm">{{ a.type }}</c-badge></td>
+                  <td class="text-body-secondary small d-mobile-none">{{ a.exchange }}</td>
+                  <td class="text-center mantis-mono d-mobile-none">
                     @if (positionCounts()[a.epic]) {
                       <c-badge color="info" class="badge-sm">{{ positionCounts()[a.epic] }}</c-badge>
                     } @else {
@@ -255,7 +258,7 @@ const TYPE_BADGE_COLORS: Record<string, string> = {
                               [disabled]="trainingEpics().has(a.epic)"
                               (click)="trainModel(a.epic)">
                         @if (trainingEpics().has(a.epic)) {
-                          <span class="spinner-border spinner-border-sm" style="width: 0.75rem; height: 0.75rem;"></span>
+                          <span class="spinner-border spinner-border-sm settings-train-spinner"></span>
                         } @else {
                           <small>Train</small>
                         }
