@@ -58,24 +58,24 @@ export class TradingService {
 
   loadOverview(): void {
     this.api.get<DashboardOverview>('/api/dashboard/overview')
-      .subscribe(data => this.overview.set(data));
+      .subscribe({ next: data => this.overview.set(data), error: () => {} });
   }
 
   loadEquityCurve(days = 30): void {
     this.api.get<EquityCurvePoint[]>('/api/dashboard/equity-curve', { days })
-      .subscribe(data => this.equityCurve.set(data));
+      .subscribe({ next: data => this.equityCurve.set(data), error: () => {} });
   }
 
   loadRiskStatus(): void {
     this.api.get<RiskStatus>('/api/system/risk-status')
-      .subscribe(data => this.riskStatus.set(data));
+      .subscribe({ next: data => this.riskStatus.set(data), error: () => {} });
   }
 
   // ── Positions ──
 
   loadPositions(): void {
     this.api.get<Position[]>('/api/positions/')
-      .subscribe(data => this.positions.set(data));
+      .subscribe({ next: data => this.positions.set(data), error: () => {} });
   }
 
   closePosition(dealId: string) {
@@ -88,7 +88,7 @@ export class TradingService {
     const params: Record<string, string> = {};
     if (epic) params['epic'] = epic;
     this.api.get<TradingSignal[]>('/api/signals/', params)
-      .subscribe(data => this.signals.set(data));
+      .subscribe({ next: data => this.signals.set(data), error: () => {} });
   }
 
   generateSignal(epic = 'XAUUSD', confidence = 0.8, signalClass = 3) {
@@ -103,7 +103,7 @@ export class TradingService {
 
   loadMarkets(q = ''): void {
     this.api.get<MarketInfo[]>('/api/markets/search', { q })
-      .subscribe(data => this.markets.set(data));
+      .subscribe({ next: data => this.markets.set(data), error: () => {} });
   }
 
   searchMarkets(q = '') {
@@ -118,19 +118,19 @@ export class TradingService {
 
   loadStrategyConfig(): void {
     this.api.get<StrategyConfig[]>('/api/strategy/config')
-      .subscribe(data => this.strategyConfigs.set(data));
+      .subscribe({ next: data => this.strategyConfigs.set(data), error: () => {} });
   }
 
   loadRiskLimits(): void {
     this.api.get<RiskLimits>('/api/strategy/risk-limits')
-      .subscribe(data => this.riskLimitsData.set(data));
+      .subscribe({ next: data => this.riskLimitsData.set(data), error: () => {} });
   }
 
   loadAllocation(regime?: string): void {
     const params: Record<string, string> = {};
     if (regime) params['regime'] = regime;
     this.api.get<Allocation>('/api/strategy/allocation', params)
-      .subscribe(data => this.allocationData.set(data));
+      .subscribe({ next: data => this.allocationData.set(data), error: () => {} });
   }
 
   getStrategyConfig() {
@@ -173,7 +173,7 @@ export class TradingService {
 
   loadModels(): void {
     this.api.get<MLModel[]>('/api/models/')
-      .subscribe(data => this.models.set(data));
+      .subscribe({ next: data => this.models.set(data), error: () => {} });
   }
 
   listModels() {
@@ -188,6 +188,10 @@ export class TradingService {
 
   getRiskStatus() {
     return this.api.get<RiskStatus>('/api/system/risk-status');
+  }
+
+  trainModel(epic: string) {
+    return this.api.post<{ message: string; epic: string }>(`/api/models/train/${epic}`);
   }
 
   // ── Paper Trading ──

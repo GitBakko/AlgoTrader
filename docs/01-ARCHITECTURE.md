@@ -1,4 +1,4 @@
-# AlgoTrader AI - System Architecture
+# MANTIS AI - System Architecture
 
 ## High-Level Architecture
 
@@ -116,44 +116,50 @@ Transforms raw data into ML-ready features.
 
 ### 3. ML Models (`backend/src/models/`)
 
-Ensemble approach with asset-specific model configurations.
+XGBoost 3-class classifier with 220 features per asset (21 assets supported).
 
 **Sub-components:**
-- `lstm_model.py` - LSTM network for temporal patterns
-- `transformer_model.py` - Temporal Fusion Transformer (TFT)
-- `xgboost_model.py` - XGBoost/LightGBM gradient boosting
-- `ensemble.py` - Stacking meta-learner
+- `xgboost_model.py` - XGBoost gradient boosting classifier (3-class: BUY/HOLD/SELL)
+- `lstm_model.py` - LSTM network (implemented, not in production — F1 ~0.17)
 - `trainer.py` - Training pipeline with walk-forward optimization
+- `tuner.py` - Optuna hyperparameter tuning (TPE sampler, 40 trials)
+- `feature_selector.py` - Feature importance-based selection
+- `calibration.py` - Isotonic + Platt confidence calibration, ECE metric
 - `predictor.py` - Inference engine for real-time predictions
 
 **Model Architecture (per asset):**
 ```
-                    ┌─────────────┐
-Raw Features ──────>│   Feature   │
-                    │  Selection  │
-                    └──────┬──────┘
-                           │
-              ┌────────────┼────────────┐
-              │            │            │
-         ┌────▼────┐ ┌────▼────┐ ┌────▼─────┐
-         │  LSTM   │ │Transformer│ │ XGBoost  │
-         │ (seq)   │ │  (TFT)   │ │(tabular) │
-         └────┬────┘ └────┬─────┘ └────┬─────┘
-              │            │            │
-              └────────────┼────────────┘
-                           │
-                    ┌──────▼──────┐
-                    │   Stacking  │
-                    │ Meta-Learner│
-                    │  (XGBoost)  │
-                    └──────┬──────┘
-                           │
-                    ┌──────▼──────┐
-                    │   Signal    │
-                    │  (BUY/SELL/ │
-                    │   HOLD +    │
-                    │ confidence) │
-                    └─────────────┘
+Raw OHLCV (1h, 4h, 1d)
+         │
+    ┌────▼─────────┐
+    │   Feature     │
+    │  Engineering  │
+    │  (220 feats)  │
+    └────┬─────────┘
+         │
+    ┌────▼─────────┐
+    │   Optuna      │
+    │   Tuning      │
+    │  (40 trials)  │
+    └────┬─────────┘
+         │
+    ┌────▼─────────┐
+    │   XGBoost     │
+    │  3-class      │
+    │  Classifier   │
+    └────┬─────────┘
+         │
+    ┌────▼─────────┐
+    │  Isotonic     │
+    │ Calibration   │
+    └────┬─────────┘
+         │
+    ┌────▼─────────┐
+    │   Signal      │
+    │  BUY/SELL/    │
+    │  HOLD +       │
+    │  confidence   │
+    └──────────────┘
 ```
 
 **Training Strategy:**
@@ -161,7 +167,10 @@ Raw Features ──────>│   Feature   │
 - 63-day (3 months) validation window
 - Rolling forward 21 days (1 month) between retrains
 - Purged cross-validation to prevent data leakage
+- Optuna TPE tuning (40 trials per asset)
+- Isotonic confidence calibration per fold
 - Models saved with versioning in `data/models/`
+- F1 macro: 0.53-0.61 depending on asset
 
 ### 4. Strategy Engine (`backend/src/strategy/`)
 
@@ -228,33 +237,64 @@ Real-time system health and performance tracking.
 **Sub-components:**
 - `health_checker.py` - System component health monitoring
 - `pnl_tracker.py` - Real-time P&L calculation
-- `model_monitor.py` - ML model drift detection
-- `alerter.py` - Alert system (email, webhook notifications)
+- `trade_logger.py` - Structured trade event logging (signals, executions, risk)
+- `log_analyzer.py` - Polars-based log analysis (signal accuracy, execution quality)
+- `log_formatter.py` - JSON structured log formatting
+- `metrics.py` - Performance metrics collection
+- `alerting/` - Alert rules and notification system
 
-### 9. Backend API (`backend/src/api/`)
+### 9. Authentication & Security
+
+**`backend/src/auth/`** - JWT-based authentication with RBAC:
+- `models.py` - User, Role, Permission SQLAlchemy models
+- `schemas.py` - Pydantic schemas (UserCreate, UserResponse, TokenResponse)
+- `rbac.py` - Role-Based Access Control (VIEWER, TRADER, ADMIN roles)
+- `jwt.py` - JWT token creation/validation (access + refresh tokens)
+
+**`backend/src/security/`** - Security hardening:
+- Input sanitization, rate limiting, CORS configuration
+- JWT secret validation (fails startup if default key in production)
+
+**`backend/src/audit/`** - Audit trail:
+- System event logging for compliance
+
+### 10. Backend API (`backend/src/api/`)
 
 FastAPI server exposing REST + WebSocket for the frontend.
+
+**Middleware:** GZipMiddleware (min 1000 bytes), CORS, rate limiting (slowapi)
 
 **Key Endpoints:**
 - `GET /api/dashboard` - Overview data (P&L, positions, signals)
 - `GET /api/positions` - Current open positions
 - `GET /api/signals` - Active trading signals
-- `GET /api/backtest/{id}` - Backtest results
+- `POST /api/backtest/run` - Run walk-forward backtest
 - `POST /api/strategy/activate` - Enable/disable strategies
+- `POST /api/trading/start|stop` - Paper trading control
+- `GET /api/system/health` - Health check (data freshness, broker, DB)
+- `GET /api/system/recovery-report` - State recovery status
+- `POST /api/auth/login|register` - Authentication (rate-limited)
+- `POST /api/auth/avatar/upload` - Avatar image upload
 - `WS /ws/prices` - Real-time price streaming
 - `WS /ws/trades` - Real-time trade updates
 
-### 10. Frontend Dashboard (Angular 21 + CoreUI)
+### 11. Frontend Dashboard (Angular 21 + CoreUI)
+
+**MANTIS AI Theme:** Neon green `#39FF14`, dark bg `#0d1117`, surface `#161b22`
 
 **Pages:**
-- **Dashboard** - P&L overview, equity curve, active positions, recent trades
-- **Markets** - Real-time charts for Gold, BTC, S&P 500 with indicators
-- **Signals** - Current ML signals with confidence scores and reasoning
-- **Positions** - Open positions manager with SL/TP visualization
-- **Backtest** - Run and review backtests, compare strategies
-- **Strategy** - Configure strategy parameters, risk settings
-- **Models** - ML model performance, training history, drift alerts
-- **Settings** - Broker connection, API keys, notification preferences
+- **Dashboard** - Full-width equity curve, 8-asset price grid, risk metric cards
+- **Markets** - Real-time charts for 21 assets with TradingView Lightweight Charts
+- **Signals** - ML signal history with confidence scores
+- **Positions** - Open positions with live P&L via WebSocket
+- **Paper Trading** - Start/stop trading, live signal monitor
+- **Trade Journal** - Full signal history with filters and stats
+- **Backtest** - Walk-forward backtest runner with equity curves
+- **Strategy** - Strategy and risk configuration
+- **Models** - ML model performance monitoring
+- **Settings** - App settings, broker configuration
+- **Login/Register** - Glassmorphism split-screen with animated gradients
+- **User Profile** - Avatar upload, account info, permissions
 
 ### State Recovery System
 

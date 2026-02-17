@@ -42,8 +42,8 @@ class ExecutionEngine:
             trade_repository: Repository for persisting trade audit trail (optional, graceful degradation)
         """
         self._mode = mode
-        self._order_manager = OrderManager(broker=broker, mode=mode)
         self._position_tracker = PositionTracker(broker=broker, mode=mode)
+        self._order_manager = OrderManager(broker=broker, mode=mode, position_tracker=self._position_tracker)
         self._slippage_tracker = SlippageTracker()
 
         # CRITICAL FIX (CRIT-2): Add database persistence to prevent data loss
@@ -214,6 +214,31 @@ class ExecutionEngine:
                         logger.debug(f"✅ Position closed in DB: position_id={position_db.id} P&L={position_db.profit_loss}")
                 except Exception as e:
                     logger.error(f"❌ Database close update failed: {e}")
+
+            # Broadcast trade_closed event to frontend via WebSocket
+            try:
+                from src.api.websocket import ws_manager
+                pnl = 0.0
+                epic = "UNKNOWN"
+                direction = "UNKNOWN"
+                if closed_position:
+                    epic = closed_position.get("epic", "UNKNOWN")
+                    direction = closed_position.get("direction", "UNKNOWN")
+                    entry = closed_position.get("level") or closed_position.get("entry_price", 0)
+                    size = closed_position.get("size", 0)
+                    if result.fill_price and entry:
+                        pnl = (result.fill_price - entry) * size if direction == "BUY" else (entry - result.fill_price) * size
+                await ws_manager.broadcast("trades", {
+                    "type": "trade_closed",
+                    "deal_id": deal_id,
+                    "epic": epic,
+                    "direction": direction,
+                    "pnl": round(pnl, 2),
+                    "close_reason": reason,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                })
+            except Exception as e:
+                logger.debug(f"WS broadcast trade_closed failed: {e}")
 
             logger.info(f"Position closed: {deal_id} reason={reason}")
 

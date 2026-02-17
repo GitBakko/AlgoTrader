@@ -66,7 +66,6 @@ export class LoginComponent {
     this.authService.login(username, password).subscribe({
       next: (response) => {
         this.loading.set(false);
-        console.log('[LoginComponent] Login successful');
 
         // Get return URL from query params or default to dashboard
         const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/dashboard';

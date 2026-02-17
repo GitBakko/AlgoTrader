@@ -233,21 +233,36 @@
                 <th>Dir</th>
                 <th>Size</th>
                 <th>Entry</th>
+                <th>Risk</th>
                 <th class="text-end">P&amp;L (USD)</th>
               </tr>
             </thead>
             <tbody>
               @for (pos of livePositions(); track pos.deal_id) {
                 <tr>
-                  <td class="fw-semibold">{{ pos.epic }}</td>
-                  <td>
-                    <c-badge [color]="directionColor(pos.direction)" class="badge-sm">
-                      {{ pos.direction }}
-                    </c-badge>
+                  <td class="fw-semibold">
+                    <div class="d-flex align-items-center gap-1">
+                      <app-epic-logo [epic]="pos.epic" [size]="20" [rounded]="true" />
+                      {{ pos.epic }}
+                    </div>
                   </td>
-                  <td>{{ pos.size | number:'1.4-4' }}</td>
+                  <td>
+                    <span class="dir-indicator" [class.dir-indicator--buy]="pos.direction === 'BUY'" [class.dir-indicator--sell]="pos.direction === 'SELL'">
+                      {{ pos.direction }}
+                    </span>
+                  </td>
+                  <td class="font-monospace">{{ pos.size | number:'1.2-4' }}</td>
                   <td class="font-monospace">{{ pos.level | priceFormat:pos.epic }}</td>
-                  <td class="text-end fw-semibold"
+                  <td>
+                    @if (pos.risk_managed_locally) {
+                      <span class="risk-badge risk-badge--local" cTooltip="SL/TP gestito da MANTIS">LOCAL</span>
+                    } @else if (pos.stop_level != null) {
+                      <span class="risk-badge risk-badge--broker" cTooltip="SL/TP gestito dal broker">BROKER</span>
+                    } @else {
+                      <span class="risk-badge risk-badge--none" cTooltip="Nessun risk management!">NONE</span>
+                    }
+                  </td>
+                  <td class="text-end fw-semibold font-monospace"
                       [class.text-success]="pos.live_pnl >= 0"
                       [class.text-danger]="pos.live_pnl < 0">
                     $ {{ pos.live_pnl >= 0 ? '+' : '' }}{{ pos.live_pnl | number:'1.2-2' }}

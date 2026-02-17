@@ -46,7 +46,7 @@ export class AppComponent implements OnInit {
     this.#ws.connectTrades();
 
     // Initialize browser notifications for trade events
-    this.#notifications.requestPermission();
+    this.#notifications.requestPermission().catch(() => {});
     this.#notifications.init();
 
     this.#router.events.pipe(

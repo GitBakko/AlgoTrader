@@ -4,7 +4,7 @@ import { RouterLink } from '@angular/router';
 import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
   ColComponent, RowComponent, BadgeComponent, ProgressComponent,
-  TableDirective, AlertComponent,
+  TableDirective, AlertComponent, TooltipDirective,
 } from '@coreui/angular';
 import { TvChartComponent, LineDataPoint } from '../../shared/components/tv-chart/tv-chart.component';
 import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
@@ -23,7 +23,7 @@ import { NewsWidgetComponent } from '../../shared/components/news-widget/news-wi
     CommonModule, RouterLink,
     CardComponent, CardBodyComponent, CardHeaderComponent,
     ColComponent, RowComponent, BadgeComponent, ProgressComponent,
-    TableDirective, AlertComponent,
+    TableDirective, AlertComponent, TooltipDirective,
     TvChartComponent,
     PriceFormatPipe, EpicLogoComponent, NewsWidgetComponent,
   ]
@@ -119,7 +119,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return 60000; // 1min if suspended
   });
 
-  private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private pollTimer: ReturnType<typeof setTimeout> | null = null;
+  private newsTimer: ReturnType<typeof setInterval> | null = null;
 
   ngOnInit(): void {
     this.startSmartPolling();
@@ -127,13 +128,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
     // Fetch market headlines (US500 news) - refresh every 5 minutes
     this.newsService.getNews('US500', 5, 7);
-    setInterval(() => this.newsService.getNews('US500', 5, 7), 5 * 60 * 1000);
+    this.newsTimer = setInterval(() => this.newsService.getNews('US500', 5, 7), 5 * 60 * 1000);
   }
 
   ngOnDestroy(): void {
     if (this.pollTimer) {
-      clearInterval(this.pollTimer);
+      clearTimeout(this.pollTimer);
       this.pollTimer = null;
+    }
+    if (this.newsTimer) {
+      clearInterval(this.newsTimer);
+      this.newsTimer = null;
     }
   }
 

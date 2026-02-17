@@ -12,6 +12,10 @@ from fastapi import WebSocket, WebSocketDisconnect
 from loguru import logger
 
 
+class _BrokerDisconnected(Exception):
+    """Sentinel raised when broker WS drops so prices_endpoint falls back to mock."""
+
+
 class ConnectionManager:
     """Manages active WebSocket connections per channel."""
 
@@ -61,17 +65,13 @@ class ConnectionManager:
 # Singleton manager
 ws_manager = ConnectionManager()
 
-# Base prices for mock ticker (paper mode)
+# Base prices for mock ticker (paper mode) — realistic Feb 2026 values
 _BASE_PRICES = {
-    "XAUUSD": 2000.0,
-    "BTCUSD": 50000.0,
-    "US500": 5000.0,
-    "WTIUSD": 75.0,
-    "EURUSD": 1.08,
-    "NVDA": 800.0,
-    "TSLA": 250.0,
-    "XAGUSD": 25.0,
-    "DE40": 18000.0,
+    "XAUUSD": 4994.0, "BTCUSD": 68500.0, "US500": 6836.0, "WTIUSD": 64.0,
+    "EURUSD": 1.19, "NVDA": 192.0, "TSLA": 431.0, "XAGUSD": 83.0, "DE40": 25205.0,
+    "SOLUSD": 88.0, "ETHUSD": 2085.0, "BNBUSD": 632.0, "DOGUSD": 0.11,
+    "DASHUSD": 39.8, "ICPUSD": 2.55, "NATGAS": 3.09, "COPPER": 5.84,
+    "PLATINUM": 2067.0, "GBPUSD": 1.37, "USDJPY": 152.7, "NAS100": 227.0,
 }
 
 
@@ -138,15 +138,29 @@ async def _broker_price_stream(websocket: WebSocket, broker_ws) -> None:
 
     listeners.append(on_quote)
 
+    consecutive_heartbeats = 0
+    max_heartbeats = 6  # 6 * 5s = 30s without data → broker is dead
+
     try:
         while True:
             try:
                 tick = await asyncio.wait_for(quote_queue.get(), timeout=5.0)
                 await websocket.send_json(tick)
+                consecutive_heartbeats = 0  # Reset on real data
             except asyncio.TimeoutError:
+                consecutive_heartbeats += 1
+                # Check if broker WS is still connected
+                if not getattr(broker_ws, "_connected", False) or consecutive_heartbeats >= max_heartbeats:
+                    logger.warning(
+                        f"Broker WS disconnected (connected={getattr(broker_ws, '_connected', False)}, "
+                        f"heartbeats={consecutive_heartbeats}), falling back to mock prices"
+                    )
+                    raise _BrokerDisconnected()
                 await websocket.send_json({"type": "heartbeat"})
     except WebSocketDisconnect:
         pass
+    except _BrokerDisconnected:
+        raise  # Propagate to prices_endpoint for fallback
     except Exception as e:
         logger.debug(f"Broker price stream ended: {e}")
     finally:
@@ -155,13 +169,20 @@ async def _broker_price_stream(websocket: WebSocket, broker_ws) -> None:
 
 
 async def prices_endpoint(websocket: WebSocket) -> None:
-    """WebSocket endpoint for real-time price streaming."""
+    """WebSocket endpoint for real-time price streaming.
+
+    Tries broker WS first; if it disconnects mid-stream, falls back to mock.
+    """
     await ws_manager.connect(websocket, "prices")
     try:
         # Check if broker WebSocket is available
         broker_ws = getattr(websocket.app.state, "broker_ws_client", None)
         if broker_ws and getattr(broker_ws, "_connected", False):
-            await _broker_price_stream(websocket, broker_ws)
+            try:
+                await _broker_price_stream(websocket, broker_ws)
+            except _BrokerDisconnected:
+                logger.info("Switching to mock price stream after broker disconnect")
+                await _mock_price_stream(websocket)
         else:
             await _mock_price_stream(websocket)
     finally:

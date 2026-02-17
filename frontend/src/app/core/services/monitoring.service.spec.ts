@@ -7,7 +7,7 @@ import { environment } from '../../../environments/environment';
 describe('MonitoringService', () => {
   let service: MonitoringService;
   let httpMock: HttpTestingController;
-  const baseUrl = `${environment.apiUrl}/monitoring`;
+  const baseUrl = `${environment.apiUrl}/api/monitoring`;
 
   const mockSignalLogsResponse = {
     success: true,

@@ -387,6 +387,57 @@ h1, h2, h3, h4, h5, h6,
   }
 }
 
+// Risk Management Badges (positions page)
+.risk-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: help;
+
+  &--broker {
+    color: $mantis-green;
+    background: rgba($mantis-green, 0.12);
+    border: 1px solid rgba($mantis-green, 0.3);
+  }
+
+  &--local {
+    color: #ffa726;
+    background: rgba(#ffa726, 0.12);
+    border: 1px solid rgba(#ffa726, 0.35);
+    animation: local-risk-pulse 3s ease-in-out infinite;
+  }
+
+  &--none {
+    color: #ef5350;
+    background: rgba(#ef5350, 0.12);
+    border: 1px solid rgba(#ef5350, 0.35);
+    animation: none-risk-pulse 2s ease-in-out infinite;
+  }
+
+  &--slim {
+    padding: 0.1rem 0.3rem;
+    font-size: 0.55rem;
+    border-radius: 3px;
+    min-width: 16px;
+    justify-content: center;
+  }
+}
+
+@keyframes local-risk-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes none-risk-pulse {
+  0%, 100% { opacity: 1; border-color: rgba(#ef5350, 0.35); }
+  50% { opacity: 0.8; border-color: rgba(#ef5350, 0.7); }
+}
+
 // Empty States
 .empty-state {
   padding: 3rem 1rem;

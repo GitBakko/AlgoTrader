@@ -1,54 +1,73 @@
-# AlgoTrader AI - ML & Strategy Guide
+# MANTIS AI - ML & Strategy Guide
 
 ## Model Architecture
 
-### Ensemble Stacking Approach
+### XGBoost 3-Class Classifier
 
-For each asset (Gold, BTC, S&P500) we train a 3-model ensemble:
+For each of the 21 supported assets, we train an XGBoost classifier with 220 features:
 
 ```
-Layer 1 (Base Models):
-├── LSTM         → Captures sequential temporal patterns
-├── TFT          → Long-range dependencies + attention on key features
-└── XGBoost      → Non-linear feature interactions on tabular data
-
-Layer 2 (Meta-Learner):
-└── XGBoost      → Combines base model outputs into final prediction
+Raw OHLCV Data (multi-timeframe: 1h, 4h, 1d)
+    │
+    ▼
+Feature Engineering (220 features)
+    ├── Technical indicators (EMA, MACD, RSI, BB, ATR, ADX, OBV, Stochastic RSI)
+    ├── Candlestick patterns (8: hammer, engulfing, doji, stars, pin_bar, etc.)
+    ├── Fibonacci clusters (7: distances + nearest + cluster_strength)
+    ├── Market structure (3: BOS/CHoCH, swing HH/HL/LH/LL)
+    ├── Keltner channels + Bollinger squeeze detection
+    ├── VWAP bands (distance from VWAP, ±1/2 SD bands)
+    └── Session features (cyclical hour_sin/cos, dow_sin/cos)
+    │
+    ▼
+Optuna Hyperparameter Tuning (40 trials/asset, TPE sampler)
+    │
+    ▼
+Walk-Forward Training (purged CV, embargo)
+    │
+    ▼
+Isotonic Confidence Calibration (per fold)
+    │
+    ▼
+XGBoost Classifier → 3-class prediction (BUY/HOLD/SELL + calibrated confidence)
 ```
 
-### Why This Combination
+### Performance
 
-| Model | Strength | Weakness | Role |
-|-------|----------|----------|------|
-| LSTM | Excellent at sequential patterns, momentum | Forgets very long-term | Short-medium patterns |
-| TFT | Attention mechanism highlights key drivers | Slower training | Long-range + explainability |
-| XGBoost | Fast, handles missing data, feature interactions | No temporal awareness | Tabular features, regime |
+| Metric | Value |
+|--------|-------|
+| F1 Macro | 0.53-0.61 (varies by asset) |
+| Features | 220 per asset |
+| Tuning | Optuna TPE, 40 trials |
+| Calibration | Isotonic regression |
+| Training | Walk-forward with purge + embargo |
 
 ### Prediction Target
 
-We predict **direction + magnitude** as a classification task:
+We predict **direction** as a 3-class classification task:
 
 ```
 Classes:
-  STRONG_BUY  = price increase > 1.5x ATR in next N bars
-  BUY         = price increase > 0.5x ATR in next N bars
-  HOLD        = price change < 0.5x ATR in next N bars
-  SELL        = price decrease > 0.5x ATR in next N bars
-  STRONG_SELL = price decrease > 1.5x ATR in next N bars
+  SELL = 0  — price decrease > 0.5x ATR in next N bars
+  HOLD = 1  — price change < 0.5x ATR in next N bars
+  BUY  = 2  — price increase > 0.5x ATR in next N bars
 
-Prediction Horizons:
-  Short:  next 4 hours (for intraday)
-  Medium: next 1-3 days (for swing)
-  Long:   next 1-2 weeks (for position)
+Primary Timeframe: 1h (with 4h and 1d as additional features)
 ```
 
 Using ATR-relative targets instead of fixed percentages makes the model regime-adaptive.
 
+### LSTM (Tested, Not in Production)
+
+LSTM was implemented and tested but achieved F1 ~0.17 (near random). XGBoost consistently outperforms on our feature set. LSTM and TFT (Temporal Fusion Transformer) remain as future enhancement candidates if more sequential data becomes available.
+
 ---
 
-## Feature Engineering Details
+## Feature Engineering Details (220 Features)
 
-### Technical Features (all assets)
+All features are computed using pure Polars/numpy (no ta-lib dependency).
+
+### Core Technical Features (all assets)
 
 ```python
 # Trend Indicators
@@ -60,7 +79,8 @@ adx                                      # Average Directional Index
 
 # Mean Reversion
 rsi_14                                   # Relative Strength Index
-rsi_divergence                           # Price vs RSI divergence
+rsi_divergence                           # Price vs RSI divergence (bullish=+1, bearish=-1)
+stochastic_rsi_k, stochastic_rsi_d       # Stochastic RSI
 bb_upper, bb_lower, bb_width, bb_pctb    # Bollinger Bands
 
 # Volatility
@@ -70,81 +90,73 @@ historical_volatility_20                 # 20-day realized volatility
 
 # Volume
 obv                                      # On-Balance Volume
-volume_sma_ratio = volume / sma(volume, 20) # Volume relative to average
-vwap                                     # Volume-Weighted Average Price
+volume_sma_ratio                         # Volume relative to 20-bar average
+vwap, vwap_distance                      # VWAP + distance from VWAP
 
 # Price Action
 returns_1, returns_5, returns_20         # Log returns at different lags
 high_low_range = (high - low) / close    # Intraday range
-close_position = (close - low) / (high - low) # Where close is in range
+close_position = (close - low) / (high - low)
 ```
 
-### Asset-Specific Features
+### Advanced Features (Phase 8+)
 
-**Gold (XAUUSD):**
 ```python
-# Macro (from FRED API)
-fed_funds_rate                           # Federal Funds Rate
-us_10y_yield                             # 10-Year Treasury Yield
-real_yield = us_10y_yield - cpi_yoy      # Real interest rate
-dxy_index                                # US Dollar Index
-cpi_yoy_change                           # CPI Year-over-Year change rate
-gold_silver_ratio                        # Gold/Silver ratio
+# Candlestick Patterns (8 binary features)
+hammer, inverted_hammer, engulfing_bullish, engulfing_bearish
+doji, morning_star, evening_star, pin_bar
 
-# Derived
-gold_usd_correlation_20d                 # Rolling correlation with DXY
-gold_sp500_correlation_20d               # Rolling correlation with S&P500
+# Fibonacci Clusters (7 features)
+fib_distance_236, fib_distance_382, fib_distance_500
+fib_distance_618, fib_distance_786
+fib_nearest, fib_cluster_strength        # ATR-normalized
+
+# Market Structure (3 features)
+market_structure_bos                     # Break of Structure
+market_structure_choch                   # Change of Character
+swing_type                              # HH/HL/LH/LL classification
+
+# Keltner Channels + Bollinger Squeeze
+keltner_upper, keltner_lower
+bb_inside_kc (squeeze detection)         # Binary + duration
+squeeze_momentum                         # Momentum + volume breakout
+
+# VWAP Bands
+vwap_upper_1sd, vwap_lower_1sd
+vwap_upper_2sd, vwap_lower_2sd
+
+# Session Features (cyclical encoding)
+hour_sin, hour_cos                       # Intraday cycle
+dow_sin, dow_cos                         # Day-of-week cycle
 ```
 
-**Bitcoin (BTCUSD):**
-```python
-# Cross-asset (top predictors per research)
-gold_price_normalized                    # Gold price (top predictor for BTC)
-sp500_returns                            # S&P 500 returns
-nasdaq_returns                           # NASDAQ returns
+### Multi-Timeframe Features
 
-# Blockchain metrics (optional, from on-chain APIs)
-hash_rate_change                         # Mining hash rate change
-active_addresses                         # Active wallet addresses
-exchange_net_flow                        # Net flow to/from exchanges
-
-# Crypto-specific
-btc_dominance                            # BTC market cap dominance
-funding_rate                             # Perpetual futures funding rate
-```
-
-**S&P 500 (US500):**
-```python
-# Market breadth
-vix                                      # CBOE Volatility Index
-vix_change                               # VIX rate of change
-put_call_ratio                           # Options put/call ratio
-
-# Macro
-gdp_growth_rate                          # GDP growth rate
-unemployment_rate                        # Unemployment rate
-pmi_manufacturing                        # PMI Manufacturing
-
-# Sentiment
-news_sentiment_score                     # FinBERT aggregate sentiment
-earnings_surprise_aggregate              # Aggregate earnings surprises
-```
+Features from 4h and 1d timeframes are merged via asof join (forward-fill):
+- All technical indicators computed on each timeframe
+- Suffix naming: `_4h`, `_1d` for additional timeframes
+- Total: ~70 features per timeframe x 3 timeframes ≈ 220 features
 
 ### Feature Normalization
 
 ```python
-# For each feature:
-# 1. Z-score normalization using rolling window (not global)
-# 2. Window = 252 bars (1 year for daily, adjust for intraday)
-# 3. This prevents look-ahead bias from global normalization
+# Combined clip + rolling z-score (optimized single pass):
+# 1. Clip outliers beyond ±5 std
+# 2. Rolling z-score with window=252 (prevents look-ahead bias)
 
-normalized_feature = (feature - rolling_mean(252)) / rolling_std(252)
+normalized = clip_and_zscore(feature, window=252, clip_std=5.0)
 
-# For volume and other non-stationary features:
-# Use log transformation first, then z-score
+# For volume: log transform first, then z-score
 log_volume = np.log1p(volume)
-normalized_log_volume = z_score(log_volume, window=252)
+normalized_log_volume = clip_and_zscore(log_volume, window=252)
 ```
+
+### Future Enhancement: Asset-Specific Features
+
+These features are planned but not yet implemented:
+- **Macro**: FRED API (CPI, Fed Funds, DXY, VIX) — requires data pipeline
+- **Sentiment**: FinBERT news scoring — requires NLP pipeline
+- **Blockchain**: On-chain metrics for crypto — requires data source
 
 ---
 
@@ -224,65 +236,80 @@ XGBoost:
 
 ## Signal Generation Logic
 
-### From ML Predictions to Trading Signals
+### Strategy Router (Regime-Based)
+
+The `StrategyRouter` selects the appropriate strategy based on market regime:
+
+```
+Market Regime Detection (ADX + EMA slope)
+    │
+    ├── Trending (ADX > 25) → ML Strategy (XGBoost prediction)
+    │
+    └── Ranging (ADX < 20)  → Best of:
+                               ├── Volatility Squeeze Strategy (BB inside KC)
+                               ├── VWAP Reversion Strategy (±2SD entry)
+                               └── ML Strategy (fallback)
+```
+
+### From XGBoost Prediction to Trading Signal
 
 ```python
-def generate_signal(asset: str, predictions: dict) -> Signal:
-    """
-    Combine ML predictions with technical confirmations.
+# XGBoost outputs calibrated probabilities for 3 classes:
+# P(SELL), P(HOLD), P(BUY)
 
-    predictions = {
-        "direction": "BUY",          # from ensemble
-        "confidence": 0.78,          # meta-learner confidence
-        "horizon": "medium",         # 1-3 days
-        "lstm_vote": "BUY",
-        "tft_vote": "BUY",
-        "xgb_vote": "HOLD",
-    }
-    """
+# Step 1: Minimum confidence threshold (0.40 for 3-class)
+if max_probability < 0.40:
+    return Signal.HOLD
 
-    # Step 1: Minimum confidence threshold
-    if predictions["confidence"] < CONFIDENCE_THRESHOLD:  # 0.65
-        return Signal.HOLD
+# Step 2: ADX pre-signal filter
+if adx < 20:
+    reject  # choppy market
+if adx > 25:
+    confidence += 0.05  # boost for trending
 
-    # Step 2: Model agreement (at least 2 of 3 must agree)
-    votes = [predictions["lstm_vote"], predictions["tft_vote"], predictions["xgb_vote"]]
-    if votes.count(predictions["direction"]) < 2:
-        return Signal.HOLD
+# Step 3: RSI extreme filter
+if direction == BUY and rsi > 80: return HOLD
+if direction == SELL and rsi < 20: return HOLD
 
-    # Step 3: Technical confirmation
-    # RSI must not be extreme against the signal
-    if predictions["direction"] == "BUY" and rsi > 80:
-        return Signal.HOLD  # Overbought, don't buy
-    if predictions["direction"] == "SELL" and rsi < 20:
-        return Signal.HOLD  # Oversold, don't sell
+# Step 4: Regime filter (counter-trend penalty)
+if regime == STRONG_BULL and direction == SELL:
+    confidence *= 0.5
 
-    # Step 4: Regime filter
-    # Don't trade counter-trend in strong trends
-    if regime == "STRONG_BULL" and predictions["direction"] == "SELL":
-        confidence *= 0.5  # Reduce confidence for counter-trend
-
-    # Step 5: Generate signal with risk parameters
-    return Signal(
-        direction=predictions["direction"],
-        confidence=predictions["confidence"],
-        entry_price=current_price,
-        stop_loss=calculate_atr_stop(direction, atr, multiplier=2.0),
-        take_profit=calculate_atr_target(direction, atr, multiplier=3.0),
-        position_size=risk_manager.calculate_size(stop_distance, confidence),
-    )
+# Step 5: Generate signal with risk parameters
+signal = Signal(direction, confidence, entry, SL, TP1, TP2)
 ```
+
+### Additional Strategies
+
+**Volatility Squeeze** (`squeeze_strategy.py`):
+- Detects Bollinger Bands inside Keltner Channels
+- Entry on momentum + volume breakout
+- Works best in ranging markets transitioning to trending
+
+**VWAP Reversion** (`vwap_strategy.py`):
+- Entry at ±2 standard deviations from VWAP
+- Take profit at VWAP center
+- Stop loss at ±3 standard deviations
+- ADX and RSI filters
+
+**Pairs Trading Gold-BTC** (`pairs/pairs_strategy.py`):
+- Engle-Granger cointegration test (ADF)
+- Z-score entry (±2) / exit (±0.5)
+- Dollar-neutral position sizing
 
 ### Confidence Calibration
 
-Model confidence must be calibrated (not just raw softmax):
+Isotonic regression calibration is applied per walk-forward fold:
 
 ```python
-# Use Platt scaling or isotonic regression on validation set
-# to ensure 70% confidence = 70% historical accuracy
+# Calibration ensures: 70% predicted confidence ≈ 70% actual accuracy
+# Fitted on validation set of each fold, saved with model
 
-from sklearn.calibration import CalibratedClassifierCV
-calibrated_model = CalibratedClassifierCV(base_model, method='isotonic')
+from src.models.calibration import ConfidenceCalibrator
+calibrator = ConfidenceCalibrator(method='isotonic')
+calibrator.fit(val_probabilities, val_labels)
+calibrated_probs = calibrator.transform(test_probabilities)
+# ECE (Expected Calibration Error) tracked as quality metric
 ```
 
 ---
@@ -433,5 +460,6 @@ Retraining process:
 - [ ] Data splits are always chronological, never random
 
 ### Survivorship Bias
-- Not a major concern for our 3 assets (Gold, BTC, S&P500 are all active)
-- However, if we add individual stocks later, ensure delisted stocks are included
+- Not a major concern for major assets (Gold, BTC, S&P500, etc.)
+- Stock CFDs (NVDA, TSLA) could be affected — monitor for delistings
+- Crypto assets (SOL, ETH, BNB, DOGE, DASH, ICP) have higher risk of structural changes

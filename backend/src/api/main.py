@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -415,6 +416,9 @@ app = FastAPI(
     redoc_url="/redoc" if settings.debug else None,
     lifespan=lifespan,
 )
+
+# Configure GZip compression (responses > 1KB)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Configure CORS
 app.add_middleware(

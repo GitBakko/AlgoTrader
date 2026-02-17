@@ -57,7 +57,7 @@ async def get_overview(
     win_rate = 0.0
     if trade_repo is not None:
         try:
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             summary = await trade_repo.get_pnl_summary(
                 now - timedelta(days=30), now
             )

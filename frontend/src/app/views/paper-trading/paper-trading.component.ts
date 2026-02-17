@@ -4,7 +4,7 @@ import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
   ColComponent, RowComponent, BadgeComponent, ProgressComponent, ProgressBarComponent,
   ButtonDirective, SpinnerComponent,
-  TableDirective, AlertComponent,
+  TableDirective, AlertComponent, TooltipDirective,
 } from '@coreui/angular';
 
 import { TradingService } from '../../core/services/trading.service';
@@ -41,7 +41,7 @@ interface GroupedPosition {
     CardComponent, CardBodyComponent, CardHeaderComponent,
     ColComponent, RowComponent, BadgeComponent, ProgressComponent, ProgressBarComponent,
     ButtonDirective, SpinnerComponent,
-    TableDirective, AlertComponent,
+    TableDirective, AlertComponent, TooltipDirective,
     PriceFormatPipe,
     EpicLogoComponent,
     NewsWidgetComponent,
@@ -214,9 +214,27 @@ interface GroupedPosition {
         </c-col>
         <c-col sm="6" lg="3">
           <c-card class="h-100">
-            <c-card-body class="py-2 d-flex justify-content-between align-items-center">
-              <span class="text-body-secondary small">Kelly History</span>
-              <strong class="text-info">{{ status()?.kelly_trade_history_size ?? 0 }}</strong>
+            <c-card-body class="py-2">
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="text-body-secondary small">Kelly Sizing</span>
+                @if (status()?.kelly_stats; as ks) {
+                  <c-badge [color]="ks.active ? 'success' : 'warning'" class="badge-sm">
+                    {{ ks.active ? 'Attivo' : ks.total_trades + '/' + ks.min_required }}
+                  </c-badge>
+                } @else {
+                  <c-badge color="secondary" class="badge-sm">0 trade</c-badge>
+                }
+              </div>
+              @if (status()?.kelly_stats; as ks) {
+                <div class="mt-1 small text-body-secondary" style="font-size: 0.75rem;">
+                  <span class="text-success">{{ ks.wins }}W</span> /
+                  <span class="text-danger">{{ ks.losses }}L</span>
+                  &middot; WR {{ (ks.win_rate * 100).toFixed(0) }}%
+                  &middot; P&L <span [class]="ks.total_pnl >= 0 ? 'text-success' : 'text-danger'">
+                    {{ (ks.total_pnl >= 0 ? '+' : '') + '$' + ks.total_pnl.toFixed(2) }}
+                  </span>
+                </div>
+              }
             </c-card-body>
           </c-card>
         </c-col>
@@ -284,6 +302,16 @@ interface GroupedPosition {
                           <c-badge [color]="directionColor(group.netDirection)" class="badge-sm">
                             {{ group.netDirection }}
                           </c-badge>
+                          @if (getGroupRiskType(group) === 'local') {
+                            <span class="risk-badge risk-badge--local risk-badge--slim"
+                                  cTooltip="Risk gestito da MANTIS">L</span>
+                          } @else if (getGroupRiskType(group) === 'broker') {
+                            <span class="risk-badge risk-badge--broker risk-badge--slim"
+                                  cTooltip="Risk gestito dal broker">B</span>
+                          } @else {
+                            <span class="risk-badge risk-badge--none risk-badge--slim"
+                                  cTooltip="Nessun risk management!">!</span>
+                          }
                           <span class="font-monospace">{{ group.totalSize | number:'1.4-4' }}</span>
                         </div>
                       </td>
@@ -301,9 +329,21 @@ interface GroupedPosition {
                         <tr class="detail-row">
                           <td></td>
                           <td class="ps-4">
-                            <c-badge [color]="directionColor(pos.direction)" class="badge-sm">
-                              {{ pos.direction }}
-                            </c-badge>
+                            <div class="d-flex align-items-center gap-1">
+                              <c-badge [color]="directionColor(pos.direction)" class="badge-sm">
+                                {{ pos.direction }}
+                              </c-badge>
+                              @if (pos.risk_managed_locally) {
+                                <span class="risk-badge risk-badge--local risk-badge--slim"
+                                      cTooltip="Risk gestito da MANTIS">L</span>
+                              } @else if (pos.stop_level !== null) {
+                                <span class="risk-badge risk-badge--broker risk-badge--slim"
+                                      cTooltip="Risk gestito dal broker">B</span>
+                              } @else {
+                                <span class="risk-badge risk-badge--none risk-badge--slim"
+                                      cTooltip="Nessun risk management!">!</span>
+                              }
+                            </div>
                           </td>
                           <td class="font-monospace small">{{ pos.size | number:'1.4-4' }}</td>
                           <td class="font-monospace small">{{ pos.level | priceFormat:pos.epic }}</td>
@@ -895,6 +935,14 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   closeNewsModal(): void {
     this.showNewsModal.set(false);
     this.selectedEpic.set(null);
+  }
+
+  getGroupRiskType(group: GroupedPosition): 'broker' | 'local' | 'none' {
+    const hasLocal = group.positions.some(p => p.risk_managed_locally);
+    const hasBroker = group.positions.some(p => !p.risk_managed_locally && p.stop_level !== null);
+    if (hasLocal) return 'local';
+    if (hasBroker) return 'broker';
+    return 'none';
   }
 
   getCurrentPrice(pos: LivePosition): number | null {

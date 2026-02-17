@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     environment: Literal["development", "staging", "production"] = Field(
         default="development", alias="ENVIRONMENT"
     )
-    debug: bool = Field(default=True, alias="DEBUG")
+    debug: bool = Field(default=False, alias="DEBUG")
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
         default="INFO", alias="LOG_LEVEL"
     )
@@ -220,6 +220,19 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = Field(
         default=60, alias="ACCESS_TOKEN_EXPIRE_MINUTES"
     )
+
+    @field_validator("secret_key")
+    @classmethod
+    def validate_secret_key(cls, v: str) -> str:
+        """Warn if using default secret key."""
+        if v == "dev_secret_key_change_in_production":
+            import warnings
+            warnings.warn(
+                "Using default SECRET_KEY — set a strong key in .env for production!",
+                UserWarning,
+                stacklevel=2,
+            )
+        return v
     encryption_key: str = Field(
         default="", alias="ENCRYPTION_KEY", description="Fernet encryption key (32 bytes base64)"
     )

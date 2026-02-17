@@ -7,7 +7,8 @@
 - **CSS Framework**: Bootstrap 5 (via CoreUI)
 - **Charts**: Chart.js (via @coreui/angular-chartjs)
 - **Icons**: @coreui/icons-angular
-- **Theme**: Dark mode as default (MANTIS green accent `#00d97e`)
+- **Theme**: Dark mode default — Brand green `#39FF14`, muted green `#00d97e`, dark `#0d1117`
+- **Fonts**: Plus Jakarta Sans (display), IBM Plex Mono (code)
 
 ## Setup
 
@@ -27,14 +28,23 @@ npx ng build --configuration=production
 ```text
 frontend/src/app/
 ├── core/                          # Singleton services
+│   ├── guards/
+│   │   └── auth.guard.ts          # Route protection (redirect to login)
+│   ├── interceptors/
+│   │   └── auth.interceptor.ts    # JWT token injection on HTTP requests
 │   ├── services/
 │   │   ├── api.service.ts         # HTTP client with ApiResponse<T> envelope
+│   │   ├── auth.service.ts        # Login, register, JWT, avatar, currentUser signal
 │   │   ├── trading.service.ts     # Trading state (positions, signals, paper status)
-│   │   └── websocket.service.ts   # WebSocket for live prices & trade events
+│   │   └── websocket.service.ts   # WebSocket with exponential backoff reconnection
 │   └── models/
-│       └── index.ts               # TypeScript interfaces (Position, Signal, etc.)
+│       ├── index.ts               # TypeScript interfaces (Position, Signal, etc.)
+│       └── auth.models.ts         # User, Role, Permission, LoginRequest, etc.
 │
 ├── shared/                        # Shared utilities
+│   ├── components/
+│   │   ├── avatar/                # Avatar display (initials fallback)
+│   │   └── avatar-upload/         # Drag-drop avatar upload (5MB, 256x256)
 │   ├── pipes/
 │   │   └── price-format.pipe.ts   # Asset-specific decimal formatting
 │   └── services/
@@ -137,34 +147,57 @@ Usage: `{{ price | priceFormat:epic }}`
 - **Trade executed**: shows epic, direction, size, entry price
 - **Circuit breaker activated**: warning notification with reason
 
-## Dark Theme
+## MANTIS AI Theme
 
-CoreUI dark mode is set by default. Custom MANTIS theme variables in `_custom.scss`:
+CoreUI dark mode is set by default. Custom MANTIS theme in `_custom.scss`:
 
 ```scss
-$mantis-green: #00d97e;
-$mantis-dark: #1a1a2e;
-$mantis-card: #16213e;
+// Brand colors
+$mantis-neon:    #39FF14;   // Primary brand (neon green)
+$mantis-muted:   #00d97e;   // Muted green (accents)
+$mantis-dark:    #0d1117;   // Background
+$mantis-surface: #161b22;   // Cards, surfaces
+
+// Fonts: Plus Jakarta Sans (display) + IBM Plex Mono (code)
 
 // P&L flash animations
 .pnl-flash-positive { animation: flash-green 0.6s ease-out; }
 .pnl-flash-negative { animation: flash-red 0.6s ease-out; }
 ```
 
+### Auth Pages (Glassmorphism Design)
+
+Login and register pages use a split-screen layout:
+- **Left**: Hero section with animated SVG mantis logo, floating gradient blobs
+- **Right**: Glassmorphism form (`backdrop-filter: blur(20px)`)
+- **Animations**: `gradient-shift` (15s), `float-blob` (20-30s), `glow-pulse` (2s)
+- **Registration**: Password strength meter (weak/medium/strong) with animated bars
+
+### Avatar System
+
+- `AvatarComponent` — Displays user avatar with initials fallback (computed from username)
+- `AvatarUploadComponent` — Drag-and-drop upload zone with file validation
+  - Accepts: JPG, PNG, GIF, WEBP (max 5MB)
+  - Backend resizes to 256x256 via Pillow
+  - Integrated in user dropdown and profile page
+
 ## Pages Overview
 
 | Page          | Route            | Description                                         |
 | ------------- | ---------------- | --------------------------------------------------- |
-| Dashboard     | `/dashboard`     | KPIs, live prices, recent positions, quick overview |
-| Posizioni     | `/positions`     | All open positions with live P&L                    |
+| Dashboard     | `/dashboard`     | Equity curve, 8-asset grid, risk metric cards       |
+| Posizioni     | `/positions`     | Open positions with live P&L (WebSocket)            |
 | Segnali       | `/signals`       | ML signal feed with confidence scores               |
-| Mercati       | `/markets`       | Market overview per asset                           |
+| Mercati       | `/markets`       | Market overview per asset (21 assets)               |
 | Paper Trading | `/paper-trading` | Start/stop trading, live signals & positions        |
 | Trade Journal | `/trade-journal` | Full signal history with filters, sorting, stats    |
 | Backtest      | `/backtest`      | Run walk-forward backtests, view equity curves      |
 | Strategia     | `/strategy`      | Strategy and risk configuration                     |
 | Modelli AI    | `/models`        | ML model performance monitoring                     |
 | Impostazioni  | `/settings`      | App settings, API configuration                     |
+| Login         | `/login`         | Glassmorphism auth with animated mantis logo        |
+| Registrazione | `/register`      | Registration with password strength meter           |
+| Profilo       | `/profile`       | User profile, avatar upload, permissions            |
 
 ## Docker
 

@@ -1,4 +1,4 @@
-# AlgoTrader AI - Development Roadmap
+# MANTIS AI - Development Roadmap
 
 ## Phase Overview
 
@@ -16,7 +16,11 @@
 | 7 | Paper Trading Dashboard | Frontend paper trading page, signal history, live P&L | COMPLETE |
 | 8 | TRADING MAGNA AI | 15 improvements: risk, features, strategies, pairs | COMPLETE |
 | 9 | Integration & Coverage | Paper loop wiring, backtest router, coverage 80% | COMPLETE |
-| 10 | Live Preparation | Walk-forward validation, frontend upgrade, live deploy | IN PROGRESS |
+| 10 | MANTIS AI Branding | Rebrand, Angular optimization, OnPush, withFetch | COMPLETE |
+| 11 | Production Quick Wins | Max positions, rate limiting, graceful shutdown, 21 assets | COMPLETE |
+| 14 | State Recovery | Multi-source recovery, auto-persistence, backoff retry | COMPLETE |
+| 15 | UI/UX + Avatar System | Auth redesign, dashboard layout, avatar upload | COMPLETE |
+| 16 | Best Practices & Docs | Security, performance, memory leaks, documentation | COMPLETE |
 
 ---
 
@@ -443,44 +447,103 @@
 
 ---
 
-## Phase 10: Live Preparation [IN PROGRESS]
+## Phase 10: MANTIS AI Branding + Angular Optimization [COMPLETE]
 
-### 10.1 Walk-Forward Validation
+- [x] Rebrand from "AlgoTrader AI" to "MANTIS AI"
+- [x] Neon green theme (`#39FF14`) with dark backgrounds (`#0d1117`)
+- [x] SVG mantis logo (favicon, sidebar, footer)
+- [x] CoreUI CSS variable overrides in `_custom.scss`
+- [x] All 9 components migrated to `ChangeDetectionStrategy.OnPush`
+- [x] `app.config.ts`: `withFetch()` + `withPreloading(PreloadAllModules)`
+- [x] TradingView Lightweight Charts with mantis green palette
+- [x] Plus Jakarta Sans + IBM Plex Mono fonts
 
-- [ ] Run WF backtest with retrained models (220 features) on all 8 assets
-- [ ] Compare OOS performance pre/post Phase 8 features
-- [ ] Validate Monte Carlo CIs and risk of ruin
+---
 
-### 10.2 Frontend Upgrade Phase 8
+## Phase 11: Production Readiness Quick Wins [COMPLETE]
 
-- [ ] Circuit breaker status in dashboard
-- [ ] Trailing stop phase visualization
-- [ ] Equity curve filter indicator
-- [ ] Kelly sizing info in position details
-- [ ] Strategy name in signals table
+- [x] Max positions limit per asset (configurable)
+- [x] API rate limiting (token bucket)
+- [x] Graceful shutdown with signal handlers
+- [x] Enhanced health checks (data freshness, broker connectivity)
+- [x] 21-asset expansion: XAUUSD, BTCUSD, US500, WTIUSD, EURUSD, NVDA, TSLA, XAGUSD, DE40, SOLUSD, ETHUSD, BNBUSD, DOGUSD, DASHUSD, ICPUSD, NATGAS, COPPER, PLATINUM, GBPUSD, USDJPY, NAS100
+- [x] Paper trading verified: 21 assets configured, 4 trades executed, 0 errors
+- [x] WF OOS results: BTCUSD +56%, XAUUSD +13%, US500 +6% (all MC p=0.0000)
 
-### 10.3 Paper Trading Validation
+---
 
-- [ ] Run paper trading with all Phase 8/9 modules active
-- [ ] Monitor for 2+ weeks per asset
-- [ ] Validate trailing stop phase transitions
-- [ ] Validate circuit breaker triggers
+## Phase 15: UI/UX Improvements & Avatar System [COMPLETE]
 
-### 10.4 Live Trading Deployment
+### API Endpoint Fixes
 
-- [ ] Switch from demo to live Capital.com API
-- [ ] Start with minimal position sizes (0.5% risk per trade)
-- [ ] Enhanced monitoring and alerting
-- [ ] Daily performance reports
-- [ ] Gradual position size increase based on performance
+- [x] Positions page: switched to `trading.paperPositions` + `loadPaperPositions()` (was using broker API)
+- [x] Signals page: switched to `trading.paperSignals` + `loadPaperSignals()` (was using broker API)
+- [x] WebSocket integration for live P&L calculation in positions table
 
-### 10.5 Continuous Improvement (Future)
+### Dashboard Redesign
 
-- [ ] Automated model retraining pipeline
-- [ ] Model drift detection and alerts
-- [ ] TFT model + ensemble stacking
-- [ ] FRED macro features, FinBERT sentiment
-- [ ] SHAP feature importance dashboard
+- [x] Full-width equity curve card (12 cols, 360px height)
+- [x] 8 core assets in 4-column responsive grid (XAUUSD, BTCUSD, US500, WTIUSD, NVDA, TSLA, XAGUSD, DE40)
+- [x] 4 horizontal risk metric cards (Circuit Breaker, Drawdown, Daily P&L, Peak Equity)
+
+### Auth Pages Redesign
+
+- [x] Split-screen layout (hero section left + form section right)
+- [x] Glassmorphism: `backdrop-filter: blur(20px)`, rgba backgrounds, border glows
+- [x] Animated gradients, floating blobs, neon green focus states
+- [x] Registration: password strength meter (weak/medium/strong) with visual bars
+
+### Avatar System (End-to-End)
+
+- [x] Backend: `avatar_handler.py` — validate, resize (Pillow 256x256), save to `data/avatars/`
+- [x] Migration: `avatar_url`, `avatar_storage_path` columns on `users` table
+- [x] Endpoints: POST `/api/auth/avatar/upload`, GET `/api/auth/avatar/{user_id}`, DELETE `/api/auth/avatar`
+- [x] Frontend: `AvatarComponent` (display + initials fallback), `AvatarUploadComponent` (drag-drop, 5MB max)
+- [x] Integration: user dropdown, profile page, auth service methods
+
+### Critical Fixes
+
+- [x] CoreUI icons: removed non-existent `cilBrain`, `cilX`; added `cilBolt`, `cilBook`, `cilChartLine`
+- [x] RBAC: `init_permissions.py` script, `settings:write` added to ADMIN role
+- [x] SASS deprecation: replaced `lighten()` with `color.adjust()` (sass:color module)
+
+### Build Status
+
+- Frontend: **0 errors, 0 warnings** (bundle: 2.81 MB)
+
+---
+
+## Phase 16: Best Practices, Performance & Documentation [COMPLETE]
+
+### S1 — Backend Fixes
+
+- [x] Replace all `datetime.utcnow()` with `datetime.now(timezone.utc)` across backend
+- [x] Add LIMIT to unbounded repository queries
+- [x] Fix HTTP client resource leak (`_http_client.aclose()` in broker)
+- [x] Add GZipMiddleware (minimum_size=1000)
+- [x] Rate limiting on auth endpoints (5/min login, 3/hour register)
+- [x] JWT secret validation (fail startup if default secret in production)
+- [x] Debug mode default changed to `False`
+- [x] **1065 tests passing, 0 failures**
+
+### S2 — Frontend Fixes
+
+- [x] Fix memory leak: uncleared `setInterval` in dashboard (news timer)
+- [x] Remove `console.log` from production code (kept `console.error`)
+- [x] WebSocket exponential backoff: `min(1000 * 2^attempts, 60000)`
+- [x] Add error handlers to all 13 TradingService `.subscribe()` calls
+- [x] **Frontend build: 0 errors, 0 warnings**
+
+### S3 — Documentation Overhaul
+
+- [x] Rewrite CLAUDE.md (MANTIS AI, 21 assets, new modules)
+- [x] Update all docs (01-ARCHITECTURE through 06-SETUP-GUIDE)
+- [x] Fix 03-ML-STRATEGY (5-class ensemble → 3-class XGBoost)
+- [x] Create 08-API-REFERENCE.md
+
+### S4 — Roadmap
+
+- [x] Create ROADMAP-NEXT-STEPS.md with Phases 17-20+
 
 ---
 

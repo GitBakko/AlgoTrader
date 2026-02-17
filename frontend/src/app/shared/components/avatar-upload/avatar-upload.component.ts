@@ -254,7 +254,6 @@ export class AvatarUploadComponent {
         this.isUploading.set(false);
         this.success.set(true);
         this.uploaded.emit();
-        console.log('[AvatarUploadComponent] Avatar uploaded successfully');
 
         // Clear success message after 3 seconds
         setTimeout(() => {

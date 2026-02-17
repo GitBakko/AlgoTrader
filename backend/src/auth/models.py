@@ -3,7 +3,7 @@ Authentication database models.
 User, Role, and Permission tables for RBAC.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import BigInteger, Column, ForeignKey, Table, text
@@ -38,7 +38,7 @@ class Role(SQLModel, table=True):
     name: str = Field(max_length=50, nullable=False, unique=True, index=True)
     description: Optional[str] = Field(default=None, max_length=255)
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
@@ -57,7 +57,7 @@ class Permission(SQLModel, table=True):
     action: str = Field(max_length=50, nullable=False, index=True)
     description: Optional[str] = Field(default=None, max_length=255)
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
@@ -85,12 +85,12 @@ class User(SQLModel, table=True):
     is_active: bool = Field(default=True, nullable=False)
     last_login: Optional[datetime] = None
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()"), "onupdate": text("NOW()")},
     )

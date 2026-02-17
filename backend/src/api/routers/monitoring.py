@@ -3,7 +3,7 @@ Monitoring API Router - Endpoints for trading logs and statistics.
 
 Provides access to structured logging data for analysis and debugging.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Query
 from loguru import logger
@@ -49,7 +49,7 @@ async def get_signal_logs(
         Signal statistics
     """
     analyzer = get_log_analyzer()
-    end_date = datetime.utcnow()
+    end_date = datetime.now(timezone.utc)
     start_date = end_date - timedelta(days=days)
 
     try:
@@ -103,7 +103,7 @@ async def get_execution_logs(
         Execution statistics
     """
     analyzer = get_log_analyzer()
-    end_date = datetime.utcnow()
+    end_date = datetime.now(timezone.utc)
     start_date = end_date - timedelta(days=days)
 
     try:
@@ -162,7 +162,7 @@ async def get_risk_event_logs(
         Risk event statistics
     """
     analyzer = get_log_analyzer()
-    end_date = datetime.utcnow()
+    end_date = datetime.now(timezone.utc)
     start_date = end_date - timedelta(days=days)
 
     try:
@@ -216,7 +216,7 @@ async def get_performance_overview(
         Combined performance statistics
     """
     analyzer = get_log_analyzer()
-    end_date = datetime.utcnow()
+    end_date = datetime.now(timezone.utc)
     start_date = end_date - timedelta(days=days)
 
     try:

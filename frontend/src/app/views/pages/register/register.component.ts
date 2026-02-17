@@ -149,7 +149,6 @@ export class RegisterComponent {
     this.authService.register(username, email, password, role_name).subscribe({
       next: (response) => {
         this.loading.set(false);
-        console.log('[RegisterComponent] Registration successful');
         this.successMessage.set('Registrazione completata! Reindirizzamento al login...');
 
         // Redirect to login after 2 seconds

@@ -4,7 +4,12 @@ Provides ML model information, performance metrics, and version history.
 Dual-mode: uses ModelVersioning from filesystem when available, falls back to static registry.
 """
 
+import subprocess
+import sys
+from pathlib import Path as FilePath
+
 from fastapi import APIRouter, Depends, Path
+from loguru import logger
 
 from src.api.dependencies import get_model_versioning, get_prediction_service
 from src.api.schemas import error_response, success_response
@@ -241,3 +246,35 @@ async def get_model_versions(
     ]
 
     return success_response(versions)
+
+
+_VALID_EPICS = {m["epic"] for m in _MODEL_REGISTRY}
+
+
+@router.post("/train/{epic}")
+async def train_model(epic: str = Path(...)):
+    """Trigger model training for a specific epic as a background subprocess."""
+    if epic not in _VALID_EPICS:
+        return error_response(f"Unknown epic: {epic}", 400)
+
+    script = FilePath(__file__).resolve().parent.parent.parent.parent / "scripts" / "train_models.py"
+    if not script.exists():
+        return error_response("Training script not found", 500)
+
+    # Ensure log directory exists
+    log_dir = FilePath(__file__).resolve().parent.parent.parent.parent / "data" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / f"train_{epic.lower()}.log"
+
+    python = sys.executable
+
+    subprocess.Popen(
+        [python, str(script), "--assets", epic],
+        cwd=str(script.parent.parent),
+        stdout=log_file.open("w"),
+        stderr=subprocess.STDOUT,
+    )
+
+    logger.info(f"Training subprocess started for {epic}")
+
+    return success_response({"message": f"Training avviato per {epic}", "epic": epic})

@@ -116,6 +116,10 @@ RISK_MAX_TOTAL_EXPOSURE=0.10   # 10% max total exposure
 RISK_MAX_DRAWDOWN=0.15         # 15% max drawdown before halt
 RISK_DAILY_LOSS_LIMIT=0.03     # 3% daily loss circuit breaker
 
+# ===== Authentication =====
+SECRET_KEY=change-this-to-a-random-string-in-production
+# WARNING: Default SECRET_KEY will prevent startup in production mode
+
 # ===== Logging =====
 LOG_LEVEL=INFO
 ```
@@ -216,7 +220,7 @@ After setup, download historical data and train models:
 ```bash
 cd backend
 
-# Download data for all 9 assets (3 timeframes each)
+# Download data for all 21 assets (3 timeframes each)
 .venv/Scripts/python.exe scripts/download_data.py
 
 # Train XGBoost models with Optuna tuning
@@ -226,19 +230,49 @@ cd backend
 .venv/Scripts/python.exe scripts/walk_forward_backtest.py --epic XAUUSD --tune --monte-carlo
 ```
 
-### Supported Assets
+### Auth & Permissions Setup
 
-| Asset     | Epic   | Capital.com Epic | Type      |
-| --------- | ------ | ---------------- | --------- |
-| Gold      | XAUUSD | GOLD             | Commodity |
-| Silver    | XAGUSD | SILVER           | Commodity |
-| Crude Oil | WTIUSD | OIL_CRUDE        | Commodity |
-| Bitcoin   | BTCUSD | BTCUSD           | Crypto    |
-| EUR/USD   | EURUSD | EURUSD           | Forex     |
-| S&P 500   | US500  | US500            | Index     |
-| DAX 40    | DE40   | DE40             | Index     |
-| NVIDIA    | NVDA   | NVDA             | Stock CFD |
-| Tesla     | TSLA   | TSLA             | Stock CFD |
+```bash
+cd backend
+
+# Run database migrations (creates users, roles, permissions tables)
+.venv/Scripts/python.exe -m alembic upgrade head
+
+# Initialize RBAC permissions (VIEWER, TRADER, ADMIN roles)
+.venv/Scripts/python.exe scripts/init_permissions.py
+
+# (Optional) Promote a user to GOD/ADMIN role
+.venv/Scripts/python.exe scripts/promote_user_to_god.py --username youruser
+
+# Create avatar storage directory
+mkdir -p data/avatars
+```
+
+### Supported Assets (21)
+
+| Asset    | Epic     | Capital.com Epic | Type      |
+| -------- | -------- | ---------------- | --------- |
+| Gold     | XAUUSD   | GOLD             | Commodity |
+| Silver   | XAGUSD   | SILVER           | Commodity |
+| Crude Oil| WTIUSD   | OIL_CRUDE        | Commodity |
+| Nat Gas  | NATGAS   | NATGAS           | Commodity |
+| Copper   | COPPER   | COPPER           | Commodity |
+| Platinum | PLATINUM | PLATINUM         | Commodity |
+| Bitcoin  | BTCUSD   | BTCUSD           | Crypto    |
+| Ethereum | ETHUSD   | ETHUSD           | Crypto    |
+| Solana   | SOLUSD   | SOLUSD           | Crypto    |
+| BNB      | BNBUSD   | BNBUSD           | Crypto    |
+| Dogecoin | DOGUSD   | DOGUSD           | Crypto    |
+| Dash     | DASHUSD  | DASHUSD          | Crypto    |
+| ICP      | ICPUSD   | ICPUSD           | Crypto    |
+| EUR/USD  | EURUSD   | EURUSD           | Forex     |
+| GBP/USD  | GBPUSD   | GBPUSD           | Forex     |
+| USD/JPY  | USDJPY   | USDJPY           | Forex     |
+| S&P 500  | US500    | US500            | Index     |
+| NASDAQ   | NAS100   | NAS100           | Index     |
+| DAX 40   | DE40     | DE40             | Index     |
+| NVIDIA   | NVDA     | NVDA             | Stock CFD |
+| Tesla    | TSLA     | TSLA             | Stock CFD |
 
 > **Note**: EURUSD is excluded from active trading (ATR too small for reliable position sizing).
 
@@ -246,7 +280,7 @@ cd backend
 
 ## Running Tests
 
-### Backend Tests (865 tests, ~80% coverage)
+### Backend Tests (1065 tests, ~80% coverage)
 
 ```bash
 cd backend

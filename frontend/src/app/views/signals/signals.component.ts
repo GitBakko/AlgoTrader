@@ -7,6 +7,7 @@ import {
 } from '@coreui/angular';
 import { TradingService } from '../../core/services/trading.service';
 import { ToastService } from '../../shared/services/toast.service';
+import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.component';
 
 @Component({
   selector: 'app-signals',
@@ -15,7 +16,8 @@ import { ToastService } from '../../shared/services/toast.service';
   imports: [
     CommonModule, CardComponent, CardBodyComponent,
     TableDirective, BadgeComponent,
-    ButtonDirective, ProgressComponent, ProgressBarComponent
+    ButtonDirective, ProgressComponent, ProgressBarComponent,
+    EpicLogoComponent,
   ],
   template: `
     <!-- Header -->
@@ -56,7 +58,12 @@ import { ToastService } from '../../shared/services/toast.service';
               <tbody>
                 @for (sig of signals(); track sig.timestamp + sig.epic) {
                   <tr>
-                    <td class="fw-semibold">{{ sig.epic }}</td>
+                    <td class="fw-semibold">
+                      <div class="d-flex align-items-center gap-2">
+                        <app-epic-logo [epic]="sig.epic" [size]="20" />
+                        {{ sig.epic }}
+                      </div>
+                    </td>
                     <td>
                       <span class="dir-indicator" [class.dir-indicator--buy]="sig.direction === 'BUY'" [class.dir-indicator--sell]="sig.direction === 'SELL'">
                         {{ sig.direction }}

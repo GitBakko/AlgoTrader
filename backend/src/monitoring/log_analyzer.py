@@ -5,7 +5,7 @@ Provides statistical analysis and performance metrics from logged trading data.
 Works with both PostgreSQL tables and fallback JSONL files.
 """
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -105,9 +105,9 @@ class LogAnalyzer:
             Signal statistics
         """
         if start_date is None:
-            start_date = datetime.utcnow() - timedelta(days=30)
+            start_date = datetime.now(timezone.utc) - timedelta(days=30)
         if end_date is None:
-            end_date = datetime.utcnow()
+            end_date = datetime.now(timezone.utc)
 
         try:
             # Try PostgreSQL first
@@ -191,9 +191,9 @@ class LogAnalyzer:
             Execution statistics
         """
         if start_date is None:
-            start_date = datetime.utcnow() - timedelta(days=30)
+            start_date = datetime.now(timezone.utc) - timedelta(days=30)
         if end_date is None:
-            end_date = datetime.utcnow()
+            end_date = datetime.now(timezone.utc)
 
         try:
             df = await self._query_executions_pg(start_date, end_date)
@@ -310,9 +310,9 @@ class LogAnalyzer:
             Risk statistics
         """
         if start_date is None:
-            start_date = datetime.utcnow() - timedelta(days=30)
+            start_date = datetime.now(timezone.utc) - timedelta(days=30)
         if end_date is None:
-            end_date = datetime.utcnow()
+            end_date = datetime.now(timezone.utc)
 
         try:
             df = await self._query_risk_events_pg(start_date, end_date)
@@ -427,7 +427,16 @@ class LogAnalyzer:
             return pl.DataFrame()
 
         df = pl.read_ndjson(file_path)
-        df = df.with_columns(pl.col("timestamp").str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S%.f"))
+        df = df.with_columns(
+            pl.col("timestamp").str.replace("Z$", "")
+            .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S%.f")
+            .dt.replace_time_zone("UTC")
+        )
+        # Ensure filter dates are timezone-aware
+        if start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=timezone.utc)
+        if end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=timezone.utc)
         return df.filter(
             (pl.col("timestamp") >= start_date) & (pl.col("timestamp") <= end_date)
         )
@@ -447,7 +456,11 @@ class LogAnalyzer:
         # Parse timestamp column
         if "timestamp" in df.columns:
             try:
-                df = df.with_columns(pl.col("timestamp").str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S%.f"))
+                df = df.with_columns(
+                    pl.col("timestamp").str.replace("Z$", "")
+                    .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S%.f")
+                    .dt.replace_time_zone("UTC")
+                )
             except Exception:
                 # Fallback: skip timestamp parsing
                 pass
@@ -461,7 +474,11 @@ class LogAnalyzer:
                 df = df.with_columns(
                     pl.when(pl.col("exit_timestamp").is_null() | (pl.col("exit_timestamp") == "null"))
                     .then(None)
-                    .otherwise(pl.col("exit_timestamp").str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S%.f"))
+                    .otherwise(
+                        pl.col("exit_timestamp").str.replace("Z$", "")
+                        .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S%.f")
+                        .dt.replace_time_zone("UTC")
+                    )
                     .alias("exit_timestamp")
                 )
             except Exception:
@@ -470,7 +487,13 @@ class LogAnalyzer:
 
         # Filter by date and status
         filters = [pl.col("status") == "executed"]
-        if "timestamp" in df.columns and df["timestamp"].dtype == pl.Datetime:
+        ts_is_datetime = "timestamp" in df.columns and str(df["timestamp"].dtype).startswith("Datetime")
+        if ts_is_datetime:
+            # Ensure filter dates are timezone-aware
+            if start_date.tzinfo is None:
+                start_date = start_date.replace(tzinfo=timezone.utc)
+            if end_date.tzinfo is None:
+                end_date = end_date.replace(tzinfo=timezone.utc)
             filters.extend([
                 pl.col("timestamp") >= start_date,
                 pl.col("timestamp") <= end_date
@@ -485,7 +508,16 @@ class LogAnalyzer:
             return pl.DataFrame()
 
         df = pl.read_ndjson(file_path)
-        df = df.with_columns(pl.col("timestamp").str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S%.f"))
+        df = df.with_columns(
+            pl.col("timestamp").str.replace("Z$", "")
+            .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S%.f")
+            .dt.replace_time_zone("UTC")
+        )
+        # Ensure filter dates are timezone-aware
+        if start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=timezone.utc)
+        if end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=timezone.utc)
         return df.filter(
             (pl.col("timestamp") >= start_date) & (pl.col("timestamp") <= end_date)
         )

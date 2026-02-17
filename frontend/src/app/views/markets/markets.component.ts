@@ -227,7 +227,7 @@ export class MarketsComponent implements OnInit, OnDestroy {
       });
   });
 
-  private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private pollTimer: ReturnType<typeof setTimeout> | null = null;
 
   ngOnInit(): void {
     this.startSmartPolling();
@@ -236,7 +236,7 @@ export class MarketsComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.pollTimer) {
-      clearInterval(this.pollTimer);
+      clearTimeout(this.pollTimer);
       this.pollTimer = null;
     }
   }

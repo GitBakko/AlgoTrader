@@ -129,7 +129,7 @@ class CreatePositionRequest(BaseModel):
 
     epic: str
     direction: Direction
-    size: float = Field(gt=0.0, le=1000.0)  # HIGH-4 FIX: Validate size (0 < size <= 1000)
+    size: float = Field(gt=0.0, le=100000.0)
     guaranteed_stop: bool = Field(default=False, alias="guaranteedStop")
     stop_level: float | None = Field(default=None, alias="stopLevel")
     profit_level: float | None = Field(default=None, alias="profitLevel")
@@ -137,15 +137,13 @@ class CreatePositionRequest(BaseModel):
     @field_validator("size")
     @classmethod
     def validate_size(cls, v: float) -> float:
-        """HIGH-4 FIX: Validate position size is within reasonable bounds."""
+        """Validate and normalize position size for broker submission."""
         if v <= 0:
             raise ValueError(f"Position size must be positive, got {v}")
-        if v > 1000:
-            raise ValueError(f"Position size {v} exceeds maximum of 1000")
-        # Check for precision (Capital.com typically allows 2-4 decimals)
-        if round(v, 4) != v:
-            raise ValueError(f"Position size {v} has too many decimal places (max 4)")
-        return v
+        if v > 100000:
+            raise ValueError(f"Position size {v} exceeds maximum of 100000")
+        # Round to 4 decimal places (Capital.com precision requirement)
+        return round(v, 4)
 
 
 class ModifyPositionRequest(BaseModel):

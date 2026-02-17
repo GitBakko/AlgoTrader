@@ -24,6 +24,7 @@ from src.execution.schemas import ExecutionMode
 from src.models.prediction_service import PredictionService
 from src.risk.risk_manager import RiskManager
 from src.risk.trailing_stop_manager import TrailingPhase, TrailingStopConfig, TrailingStopManager
+from src.monitoring.trade_logger import get_trade_logger, SignalType, ExecutionStatus, RiskEventType
 from src.strategy.strategy_manager import StrategyManager
 
 # How often to check for new candles (seconds)
@@ -202,7 +203,7 @@ class PaperTradingLoop:
             from decimal import Decimal
 
             from src.database.repositories import TrailingStopRepository
-            from src.execution.schemas import Direction
+            from src.broker.models import Direction
 
             state = self.trailing_stop_manager.get_state(deal_id)
             if state is None:
@@ -254,21 +255,41 @@ class PaperTradingLoop:
         logger.info("Paper trading loop stopped")
 
     def _on_task_done(self, task: asyncio.Task) -> None:
-        """Callback when the loop task finishes."""
-        self._running = False
+        """Callback when the loop task finishes — auto-restart on crash."""
         if task.cancelled():
+            self._running = False
             return
         exc = task.exception()
         if exc:
-            logger.error(f"Paper trading loop crashed: {exc}")
+            logger.error(f"🚨 Paper trading loop crashed: {exc}")
+            # Auto-restart after 30 seconds
+            logger.info("🔄 Auto-restarting paper trading loop in 30 seconds...")
+            self._running = False
+            try:
+                loop = asyncio.get_event_loop()
+                loop.call_later(30.0, self._auto_restart)
+            except RuntimeError:
+                logger.error("Cannot auto-restart: no event loop available")
+
+    def _auto_restart(self) -> None:
+        """Auto-restart the trading loop after a crash."""
+        if self._running:
+            return  # Already running (manual restart happened)
+        logger.info("🔄 Auto-restarting paper trading loop now...")
+        self.start()
 
     async def _run_loop(self) -> None:
         """Main loop: check for new candles at fixed intervals."""
+        consecutive_errors = 0
+        max_consecutive_errors = 10
+
         # Run first iteration immediately (process all epics regardless)
         try:
             await self._run_iteration(force=True)
+            consecutive_errors = 0
         except Exception as e:
             self._error_count += 1
+            consecutive_errors += 1
             logger.error(f"First iteration failed: {e}")
 
         while self._running:
@@ -277,11 +298,25 @@ class PaperTradingLoop:
                 if not self._running:
                     break
                 await self._run_iteration(force=False)
+                consecutive_errors = 0  # Reset on success
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Paper trading iteration error: {e}")
-                await asyncio.sleep(60)
+                consecutive_errors += 1
+                self._error_count += 1
+                logger.error(
+                    f"Paper trading iteration error ({consecutive_errors}/{max_consecutive_errors}): {e}"
+                )
+                if consecutive_errors >= max_consecutive_errors:
+                    logger.error(
+                        f"🚨 {max_consecutive_errors} consecutive errors — "
+                        f"stopping loop for auto-restart"
+                    )
+                    raise  # Let _on_task_done handle restart
+                # Exponential backoff: 30s, 60s, 120s, ... max 5min
+                backoff = min(30 * (2 ** (consecutive_errors - 1)), 300)
+                logger.info(f"Waiting {backoff}s before next attempt...")
+                await asyncio.sleep(backoff)
 
     def _has_new_candle(self, epic: str) -> bool:
         """Check if there's a new 1h candle since last processed."""
@@ -360,6 +395,15 @@ class PaperTradingLoop:
         await self._check_stop_losses(current_positions)
 
         open_epics = {p.get("epic") for p in current_positions}
+
+        # Early exit: skip signal generation if already at max open positions
+        max_positions = self.risk_manager.circuit_breakers.config.max_open_positions
+        if len(current_positions) >= max_positions:
+            logger.debug(
+                f"Check #{self._check_count}: at max positions "
+                f"({len(current_positions)}/{max_positions}), skipping signal generation"
+            )
+            return
 
         epics_to_process = []
         for epic in self.epics:
@@ -460,6 +504,10 @@ class PaperTradingLoop:
         self._last_signals[epic] = signal_info
         self._signal_history.appendleft(signal_info)
 
+        # Map direction to SignalType for structured logging
+        _dir_map = {"BUY": SignalType.LONG, "SELL": SignalType.SHORT, "HOLD": SignalType.HOLD}
+        _signal_type = _dir_map.get(signal.direction.value, SignalType.HOLD)
+
         logger.info(
             f"[{epic}] Signal: {signal.direction.value} "
             f"@ {signal.entry_price:.2f} "
@@ -468,6 +516,15 @@ class PaperTradingLoop:
 
         if signal.direction.value == "HOLD":
             signal_info["status"] = "hold"
+            # Log HOLD signal
+            try:
+                await get_trade_logger().log_signal(
+                    epic=epic, direction=_signal_type, confidence=signal.confidence,
+                    strategy=signal.strategy_name or "unknown",
+                    execution_status=ExecutionStatus.HOLD,
+                )
+            except Exception:
+                pass
             logger.info(f"[{epic}] HOLD signal, skipping execution")
             return
 
@@ -514,6 +571,23 @@ class PaperTradingLoop:
             logger.info(
                 f"[{epic}] Risk REJECTED: {risk_result.rejection_reason}"
             )
+            # Log rejected signal + risk event
+            try:
+                tl = get_trade_logger()
+                await tl.log_signal(
+                    epic=epic, direction=_signal_type, confidence=signal.confidence,
+                    strategy=signal.strategy_name or "unknown",
+                    execution_status=ExecutionStatus.REJECTED,
+                    rejection_reason=risk_result.rejection_reason,
+                )
+                await tl.log_risk_decision(
+                    event_type=RiskEventType.POSITION_LIMIT, epic=epic,
+                    description=risk_result.rejection_reason or "Risk check failed",
+                    action="rejected_trade", current_equity=equity,
+                    open_positions=len(open_positions),
+                )
+            except Exception:
+                pass
             return
 
         logger.info(
@@ -555,12 +629,46 @@ class PaperTradingLoop:
                 )
                 # Phase 14: persist trailing stop state
                 await self._persist_trailing_stop_state(exec_result.deal_id)
+
+            # Log executed signal + execution
+            try:
+                tl = get_trade_logger()
+                await tl.log_signal(
+                    epic=epic, direction=_signal_type, confidence=signal.confidence,
+                    strategy=signal.strategy_name or "unknown",
+                    execution_status=ExecutionStatus.EXECUTED,
+                )
+                await tl.log_execution(
+                    epic=epic, direction=signal.direction.value,
+                    size=risk_result.position_size, entry_price=exec_result.fill_price or signal.entry_price,
+                    status=ExecutionStatus.EXECUTED, deal_id=exec_result.deal_id,
+                    stop_loss=risk_result.stop_loss, take_profit=risk_result.take_profit,
+                    equity_at_entry=equity,
+                )
+            except Exception:
+                pass
         else:
             signal_info["status"] = "exec_failed"
             signal_info["rejection_reason"] = exec_result.error
             if exec_result.error_detail:
                 signal_info["error_detail"] = exec_result.error_detail
             logger.warning(f"[{epic}] Execution failed: {exec_result.error}")
+            # Log failed execution
+            try:
+                tl = get_trade_logger()
+                await tl.log_signal(
+                    epic=epic, direction=_signal_type, confidence=signal.confidence,
+                    strategy=signal.strategy_name or "unknown",
+                    execution_status=ExecutionStatus.EXEC_FAILED,
+                    rejection_reason=exec_result.error,
+                )
+                await tl.log_execution(
+                    epic=epic, direction=signal.direction.value,
+                    size=risk_result.position_size, entry_price=signal.entry_price,
+                    status=ExecutionStatus.EXEC_FAILED, error_message=exec_result.error,
+                )
+            except Exception:
+                pass
 
     async def _update_trailing_stops(self, current_positions: list[dict]) -> None:
         """
@@ -626,10 +734,12 @@ class PaperTradingLoop:
 
     async def _check_stop_losses(self, current_positions: list[dict]) -> None:
         """
-        CRITICAL: Check if any open position has violated its stop loss.
-        Auto-close positions where current price <= SL (for longs) or >= SL (for shorts).
+        CRITICAL: Check if any open position has violated its stop loss OR take profit.
+        Auto-close positions where:
+          - SL violated: price <= SL (longs) or price >= SL (shorts)
+          - TP hit: price >= TP (longs) or price <= TP (shorts)
 
-        This is essential for paper trading since Capital.com won't auto-close paper positions.
+        This is essential for locally-managed risk when broker doesn't have SL/TP set.
         """
         if not current_positions:
             return
@@ -639,9 +749,10 @@ class PaperTradingLoop:
             epic = position.get("epic", "")
             direction = position.get("direction", "")
             stop_level = position.get("stop_level")
+            profit_level = position.get("profit_level")
 
-            # Skip if no stop loss set
-            if stop_level is None or stop_level <= 0:
+            # Skip if no stop loss AND no take profit set
+            if (stop_level is None or stop_level <= 0) and (profit_level is None or profit_level <= 0):
                 continue
 
             # Get current market price
@@ -656,65 +767,109 @@ class PaperTradingLoop:
 
                 # Check if stop loss violated
                 stop_violated = False
-                if direction == "BUY":
-                    # Long position: SL violated if price drops below stop
-                    if current_price <= stop_level:
+                if stop_level is not None and stop_level > 0:
+                    if direction == "BUY" and current_price <= stop_level:
                         stop_violated = True
                         logger.warning(
                             f"🚨 [{epic}] STOP LOSS VIOLATED! "
                             f"Price {current_price:.5f} <= SL {stop_level:.5f} (LONG)"
                         )
-                elif direction == "SELL":
-                    # Short position: SL violated if price rises above stop
-                    if current_price >= stop_level:
+                    elif direction == "SELL" and current_price >= stop_level:
                         stop_violated = True
                         logger.warning(
                             f"🚨 [{epic}] STOP LOSS VIOLATED! "
                             f"Price {current_price:.5f} >= SL {stop_level:.5f} (SHORT)"
                         )
 
-                # Auto-close position if SL violated
-                if stop_violated:
-                    try:
-                        logger.info(f"[{epic}] Auto-closing position {deal_id} due to SL violation")
+                # Check if take profit hit
+                tp_hit = False
+                if not stop_violated and profit_level is not None and profit_level > 0:
+                    if direction == "BUY" and current_price >= profit_level:
+                        tp_hit = True
+                        logger.info(
+                            f"🎯 [{epic}] TAKE PROFIT HIT! "
+                            f"Price {current_price:.5f} >= TP {profit_level:.5f} (LONG)"
+                        )
+                    elif direction == "SELL" and current_price <= profit_level:
+                        tp_hit = True
+                        logger.info(
+                            f"🎯 [{epic}] TAKE PROFIT HIT! "
+                            f"Price {current_price:.5f} <= TP {profit_level:.5f} (SHORT)"
+                        )
 
-                        # Close position via execution engine
+                # Auto-close position if SL violated or TP hit
+                if stop_violated or tp_hit:
+                    close_reason = "STOP_LOSS_HIT" if stop_violated else "TAKE_PROFIT_HIT"
+                    reason_label = "SL" if stop_violated else "TP"
+                    try:
+                        logger.info(f"[{epic}] Auto-closing position {deal_id} due to {close_reason}")
+
                         result = await self.execution_engine.close_position(
                             deal_id=deal_id,
-                            reason="STOP_LOSS_HIT"
+                            reason=close_reason,
                         )
 
                         if result.success:
-                            pnl = result.realized_pnl or 0.0
+                            entry_price = position.get("level") or position.get("entry_price", 0)
+                            size = position.get("size", 0)
+                            if direction == "BUY":
+                                pnl = (current_price - entry_price) * size
+                            else:
+                                pnl = (entry_price - current_price) * size
                             logger.info(
-                                f"✅ [{epic}] Position closed at SL: "
+                                f"✅ [{epic}] Position closed at {reason_label}: "
                                 f"P&L = ${pnl:.2f}"
                             )
 
-                            # Record trade close for risk management
                             self._on_position_closed(deal_id, pnl)
 
-                            # Add to signal history
+                            # Broadcast trade_closed event to frontend via WebSocket
+                            try:
+                                from src.api.websocket import ws_manager
+                                await ws_manager.broadcast("trades", {
+                                    "type": "trade_closed",
+                                    "deal_id": deal_id,
+                                    "epic": epic,
+                                    "direction": direction,
+                                    "pnl": round(pnl, 2),
+                                    "close_reason": close_reason,
+                                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                                })
+                            except Exception as e:
+                                logger.debug(f"WS broadcast trade_closed failed: {e}")
+
+                            # Log execution close for System Logs page
+                            try:
+                                await get_trade_logger().log_execution(
+                                    epic=epic, direction=direction, size=size,
+                                    entry_price=entry_price,
+                                    status=ExecutionStatus.EXECUTED, deal_id=deal_id,
+                                    exit_price=current_price, realized_pnl=round(pnl, 2),
+                                )
+                            except Exception:
+                                pass
+
+                            status = "sl_hit" if stop_violated else "tp_hit"
                             self._signal_history.append({
                                 "timestamp": datetime.now(timezone.utc).isoformat(),
                                 "epic": epic,
                                 "direction": direction,
                                 "confidence": 0.0,
-                                "status": "sl_hit",
-                                "reason": f"Stop loss hit at {current_price:.5f}",
+                                "status": status,
+                                "reason": f"{reason_label} hit at {current_price:.5f}",
                                 "deal_id": deal_id,
                                 "pnl": pnl,
                             })
                         else:
                             logger.error(
-                                f"❌ [{epic}] Failed to close position at SL: {result.error}"
+                                f"❌ [{epic}] Failed to close position at {reason_label}: {result.error}"
                             )
 
                     except Exception as e:
-                        logger.error(f"❌ [{epic}] Error closing position at SL: {e}")
+                        logger.error(f"❌ [{epic}] Error closing position at {reason_label}: {e}")
 
             except Exception as e:
-                logger.debug(f"[{epic}] SL check failed: {e}")
+                logger.debug(f"[{epic}] Risk level check failed: {e}")
 
     def _on_position_closed(self, deal_id: str, pnl: float) -> None:
         """
@@ -778,7 +933,34 @@ class PaperTradingLoop:
             "trailing_stops_tracked": len(trailing_tracked),
             "equity_curve_below_sma": eq_below_sma,
             "kelly_trade_history_size": len(self._trade_history),
+            "kelly_stats": self._get_kelly_stats(),
         }
+
+    def _get_kelly_stats(self) -> dict | None:
+        """Compute Kelly stats for API response."""
+        history = list(self._trade_history)
+        if not history:
+            return None
+        wins = [t["pnl"] for t in history if t["pnl"] > 0]
+        losses = [t["pnl"] for t in history if t["pnl"] < 0]
+        min_trades = self.risk_manager.kelly_sizer.min_trades
+        stats = self.risk_manager.kelly_sizer.compute_stats(history)
+        result: dict = {
+            "total_trades": len(history),
+            "wins": len(wins),
+            "losses": len(losses),
+            "win_rate": len(wins) / max(1, len(wins) + len(losses)),
+            "total_pnl": round(sum(t["pnl"] for t in history), 2),
+            "min_required": min_trades,
+            "active": stats is not None,
+            "method": "kelly" if stats else "fixed_fractional",
+        }
+        if stats:
+            result["avg_win"] = round(stats.avg_win, 2)
+            result["avg_loss"] = round(stats.avg_loss, 2)
+            result["kelly_fraction"] = round(stats.kelly_fraction, 4)
+            result["half_kelly"] = round(stats.half_kelly, 4)
+        return result
 
     async def get_status_async(self) -> dict:
         """Get status with live position data (async, works for all modes)."""

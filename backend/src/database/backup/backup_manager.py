@@ -7,7 +7,7 @@ import asyncio
 import gzip
 import os
 import shutil
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -67,7 +67,7 @@ class BackupManager:
         Raises:
             Exception: If backup fails
         """
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
 
         # Generate backup filename
         if backup_name is None:
@@ -131,7 +131,7 @@ class BackupManager:
             size_bytes = backup_path.stat().st_size
 
             # Calculate duration
-            end_time = datetime.utcnow()
+            end_time = datetime.now(timezone.utc)
             duration = (end_time - start_time).total_seconds()
 
             result = {
@@ -175,7 +175,7 @@ class BackupManager:
             Number of backups deleted
         """
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=self.retention_days)
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=self.retention_days)
             deleted_count = 0
 
             for backup_file in self.backup_dir.glob("mantis_backup_*.sql.gz"):

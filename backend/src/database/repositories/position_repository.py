@@ -17,15 +17,21 @@ class PositionRepository(BaseRepository[Position]):
     def __init__(self, session: AsyncSession):
         super().__init__(Position, session)
 
-    async def get_open_positions(self) -> list[Position]:
+    async def get_open_positions(self, limit: int = 500) -> list[Position]:
         """
         Get all open positions.
+
+        Args:
+            limit: Maximum positions to return (default: 500)
 
         Returns:
             List of open positions
         """
         result = await self.session.execute(
-            select(Position).where(Position.status == "OPEN").order_by(Position.opened_at.desc())
+            select(Position)
+            .where(Position.status == "OPEN")
+            .order_by(Position.opened_at.desc())
+            .limit(limit)
         )
         return list(result.scalars().all())
 
@@ -44,13 +50,14 @@ class PositionRepository(BaseRepository[Position]):
         )
         return result.scalar_one_or_none()
 
-    async def get_by_epic(self, epic: str, status: str | None = None) -> list[Position]:
+    async def get_by_epic(self, epic: str, status: str | None = None, limit: int = 500) -> list[Position]:
         """
         Get positions by epic (asset).
 
         Args:
             epic: Asset epic code (e.g., "GOLD", "BITCOIN")
             status: Optional status filter (OPEN, CLOSED, CANCELLED)
+            limit: Maximum positions to return (default: 500)
 
         Returns:
             List of positions
@@ -58,7 +65,7 @@ class PositionRepository(BaseRepository[Position]):
         query = select(Position).where(Position.epic == epic)
         if status:
             query = query.where(Position.status == status)
-        query = query.order_by(Position.opened_at.desc())
+        query = query.order_by(Position.opened_at.desc()).limit(limit)
 
         result = await self.session.execute(query)
         return list(result.scalars().all())

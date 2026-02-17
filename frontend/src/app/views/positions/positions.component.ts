@@ -1,15 +1,15 @@
-import { Component, ChangeDetectionStrategy, inject, OnInit, computed } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   CardComponent, CardBodyComponent,
   TableDirective,
-  BadgeComponent, ButtonDirective
+  BadgeComponent, ButtonDirective,
+  TooltipDirective
 } from '@coreui/angular';
 import { TradingService } from '../../core/services/trading.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
 import { ToastService } from '../../shared/services/toast.service';
-import { getEpicSymbol } from '../../shared/constants/epic-symbols';
 import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.component';
 
 @Component({
@@ -18,7 +18,7 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, CardComponent, CardBodyComponent,
-    TableDirective, BadgeComponent, ButtonDirective,
+    TableDirective, BadgeComponent, ButtonDirective, TooltipDirective,
     PriceFormatPipe, EpicLogoComponent,
   ],
   template: `
@@ -53,6 +53,7 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
                 <th>Entry</th>
                 <th>SL</th>
                 <th>TP</th>
+                <th>Risk</th>
                 <th>Aperta</th>
                 <th class="text-end">P&amp;L (USD)</th>
                 <th class="text-end">Azioni</th>
@@ -64,7 +65,6 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
                   <td class="fw-semibold">
                     <div class="d-flex align-items-center gap-2">
                       <app-epic-logo [epic]="pos.epic" [size]="24" [rounded]="true" />
-                      <span class="me-1" style="font-size: 1.1em;">{{ getSymbol(pos.epic) }}</span>
                       {{ pos.epic }}
                     </div>
                   </td>
@@ -77,6 +77,24 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
                   <td class="font-monospace">{{ pos.level | priceFormat:pos.epic }}</td>
                   <td class="font-monospace">{{ pos.stop_level != null ? (pos.stop_level | priceFormat:pos.epic) : '—' }}</td>
                   <td class="font-monospace">{{ pos.profit_level != null ? (pos.profit_level | priceFormat:pos.epic) : '—' }}</td>
+                  <td>
+                    @if (pos.risk_managed_locally) {
+                      <span class="risk-badge risk-badge--local"
+                            cTooltip="SL/TP gestito localmente dal sistema MANTIS (non dal broker)">
+                        LOCAL
+                      </span>
+                    } @else if (pos.stop_level != null) {
+                      <span class="risk-badge risk-badge--broker"
+                            cTooltip="SL/TP gestito dal broker Capital.com">
+                        BROKER
+                      </span>
+                    } @else {
+                      <span class="risk-badge risk-badge--none"
+                            cTooltip="Nessun risk management attivo!">
+                        NONE
+                      </span>
+                    }
+                  </td>
                   <td class="text-body-secondary small">{{ formatDate(pos.opened_at) }}</td>
                   <td class="text-end fw-semibold font-monospace"
                       [class.text-success]="pos.live_pnl >= 0"
@@ -97,10 +115,11 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
     </c-card>
   `
 })
-export class PositionsComponent implements OnInit {
+export class PositionsComponent implements OnInit, OnDestroy {
   private readonly trading = inject(TradingService);
   private readonly ws = inject(WebSocketService);
   private readonly toast = inject(ToastService);
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
   readonly positions = this.trading.paperPositions;
 
   // Calculate live P&L using WebSocket prices
@@ -120,11 +139,20 @@ export class PositionsComponent implements OnInit {
     this.livePositions().reduce((sum, p) => sum + (p.live_pnl ?? 0), 0)
   );
 
-  // Get symbol for EPIC display
-  getSymbol = getEpicSymbol;
-
   ngOnInit(): void {
     this.trading.loadPaperPositions();
+    this.ws.connectPrices();
+    // Auto-refresh positions every 10 seconds
+    this.pollTimer = setInterval(() => {
+      this.trading.loadPaperPositions();
+    }, 10_000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
   }
 
   closePosition(dealId: string): void {

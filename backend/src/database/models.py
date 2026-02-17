@@ -3,7 +3,7 @@ SQLModel ORM models for AlgoTrader AI PostgreSQL database.
 Based on schema design in schema_design.md.
 """
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
@@ -34,7 +34,7 @@ class Account(SQLModel, table=True):
     currency: str = Field(default="USD", max_length=3, nullable=False)
     snapshot_at: datetime = Field(nullable=False, index=True)
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
@@ -69,12 +69,12 @@ class Position(SQLModel, table=True):
         default=None, sa_column=Column(BigInteger, ForeignKey("signals.id"))
     )
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()"), "onupdate": text("NOW()")},
     )
@@ -109,13 +109,13 @@ class Order(SQLModel, table=True):
         default=None, sa_column=Column(BigInteger, ForeignKey("signals.id"))
     )
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         nullable=False,
         index=True,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()"), "onupdate": text("NOW()")},
     )
@@ -143,7 +143,7 @@ class Trade(SQLModel, table=True):
     commission: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=4)
     executed_at: datetime = Field(nullable=False, index=True)
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
@@ -182,7 +182,7 @@ class Signal(SQLModel, table=True):
     generated_at: datetime = Field(nullable=False, index=True)
     expires_at: Optional[datetime] = None
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
@@ -209,12 +209,12 @@ class Strategy(SQLModel, table=True):
     risk_params: dict = Field(sa_column=Column(JSONB, nullable=False))
     performance_metrics: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()"), "onupdate": text("NOW()")},
     )
@@ -245,7 +245,7 @@ class Model(SQLModel, table=True):
     train_end_date: date = Field(nullable=False)
     is_active: bool = Field(default=False, nullable=False, index=True)
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
@@ -279,7 +279,7 @@ class MarketDataSnapshot(SQLModel, table=True):
     )  # % short
     snapshot_at: datetime = Field(nullable=False, index=True)
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
@@ -309,7 +309,7 @@ class SystemEvent(SQLModel, table=True):
     )
     occurred_at: datetime = Field(nullable=False, index=True)
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
@@ -347,7 +347,7 @@ class BacktestRun(SQLModel, table=True):
     started_at: datetime = Field(nullable=False, index=True)
     completed_at: Optional[datetime] = None
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
@@ -379,12 +379,12 @@ class TrailingStopState(SQLModel, table=True):
 
     # Metadata
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()"), "onupdate": text("NOW()")},
     )
@@ -418,7 +418,7 @@ class RiskStateSnapshot(SQLModel, table=True):
 
     # Metadata
     snapshot_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         nullable=False,
         index=True,
         sa_column_kwargs={"server_default": text("NOW()")},

@@ -2,7 +2,7 @@
 Security database models for encrypted secrets.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import BigInteger, Column, ForeignKey, text
@@ -25,12 +25,12 @@ class EncryptedSecret(SQLModel, table=True):
         default=None, sa_column=Column(BigInteger, ForeignKey("users.id", ondelete="SET NULL"))
     )
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()"), "onupdate": text("NOW()")},
     )

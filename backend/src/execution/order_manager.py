@@ -28,6 +28,7 @@ class OrderManager:
         self,
         broker: CapitalComClient | None = None,
         mode: ExecutionMode = ExecutionMode.PAPER,
+        position_tracker=None,
     ):
         """
         Initialize order manager.
@@ -35,9 +36,11 @@ class OrderManager:
         Args:
             broker: Capital.com client (required for LIVE mode)
             mode: Execution mode (PAPER or LIVE)
+            position_tracker: Optional PositionTracker for updating local SL/TP on broker rejection
         """
         self._broker = broker
         self._mode = mode
+        self._position_tracker = position_tracker
 
         if mode in (ExecutionMode.DEMO, ExecutionMode.LIVE) and broker is None:
             raise ValueError("Broker client is required for DEMO/LIVE execution mode")
@@ -161,19 +164,37 @@ class OrderManager:
                 profit_level=order.take_profit,
             )
 
-            # CRITICAL FIX (CRIT-6): Add 10-second timeout to prevent infinite hang
-            try:
-                confirmation = await asyncio.wait_for(
-                    self._broker.create_position(request),
-                    timeout=10.0
-                )
-            except asyncio.TimeoutError:
-                logger.error(f"Broker API timeout (10s) for {order.epic} {order.direction}")
+            opened_without_stops = False
+
+            confirmation = await self._send_position_request(request, order)
+            if confirmation is None:
                 return ExecutionResult(
                     success=False,
                     error="Broker API timeout (10 seconds)",
                     error_detail={"timeout_seconds": 10.0, "epic": order.epic}
                 )
+
+            # Check if broker rejected due to invalid SL/TP — retry without them
+            if confirmation.deal_status == "REJECTED":
+                reason = confirmation.reason or ""
+                if "stoploss" in reason.lower() or "takeprofit" in reason.lower():
+                    logger.warning(
+                        f"[{order.epic}] Broker rejected SL/TP ({reason}), "
+                        f"retrying without — will set stops after fill"
+                    )
+                    request_no_stops = CreatePositionRequest(
+                        epic=order.epic,
+                        direction=direction,
+                        size=order.size,
+                    )
+                    confirmation = await self._send_position_request(request_no_stops, order)
+                    if confirmation is None:
+                        return ExecutionResult(
+                            success=False,
+                            error="Broker API timeout on retry (10 seconds)",
+                            error_detail={"timeout_seconds": 10.0, "epic": order.epic}
+                        )
+                    opened_without_stops = True
 
             # Check if broker accepted the deal
             if confirmation.deal_status == "REJECTED":
@@ -196,6 +217,18 @@ class OrderManager:
                 f"size={order.size:.4f} @ {confirmation.level:.2f} "
                 f"(expected {order.entry_price:.2f}, slippage={slippage:.4f})"
             )
+
+            # CRITICAL: If opened without stops, set SL/TP via modify_stops
+            if opened_without_stops and confirmation.deal_id:
+                await self._set_stops_after_fill(
+                    deal_id=confirmation.deal_id,
+                    epic=order.epic,
+                    direction=order.direction,
+                    fill_price=confirmation.level,
+                    original_sl=order.stop_loss,
+                    original_tp=order.take_profit,
+                    original_entry=order.entry_price,
+                )
 
             return ExecutionResult(
                 success=True,
@@ -229,11 +262,178 @@ class OrderManager:
                 success=False, error=parsed.summary, error_detail=parsed.to_dict(),
             )
         except CapitalComError as e:
+            # Check if it's a SL/TP error — retry without stops
+            error_str = str(e).lower()
+            if "stoploss" in error_str or "takeprofit" in error_str:
+                logger.warning(
+                    f"[{order.epic}] Broker SL/TP error ({e}), retrying without stops"
+                )
+                try:
+                    direction = Direction.BUY if order.direction == "BUY" else Direction.SELL
+                    request_no_stops = CreatePositionRequest(
+                        epic=order.epic,
+                        direction=direction,
+                        size=order.size,
+                    )
+                    confirmation = await self._send_position_request(request_no_stops, order)
+                    if confirmation and confirmation.deal_status != "REJECTED":
+                        slippage = abs(confirmation.level - order.entry_price)
+                        logger.info(
+                            f"Live fill (no SL/TP): {order.epic} {order.direction} "
+                            f"size={order.size:.4f} @ {confirmation.level:.2f}"
+                        )
+
+                        # Set stops after fill
+                        if confirmation.deal_id:
+                            await self._set_stops_after_fill(
+                                deal_id=confirmation.deal_id,
+                                epic=order.epic,
+                                direction=order.direction,
+                                fill_price=confirmation.level,
+                                original_sl=order.stop_loss,
+                                original_tp=order.take_profit,
+                                original_entry=order.entry_price,
+                            )
+
+                        return ExecutionResult(
+                            success=True,
+                            deal_id=confirmation.deal_id,
+                            fill_price=confirmation.level,
+                            slippage=slippage,
+                        )
+                except Exception:
+                    pass  # Fall through to original error
             logger.error(f"Broker error for {order.epic}: {e}")
             parsed = parse_broker_error(str(e), epic=order.epic)
             return ExecutionResult(
                 success=False, error=parsed.summary, error_detail=parsed.to_dict(),
             )
+
+    async def _send_position_request(self, request: CreatePositionRequest, order: ExecutionOrder):
+        """Send position request to broker with timeout. Returns None on timeout."""
+        try:
+            return await asyncio.wait_for(
+                self._broker.create_position(request),
+                timeout=10.0
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"Broker API timeout (10s) for {order.epic} {order.direction}")
+            return None
+
+    async def _set_stops_after_fill(
+        self,
+        deal_id: str,
+        epic: str,
+        direction: str,
+        fill_price: float,
+        original_sl: float | None,
+        original_tp: float | None,
+        original_entry: float,
+    ) -> None:
+        """
+        Set SL/TP on a broker position AFTER it has been filled.
+
+        Recalculates stop/profit levels relative to the actual fill price
+        (not the predicted OHLC price used to compute the original levels).
+        This handles the case where broker rejected the initial SL/TP.
+        """
+        if original_sl is None and original_tp is None:
+            return
+
+        # Recalculate SL/TP relative to fill price (preserve distance from entry)
+        adjusted_sl = None
+        adjusted_tp = None
+
+        if original_sl is not None and original_entry > 0:
+            sl_distance = abs(original_entry - original_sl)
+            if direction == "BUY":
+                adjusted_sl = fill_price - sl_distance
+            else:
+                adjusted_sl = fill_price + sl_distance
+            # Ensure SL is on the correct side
+            if direction == "BUY" and adjusted_sl >= fill_price:
+                adjusted_sl = fill_price * 0.97  # 3% fallback SL
+            elif direction == "SELL" and adjusted_sl <= fill_price:
+                adjusted_sl = fill_price * 1.03
+
+        if original_tp is not None and original_entry > 0:
+            tp_distance = abs(original_tp - original_entry)
+            if direction == "BUY":
+                adjusted_tp = fill_price + tp_distance
+            else:
+                adjusted_tp = fill_price - tp_distance
+
+        logger.info(
+            f"[{epic}] Setting post-fill stops: SL={adjusted_sl}, TP={adjusted_tp} "
+            f"(fill={fill_price}, original SL={original_sl}, TP={original_tp})"
+        )
+
+        # Capital.com returns a DIFFERENT deal_id for create vs list.
+        # We must look up the real position deal_id by listing positions
+        # and matching by epic. Add delays for broker propagation.
+        max_retries = 3
+        delays = [2.0, 3.0, 5.0]  # seconds between retries
+        actual_deal_id = deal_id  # fallback to creation deal_id
+
+        for attempt in range(max_retries):
+            try:
+                await asyncio.sleep(delays[attempt])
+
+                # Look up the real broker deal_id by epic
+                if self._broker:
+                    try:
+                        positions = await asyncio.wait_for(
+                            self._broker.list_positions(), timeout=10.0
+                        )
+                        for p in positions:
+                            if p.epic == epic:
+                                actual_deal_id = p.deal_id
+                                break
+                    except Exception as e:
+                        logger.debug(f"[{epic}] Position lookup failed: {e}")
+
+                if attempt > 0:
+                    logger.info(
+                        f"[{epic}] Retry #{attempt + 1} setting SL/TP "
+                        f"(deal_id={actual_deal_id})..."
+                    )
+
+                result = await self.modify_stops(
+                    deal_id=actual_deal_id,
+                    stop_level=adjusted_sl,
+                    profit_level=adjusted_tp,
+                )
+                if result.success:
+                    logger.info(f"[{epic}] ✅ SL/TP set on broker: SL={adjusted_sl}, TP={adjusted_tp}")
+                    return  # Success
+                elif "not-found" in (result.error or ""):
+                    logger.debug(f"[{epic}] Deal not yet available (attempt {attempt + 1})")
+                    continue  # Retry
+                else:
+                    logger.warning(
+                        f"[{epic}] ⚠️ Failed to set SL/TP on broker ({result.error}). "
+                        f"Position {deal_id} will use LOCAL stop management only."
+                    )
+                    self._update_local_stops(deal_id, adjusted_sl, adjusted_tp)
+                    return  # Non-retryable error
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    logger.debug(f"[{epic}] Exception on attempt {attempt + 1}: {e}")
+                    continue
+                logger.warning(
+                    f"[{epic}] ⚠️ All {max_retries} attempts failed to set SL/TP ({e}). "
+                    f"Position {deal_id} will use LOCAL stop management only."
+                )
+                self._update_local_stops(deal_id, adjusted_sl, adjusted_tp)
+
+    def _update_local_stops(self, deal_id: str, sl: float | None, tp: float | None) -> None:
+        """Update local position SL/TP when broker rejects. Falls back gracefully."""
+        if self._position_tracker is None:
+            return
+        try:
+            self._position_tracker.update_stops(deal_id, stop_level=sl, profit_level=tp)
+        except Exception as e:
+            logger.debug(f"Local stops update failed for {deal_id}: {e}")
 
     async def _live_close(self, deal_id: str) -> ExecutionResult:
         """Close a live position via broker."""

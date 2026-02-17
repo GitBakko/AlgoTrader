@@ -99,6 +99,9 @@ class CapitalComWebSocketClient:
         self._receive_task: asyncio.Task | None = None
         self._ping_task: asyncio.Task | None = None
 
+        # Reconnection guard — prevents unlimited concurrent connect() tasks
+        self._reconnecting = False
+
     def on_quote(self, handler: Callable[[QuoteData], None]) -> None:
         """
         Register callback for quote events.
@@ -124,15 +127,30 @@ class CapitalComWebSocketClient:
         Raises:
             BrokerConnectionError: If connection fails after max retries
         """
+        # Cancel any existing background tasks before reconnecting
+        if self._receive_task and not self._receive_task.done():
+            self._receive_task.cancel()
+        if self._ping_task and not self._ping_task.done():
+            self._ping_task.cancel()
+
         for attempt in range(self.max_reconnect_attempts):
             try:
                 logger.info(f"🔌 Connecting to Capital.com WebSocket (attempt {attempt + 1})")
+
+                # Close existing socket if any
+                if self._ws:
+                    try:
+                        await self._ws.close()
+                    except Exception:
+                        pass
+                    self._ws = None
 
                 self._ws = await websockets.connect(
                     self.ws_url, ping_interval=None  # We handle pings manually
                 )
 
                 self._connected = True
+                self._reconnecting = False  # Reset reconnection guard
                 logger.success("✅ WebSocket connected")
 
                 # Start background tasks
@@ -152,7 +170,35 @@ class CapitalComWebSocketClient:
                     logger.info(f"Retrying in {delay} seconds...")
                     await asyncio.sleep(delay)
                 else:
+                    self._reconnecting = False
+                    self._connected = False
                     raise BrokerConnectionError(f"Failed to connect after {self.max_reconnect_attempts} attempts")
+
+    async def _safe_reconnect(self) -> None:
+        """
+        Safely trigger reconnection with a guard to prevent reconnection storms.
+        Only one reconnection attempt runs at a time.
+        """
+        if self._reconnecting:
+            logger.debug("Reconnection already in progress, skipping duplicate")
+            return
+
+        self._reconnecting = True
+        self._connected = False
+        logger.info("🔄 Scheduling safe WebSocket reconnection...")
+
+        try:
+            await asyncio.sleep(self.reconnect_delay_seconds)  # Brief cooldown
+            await self.connect()
+        except BrokerConnectionError:
+            logger.error(
+                "❌ WebSocket reconnection failed after all attempts. "
+                "Will retry on next trading iteration."
+            )
+            self._reconnecting = False
+        except Exception as e:
+            logger.error(f"❌ Unexpected error during reconnection: {e}")
+            self._reconnecting = False
 
     async def disconnect(self) -> None:
         """Disconnect from WebSocket server."""
@@ -272,13 +318,15 @@ class CapitalComWebSocketClient:
                 except asyncio.CancelledError:
                     break
                 except WebSocketException as e:
-                    logger.error(f"WebSocket error: {e}")
-                    # Attempt reconnection
-                    asyncio.create_task(self.connect())
+                    logger.error(f"WebSocket error in receive loop: {e}")
+                    # Attempt reconnection with guard to prevent storm
+                    await self._safe_reconnect()
                     break
 
         except Exception as e:
             logger.error(f"Error in receive loop: {e}")
+            if self._connected:
+                await self._safe_reconnect()
 
     async def _handle_message(self, message: str) -> None:
         """

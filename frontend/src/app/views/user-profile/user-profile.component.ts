@@ -64,7 +64,6 @@ export class UserProfileComponent implements OnInit {
     this.authService.getCurrentUser().subscribe({
       next: () => {
         this.loading.set(false);
-        console.log('[UserProfileComponent] Profile refreshed');
       },
       error: (error) => {
         this.loading.set(false);
@@ -96,7 +95,6 @@ export class UserProfileComponent implements OnInit {
   }
 
   onAvatarUploaded(): void {
-    console.log('[UserProfileComponent] Avatar uploaded, refreshing profile');
     this.showAvatarUpload.set(false);
     this.refreshProfile();
   }
@@ -110,7 +108,6 @@ export class UserProfileComponent implements OnInit {
     this.authService.deleteAvatar().subscribe({
       next: () => {
         this.deletingAvatar.set(false);
-        console.log('[UserProfileComponent] Avatar deleted successfully');
         this.refreshProfile();
       },
       error: (error) => {

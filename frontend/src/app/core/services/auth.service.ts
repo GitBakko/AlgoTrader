@@ -89,15 +89,12 @@ export class AuthService {
     return this.http.post<ApiResponse<LoginResponse>>(`${this.baseUrl}/api/auth/login`, request)
       .pipe(
         tap(response => {
-          console.log('[AuthService] Raw response:', response);
           const data = response.data;
-          console.log('[AuthService] Response data:', data);
           this.authState.set({
             isAuthenticated: true,
             currentUser: data.user,
             token: data.access_token
           });
-          console.log('[AuthService] Login successful', data.user.username);
         }),
         catchError(error => {
           console.error('[AuthService] Login failed', error);
@@ -114,9 +111,7 @@ export class AuthService {
 
     return this.http.post<ApiResponse<RegisterResponse>>(`${this.baseUrl}/api/auth/register`, request)
       .pipe(
-        tap(response => {
-          console.log('[AuthService] Registration successful', response.data.user.username);
-        }),
+        tap(() => {}),
         catchError(error => {
           console.error('[AuthService] Registration failed', error);
           return throwError(() => error);
@@ -128,7 +123,6 @@ export class AuthService {
    * Logout and clear authentication state
    */
   logout(): void {
-    console.log('[AuthService] Logging out');
     this.clearAuth();
     this.router.navigate(['/login']);
   }
@@ -158,7 +152,7 @@ export class AuthService {
             ...state,
             currentUser: user
           }));
-          console.log('[AuthService] User profile refreshed', user.username);
+          // Profile refreshed
         }),
         catchError(error => {
           console.error('[AuthService] Failed to get current user', error);
@@ -236,7 +230,7 @@ export class AuthService {
             ...state,
             currentUser: updatedUser
           }));
-          console.log('[AuthService] Avatar uploaded successfully', updatedUser.avatar_url);
+          // Avatar uploaded
         }),
         catchError(error => {
           console.error('[AuthService] Failed to upload avatar', error);
@@ -260,7 +254,7 @@ export class AuthService {
               avatar_url: null
             } : null
           }));
-          console.log('[AuthService] Avatar deleted successfully');
+          // Avatar deleted
         }),
         catchError(error => {
           console.error('[AuthService] Failed to delete avatar', error);

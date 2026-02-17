@@ -48,7 +48,7 @@ class DataQualityReport(BaseModel):
     outliers_found: int
     validation_errors: list[str] = Field(default_factory=list)
     passed: bool
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class GapInfo(BaseModel):
@@ -123,7 +123,7 @@ class DataStorageStats(BaseModel):
     total_size_bytes: int
     earliest_data: datetime | None = None
     latest_data: datetime | None = None
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property
     def total_size_mb(self) -> float:

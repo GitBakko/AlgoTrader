@@ -189,11 +189,17 @@ export interface PriceTick {
 }
 
 export interface TradeEvent {
-  event: string;
+  event: 'OPEN' | 'CLOSE';
   deal_id: string;
   epic: string;
   direction: string;
   pnl: number;
+  size?: number;
+  fill_price?: number;
+  stop_loss?: number;
+  take_profit?: number;
+  close_reason?: string;
+  timestamp?: string;
 }
 
 // Paper Trading Status (GET /api/trading/status)
@@ -219,6 +225,22 @@ export interface PaperTradingStatus {
   trailing_stops_tracked: number;
   equity_curve_below_sma: boolean;
   kelly_trade_history_size: number;
+  kelly_stats: KellyStats | null;
+}
+
+export interface KellyStats {
+  total_trades: number;
+  wins: number;
+  losses: number;
+  win_rate: number;
+  total_pnl: number;
+  min_required: number;
+  active: boolean;
+  method: string;
+  avg_win?: number;
+  avg_loss?: number;
+  kelly_fraction?: number;
+  half_kelly?: number;
 }
 
 export interface LastSignalInfo {
@@ -250,6 +272,7 @@ export interface PaperPosition {
   profit_level: number | null;
   opened_at: string;
   trailing_stop_phase?: string; // "INITIAL" | "BREAKEVEN" | "TP1_LOCK" | "TRAILING"
+  risk_managed_locally?: boolean; // true if SL/TP managed by MANTIS (not broker)
 }
 
 // Structured broker error detail (from broker_error_parser)

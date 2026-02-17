@@ -3,16 +3,20 @@ Authentication API router.
 Handles user login, registration, and profile retrieval.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, status, UploadFile, File
 from fastapi.responses import FileResponse
 from loguru import logger
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.schemas import error_response, success_response
+
+limiter = Limiter(key_func=get_remote_address)
 from src.auth.dependencies import get_current_user
 from src.auth.jwt import create_access_token
 from src.auth.models import Role, User
@@ -27,15 +31,18 @@ router = APIRouter()
 
 
 @router.post("/login")
+@limiter.limit("10/minute")
 async def login(
-    request: LoginRequest,
+    request: Request,
+    body: LoginRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ):
     """
     Authenticate user and return JWT token with user info.
 
     Args:
-        request: Login credentials (username, password)
+        request: FastAPI request (for rate limiting)
+        body: Login credentials (username, password)
         session: Database session
 
     Returns:
@@ -45,7 +52,7 @@ async def login(
         HTTPException: 401 if credentials invalid
     """
     # Find user by username
-    stmt = select(User).where(User.username == request.username)
+    stmt = select(User).where(User.username == body.username)
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
 
@@ -57,7 +64,7 @@ async def login(
         )
 
     # Verify password
-    if not verify_password(request.password, user.hashed_password):
+    if not verify_password(body.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -72,8 +79,8 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Update last login
-    user.last_login = datetime.utcnow()
+    # Update last login (naive UTC for TIMESTAMP WITHOUT TIME ZONE column)
+    user.last_login = datetime.now(timezone.utc).replace(tzinfo=None)
     await session.commit()
 
     # Get role name for response
@@ -121,15 +128,18 @@ async def login(
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
+@limiter.limit("5/hour")
 async def register(
-    request: RegisterRequest,
+    request: Request,
+    body: RegisterRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ):
     """
     Register a new user.
 
     Args:
-        request: Registration data (username, email, password, role)
+        request: FastAPI request (for rate limiting)
+        body: Registration data (username, email, password, role)
         session: Database session
 
     Returns:
@@ -139,7 +149,7 @@ async def register(
         HTTPException: 400 if username/email already exists or role invalid
     """
     # Check if username already exists
-    stmt = select(User).where(User.username == request.username)
+    stmt = select(User).where(User.username == body.username)
     result = await session.execute(stmt)
     if result.scalar_one_or_none():
         raise HTTPException(
@@ -148,7 +158,7 @@ async def register(
         )
 
     # Check if email already exists
-    stmt = select(User).where(User.email == request.email)
+    stmt = select(User).where(User.email == body.email)
     result = await session.execute(stmt)
     if result.scalar_one_or_none():
         raise HTTPException(
@@ -158,18 +168,18 @@ async def register(
 
     # Get role
     rbac = RBACManager(session)
-    role = await rbac.get_role_by_name(request.role_name)
+    role = await rbac.get_role_by_name(body.role_name)
     if not role:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid role: {request.role_name}. Must be one of: VIEWER, TRADER, ADMIN",
+            detail=f"Invalid role: {body.role_name}. Must be one of: VIEWER, TRADER, ADMIN",
         )
 
     # Create user
-    hashed_pwd = hash_password(request.password)
+    hashed_pwd = hash_password(body.password)
     user = User(
-        username=request.username,
-        email=request.email,
+        username=body.username,
+        email=body.email,
         hashed_password=hashed_pwd,
         role_id=role.id,
         is_active=True,
@@ -179,7 +189,7 @@ async def register(
     await session.commit()
     await session.refresh(user)
 
-    logger.info(f"New user registered: {user.username} with role {request.role_name}")
+    logger.info(f"New user registered: {user.username} with role {body.role_name}")
 
     # Get role name for response
     return success_response(
@@ -217,6 +227,16 @@ async def get_current_user_profile(
     result = await session.execute(stmt)
     role = result.scalar_one_or_none()
 
+    # Get role permissions (same as login endpoint)
+    from src.auth.models import role_permissions, Permission
+    stmt_perms = (
+        select(Permission)
+        .join(role_permissions, role_permissions.c.permission_id == Permission.id)
+        .where(role_permissions.c.role_id == current_user.role_id)
+    )
+    result_perms = await session.execute(stmt_perms)
+    permissions = result_perms.scalars().all()
+
     return success_response(
         UserResponse(
             id=current_user.id,
@@ -227,6 +247,10 @@ async def get_current_user_profile(
             is_active=current_user.is_active,
             last_login=current_user.last_login,
             avatar_url=current_user.avatar_url,
+            permissions=[
+                PermissionResponse(id=p.id, resource=p.resource, action=p.action)
+                for p in permissions
+            ],
         ).model_dump()
     )
 

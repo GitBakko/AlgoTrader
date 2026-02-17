@@ -2,7 +2,7 @@
 Alert schemas and models.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -40,7 +40,7 @@ class Alert(BaseModel):
     severity: AlertSeverity
     title: str
     message: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     details: dict[str, Any] = Field(default_factory=dict)
     epic: str | None = None
     user_id: int | None = None

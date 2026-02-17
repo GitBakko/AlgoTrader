@@ -37,7 +37,13 @@ class PositionTracker:
     def get_paper_positions_sync(self) -> list[dict]:
         """Get paper positions synchronously (for status queries in paper mode) - thread-safe."""
         with self._lock:
-            return list(self._paper_positions.values())
+            positions = []
+            for p in self._paper_positions.values():
+                pos = dict(p)
+                pos.setdefault("risk_managed_locally", True)
+                self._apply_emergency_levels(pos)
+                positions.append(pos)
+            return positions
 
     async def sync_positions(self) -> list[dict]:
         """
@@ -53,7 +59,14 @@ class PositionTracker:
         # DEMO and LIVE must call broker to detect manual closes!
         if self._mode == ExecutionMode.PAPER:
             with self._lock:
-                return list(self._paper_positions.values())
+                positions = []
+                for p in self._paper_positions.values():
+                    pos = dict(p)
+                    # Paper mode: all risk is managed locally
+                    pos.setdefault("risk_managed_locally", True)
+                    self._apply_emergency_levels(pos)
+                    positions.append(pos)
+                return positions
 
         # DEMO and LIVE: broker is the source of truth
         if self._broker is None:
@@ -62,8 +75,9 @@ class PositionTracker:
                 return list(self._paper_positions.values())
 
         positions = await self._broker.list_positions()
-        return [
-            {
+        result = []
+        for p in positions:
+            pos_dict = {
                 "deal_id": p.deal_id,
                 "epic": p.epic,
                 "direction": p.direction.value,
@@ -72,8 +86,39 @@ class PositionTracker:
                 "stop_level": p.stop_level,
                 "profit_level": p.profit_level,
             }
-            for p in positions
-        ]
+
+            # CRITICAL: Merge local SL/TP data if broker doesn't have them.
+            # Capital.com returns DIFFERENT deal_ids for create vs list,
+            # so we match by EPIC (one position per asset in our system).
+            risk_local = False
+            with self._lock:
+                local = self._find_local_by_epic(p.epic)
+            if local:
+                if pos_dict["stop_level"] is None and local.get("stop_level"):
+                    pos_dict["stop_level"] = local["stop_level"]
+                    risk_local = True
+                    logger.debug(
+                        f"[{p.epic}] Merged local SL={local['stop_level']} "
+                        f"(broker has no SL set)"
+                    )
+                if pos_dict["profit_level"] is None and local.get("profit_level"):
+                    pos_dict["profit_level"] = local["profit_level"]
+                    risk_local = True
+
+            # Apply emergency SL/TP if still missing after merge
+            had_sl = pos_dict["stop_level"] is not None
+            had_tp = pos_dict["profit_level"] is not None
+            self._apply_emergency_levels(pos_dict)
+            if not had_sl and pos_dict["stop_level"] is not None:
+                risk_local = True
+            if not had_tp and pos_dict["profit_level"] is not None:
+                risk_local = True
+
+            # Flag: broker has no SL/TP, risk is managed locally
+            pos_dict["risk_managed_locally"] = risk_local
+
+            result.append(pos_dict)
+        return result
 
     async def get_open_positions(self, epic: str | None = None) -> list[dict]:
         """
@@ -108,6 +153,75 @@ class PositionTracker:
         for p in positions:
             if p.get("deal_id") == deal_id:
                 return p
+        return None
+
+    def update_stops(
+        self, deal_id: str, stop_level: float | None = None, profit_level: float | None = None
+    ) -> None:
+        """
+        Update SL/TP on a local position (thread-safe).
+        Used when broker rejects SL/TP and we need to store adjusted levels locally.
+        """
+        with self._lock:
+            position = self._paper_positions.get(deal_id)
+            if position is None:
+                # Try matching by epic (Capital.com deal_id mismatch)
+                for pos in self._paper_positions.values():
+                    if pos.get("deal_id") == deal_id:
+                        position = pos
+                        break
+            if position is None:
+                return
+            if stop_level is not None:
+                position["stop_level"] = stop_level
+            if profit_level is not None:
+                position["profit_level"] = profit_level
+            logger.debug(
+                f"Local stops updated for {deal_id}: "
+                f"SL={stop_level}, TP={profit_level}"
+            )
+
+    @staticmethod
+    def _apply_emergency_levels(pos_dict: dict) -> None:
+        """
+        Compute emergency SL/TP for positions missing them.
+        Emergency SL: 3% from entry. Emergency TP: R:R 2.0 from SL distance.
+        Mutates pos_dict in place.
+        """
+        entry = pos_dict.get("level")
+        direction = pos_dict.get("direction")
+        if not entry or entry <= 0 or not direction:
+            return
+
+        # Emergency SL: 3% from entry
+        if pos_dict.get("stop_level") is None:
+            if direction == "BUY":
+                pos_dict["stop_level"] = round(entry * 0.97, 6)
+            else:
+                pos_dict["stop_level"] = round(entry * 1.03, 6)
+            logger.warning(
+                f"[{pos_dict.get('epic')}] EMERGENCY SL at 3%: "
+                f"SL={pos_dict['stop_level']}"
+            )
+
+        # Emergency TP: R:R 2.0 from SL distance
+        if pos_dict.get("profit_level") is None and pos_dict.get("stop_level") is not None:
+            sl_distance = abs(entry - pos_dict["stop_level"])
+            rr_ratio = 2.0
+            if direction == "BUY":
+                pos_dict["profit_level"] = round(entry + sl_distance * rr_ratio, 6)
+            else:
+                pos_dict["profit_level"] = round(entry - sl_distance * rr_ratio, 6)
+            logger.warning(
+                f"[{pos_dict.get('epic')}] EMERGENCY TP at R:R {rr_ratio}: "
+                f"TP={pos_dict['profit_level']}"
+            )
+
+    def _find_local_by_epic(self, epic: str) -> dict | None:
+        """Find local position by epic (must be called within self._lock)."""
+        for pos in self._paper_positions.values():
+            if pos.get("epic") == epic:
+                return pos
         return None
 
     def open_paper_position(

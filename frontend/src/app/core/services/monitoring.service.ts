@@ -128,7 +128,7 @@ export interface PerformanceResponse {
 })
 export class MonitoringService {
   private http = inject(HttpClient);
-  private baseUrl = `${environment.apiUrl}/monitoring`;
+  private baseUrl = `${environment.apiUrl}/api/monitoring`;
 
   // Reactive state
   signalLogs = signal<SignalLogsResponse | null>(null);

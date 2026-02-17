@@ -4,7 +4,7 @@ Trade Logger - Structured logging for signals, executions, and risk decisions.
 Logs all trading activity to PostgreSQL for analysis without stopping the backend.
 Gracefully degrades to file logging if PostgreSQL unavailable.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 from pathlib import Path
@@ -48,7 +48,7 @@ class RiskEventType(str, Enum):
 
 class SignalLog(BaseModel):
     """Signal generation log entry."""
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     epic: str
     direction: SignalType
     confidence: float = Field(ge=0.0, le=1.0)
@@ -91,7 +91,7 @@ class SignalLog(BaseModel):
 
 class ExecutionLog(BaseModel):
     """Trade execution log entry."""
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     deal_id: str | None = None
     epic: str
     direction: str  # "BUY" or "SELL"
@@ -138,7 +138,7 @@ class ExecutionLog(BaseModel):
 
 class RiskEventLog(BaseModel):
     """Risk management decision log."""
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     event_type: RiskEventType
     epic: str | None = None
     description: str

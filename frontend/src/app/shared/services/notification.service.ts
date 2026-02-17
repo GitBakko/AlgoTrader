@@ -1,6 +1,7 @@
 import { Injectable, inject, effect, signal, Injector } from '@angular/core';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { TradingService } from '../../core/services/trading.service';
+import { ToastService } from './toast.service';
 
 /**
  * Browser notification service for trade events and circuit breakers.
@@ -10,6 +11,7 @@ import { TradingService } from '../../core/services/trading.service';
 export class NotificationService {
   private readonly ws = inject(WebSocketService);
   private readonly trading = inject(TradingService);
+  private readonly toast = inject(ToastService);
   private readonly injector = inject(Injector);
 
   readonly enabled = signal(
@@ -38,11 +40,20 @@ export class NotificationService {
       const action = trade.event === 'OPEN' ? 'Aperto' : 'Chiuso';
       const pnl = trade.event === 'CLOSE' ? ` | P&L: $${trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)}` : '';
 
-      this.send(
-        `${emoji} ${action}: ${trade.epic} ${trade.direction}`,
-        `Deal: ${trade.deal_id}${pnl}`,
-        trade.event === 'CLOSE' && !isGain ? 'loss' : 'trade',
-      );
+      const title = `${emoji} ${action}: ${trade.epic} ${trade.direction}`;
+      const body = `Deal: ${trade.deal_id}${pnl}`;
+
+      // In-app toast notification
+      if (trade.event === 'OPEN') {
+        this.toast.info(`${action}: ${trade.epic} ${trade.direction}`, 5000);
+      } else if (isGain) {
+        this.toast.success(`${action}: ${trade.epic} ${trade.direction}${pnl}`, 6000);
+      } else {
+        this.toast.error(`${action}: ${trade.epic} ${trade.direction}${pnl}`, 6000);
+      }
+
+      // Browser notification + sound
+      this.send(title, body, trade.event === 'CLOSE' && !isGain ? 'loss' : 'trade');
     }, { injector: this.injector });
 
     // Watch for circuit breaker activation
@@ -55,6 +66,7 @@ export class NotificationService {
 
       const reasons = Array.isArray(tripped) ? tripped : Object.keys(tripped);
       if (reasons.length > 0) {
+        this.toast.warning(`Circuit Breaker: ${reasons.join(', ')}`, 8000);
         this.send(
           '\u{1F6A8} Circuit Breaker Attivato',
           `Motivi: ${reasons.join(', ')}`,
@@ -89,7 +101,7 @@ export class NotificationService {
     new Notification(title, {
       body,
       tag,
-      icon: '/assets/mantis-icon.png',
+      icon: '/assets/favicon.svg',
       silent: true, // we handle sound ourselves
     });
   }
