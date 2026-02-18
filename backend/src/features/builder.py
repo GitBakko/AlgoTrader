@@ -2,6 +2,10 @@
 Feature builder orchestrator.
 Coordinates the full feature engineering pipeline:
 OHLC data -> technical indicators -> normalization -> regime detection -> FeatureMatrix
+
+Sentiment data flow (Step 8):
+- Async fetch: call `fetch_sentiment_data(epic, ...)` from an async context
+- Sync apply: pass the result dict to `build_features(sentiment_data=...)` or `_apply_sentiment_features()`
 """
 
 from datetime import datetime
@@ -10,8 +14,6 @@ import polars as pl
 from loguru import logger
 
 from src.data.data_access import DataAccessLayer
-from src.external.finnhub_client import FinnhubClient
-from src.external.marketaux_client import MarketauxClient
 from src.features.alignment import TimeframeAligner
 from src.features.asset_config import DEFAULT_TECHNICAL_PARAMS, get_asset_config
 from src.features.keltner import KeltnerChannel
@@ -22,6 +24,93 @@ from src.features.normalizer import FeatureNormalizer
 from src.features.regime import RegimeDetector
 from src.features.schemas import AssetFeatureConfig, FeatureMatrix
 from src.features.technical import TechnicalIndicators
+
+
+async def fetch_sentiment_data(
+    epic: str,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> dict:
+    """
+    Async-safe function to fetch sentiment data from external APIs.
+
+    Call this from async contexts (FastAPI, paper_loop, etc.), then pass
+    the result to build_features(sentiment_data=...).
+
+    Tier 1 (NVDA, TSLA): fetches insider, analyst, price_target, earnings, news
+    Tier 2 (all others): fetches news only
+
+    Returns:
+        Dict with keys: insider, analyst, price_target, earnings, news
+        (None/empty for unavailable data)
+    """
+    import asyncio
+    from datetime import timedelta
+
+    from src.external.finnhub_client import FinnhubClient
+    from src.external.marketaux_client import MarketauxClient
+    from src.external.ticker_mapping import get_news_query, supports_equity_features
+
+    result: dict = {
+        "insider": None,
+        "analyst": None,
+        "price_target": None,
+        "earnings": [],
+        "news": [],
+    }
+
+    now = datetime.now()
+    _end = end_date or now
+    _start = start_date or (now - timedelta(days=180))
+
+    try:
+        news_query = get_news_query(epic)
+
+        if supports_equity_features(epic):
+            # Tier 1: stocks (NVDA, TSLA) — all 5 features
+            finnhub = FinnhubClient()
+            marketaux = MarketauxClient()
+
+            insider_start = _start - timedelta(days=180)
+
+            insider, analyst, price_target, earnings, news = await asyncio.gather(
+                finnhub.get_insider_sentiment(epic, insider_start, _end),
+                finnhub.get_analyst_recommendations(epic),
+                finnhub.get_price_target(epic),
+                finnhub.get_earnings_calendar(
+                    epic, _end, _end + timedelta(days=30)
+                ),
+                marketaux.get_news_sentiment(
+                    news_query or epic, limit=100, days=30
+                ),
+                return_exceptions=True,
+            )
+
+            result["insider"] = insider if not isinstance(insider, Exception) else None
+            result["analyst"] = analyst if not isinstance(analyst, Exception) else None
+            result["price_target"] = price_target if not isinstance(price_target, Exception) else None
+            result["earnings"] = earnings if isinstance(earnings, list) else []
+            result["news"] = news if isinstance(news, list) else []
+
+            await finnhub.close()
+            await marketaux.close()
+
+        elif news_query:
+            # Tier 2: non-equity assets — news sentiment only
+            marketaux = MarketauxClient()
+            try:
+                news = await marketaux.get_news_sentiment(
+                    news_query, limit=50, days=30
+                )
+                result["news"] = news if isinstance(news, list) else []
+            except Exception:
+                pass
+            await marketaux.close()
+
+    except Exception as e:
+        logger.warning(f"Sentiment data fetch failed for {epic}: {e}")
+
+    return result
 
 
 class FeatureBuilder:
@@ -61,6 +150,9 @@ class FeatureBuilder:
         normalize: bool = True,
         multi_timeframe: bool = False,
         include_sentiment: bool = False,
+        sentiment_data: dict | None = None,
+        include_macro: bool = False,
+        macro_df: pl.DataFrame | None = None,
     ) -> tuple[pl.DataFrame, FeatureMatrix]:
         """
         Build complete feature matrix for an asset.
@@ -74,7 +166,12 @@ class FeatureBuilder:
             include_regime: Include regime detection
             normalize: Apply feature normalization
             multi_timeframe: Include higher-timeframe features
-            include_sentiment: Include sentiment features (NVDA/TSLA only)
+            include_sentiment: Include sentiment features
+            sentiment_data: Pre-fetched sentiment data from fetch_sentiment_data().
+                If include_sentiment=True and this is None, placeholder columns are added.
+            include_macro: Include macro features (VIX, DXY, 10Y yield)
+            macro_df: Pre-fetched macro DataFrame from MacroDataClient.get_macro_data().
+                If include_macro=True and this is None, fetches automatically.
 
         Returns:
             Tuple of (DataFrame with all features, FeatureMatrix metadata)
@@ -109,25 +206,27 @@ class FeatureBuilder:
         # Step 2: Compute technical indicators
         df = self._add_technical_indicators(df, params)
 
-        # Step 3: Sentiment features (async, NVDA/TSLA only)
+        # Step 3: Sentiment features (sync, uses pre-fetched data)
         if include_sentiment:
-            import asyncio
+            df = self._apply_sentiment_features(df, epic, sentiment_data)
 
-            df = asyncio.run(self._add_sentiment_features(df, epic))
+        # Step 4: Macro features (VIX, DXY, 10Y yield)
+        if include_macro:
+            df = self._add_macro_features(df, macro_df)
 
-        # Step 4: Multi-timeframe alignment (optional)
+        # Step 6: Multi-timeframe alignment (optional)
         if multi_timeframe and config.additional_timeframes:
             df = self._add_multi_timeframe_features(
                 df, epic, config.additional_timeframes, params, start_date, end_date
             )
 
-        # Step 5: Regime detection
+        # Step 7: Regime detection
         if include_regime:
             detector = RegimeDetector()
             if "adx" in df.columns and f"ema_{detector.ema_period}" in df.columns:
                 df = detector.detect(df)
 
-        # Step 6: Normalize features
+        # Step 8: Normalize features
         feature_cols = [c for c in df.columns if c not in initial_cols and c != "regime"]
 
         if normalize and feature_cols:
@@ -349,97 +448,160 @@ class FeatureBuilder:
 
         return base_df
 
-    async def _add_sentiment_features(
-        self, df: pl.DataFrame, epic: str
+    def _apply_sentiment_features(
+        self,
+        df: pl.DataFrame,
+        epic: str,
+        sentiment_data: dict | None = None,
     ) -> pl.DataFrame:
         """
-        Add sentiment features from external APIs (NVDA/TSLA only).
+        Apply sentiment features to DataFrame (sync, no I/O).
 
-        Fetches data from Finnhub (insider, analyst, earnings) and Marketaux (news)
-        and adds 5 sentiment features:
-        - insider_mspr
-        - analyst_consensus
-        - price_target_upside
-        - earnings_flag
-        - news_sentiment_avg
-
-        For non-equity assets, adds placeholder columns with default values.
+        Tier 1 (NVDA, TSLA): all 5 features from pre-fetched data
+        Tier 2 (all others): news_sentiment_avg only, 4 placeholders
 
         Args:
             df: DataFrame with OHLC data
-            epic: Asset ticker
+            epic: Asset epic
+            sentiment_data: Pre-fetched dict from fetch_sentiment_data().
+                If None, adds placeholder columns for all 5 features.
 
         Returns:
-            DataFrame with sentiment features added
+            DataFrame with 5 sentiment feature columns
         """
-        if epic not in ["NVDA", "TSLA"]:
-            # Non-equity assets: add placeholder columns
-            return df.with_columns(
-                [
+        from src.external.ticker_mapping import supports_equity_features
+
+        if sentiment_data is None:
+            # No data fetched: add 5 placeholder columns
+            return df.with_columns([
+                pl.lit(None).alias("insider_mspr").cast(pl.Float64),
+                pl.lit(0).alias("analyst_consensus"),
+                pl.lit(0.0).alias("price_target_upside"),
+                pl.lit(0).alias("earnings_flag"),
+                pl.lit(0.0).alias("news_sentiment_avg"),
+            ])
+
+        try:
+            news = sentiment_data.get("news", [])
+
+            if supports_equity_features(epic):
+                # Tier 1: stocks → all 5 features
+                insider = sentiment_data.get("insider")
+                analyst = sentiment_data.get("analyst")
+                price_target = sentiment_data.get("price_target")
+                earnings = sentiment_data.get("earnings", [])
+
+                df = SentimentFeatures.add_insider_mspr(
+                    df, [insider] if insider else []
+                )
+                df = SentimentFeatures.add_analyst_consensus(df, analyst)
+                df = SentimentFeatures.add_price_target_upside(df, price_target)
+                df = SentimentFeatures.add_earnings_flag(df, earnings)
+                df = SentimentFeatures.add_news_sentiment(df, news, window_days=7)
+                logger.info(f"Added 5 sentiment features for {epic} (Tier 1)")
+            else:
+                # Tier 2: non-equity → news_sentiment_avg only, 4 placeholders
+                df = df.with_columns([
                     pl.lit(None).alias("insider_mspr").cast(pl.Float64),
                     pl.lit(0).alias("analyst_consensus"),
                     pl.lit(0.0).alias("price_target_upside"),
                     pl.lit(0).alias("earnings_flag"),
-                    pl.lit(0.0).alias("news_sentiment_avg"),
-                ]
-            )
+                ])
+                df = SentimentFeatures.add_news_sentiment(df, news, window_days=7)
+                logger.info(f"Added news sentiment for {epic} (Tier 2)")
 
-        try:
-            # Initialize API clients
-            finnhub = FinnhubClient()
-            marketaux = MarketauxClient()
-
-            # Determine date range from DataFrame
-            start_date = df["timestamp"].min()
-            end_date = df["timestamp"].max()
-
-            # Fetch data in parallel (with 180-day lookback for insider data)
-            import asyncio
-            from datetime import timedelta
-
-            insider_start = start_date - timedelta(days=180)
-
-            insider, analyst, price_target, earnings, news = await asyncio.gather(
-                finnhub.get_insider_sentiment(epic, insider_start, end_date),
-                finnhub.get_analyst_recommendations(epic),
-                finnhub.get_price_target(epic),
-                finnhub.get_earnings_calendar(
-                    epic, end_date, end_date + timedelta(days=30)
-                ),
-                marketaux.get_news_sentiment(epic, limit=100, days=30),
-                return_exceptions=True,
-            )
-
-            # Handle exceptions from parallel fetches
-            insider = insider if not isinstance(insider, Exception) else None
-            analyst = analyst if not isinstance(analyst, Exception) else None
-            price_target = price_target if not isinstance(price_target, Exception) else None
-            earnings = earnings if isinstance(earnings, list) else []
-            news = news if isinstance(news, list) else []
-
-            # Apply features using SentimentFeatures static methods
-            df = SentimentFeatures.add_insider_mspr(df, [insider] if insider else [])
-            df = SentimentFeatures.add_analyst_consensus(df, analyst)
-            df = SentimentFeatures.add_price_target_upside(df, price_target)
-            df = SentimentFeatures.add_earnings_flag(df, earnings)
-            df = SentimentFeatures.add_news_sentiment(df, news, window_days=7)
-
-            # Cleanup clients
-            await finnhub.close()
-            await marketaux.close()
-
-            logger.info(f"Added 5 sentiment features for {epic}")
             return df
 
         except Exception as e:
-            logger.warning(f"Sentiment features failed for {epic}: {e}, using defaults")
-            # Graceful fallback: return df with placeholder columns
+            logger.warning(f"Sentiment feature apply failed for {epic}: {e}")
+            return df.with_columns([
+                pl.lit(None).alias("insider_mspr").cast(pl.Float64),
+                pl.lit(0).alias("analyst_consensus"),
+                pl.lit(0.0).alias("price_target_upside"),
+                pl.lit(0).alias("earnings_flag"),
+                pl.lit(0.0).alias("news_sentiment_avg"),
+            ])
+
+    _MACRO_FEATURE_COLS = [
+        "vix_close", "vix_change_5d",
+        "dxy_close", "dxy_change_5d",
+        "yield_10y_close", "yield_10y_change_5d",
+    ]
+
+    def _add_macro_features(
+        self,
+        df: pl.DataFrame,
+        macro_df: pl.DataFrame | None = None,
+    ) -> pl.DataFrame:
+        """
+        Add macro features (VIX, DXY, 10Y yield) via asof join.
+
+        Daily macro data is aligned to hourly bars using backward strategy:
+        each bar gets the most recent macro observation <= its date.
+
+        Args:
+            df: OHLCV DataFrame with "timestamp" column
+            macro_df: Pre-fetched macro data. If None, fetches automatically.
+
+        Returns:
+            DataFrame with 6 additional macro feature columns.
+        """
+        if macro_df is None:
+            try:
+                from src.external.macro_client import MacroDataClient
+                client = MacroDataClient()
+                macro_df = client.get_macro_data()
+            except Exception as e:
+                logger.warning(f"Macro data fetch failed: {e}")
+
+        if macro_df is None or macro_df.is_empty():
+            logger.info("No macro data available, adding placeholder columns")
             return df.with_columns(
-                [
-                    pl.lit(None).alias("insider_mspr").cast(pl.Float64),
-                    pl.lit(0).alias("analyst_consensus"),
-                    pl.lit(0.0).alias("price_target_upside"),
-                    pl.lit(0).alias("earnings_flag"),
-                    pl.lit(0.0).alias("news_sentiment_avg"),
-                ]
+                [pl.lit(0.0).alias(c) for c in self._MACRO_FEATURE_COLS]
+            )
+
+        try:
+            # Extract date from timestamp for the asof join
+            df = df.with_columns(
+                pl.col("timestamp").cast(pl.Date).alias("_macro_date")
+            )
+
+            # Ensure macro_df is sorted by date
+            macro_df = macro_df.sort("date")
+
+            # Keep only the columns we need from macro_df
+            macro_cols = ["date"] + [
+                c for c in self._MACRO_FEATURE_COLS if c in macro_df.columns
+            ]
+            macro_subset = macro_df.select(macro_cols)
+
+            # Asof join: each bar gets the most recent macro row <= its date
+            df = df.join_asof(
+                macro_subset,
+                left_on="_macro_date",
+                right_on="date",
+                strategy="backward",
+            )
+
+            # Drop temporary join columns
+            drop_cols = ["_macro_date"]
+            if "date" in df.columns:
+                drop_cols.append("date")
+            df = df.drop(drop_cols)
+
+            # Fill any missing macro columns with 0.0
+            for col in self._MACRO_FEATURE_COLS:
+                if col not in df.columns:
+                    df = df.with_columns(pl.lit(0.0).alias(col))
+                else:
+                    df = df.with_columns(pl.col(col).fill_null(0.0).fill_nan(0.0))
+
+            n_macro = sum(1 for c in self._MACRO_FEATURE_COLS if c in df.columns)
+            logger.info(f"Added {n_macro} macro features via asof join")
+            return df
+
+        except Exception as e:
+            logger.warning(f"Macro feature join failed: {e}")
+            return df.with_columns(
+                [pl.lit(0.0).alias(c) for c in self._MACRO_FEATURE_COLS]
             )

@@ -12,6 +12,8 @@ from typing import Any
 import polars as pl
 from loguru import logger
 
+from sqlalchemy import text as sa_text
+
 from ..database.session import DatabaseManager
 
 
@@ -374,7 +376,7 @@ class LogAnalyzer:
                 WHERE timestamp >= :start_date AND timestamp <= :end_date
                 ORDER BY timestamp DESC
             """
-            result = await session.execute(query, {"start_date": start_date, "end_date": end_date})
+            result = await session.execute(sa_text(query), {"start_date": start_date, "end_date": end_date})
             rows = result.fetchall()
 
             if not rows:
@@ -392,7 +394,7 @@ class LogAnalyzer:
                 AND status = 'executed'
                 ORDER BY timestamp DESC
             """
-            result = await session.execute(query, {"start_date": start_date, "end_date": end_date})
+            result = await session.execute(sa_text(query), {"start_date": start_date, "end_date": end_date})
             rows = result.fetchall()
 
             if not rows:
@@ -408,7 +410,7 @@ class LogAnalyzer:
                 WHERE timestamp >= :start_date AND timestamp <= :end_date
                 ORDER BY timestamp DESC
             """
-            result = await session.execute(query, {"start_date": start_date, "end_date": end_date})
+            result = await session.execute(sa_text(query), {"start_date": start_date, "end_date": end_date})
             rows = result.fetchall()
 
             if not rows:
@@ -423,10 +425,14 @@ class LogAnalyzer:
     def _read_signals_file(self, start_date: datetime, end_date: datetime) -> pl.DataFrame:
         """Read signals from JSONL file."""
         file_path = self.log_dir / "signals.jsonl"
-        if not file_path.exists():
+        if not file_path.exists() or file_path.stat().st_size == 0:
             return pl.DataFrame()
 
-        df = pl.read_ndjson(file_path)
+        try:
+            df = pl.read_ndjson(file_path)
+        except Exception as e:
+            logger.warning(f"Failed to read signals file: {e}")
+            return pl.DataFrame()
         df = df.with_columns(
             pl.col("timestamp").str.replace("Z$", "")
             .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S%.f")
@@ -504,10 +510,14 @@ class LogAnalyzer:
     def _read_risk_events_file(self, start_date: datetime, end_date: datetime) -> pl.DataFrame:
         """Read risk events from JSONL file."""
         file_path = self.log_dir / "risk_events.jsonl"
-        if not file_path.exists():
+        if not file_path.exists() or file_path.stat().st_size == 0:
             return pl.DataFrame()
 
-        df = pl.read_ndjson(file_path)
+        try:
+            df = pl.read_ndjson(file_path)
+        except Exception as e:
+            logger.warning(f"Failed to read risk events file: {e}")
+            return pl.DataFrame()
         df = df.with_columns(
             pl.col("timestamp").str.replace("Z$", "")
             .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S%.f")

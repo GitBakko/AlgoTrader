@@ -7,6 +7,7 @@ import {
   User,
   LoginRequest,
   LoginResponse,
+  RefreshResponse,
   RegisterRequest,
   RegisterResponse,
   AuthState
@@ -25,6 +26,7 @@ export class AuthService {
   private readonly baseUrl = environment.apiUrl;
   private readonly TOKEN_KEY = 'mantis_auth_token';
   private readonly USER_KEY = 'mantis_current_user';
+  private readonly REFRESH_TOKEN_KEY = 'mantis_refresh_token';
 
   // Reactive state with Angular Signals
   private readonly authState = signal<AuthState>({
@@ -73,6 +75,9 @@ export class AuthService {
           currentUser: user,
           token
         });
+        // Refresh profile in background to get latest avatar_url
+        // Deferred to avoid circular dependency: AuthService constructor → HTTP → authInterceptor → inject(AuthService)
+        queueMicrotask(() => this.getCurrentUser().subscribe());
       } catch (error) {
         console.error('[AuthService] Failed to parse stored user data', error);
         this.clearAuth();
@@ -95,6 +100,9 @@ export class AuthService {
             currentUser: data.user,
             token: data.access_token
           });
+          if (data.refresh_token) {
+            localStorage.setItem(this.REFRESH_TOKEN_KEY, data.refresh_token);
+          }
         }),
         catchError(error => {
           console.error('[AuthService] Login failed', error);
@@ -123,14 +131,19 @@ export class AuthService {
    * Logout and clear authentication state
    */
   logout(): void {
-    this.clearAuth();
-    this.router.navigate(['/login']);
+    // Best-effort backend logout (revoke refresh tokens), don't block on failure
+    this.http.post(`${this.baseUrl}/api/auth/logout`, {}).pipe(
+      catchError(() => of(null))
+    ).subscribe(() => {
+      this.clearAuth();
+      this.router.navigate(['/login']);
+    });
   }
 
   /**
    * Clear all authentication data
    */
-  private clearAuth(): void {
+  clearAuth(): void {
     this.authState.set({
       isAuthenticated: false,
       currentUser: null,
@@ -138,6 +151,7 @@ export class AuthService {
     });
     localStorage.removeItem(this.TOKEN_KEY);
     localStorage.removeItem(this.USER_KEY);
+    localStorage.removeItem(this.REFRESH_TOKEN_KEY);
   }
 
   /**
@@ -169,6 +183,43 @@ export class AuthService {
    */
   getToken(): string | null {
     return this.token();
+  }
+
+  /**
+   * Get stored refresh token
+   */
+  getRefreshToken(): string | null {
+    return localStorage.getItem(this.REFRESH_TOKEN_KEY);
+  }
+
+  /**
+   * Refresh access token using the stored refresh token.
+   * Updates auth state with new tokens on success.
+   */
+  refreshAccessToken(): Observable<ApiResponse<RefreshResponse>> {
+    const refreshToken = this.getRefreshToken();
+    if (!refreshToken) {
+      return throwError(() => new Error('No refresh token available'));
+    }
+
+    return this.http.post<ApiResponse<RefreshResponse>>(
+      `${this.baseUrl}/api/auth/refresh`,
+      { refresh_token: refreshToken }
+    ).pipe(
+      tap(response => {
+        const data = response.data;
+        this.authState.update(state => ({
+          ...state,
+          token: data.access_token,
+          isAuthenticated: true
+        }));
+        localStorage.setItem(this.REFRESH_TOKEN_KEY, data.refresh_token);
+      }),
+      catchError(error => {
+        console.error('[AuthService] Token refresh failed', error);
+        return throwError(() => error);
+      })
+    );
   }
 
   /**

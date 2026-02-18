@@ -1004,8 +1004,8 @@ class TestRiskStateRestore:
 
             await service._restore_risk_state()
 
-        # Verify DrawdownMonitor state was restored
-        dm_state = mock_risk_manager_with_state.drawdown_monitor.state
+        # Verify DrawdownMonitor state was restored (accesses _state directly)
+        dm_state = mock_risk_manager_with_state.drawdown_monitor._state
         assert dm_state.peak_equity == float(sample_risk_snapshot["peak_equity"])
         assert dm_state.current_equity == float(sample_risk_snapshot["current_equity"])
 
@@ -1035,10 +1035,10 @@ class TestRiskStateRestore:
 
             await service._restore_risk_state()
 
-        # Verify CircuitBreakers state was restored
+        # Verify CircuitBreakers state was restored (accesses _consecutive_losses, _tripped)
         cb = mock_risk_manager_with_state.circuit_breakers
-        assert cb.consecutive_losses == sample_risk_snapshot["consecutive_losses"]
-        assert len(cb.tripped_breakers) == 1  # US500
+        assert cb._consecutive_losses == sample_risk_snapshot["consecutive_losses"]
+        assert len(cb._tripped) == 1  # daily_loss breaker
 
     @pytest.mark.asyncio
     async def test_restore_risk_state_restores_equity_curve(self, sample_risk_snapshot, mock_risk_manager_with_state, async_db_session_factory):
@@ -1064,9 +1064,9 @@ class TestRiskStateRestore:
 
             await service._restore_risk_state()
 
-        # Verify EquityCurveFilter state was restored
+        # Verify EquityCurveFilter state was restored (accesses _equity_points deque)
         ec = mock_risk_manager_with_state.equity_curve_filter
-        assert len(ec.equity_curve) == 4  # 4 equity points
+        assert len(ec._equity_points) == 4  # 4 equity points
 
     @pytest.mark.asyncio
     async def test_restore_risk_state_handles_missing_snapshot(self):

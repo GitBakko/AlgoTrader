@@ -3,10 +3,11 @@ Authentication database models.
 User, Role, and Permission tables for RBAC.
 """
 
+import secrets
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import BigInteger, Column, ForeignKey, Table, text
+from sqlalchemy import BigInteger, Column, ForeignKey, Index, Table, text
 from sqlmodel import Field, Relationship, SQLModel
 
 from src.database.models import metadata
@@ -96,3 +97,30 @@ class User(SQLModel, table=True):
     )
     avatar_url: Optional[str] = Field(default=None, max_length=500)
     avatar_storage_path: Optional[str] = Field(default=None, max_length=500)
+
+
+class RefreshToken(SQLModel, table=True):
+    """Refresh tokens for persistent sessions (token rotation)."""
+
+    __tablename__ = "refresh_tokens"
+    __table_args__ = (
+        Index("ix_refresh_tokens_token", "token", unique=True),
+        Index("ix_refresh_tokens_user_id", "user_id"),
+    )
+
+    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    token: str = Field(
+        max_length=128,
+        nullable=False,
+        default_factory=lambda: secrets.token_urlsafe(64),
+    )
+    user_id: int = Field(
+        sa_column=Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    )
+    expires_at: datetime = Field(nullable=False)
+    is_revoked: bool = Field(default=False, nullable=False)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        nullable=False,
+        sa_column_kwargs={"server_default": text("NOW()")},
+    )

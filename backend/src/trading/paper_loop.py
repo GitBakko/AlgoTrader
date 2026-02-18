@@ -26,6 +26,7 @@ from src.risk.risk_manager import RiskManager
 from src.risk.trailing_stop_manager import TrailingPhase, TrailingStopConfig, TrailingStopManager
 from src.monitoring.trade_logger import get_trade_logger, SignalType, ExecutionStatus, RiskEventType
 from src.strategy.strategy_manager import StrategyManager
+from src.utils.constants import TRADABLE_ASSETS
 
 # How often to check for new candles (seconds)
 CHECK_INTERVAL = 300  # 5 minutes
@@ -68,15 +69,7 @@ class PaperTradingLoop:
         self.data_access = data_access
         self.broker = broker
         self.interval_seconds = interval_seconds
-        self.epics = epics or [
-            # Original 8 assets
-            "XAUUSD", "BTCUSD", "US500", "WTIUSD",
-            "NVDA", "TSLA", "XAGUSD", "DE40",
-            # Phase 12: New 11 assets (EURUSD excluded, NAS100 excluded - insufficient data)
-            "SOLUSD", "ETHUSD", "BNBUSD", "DOGUSD", "DASHUSD", "ICPUSD",
-            "NATGAS", "COPPER", "PLATINUM",
-            "GBPUSD", "USDJPY",
-        ]
+        self.epics = epics or list(TRADABLE_ASSETS)
 
         # Phase 8/14: trailing stop manager (use recovered one or create new)
         self.trailing_stop_manager = trailing_stop_manager or TrailingStopManager(trailing_stop_config)
@@ -106,6 +99,8 @@ class PaperTradingLoop:
         self._market_info_cache: dict[str, dict] = {}
         self._market_cache_ttl = 3600  # 1 hour
         self._market_cache_ts: dict[str, float] = {}
+        # Regime distribution tracking per epic (Step 7: regime detection)
+        self._regime_counts: dict[str, dict[str, int]] = {}
 
     @property
     def is_running(self) -> bool:
@@ -167,20 +162,17 @@ class PaperTradingLoop:
                 cb_state = self.risk_manager.circuit_breakers
                 ec_state = self.risk_manager.equity_curve_filter
 
-                # Tripped breakers: {epic: datetime} → {epic: iso_string}
-                tripped_breakers_serialized = {
-                    epic: ts.isoformat() if hasattr(ts, "isoformat") else str(ts)
-                    for epic, ts in cb_state.tripped_breakers.items()
-                }
+                # Tripped breakers: {breaker_type: reason_string}
+                tripped_breakers_serialized = dict(cb_state.tripped_breakers)
 
                 # Equity curve: keep last 50 points
-                equity_curve_points = list(ec_state.equity_curve)[-50:]
+                equity_curve_points = list(ec_state._equity_points)[-50:]
 
                 await repo.create_snapshot(
                     peak_equity=Decimal(str(dm_state.peak_equity)),
                     daily_start_equity=Decimal(str(dm_state.daily_start_equity)),
                     current_equity=Decimal(str(dm_state.current_equity)),
-                    consecutive_losses=cb_state.consecutive_losses,
+                    consecutive_losses=cb_state._consecutive_losses,
                     tripped_breakers=tripped_breakers_serialized,
                     equity_curve_points=equity_curve_points,
                 )
@@ -234,6 +226,10 @@ class PaperTradingLoop:
         if self._running:
             logger.warning("Paper trading loop is already running")
             return
+
+        # Reset heartbeat so the 30s timeout doesn't trip on first iteration
+        # (CircuitBreakerManager may have been created minutes/hours ago at startup)
+        self.risk_manager.circuit_breakers.heartbeat()
 
         self._running = True
         self._task = asyncio.create_task(self._run_loop(), name="paper_trading_loop")
@@ -429,6 +425,9 @@ class PaperTradingLoop:
 
         for epic in epics_to_process:
             try:
+                # Refresh heartbeat per-epic so the 30s timeout measures
+                # "loop alive" not "total iteration duration" (21 epics can exceed 30s)
+                self.risk_manager.circuit_breakers.heartbeat()
                 await self._process_epic(epic, current_positions)
             except Exception as e:
                 self._error_count += 1
@@ -489,6 +488,19 @@ class PaperTradingLoop:
             logger.warning(f"[{epic}] No market data available")
             return
 
+        # Log market state with regime info (Step 7: regime detection)
+        regime = market_data.get("regime", "unknown")
+        adx = market_data.get("adx", 0)
+        rsi = market_data.get("rsi", 0)
+        logger.info(
+            f"[{epic}] Market state: regime={regime}, ADX={adx:.1f}, RSI={rsi:.1f}"
+        )
+
+        # Track regime distribution
+        if epic not in self._regime_counts:
+            self._regime_counts[epic] = {}
+        self._regime_counts[epic][regime] = self._regime_counts[epic].get(regime, 0) + 1
+
         # Step 3: Strategy -> TradingSignal
         signal = self.strategy_manager.process_prediction(prediction, epic, market_data)
         self._signal_count += 1
@@ -522,6 +534,7 @@ class PaperTradingLoop:
                     epic=epic, direction=_signal_type, confidence=signal.confidence,
                     strategy=signal.strategy_name or "unknown",
                     execution_status=ExecutionStatus.HOLD,
+                    source="paper_trading",
                 )
             except Exception:
                 pass
@@ -579,12 +592,14 @@ class PaperTradingLoop:
                     strategy=signal.strategy_name or "unknown",
                     execution_status=ExecutionStatus.REJECTED,
                     rejection_reason=risk_result.rejection_reason,
+                    source="paper_trading",
                 )
                 await tl.log_risk_decision(
                     event_type=RiskEventType.POSITION_LIMIT, epic=epic,
                     description=risk_result.rejection_reason or "Risk check failed",
                     action="rejected_trade", current_equity=equity,
                     open_positions=len(open_positions),
+                    source="paper_trading",
                 )
             except Exception:
                 pass
@@ -637,13 +652,14 @@ class PaperTradingLoop:
                     epic=epic, direction=_signal_type, confidence=signal.confidence,
                     strategy=signal.strategy_name or "unknown",
                     execution_status=ExecutionStatus.EXECUTED,
+                    source="paper_trading",
                 )
                 await tl.log_execution(
                     epic=epic, direction=signal.direction.value,
                     size=risk_result.position_size, entry_price=exec_result.fill_price or signal.entry_price,
                     status=ExecutionStatus.EXECUTED, deal_id=exec_result.deal_id,
                     stop_loss=risk_result.stop_loss, take_profit=risk_result.take_profit,
-                    equity_at_entry=equity,
+                    equity_at_entry=equity, source="paper_trading",
                 )
             except Exception:
                 pass
@@ -661,11 +677,13 @@ class PaperTradingLoop:
                     strategy=signal.strategy_name or "unknown",
                     execution_status=ExecutionStatus.EXEC_FAILED,
                     rejection_reason=exec_result.error,
+                    source="paper_trading",
                 )
                 await tl.log_execution(
                     epic=epic, direction=signal.direction.value,
                     size=risk_result.position_size, entry_price=signal.entry_price,
                     status=ExecutionStatus.EXEC_FAILED, error_message=exec_result.error,
+                    source="paper_trading",
                 )
             except Exception:
                 pass
@@ -845,6 +863,7 @@ class PaperTradingLoop:
                                     entry_price=entry_price,
                                     status=ExecutionStatus.EXECUTED, deal_id=deal_id,
                                     exit_price=current_price, realized_pnl=round(pnl, 2),
+                                    source="paper_trading",
                                 )
                             except Exception:
                                 pass
@@ -934,12 +953,15 @@ class PaperTradingLoop:
             "equity_curve_below_sma": eq_below_sma,
             "kelly_trade_history_size": len(self._trade_history),
             "kelly_stats": self._get_kelly_stats(),
+            "regime_distribution": dict(self._regime_counts),
         }
 
     def _get_kelly_stats(self) -> dict | None:
         """Compute Kelly stats for API response."""
         history = list(self._trade_history)
         if not history:
+            return None
+        if self.risk_manager.kelly_sizer is None:
             return None
         wins = [t["pnl"] for t in history if t["pnl"] > 0]
         losses = [t["pnl"] for t in history if t["pnl"] < 0]

@@ -41,10 +41,6 @@
 
   // Avatar in toggle
   &__avatar {
-    background: linear-gradient(135deg, var(--mantis-green, #39ff14) 0%, var(--mantis-green-muted, #00d97e) 100%);
-    color: var(--cui-dark, #0d1117) !important;
-    font-weight: 600;
-    font-size: 0.875rem;
     box-shadow: 0 0 0 2px var(--cui-body-bg);
   }
 
@@ -63,11 +59,7 @@
     min-width: 280px;
     border: 1px solid var(--cui-border-color);
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-    animation: slideDown 0.2s ease-out;
-
-    @media (prefers-reduced-motion: reduce) {
-      animation: none;
-    }
+    margin-top: 0.5rem;
   }
 
   // User info header
@@ -78,10 +70,6 @@
   }
 
   &__header-avatar {
-    background: linear-gradient(135deg, var(--mantis-green, #39ff14) 0%, var(--mantis-green-muted, #00d97e) 100%);
-    color: var(--cui-dark, #0d1117) !important;
-    font-weight: 700;
-    font-size: 1.125rem;
     flex-shrink: 0;
   }
 
@@ -149,18 +137,6 @@
         opacity: 1;
       }
     }
-  }
-}
-
-// Slide down animation for dropdown
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
   }
 }
 

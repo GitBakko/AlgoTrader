@@ -24,6 +24,7 @@ from src.broker.client import CapitalComClient
 from src.data.historical_downloader import HistoricalDownloader
 from src.data.models import DownloadProgress
 from src.data.storage import ParquetStorageManager
+from src.utils.constants import ALL_ASSETS
 
 
 def on_progress(progress: DownloadProgress) -> None:
@@ -117,10 +118,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--assets",
         nargs="+",
-        default=["XAUUSD", "BTCUSD", "US500", "WTIUSD", "EURUSD",
-                 "NVDA", "TSLA", "XAGUSD", "DE40",
-                 "SOLUSD", "ETHUSD", "BNBUSD", "DOGUSD", "DASHUSD", "ICPUSD",
-                 "NATGAS", "COPPER", "PLATINUM", "GBPUSD", "USDJPY", "NAS100"],
+        default=ALL_ASSETS,
         help="Asset epics to download (default: all 21 assets)",
     )
     parser.add_argument(

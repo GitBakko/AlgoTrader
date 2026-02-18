@@ -145,10 +145,10 @@ h1, h2, h3, h4, h5, h6,
   border-right: 1px solid $mantis-border-accent;
 }
 
-// -- Brand area
+// -- Brand area (full sidebar)
 .sidebar-brand-full {
   margin-left: 3px;
-  display: flex !important;
+  display: flex;
   align-items: center;
   gap: 10px;
 }
@@ -160,6 +160,35 @@ h1, h2, h3, h4, h5, h6,
 
   .sidebar:hover & {
     filter: drop-shadow(0 0 10px rgba($mantis-neon, 0.6));
+  }
+}
+
+// -- Narrow sidebar logo (mantis eyes only)
+.sidebar-brand-narrow {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.mantis-logo-narrow {
+  filter: drop-shadow(0 0 6px rgba($mantis-neon, 0.5));
+  transition: filter $mantis-duration-normal ease;
+
+  .sidebar:hover & {
+    filter: drop-shadow(0 0 10px rgba($mantis-neon, 0.7));
+  }
+}
+
+// -- Brand switching for narrow/unfoldable mode
+.sidebar-narrow-unfoldable:not(:hover),
+.sidebar-narrow {
+  .sidebar-brand-full {
+    display: none !important;
+  }
+
+  .sidebar-brand-narrow {
+    display: flex !important;
   }
 }
 
@@ -261,6 +290,43 @@ h1, h2, h3, h4, h5, h6,
 
   &:hover {
     opacity: 0.8;
+  }
+}
+
+// -- Narrow / unfoldable mode: center icons, hide labels, reset wide-only styles
+.sidebar-narrow,
+.sidebar-narrow-unfoldable:not(:hover) {
+  // Center nav links and hide labels
+  .sidebar-nav .nav-link {
+    margin-right: 0;
+    padding: 0.75rem 0;
+    border-radius: 0;
+    justify-content: center;
+
+    // Hide link text — CoreUI renders text in <c-sidebar-nav-link-content> component
+    c-sidebar-nav-link-content {
+      display: none;
+    }
+
+    &:hover {
+      padding-left: 0;
+    }
+
+    // Thinner active glow bar in narrow mode
+    &.active::before {
+      width: 2px;
+    }
+  }
+
+  // Hide section titles (e.g. "TRADING", "ANALYTICS") — rendered as <c-sidebar-nav-title>
+  .sidebar-nav .nav-title,
+  c-sidebar-nav-title {
+    display: none;
+  }
+
+  // Hide nav group indicators (dropdown arrows)
+  .sidebar-nav .nav-group-toggle::after {
+    display: none;
   }
 }
 
@@ -683,6 +749,20 @@ h1, h2, h3, h4, h5, h6,
     font-size: 0.8125rem;
     margin-top: 0.5rem;
   }
+}
+
+// -- Skeleton / Placeholder overrides
+.placeholder {
+  background-color: $mantis-surface-4 !important;
+  opacity: 0.5;
+  border-radius: 4px;
+}
+
+.skeleton-line {
+  display: block;
+  height: 0.75rem;
+  border-radius: 4px;
+  background: $mantis-surface-4;
 }
 
 // ═══════════════════════════════════════════════════════════

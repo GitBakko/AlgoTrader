@@ -17,18 +17,11 @@ from src.risk.risk_manager import RiskManager
 from src.risk.schemas import RiskLimits
 from src.strategy.schemas import StrategyConfig
 from src.strategy.strategy_manager import StrategyManager
+from src.utils.constants import ALL_ASSETS
 
 router = APIRouter()
 
-SUPPORTED_EPICS = [
-    # Existing 9 assets
-    "XAUUSD", "BTCUSD", "US500", "WTIUSD", "EURUSD", "NVDA", "TSLA", "XAGUSD", "DE40",
-    # New 12 assets - Phase 12: Portfolio Expansion
-    "SOLUSD", "ETHUSD", "BNBUSD", "DOGUSD", "DASHUSD", "ICPUSD",
-    "NATGAS", "COPPER", "PLATINUM",
-    "GBPUSD", "USDJPY",
-    "NAS100",
-]
+SUPPORTED_EPICS = ALL_ASSETS
 
 
 @router.get("/config")

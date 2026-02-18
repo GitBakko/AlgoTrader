@@ -21,6 +21,11 @@
 | 14 | State Recovery | Multi-source recovery, auto-persistence, backoff retry | COMPLETE |
 | 15 | UI/UX + Avatar System | Auth redesign, dashboard layout, avatar upload | COMPLETE |
 | 16 | Best Practices & Docs | Security, performance, memory leaks, documentation | COMPLETE |
+| 17a | P0: Real Trading Foundation | Log cleanup, Kelly sizing, asset centralization, rate limiter | COMPLETE |
+| 17b | P0: First Real Paper Trading | Data download, model training 20 assets, 2 live trades | COMPLETE |
+| P1.7 | Regime Detection Fix | get_market_data() regime+rsi, RegimeAdapter activation | COMPLETE |
+| P1.6 | Walk-Forward OOS Scorecard | Per-asset KEEP/REVIEW/EXCLUDE, optimal_thresholds.json | COMPLETE |
+| P1.8 | Sentiment & Macro Features | Tiered sentiment, ticker mapping, VIX/DXY/yield macro | COMPLETE |
 
 ---
 
@@ -579,3 +584,151 @@
 - Structured logging events (RECOVERY_START, RECOVERY_COMPLETE, etc.)
 
 **Performance**: <5s recovery time for 100 positions, indexed queries, bulk operations
+
+---
+
+## Phase 17a (P0): Real Trading Foundation [COMPLETE]
+
+> Critical fixes to make the trading system operational with real ML models.
+
+### Log Cleanup & Test Isolation
+
+- [x] Cleared polluted test data from production logs (`signals.jsonl`, `executions.jsonl`)
+- [x] Added `source` field to all log entries (distinguish `paper_trading` from `test`)
+- [x] Conftest auto-redirects `TradeLogger` singleton to temp dirs during tests
+- [x] Log analyzer handles empty JSONL files without crashing
+
+### Kelly Sizing & Risk
+
+- [x] Enabled `AdaptiveKellySizer()` in `RiskManager` (was `None` in `dependencies.py`)
+- [x] `_get_kelly_stats()` returns `None` when kelly_sizer is None (null safety)
+- [x] Per-epic heartbeat refresh in paper_loop (21 epics can exceed 30s)
+
+### Infrastructure
+
+- [x] Centralized asset list: `src/utils/constants.py` — single source of truth (ALL_ASSETS, TRADABLE_ASSETS, CRYPTO_ASSETS)
+- [x] Rate limiter fallback: Redis -> in-memory graceful degradation
+- [x] State recovery: 6 bugs fixed (SQL column names, strategy_name, EquityCurveFilter attribute)
+
+---
+
+## Phase 17b (P0): First Real Paper Trading Session [COMPLETE]
+
+> First-ever real ML trading session on Capital.com demo.
+
+- [x] Downloaded fresh historical data for all 21 assets (through 2026-02-18)
+- [x] Re-trained XGBoost for all 20 tradable assets with walk-forward validation
+- [x] Trained NAS100 model (was missing) — all 20/20 tradable assets covered
+- [x] Fixed NAS100 limited-hours: `bars_per_day=5` (vs default 24)
+- [x] Fixed `max_open_positions`: 6 -> 20 for full 20-asset coverage
+- [x] Fixed `EquityCurveFilter` attribute name (`_equity_points` not `equity_curve`)
+- [x] **2 real trades executed**: BTCUSD BUY @$68,406, XAGUSD BUY @$75.75
+- [x] Real ML confidence: 0.397-0.751 (variable, calibrated)
+- [x] Risk management verified end-to-end: SL/TP, correlation guard, circuit breakers
+
+---
+
+## P1 Step 7: Regime Detection Fix [COMPLETE]
+
+> Activated the dormant regime pipeline (RegimeDetector, RegimeAdapter, StrategyRouter).
+
+**Problem**: `PredictionService.get_market_data()` returned only `{current_price, atr, adx}` — missing `regime` and `rsi`. The entire regime infrastructure was coded but never triggered.
+
+**Fix**:
+
+- [x] `get_market_data()`: increased `limit=30` -> `limit=300` for EMA-50 stabilization
+- [x] Added `TechnicalIndicators.add_rsi()` + `TechnicalIndicators.add_ema(periods=[50])`
+- [x] Added `RegimeDetector().detect(df)` to return `regime` in response
+- [x] Paper loop logs regime per asset: `trending_up`, `trending_down`, `ranging`
+- [x] `_regime_counts` tracking per epic + `regime_distribution` in `get_status()`
+- [x] 2 new tests for regime/rsi in market data response
+
+**Impact**: RegimeAdapter now activates — `trending_up` -> `min_confidence=0.45`, `ranging` -> `min_confidence=0.55`
+
+---
+
+## P1 Step 6: Walk-Forward OOS Scorecard [COMPLETE]
+
+> Batch evaluation of all 20 tradable assets with per-asset KEEP/REVIEW/EXCLUDE decisions.
+
+### New Files
+
+- [x] `backend/src/backtest/scorecard.py`: `WalkForwardResult` + `AssetScorecard` dataclasses
+- [x] `backend/scripts/batch_oos_scorecard.py`: batch runner for all 20 assets
+
+### Decision Framework
+
+| Criterion | Fail Threshold |
+|-----------|---------------|
+| Sharpe ratio | < 0.3 |
+| Win rate | < 40% |
+| Max drawdown | > 30% |
+| Monte Carlo p-value | > 0.10 |
+| Risk of ruin | > 15% |
+| Total trades | < 20 |
+
+1 criterion failed -> REVIEW, 3+ -> EXCLUDE
+
+### Integration
+
+- [x] Refactored `walk_forward_backtest.py`: 9 -> 20 assets, returns `WalkForwardResult`
+- [x] `StrategyManager.from_optimal_thresholds()`: loads per-asset thresholds from `optimal_thresholds.json`
+- [x] Wired in `dependencies.py` as default factory
+- [x] EXCLUDE'd assets skipped in paper loop
+- [x] 16 new tests
+
+---
+
+## P1 Step 8: Sentiment & Macro Features [COMPLETE]
+
+> Extended sentiment beyond NVDA/TSLA to all 20 assets + added macro features (VIX/DXY/10Y yield).
+
+### Ticker Mapping (`src/external/ticker_mapping.py`)
+
+- [x] `EPIC_TO_FINNHUB`: ticker for stocks (None for forex/commodities/crypto)
+- [x] `EPIC_TO_FINNHUB_CRYPTO`: Binance symbols for 7 crypto assets
+- [x] `EPIC_TO_NEWS_QUERY`: Marketaux search query for all 20 assets
+- [x] `supports_equity_features(epic)`: True only for NVDA, TSLA
+
+### Tiered Sentiment
+
+- [x] Fixed `asyncio.run()` bug: separated async fetch from sync feature application
+- [x] **Tier 1 (NVDA, TSLA)**: 5 features — insider_mspr, analyst_consensus, price_target_upside, earnings_flag, news_sentiment_avg
+- [x] **Tier 2 (all others)**: news_sentiment_avg + 4 zero placeholders (backward compatible)
+- [x] Graceful degradation: exceptions -> placeholder columns
+
+### Macro Features (`src/external/macro_client.py`)
+
+- [x] `MacroDataClient`: VIX (^VIX), DXY (DX-Y.NYB), 10Y yield (^TNX) via yfinance
+- [x] Parquet caching in `data/cache/macro/macro_daily.parquet`
+- [x] Forward-fill for weekends/holidays
+- [x] 6 features: `vix_close`, `vix_change_5d`, `dxy_close`, `dxy_change_5d`, `yield_10y_close`, `yield_10y_change_5d`
+- [x] Asof join (backward strategy) to align daily macro data to hourly bars
+
+### Other Fixes
+
+- [x] Fixed `train_sentiment_models.py`: `save_model()` now constructs proper `ModelMetadata` objects
+- [x] 29 new tests (ticker_mapping: 11, macro_client: 7, builder sentiment/macro: 11)
+
+### Feature Count Progression
+
+| Phase | Features |
+|-------|----------|
+| Phase 5 (baseline) | 41 |
+| Phase 6A (tech + session) | 121 |
+| Phase 9 (candlestick + fib + structure) | 220 |
+| **P1 Step 8 (sentiment + macro)** | **220 + 5 sentiment + 6 macro = 231** |
+
+---
+
+## Testing Progression
+
+| Phase | Tests | Notes |
+|-------|-------|-------|
+| Phase 5 | 415 | Core integration |
+| Phase 6A | 456 | 3-class migration |
+| Phase 8 | 677 | TRADING MAGNA AI |
+| Phase 9 | 865 | 80%+ coverage |
+| Phase 16 | 1065 | Best practices |
+| P0 (17a/b) | 1081 | Real trading fixes |
+| **P1 (Steps 6-8)** | **1110** | **Scorecard + sentiment + macro** |

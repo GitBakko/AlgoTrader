@@ -36,6 +36,7 @@ from src.api.websocket import prices_endpoint, trades_endpoint
 from src.database.session import DatabaseManager
 from src.monitoring.health import HealthChecker
 from src.utils.config import get_settings
+from src.utils.constants import ALL_ASSETS
 from src.utils.logger import setup_logger
 
 # Initialize settings
@@ -44,11 +45,23 @@ settings = get_settings()
 # Setup logging
 setup_logger()
 
-# Initialize rate limiter with Redis backend
+# Initialize rate limiter with Redis backend (falls back to in-memory if Redis unavailable)
+_redis_uri = f"redis://{settings.redis_host}:{settings.redis_port}/{settings.redis_db}"
+try:
+    import redis as _redis_lib
+    _r = _redis_lib.Redis.from_url(_redis_uri, socket_connect_timeout=1)
+    _r.ping()
+    _r.close()
+    _storage_uri = _redis_uri
+    logger.info("Rate limiter using Redis backend")
+except Exception:
+    _storage_uri = "memory://"
+    logger.info("Redis unavailable, rate limiter using in-memory backend")
+
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=["100/minute", "10/second"],  # Global default
-    storage_uri=f"redis://{settings.redis_host}:{settings.redis_port}/{settings.redis_db}",
+    storage_uri=_storage_uri,
     strategy="moving-window",  # More accurate than fixed-window
 )
 
@@ -146,16 +159,7 @@ async def lifespan(app: FastAPI):
                 session_manager=broker.session_manager,
             )
             await broker_ws.connect()
-            await broker_ws.subscribe_quotes([
-                # Existing 9 assets
-                "XAUUSD", "BTCUSD", "US500", "WTIUSD", "EURUSD",
-                "NVDA", "TSLA", "XAGUSD", "DE40",
-                # New 12 assets - Phase 12: Portfolio Expansion (21/40 slots)
-                "SOLUSD", "ETHUSD", "BNBUSD", "DOGUSD", "DASHUSD", "ICPUSD",
-                "NATGAS", "COPPER", "PLATINUM",
-                "GBPUSD", "USDJPY",
-                "NAS100",
-            ])
+            await broker_ws.subscribe_quotes(ALL_ASSETS)
             app.state.broker_ws_client = broker_ws
             logger.info("Broker WebSocket connected, subscribed to quotes")
         except Exception as e:

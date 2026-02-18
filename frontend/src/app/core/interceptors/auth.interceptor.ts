@@ -1,44 +1,76 @@
-import { HttpInterceptorFn } from '@angular/common/http';
+import { HttpErrorResponse, HttpEvent, HttpHandlerFn, HttpInterceptorFn, HttpRequest } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { catchError, throwError } from 'rxjs';
+import { Router } from '@angular/router';
+import { BehaviorSubject, Observable, catchError, filter, switchMap, take, throwError } from 'rxjs';
 import { AuthService } from '../services/auth.service';
 
 /**
  * Authentication Interceptor
- * Attaches JWT token to all HTTP requests and handles authentication errors
- * MANTIS AI - Secure API communication
+ * Attaches JWT token to all HTTP requests.
+ * On 401: attempts silent token refresh, then retries the original request.
+ * Uses BehaviorSubject to queue concurrent requests during refresh.
  */
+
+let isRefreshing = false;
+const refreshTokenSubject = new BehaviorSubject<string | null>(null);
+
+function addToken(req: HttpRequest<unknown>, token: string): HttpRequest<unknown> {
+  return req.clone({ setHeaders: { Authorization: `Bearer ${token}` } });
+}
+
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
+  const router = inject(Router);
   const token = authService.getToken();
 
-  // Clone request and add authorization header if token exists
-  let authReq = req;
-  if (token) {
-    authReq = req.clone({
-      setHeaders: {
-        Authorization: `Bearer ${token}`
-      }
-    });
-  }
+  const authReq = token ? addToken(req, token) : req;
 
   return next(authReq).pipe(
-    catchError((error) => {
-      // Handle 401 Unauthorized - token expired or invalid
-      if (error.status === 401) {
-        console.error('[AuthInterceptor] 401 Unauthorized - logging out');
-        authService.logout();
+    catchError((error: HttpErrorResponse) => {
+      if (error.status === 401 && !req.url.includes('/api/auth/refresh') && !req.url.includes('/api/auth/login')) {
+        return handle401(req, next, authService, router);
       }
 
-      // Handle 403 Forbidden - insufficient permissions
       if (error.status === 403) {
-        console.error('[AuthInterceptor] 403 Forbidden - insufficient permissions');
-        // You could show a toast/notification here
-        const message = error?.error?.error || 'Permessi insufficienti per eseguire questa operazione';
-        console.warn('[AuthInterceptor] Permission denied:', message);
+        console.warn('[AuthInterceptor] 403 Forbidden - insufficient permissions');
       }
 
       return throwError(() => error);
     })
   );
 };
+
+function handle401(
+  req: HttpRequest<unknown>,
+  next: HttpHandlerFn,
+  authService: AuthService,
+  router: Router
+): Observable<HttpEvent<unknown>> {
+  if (!isRefreshing) {
+    isRefreshing = true;
+    refreshTokenSubject.next(null);
+
+    return authService.refreshAccessToken().pipe(
+      switchMap(response => {
+        isRefreshing = false;
+        const newToken = response.data.access_token;
+        refreshTokenSubject.next(newToken);
+        return next(addToken(req, newToken));
+      }),
+      catchError(err => {
+        isRefreshing = false;
+        refreshTokenSubject.next(null);
+        authService.clearAuth();
+        router.navigate(['/login']);
+        return throwError(() => err);
+      })
+    );
+  }
+
+  // Another request came in while refreshing — wait for the new token
+  return refreshTokenSubject.pipe(
+    filter(token => token !== null),
+    take(1),
+    switchMap(token => next(addToken(req, token!)))
+  );
+}

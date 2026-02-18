@@ -5,6 +5,7 @@ import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
   ColComponent, RowComponent, BadgeComponent,
   TableDirective, AlertComponent, TooltipDirective,
+  PlaceholderDirective, PlaceholderAnimationDirective,
 } from '@coreui/angular';
 import { TvChartComponent, LineDataPoint } from '../../shared/components/tv-chart/tv-chart.component';
 import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
@@ -14,6 +15,8 @@ import { MarketStatusService, MarketStatusResponse } from '../../core/services/m
 import { NewsService } from '../../core/services/news.service';
 import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.component';
 import { NewsWidgetComponent } from '../../shared/components/news-widget/news-widget.component';
+import { SkeletonCardComponent } from '../../shared/components/skeleton-card/skeleton-card.component';
+import { SkeletonTableComponent } from '../../shared/components/skeleton-table/skeleton-table.component';
 
 @Component({
   templateUrl: 'dashboard.component.html',
@@ -24,8 +27,10 @@ import { NewsWidgetComponent } from '../../shared/components/news-widget/news-wi
     CardComponent, CardBodyComponent, CardHeaderComponent,
     ColComponent, RowComponent, BadgeComponent,
     TableDirective, AlertComponent, TooltipDirective,
+    PlaceholderDirective, PlaceholderAnimationDirective,
     TvChartComponent,
     PriceFormatPipe, EpicLogoComponent, NewsWidgetComponent,
+    SkeletonCardComponent, SkeletonTableComponent,
   ]
 })
 export class DashboardComponent implements OnInit, OnDestroy {
@@ -37,6 +42,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly overview = this.trading.overview;
   readonly riskStatus = this.trading.riskStatus;
   readonly paperStatus = this.trading.paperStatus;
+
+  /** True until the first overview data arrives. */
+  readonly loading = computed(() => this.overview() === null);
 
   // Market headlines (US500 news)
   readonly marketNews = this.newsService.news;

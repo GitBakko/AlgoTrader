@@ -322,7 +322,26 @@ class TestPredictSuccessful:
 # ===========================================================================
 
 class TestGetMarketData:
-    """Tests for get_market_data() edge cases."""
+    """Tests for get_market_data() including regime detection and RSI."""
+
+    def _mock_ti_chain(self, mock_ti, candles, *, adx=None, rsi=None, ema_50=None):
+        """Helper: set up the mock chain for TechnicalIndicators calls."""
+        df = candles.clone()
+        df = df.with_columns(pl.lit(25.0).alias("atr_14"))
+        mock_ti.add_atr.return_value = df
+
+        if adx is not None:
+            df = df.with_columns(pl.lit(adx).alias("adx"))
+        mock_ti.add_adx.return_value = df
+
+        if rsi is not None:
+            df = df.with_columns(pl.lit(rsi).alias("rsi_14"))
+        mock_ti.add_rsi.return_value = df
+
+        if ema_50 is not None:
+            df = df.with_columns(pl.lit(ema_50).alias("ema_50"))
+        mock_ti.add_ema.return_value = df
+        return df
 
     def test_no_data_returns_none(self):
         """get_market_data() returns None when candles DataFrame is empty."""
@@ -347,16 +366,13 @@ class TestGetMarketData:
         # Simulate cache from predict()
         svc._last_candles_cache["XAUUSD"] = ("1h", candles)
 
-        with patch("src.models.prediction_service.TechnicalIndicators") as mock_ti:
-            # add_atr and add_adx return the same DataFrame with extra columns
-            df_with_atr = candles.with_columns(
-                pl.lit(25.0).alias("atr_14"),
-            )
-            df_with_adx = df_with_atr.with_columns(
-                pl.lit(30.0).alias("adx"),
-            )
-            mock_ti.add_atr.return_value = df_with_atr
-            mock_ti.add_adx.return_value = df_with_adx
+        with (
+            patch("src.models.prediction_service.TechnicalIndicators") as mock_ti,
+            patch("src.features.regime.RegimeDetector") as mock_rd,
+        ):
+            df = self._mock_ti_chain(mock_ti, candles, adx=30.0, rsi=55.0, ema_50=2050.0)
+            df_with_regime = df.with_columns(pl.lit("trending_up").alias("regime"))
+            mock_rd.return_value.detect.return_value = df_with_regime
 
             result = svc.get_market_data("XAUUSD")
 
@@ -376,15 +392,13 @@ class TestGetMarketData:
 
         svc = _make_service(meta=None, data_access=da)
 
-        with patch("src.models.prediction_service.TechnicalIndicators") as mock_ti:
-            df_with_atr = candles.with_columns(
-                pl.lit(20.0).alias("atr_14"),
-            )
-            df_with_adx = df_with_atr.with_columns(
-                pl.lit(45.5).alias("adx"),
-            )
-            mock_ti.add_atr.return_value = df_with_atr
-            mock_ti.add_adx.return_value = df_with_adx
+        with (
+            patch("src.models.prediction_service.TechnicalIndicators") as mock_ti,
+            patch("src.features.regime.RegimeDetector") as mock_rd,
+        ):
+            df = self._mock_ti_chain(mock_ti, candles, adx=45.5, rsi=60.0, ema_50=2050.0)
+            df_with_regime = df.with_columns(pl.lit("ranging").alias("regime"))
+            mock_rd.return_value.detect.return_value = df_with_regime
 
             result = svc.get_market_data("XAUUSD")
 
@@ -400,13 +414,12 @@ class TestGetMarketData:
 
         svc = _make_service(meta=None, data_access=da)
 
-        with patch("src.models.prediction_service.TechnicalIndicators") as mock_ti:
-            df_with_atr = candles.with_columns(
-                pl.lit(20.0).alias("atr_14"),
-            )
-            # No ADX column added
-            mock_ti.add_atr.return_value = df_with_atr
-            mock_ti.add_adx.return_value = df_with_atr  # same df, no adx
+        with (
+            patch("src.models.prediction_service.TechnicalIndicators") as mock_ti,
+            patch("src.features.regime.RegimeDetector"),
+        ):
+            # No ADX or EMA column → regime detector won't trigger
+            self._mock_ti_chain(mock_ti, candles)
 
             result = svc.get_market_data("XAUUSD")
 
@@ -414,21 +427,113 @@ class TestGetMarketData:
         assert "adx" not in result
 
     def test_fetches_fresh_data_when_not_cached(self):
-        """get_market_data() calls data_access when no cache exists."""
+        """get_market_data() calls data_access with limit=300 when no cache exists."""
         da = MagicMock()
         candles = _make_candles_df(30)
         da.get_candles.return_value = candles
 
         svc = _make_service(meta=None, data_access=da)
 
-        with patch("src.models.prediction_service.TechnicalIndicators") as mock_ti:
-            df_with_atr = candles.with_columns(
-                pl.lit(20.0).alias("atr_14"),
-            )
-            mock_ti.add_atr.return_value = df_with_atr
-            mock_ti.add_adx.return_value = df_with_atr
+        with (
+            patch("src.models.prediction_service.TechnicalIndicators") as mock_ti,
+            patch("src.features.regime.RegimeDetector"),
+        ):
+            self._mock_ti_chain(mock_ti, candles)
 
             result = svc.get_market_data("XAUUSD")
 
         assert result is not None
-        da.get_candles.assert_called_once_with("XAUUSD", "1h", limit=30)
+        da.get_candles.assert_called_once_with("XAUUSD", "1h", limit=300)
+
+    def test_regime_present_in_result(self):
+        """get_market_data() includes regime when ADX + EMA-50 are present."""
+        da = MagicMock()
+        candles = _make_candles_df(100)
+        da.get_candles.return_value = candles
+
+        svc = _make_service(meta=None, data_access=da)
+
+        with (
+            patch("src.models.prediction_service.TechnicalIndicators") as mock_ti,
+            patch("src.features.regime.RegimeDetector") as mock_rd,
+        ):
+            df = self._mock_ti_chain(mock_ti, candles, adx=35.0, rsi=62.0, ema_50=2050.0)
+            df_with_regime = df.with_columns(pl.lit("trending_up").alias("regime"))
+            mock_rd.return_value.detect.return_value = df_with_regime
+
+            result = svc.get_market_data("XAUUSD")
+
+        assert result is not None
+        assert "regime" in result
+        assert result["regime"] == "trending_up"
+        # RegimeDetector.detect() should have been called
+        mock_rd.return_value.detect.assert_called_once()
+
+    def test_rsi_present_in_result(self):
+        """get_market_data() includes RSI when computed."""
+        da = MagicMock()
+        candles = _make_candles_df(100)
+        da.get_candles.return_value = candles
+
+        svc = _make_service(meta=None, data_access=da)
+
+        with (
+            patch("src.models.prediction_service.TechnicalIndicators") as mock_ti,
+            patch("src.features.regime.RegimeDetector") as mock_rd,
+        ):
+            df = self._mock_ti_chain(mock_ti, candles, adx=28.0, rsi=72.5, ema_50=2050.0)
+            df_with_regime = df.with_columns(pl.lit("ranging").alias("regime"))
+            mock_rd.return_value.detect.return_value = df_with_regime
+
+            result = svc.get_market_data("XAUUSD")
+
+        assert result is not None
+        assert "rsi" in result
+        assert result["rsi"] == pytest.approx(72.5)
+
+    def test_regime_not_present_without_adx_ema(self):
+        """get_market_data() omits regime when ADX/EMA-50 not in DataFrame."""
+        da = MagicMock()
+        candles = _make_candles_df(100)
+        da.get_candles.return_value = candles
+
+        svc = _make_service(meta=None, data_access=da)
+
+        with (
+            patch("src.models.prediction_service.TechnicalIndicators") as mock_ti,
+            patch("src.features.regime.RegimeDetector") as mock_rd,
+        ):
+            # No ADX, no EMA-50 → RegimeDetector should not be called
+            self._mock_ti_chain(mock_ti, candles)
+
+            result = svc.get_market_data("XAUUSD")
+
+        assert result is not None
+        assert "regime" not in result
+        mock_rd.return_value.detect.assert_not_called()
+
+    def test_full_market_data_result(self):
+        """get_market_data() returns all fields: current_price, atr, adx, rsi, regime."""
+        da = MagicMock()
+        candles = _make_candles_df(100)
+        da.get_candles.return_value = candles
+
+        svc = _make_service(meta=None, data_access=da)
+
+        with (
+            patch("src.models.prediction_service.TechnicalIndicators") as mock_ti,
+            patch("src.features.regime.RegimeDetector") as mock_rd,
+        ):
+            df = self._mock_ti_chain(mock_ti, candles, adx=40.0, rsi=55.0, ema_50=2050.0)
+            df_with_regime = df.with_columns(pl.lit("trending_down").alias("regime"))
+            mock_rd.return_value.detect.return_value = df_with_regime
+
+            result = svc.get_market_data("XAUUSD")
+
+        assert result is not None
+        assert set(result.keys()) == {"current_price", "atr", "adx", "rsi", "regime"}
+        assert result["regime"] == "trending_down"
+        assert result["adx"] == pytest.approx(40.0)
+        assert result["rsi"] == pytest.approx(55.0)
+        assert result["current_price"] > 0
+        assert result["atr"] > 0

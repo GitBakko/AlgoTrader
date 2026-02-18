@@ -27,6 +27,7 @@ from loguru import logger
 from src.backtest.engine import BacktestEngine
 from src.backtest.reporter import BacktestReporter
 from src.backtest.schemas import BacktestConfig
+from src.backtest.scorecard import WalkForwardResult
 from src.data.data_access import DataAccessLayer
 from src.data.storage import ParquetStorageManager
 from src.features.builder import FeatureBuilder
@@ -40,6 +41,7 @@ from src.models.xgboost_model import XGBoostClassifier
 from src.strategy.squeeze_strategy import SqueezeBreakoutStrategy
 from src.strategy.strategy_router import StrategyRouter
 from src.strategy.vwap_strategy import VWAPReversionStrategy
+from src.utils.constants import TRADABLE_ASSETS
 
 # Walk-forward window sizes (scaled for timeframe)
 WINDOWS = {
@@ -48,10 +50,11 @@ WINDOWS = {
     "1d": {"train": 252, "val": 63, "test": 21, "step": 21, "purge": 5, "embargo": 2},
 }
 
-ASSETS = ["XAUUSD", "BTCUSD", "US500", "WTIUSD", "EURUSD", "NVDA", "TSLA", "XAGUSD", "DE40"]
+ASSETS = list(TRADABLE_ASSETS)
 
-# Individual stocks trade fewer hours/day → smaller walk-forward windows
+# Individual stocks and limited-hours assets need smaller walk-forward windows
 STOCK_EPICS = {"NVDA", "TSLA"}
+LIMITED_HOURS_EPICS = {"NVDA", "TSLA", "NAS100", "DE40", "US500"}
 STOCK_WINDOWS = {
     "1h": {"train": 2520, "val": 630, "test": 210, "step": 210, "purge": 50, "embargo": 20},
     "4h": {"train": 756, "val": 189, "test": 63, "step": 63, "purge": 15, "embargo": 6},
@@ -217,8 +220,8 @@ def run_walk_forward_backtest(
     do_sweep_threshold: bool = False,
     strategy: str = "ml_ensemble",
     monte_carlo: bool = False,
-) -> None:
-    """Run walk-forward backtest for a single asset."""
+) -> WalkForwardResult | None:
+    """Run walk-forward backtest for a single asset. Returns WalkForwardResult or None."""
     logger.info(f"\n{'='*60}")
     logger.info(f"Walk-Forward Backtest: {epic}/{timeframe} [{strategy}]")
     opts = []
@@ -238,7 +241,7 @@ def run_walk_forward_backtest(
     feature_builder = FeatureBuilder(data_access)
     target_builder = TargetBuilder()
 
-    window_map = STOCK_WINDOWS if epic in STOCK_EPICS else WINDOWS
+    window_map = STOCK_WINDOWS if epic in LIMITED_HOURS_EPICS else WINDOWS
     windows = window_map.get(timeframe, window_map["1h"])
     splitter = WalkForwardSplitter(
         train_window=windows["train"],
@@ -258,7 +261,7 @@ def run_walk_forward_backtest(
 
     if df.is_empty():
         logger.error(f"No data available for {epic}/{timeframe}")
-        return
+        return None
 
     # === Non-ML strategy path ===
     if strategy != "ml_ensemble":
@@ -271,7 +274,7 @@ def run_walk_forward_backtest(
             initial_capital=initial_capital,
             risk_per_trade=risk_per_trade,
         )
-        return
+        return None
 
     # Generate targets
     df = target_builder.build_targets(df)
@@ -291,7 +294,7 @@ def run_walk_forward_backtest(
 
     if not feature_cols:
         logger.error("No feature columns found")
-        return
+        return None
 
     X = df_valid.select(feature_cols).to_numpy().astype(np.float64)
     y = df_valid["target"].to_numpy().astype(np.int32)
@@ -305,7 +308,7 @@ def run_walk_forward_backtest(
             f"Need at least {splitter.min_samples} samples, got {n_samples}. "
             "Reduce window sizes or get more data."
         )
-        return
+        return None
 
     n_folds = splitter.get_n_splits(n_samples)
     logger.info(f"Walk-forward: {n_folds} folds")
@@ -416,7 +419,7 @@ def run_walk_forward_backtest(
 
     if not oos_timestamps:
         logger.error("No OOS signals collected")
-        return
+        return None
 
     # Build OOS signals DataFrame
     signals_df = pl.DataFrame({
@@ -443,7 +446,7 @@ def run_walk_forward_backtest(
 
     if ohlc_df.is_empty():
         logger.error("No OHLC data for OOS period")
-        return
+        return None
 
     config = BacktestConfig(
         epic=epic,
@@ -489,6 +492,12 @@ def run_walk_forward_backtest(
     print("\n" + BacktestReporter.summarize(result))
     print()
 
+    # Extract metrics for WalkForwardResult
+    m = result.metrics
+    final_thresh = best_thresh if do_sweep_threshold else DEFAULT_CONFIDENCE
+    mc_p = 0.0
+    mc_ruin = 0.0
+
     # Monte Carlo validation
     closed = [t for t in result.trades if t.status.value != "open"]
     if monte_carlo and closed:
@@ -499,22 +508,40 @@ def run_walk_forward_backtest(
         eq_ci = mc_result.final_equity_ci
         dd_ci = mc_result.max_drawdown_ci
         sh_ci = mc_result.sharpe_ratio_ci
+        mc_p = mc_result.p_value_return
+        mc_ruin = mc_result.risk_of_ruin
         print(f"{'='*50}")
         print(f"MONTE CARLO VALIDATION ({mc_result.n_simulations} simulations)")
         print(f"{'='*50}")
         print(f"  Equity 90% CI:  [{eq_ci[0]:,.0f} — {eq_ci[2]:,.0f}] (median {eq_ci[1]:,.0f})")
         print(f"  Max DD 90% CI:  [{dd_ci[0]:.1%} — {dd_ci[2]:.1%}] (median {dd_ci[1]:.1%})")
         print(f"  Sharpe 90% CI:  [{sh_ci[0]:.3f} — {sh_ci[2]:.3f}] (median {sh_ci[1]:.3f})")
-        print(f"  P-value (return): {mc_result.p_value_return:.4f}")
-        print(f"  Risk of ruin:     {mc_result.risk_of_ruin:.4f}")
-        sig = "SIGNIFICANT" if mc_result.p_value_return < 0.05 else "NOT significant"
+        print(f"  P-value (return): {mc_p:.4f}")
+        print(f"  Risk of ruin:     {mc_ruin:.4f}")
+        sig = "SIGNIFICANT" if mc_p < 0.05 else "NOT significant"
         print(f"  Strategy edge:    {sig} (p<0.05)")
         print()
+
+    return WalkForwardResult(
+        epic=epic,
+        n_folds=n_folds,
+        sharpe=m.get("sharpe_ratio", 0.0),
+        sortino=m.get("sortino_ratio", 0.0),
+        max_drawdown=abs(m.get("max_drawdown", 0.0)),
+        win_rate=m.get("win_rate", 0.0),
+        profit_factor=m.get("profit_factor", 0.0),
+        total_trades=m.get("total_trades", 0),
+        total_return_pct=m.get("total_return", 0.0) * 100,
+        best_confidence_threshold=final_thresh,
+        avg_oos_f1=0.0,  # TODO: compute average OOS F1 across folds
+        mc_p_value=mc_p,
+        mc_risk_of_ruin=mc_ruin,
+    )
 
 
 def main():
     parser = argparse.ArgumentParser(description="Walk-Forward Backtest")
-    parser.add_argument("--epic", type=str, default=None, help="Single asset epic (default: all 9)")
+    parser.add_argument("--epic", type=str, default=None, help="Single asset epic (default: all 20 tradable)")
     parser.add_argument("--timeframe", type=str, default="1h", help="Timeframe (1h, 4h, 1d)")
     parser.add_argument("--capital", type=float, default=10_000.0, help="Initial capital")
     parser.add_argument("--risk", type=float, default=0.02, help="Risk per trade")

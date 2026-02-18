@@ -47,19 +47,70 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
             <div class="empty-state__hint">Le posizioni aperte appariranno qui</div>
           </div>
         } @else {
-          <div class="table-responsive-mobile">
+          <!-- Mobile: Card-based layout -->
+          <div class="d-block d-md-none p-3">
+            @for (pos of livePositions(); track pos.deal_id) {
+              <div class="pos-mobile-card mb-2">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <app-epic-logo [epic]="pos.epic" [size]="28" [rounded]="true" />
+                    <div>
+                      <div class="fw-semibold">{{ pos.epic }}</div>
+                      <span class="dir-indicator dir-indicator--sm"
+                            [class.dir-indicator--buy]="pos.direction === 'BUY'"
+                            [class.dir-indicator--sell]="pos.direction === 'SELL'">
+                        {{ pos.direction }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="text-end">
+                    <div class="fw-semibold mantis-mono"
+                         [class.text-success]="pos.live_pnl >= 0"
+                         [class.text-danger]="pos.live_pnl < 0">
+                      $ {{ pos.live_pnl >= 0 ? '+' : '' }}{{ pos.live_pnl | number:'1.2-2' }}
+                    </div>
+                    <div class="text-body-secondary small mantis-mono">
+                      Entry: {{ pos.level | priceFormat:pos.epic }}
+                    </div>
+                  </div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                  <div class="d-flex gap-2 small text-body-secondary">
+                    @if (pos.stop_level != null) {
+                      <span>SL: <span class="mantis-mono">{{ pos.stop_level | priceFormat:pos.epic }}</span></span>
+                    }
+                    @if (pos.trailing_stop_phase) {
+                      <span class="trailing-phase trailing-phase--sm"
+                            [class.trailing-phase--initial]="pos.trailing_stop_phase === 'INITIAL'"
+                            [class.trailing-phase--breakeven]="pos.trailing_stop_phase === 'BREAKEVEN'"
+                            [class.trailing-phase--tp1_lock]="pos.trailing_stop_phase === 'TP1_LOCK'"
+                            [class.trailing-phase--trailing]="pos.trailing_stop_phase === 'TRAILING'">
+                        {{ pos.trailing_stop_phase }}
+                      </span>
+                    }
+                  </div>
+                  <button cButton color="danger" size="sm" (click)="closePosition(pos.deal_id)">
+                    Chiudi
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+
+          <!-- Desktop: Table layout -->
+          <div class="d-none d-md-block table-responsive-mobile">
             <table cTable [small]="true" [hover]="true" [striped]="true" class="mb-0">
               <thead>
                 <tr class="text-body-secondary">
                   <th class="fw-semibold small">Asset</th>
                   <th class="fw-semibold small">Dir</th>
-                  <th class="fw-semibold small d-mobile-none">Size</th>
-                  <th class="fw-semibold small d-mobile-none">Entry</th>
-                  <th class="fw-semibold small d-mobile-none">SL</th>
-                  <th class="fw-semibold small d-mobile-none">TP</th>
+                  <th class="fw-semibold small">Size</th>
+                  <th class="fw-semibold small">Entry</th>
+                  <th class="fw-semibold small">SL</th>
+                  <th class="fw-semibold small">TP</th>
                   <th class="fw-semibold small">Risk</th>
-                  <th class="fw-semibold small d-mobile-none">Trailing</th>
-                  <th class="fw-semibold small d-mobile-none">Aperta</th>
+                  <th class="fw-semibold small">Trailing</th>
+                  <th class="fw-semibold small">Aperta</th>
                   <th class="fw-semibold small text-end">P&amp;L</th>
                   <th class="fw-semibold small text-end">Azioni</th>
                 </tr>
@@ -78,10 +129,10 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
                         {{ pos.direction }}
                       </span>
                     </td>
-                    <td class="mantis-mono d-mobile-none">{{ pos.size | number:'1.4-4' }}</td>
-                    <td class="mantis-mono d-mobile-none">{{ pos.level | priceFormat:pos.epic }}</td>
-                    <td class="mantis-mono d-mobile-none">{{ pos.stop_level != null ? (pos.stop_level | priceFormat:pos.epic) : '—' }}</td>
-                    <td class="mantis-mono d-mobile-none">{{ pos.profit_level != null ? (pos.profit_level | priceFormat:pos.epic) : '—' }}</td>
+                    <td class="mantis-mono">{{ pos.size | number:'1.4-4' }}</td>
+                    <td class="mantis-mono">{{ pos.level | priceFormat:pos.epic }}</td>
+                    <td class="mantis-mono">{{ pos.stop_level != null ? (pos.stop_level | priceFormat:pos.epic) : '—' }}</td>
+                    <td class="mantis-mono">{{ pos.profit_level != null ? (pos.profit_level | priceFormat:pos.epic) : '—' }}</td>
                     <td>
                       @if (pos.risk_managed_locally) {
                         <span class="risk-badge risk-badge--slim risk-badge--local"
@@ -100,7 +151,7 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
                         </span>
                       }
                     </td>
-                    <td class="d-mobile-none">
+                    <td>
                       @if (pos.trailing_stop_phase) {
                         <span class="trailing-phase"
                               [class.trailing-phase--initial]="pos.trailing_stop_phase === 'INITIAL'"
@@ -114,7 +165,7 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
                         <span class="text-body-secondary small">—</span>
                       }
                     </td>
-                    <td class="text-body-secondary small d-mobile-none">{{ formatDate(pos.opened_at) }}</td>
+                    <td class="text-body-secondary small">{{ formatDate(pos.opened_at) }}</td>
                     <td class="text-end fw-semibold mantis-mono"
                         [class.text-success]="pos.live_pnl >= 0"
                         [class.text-danger]="pos.live_pnl < 0">

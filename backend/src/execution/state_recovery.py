@@ -495,28 +495,33 @@ class StateRecoveryService:
                     logger.warning("No risk state snapshot found")
                     return False
 
-                # Restore DrawdownMonitor state
+                # Restore DrawdownMonitor state (access _state directly,
+                # .state property returns a model_copy() which would be discarded)
                 dm = self.risk_manager.drawdown_monitor
-                dm.state.peak_equity = float(snapshot.peak_equity)
-                dm.state.daily_start_equity = float(snapshot.daily_start_equity)
-                dm.state.current_equity = float(snapshot.current_equity)
+                dm._state.peak_equity = float(snapshot.peak_equity)
+                dm._state.daily_start_equity = float(snapshot.daily_start_equity)
+                dm._state.current_equity = float(snapshot.current_equity)
 
-                # Restore CircuitBreaker state
+                # Restore CircuitBreaker state (_consecutive_losses is private)
                 cb = self.risk_manager.circuit_breakers
-                cb.consecutive_losses = snapshot.consecutive_losses
+                cb._consecutive_losses = snapshot.consecutive_losses
 
-                # Restore tripped breakers: {epic: iso_string} → {epic: datetime}
-                for epic, ts_str in snapshot.tripped_breakers.items():
+                # Restore tripped breakers: {breaker_type: reason_string}
+                import time as _time
+                from src.risk.circuit_breakers import CircuitBreakerType
+                for breaker_type_str, reason in snapshot.tripped_breakers.items():
                     try:
-                        ts = datetime.fromisoformat(ts_str)
-                        cb.tripped_breakers[epic] = ts
+                        cb_type = CircuitBreakerType(breaker_type_str)
+                        with cb._lock:
+                            cb._tripped[cb_type] = reason
+                            cb._tripped_at[cb_type] = _time.monotonic()
                     except Exception as e:
-                        logger.warning(f"Failed to parse breaker timestamp for {epic}: {e}")
+                        logger.warning(f"Failed to restore breaker {breaker_type_str}: {e}")
 
-                # Restore EquityCurveFilter state
+                # Restore EquityCurveFilter state (_equity_points is the internal deque)
                 ec = self.risk_manager.equity_curve_filter
-                ec.equity_curve.clear()
-                ec.equity_curve.extend(snapshot.equity_curve_points)
+                ec._equity_points.clear()
+                ec._equity_points.extend(snapshot.equity_curve_points)
 
                 logger.info(
                     f"Restored risk state: peak_equity={snapshot.peak_equity}, "

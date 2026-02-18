@@ -14,6 +14,7 @@ from loguru import logger
 
 from src.models.ensemble_model import EnsembleClassifier
 from src.models.lstm_model import LSTMClassifier
+from src.models.schemas import ModelMetadata
 from src.models.tft_model import TFTClassifier
 from src.models.trainer import ModelTrainer
 from src.models.versioning import ModelVersioning
@@ -38,17 +39,16 @@ def train_xgboost(epic: str, timeframe: str, trainer: ModelTrainer, versioning: 
     logger.info(f"[XGBOOST] F1 Macro: {result.avg_f1_macro:.4f}, Sharpe: {result.oos_sharpe:.2f}")
 
     # Save with version tag
-    model_dir = versioning.save_model(
-        model=model,
+    meta = ModelMetadata(
+        model_id=f"{epic}_{timeframe}_xgboost_sentiment",
+        model_type="xgboost",
         epic=epic,
         timeframe=timeframe,
-        metadata={
-            "f1_macro": result.avg_f1_macro,
-            "sharpe": result.oos_sharpe,
-            "num_features": result.num_features,
-            "sentiment_enabled": True,
-        },
+        num_features=result.num_features,
+        training_result=result,
+        description=f"XGBoost with sentiment (F1={result.avg_f1_macro:.3f})",
     )
+    model_dir = versioning.save_model(model=model, metadata=meta)
 
     logger.info(f"[XGBOOST] Saved to {model_dir}")
     return model
@@ -79,17 +79,16 @@ def train_lstm(epic: str, timeframe: str, trainer: ModelTrainer, versioning: Mod
 
     logger.info(f"[LSTM] F1 Macro: {result.avg_f1_macro:.4f}, Sharpe: {result.oos_sharpe:.2f}")
 
-    model_dir = versioning.save_model(
-        model=model,
+    meta = ModelMetadata(
+        model_id=f"{epic}_{timeframe}_lstm_sentiment",
+        model_type="lstm",
         epic=epic,
         timeframe=timeframe,
-        metadata={
-            "f1_macro": result.avg_f1_macro,
-            "sharpe": result.oos_sharpe,
-            "num_features": result.num_features,
-            "sentiment_enabled": True,
-        },
+        num_features=result.num_features,
+        training_result=result,
+        description=f"LSTM with sentiment (F1={result.avg_f1_macro:.3f})",
     )
+    model_dir = versioning.save_model(model=model, metadata=meta)
 
     logger.info(f"[LSTM] Saved to {model_dir}")
     return model
@@ -120,17 +119,16 @@ def train_tft(epic: str, timeframe: str, trainer: ModelTrainer, versioning: Mode
 
     logger.info(f"[TFT] F1 Macro: {result.avg_f1_macro:.4f}, Sharpe: {result.oos_sharpe:.2f}")
 
-    model_dir = versioning.save_model(
-        model=model,
+    meta = ModelMetadata(
+        model_id=f"{epic}_{timeframe}_tft_sentiment",
+        model_type="tft",
         epic=epic,
         timeframe=timeframe,
-        metadata={
-            "f1_macro": result.avg_f1_macro,
-            "sharpe": result.oos_sharpe,
-            "num_features": result.num_features,
-            "sentiment_enabled": True,
-        },
+        num_features=result.num_features,
+        training_result=result,
+        description=f"TFT with sentiment (F1={result.avg_f1_macro:.3f})",
     )
+    model_dir = versioning.save_model(model=model, metadata=meta)
 
     logger.info(f"[TFT] Saved to {model_dir}")
     return model
@@ -162,16 +160,14 @@ def train_ensemble(
     logger.info("[ENSEMBLE] Base models loaded, training meta-learner...")
 
     # Save ensemble
-    model_dir = versioning.save_model(
-        model=ensemble,
+    meta = ModelMetadata(
+        model_id=f"{epic}_{timeframe}_ensemble_sentiment",
+        model_type="ensemble",
         epic=epic,
         timeframe=timeframe,
-        metadata={
-            "model_type": "ensemble",
-            "base_models": ["lstm", "tft", "xgboost"],
-            "sentiment_enabled": True,
-        },
+        description="Ensemble (LSTM+TFT+XGB) with sentiment",
     )
+    model_dir = versioning.save_model(model=ensemble, metadata=meta)
 
     logger.info(f"[ENSEMBLE] Saved to {model_dir}")
     return ensemble

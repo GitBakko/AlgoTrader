@@ -89,6 +89,7 @@ def mock_risk_manager():
     mgr.circuit_breakers.heartbeat = MagicMock()
     mgr.circuit_breakers.record_trade_result = MagicMock()
     mgr.circuit_breakers.tripped_breakers = {}
+    mgr.circuit_breakers.config.max_open_positions = 6
 
     mgr.equity_curve_filter = MagicMock()
     mgr.equity_curve_filter.record_trade_close = MagicMock()
@@ -307,10 +308,11 @@ class TestCircuitBreakerHeartbeat:
 
     @pytest.mark.asyncio
     async def test_heartbeat_called_every_iteration(self, loop, mock_risk_manager):
-        """Each _run_iteration call invokes circuit_breakers.heartbeat()."""
+        """Each _run_iteration call invokes circuit_breakers.heartbeat() (at start + per epic)."""
         await loop._run_iteration(force=True)
 
-        mock_risk_manager.circuit_breakers.heartbeat.assert_called_once()
+        # Called at iteration start + once per processed epic
+        assert mock_risk_manager.circuit_breakers.heartbeat.call_count >= 1
 
     @pytest.mark.asyncio
     async def test_heartbeat_called_even_when_no_epics_to_process(

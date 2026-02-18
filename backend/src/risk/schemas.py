@@ -33,9 +33,9 @@ class RiskLimits(BaseModel):
     max_position_pct: float = Field(default=0.05, ge=0.01, le=0.50)
     max_correlated_exposure: float = Field(default=0.50, ge=0.0, le=1.0)
     max_total_open_positions: int = Field(
-        default=5,
+        default=20,
         ge=1,
-        le=20,
+        le=50,
         description="Maximum total open positions across all assets"
     )
 

@@ -49,20 +49,24 @@ STOCK_BARS_PER_DAY = {
     "1d": 1,
 }
 
-# Crypto assets trade 24/7 (use default BARS_PER_DAY)
-CRYPTO_EPICS = {"BTCUSD", "SOLUSD", "ETHUSD", "BNBUSD", "DOGUSD", "DASHUSD", "ICPUSD"}
+# NAS100 trades very limited hours on Capital.com (~5h/day)
+LIMITED_HOURS_EPICS = {"NAS100"}
+LIMITED_HOURS_BARS_PER_DAY = {
+    "1h": 5,
+    "4h": 2,
+    "1d": 1,
+}
+
+# Import centralized asset definitions
+from src.utils.constants import (
+    ALL_ASSETS as _ALL_ASSETS,
+    CRYPTO_ASSETS as CRYPTO_EPICS,
+    TRADABLE_ASSETS,
+)
 
 # Active trading assets (EURUSD excluded: tiny ATR → massive position sizes → -99% OOS)
-ACTIVE_ASSETS = [
-    # Existing 8 assets
-    "XAUUSD", "BTCUSD", "US500", "WTIUSD", "NVDA", "TSLA", "XAGUSD", "DE40",
-    # New 12 assets - Phase 12: Portfolio Expansion
-    "SOLUSD", "ETHUSD", "BNBUSD", "DOGUSD", "DASHUSD", "ICPUSD",
-    "NATGAS", "COPPER", "PLATINUM",
-    "GBPUSD", "USDJPY",
-    "NAS100",
-]
-ALL_ASSETS = ACTIVE_ASSETS + ["EURUSD"]
+ACTIVE_ASSETS = list(TRADABLE_ASSETS)
+ALL_ASSETS = list(_ALL_ASSETS)
 
 # Directory to save/load tuned hyperparameters
 TUNED_PARAMS_DIR = Path(__file__).parent.parent / "data" / "tuned_params"
@@ -78,6 +82,8 @@ def get_walk_forward_splitter(timeframe: str, epic: str = "") -> WalkForwardSpli
     """
     if epic in STOCK_EPICS:
         scale = STOCK_BARS_PER_DAY.get(timeframe, 1)
+    elif epic in LIMITED_HOURS_EPICS:
+        scale = LIMITED_HOURS_BARS_PER_DAY.get(timeframe, 1)
     else:
         scale = BARS_PER_DAY.get(timeframe, 1)
     return WalkForwardSplitter(

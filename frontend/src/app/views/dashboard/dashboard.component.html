@@ -54,6 +54,13 @@
 
 <!-- ═══════ KPI CARDS ROW ═══════ -->
 <c-row class="g-3 mb-4">
+  @if (loading()) {
+    @for (_ of [1,2,3,4]; track $index) {
+      <c-col sm="6" xl="3">
+        <app-skeleton-card [rows]="3" [showHeader]="false" />
+      </c-col>
+    }
+  } @else {
   <!-- Equity -->
   <c-col sm="6" xl="3">
     <c-card class="dash-kpi-card h-100">
@@ -133,6 +140,7 @@
            [class.dash-kpi-card__accent--primary]="drawdownPct() <= 5"></div>
     </c-card>
   </c-col>
+  }
 </c-row>
 
 <!-- ═══════ SECTION: Performance ═══════ -->
@@ -216,7 +224,17 @@
     <span class="text-body-secondary small mantis-mono">{{ priceTickers().length }} assets</span>
   </c-card-header>
   <c-card-body class="p-3">
-    @if (priceTickers().length > 0) {
+    @if (loading()) {
+      <div class="price-grid">
+        @for (_ of [1,2,3,4,5,6,7,8]; track $index) {
+          <div class="price-block" cPlaceholderAnimation="wave">
+            <div class="mb-2"><span cPlaceholder class="skeleton-line" style="width:50%; height:0.65rem;"></span></div>
+            <div class="mb-1"><span cPlaceholder class="skeleton-line" style="width:80%; height:1rem;"></span></div>
+            <div><span cPlaceholder class="skeleton-line" style="width:40%; height:0.5rem;"></span></div>
+          </div>
+        }
+      </div>
+    } @else if (priceTickers().length > 0) {
       <div class="price-grid">
         @for (t of priceTickers(); track t.epic) {
           <div class="price-block">
@@ -258,7 +276,11 @@
         </a>
       </c-card-header>
       <c-card-body class="p-0">
-        @if (livePositions().length > 0) {
+        @if (loading()) {
+          <div class="p-3">
+            <app-skeleton-table [columns]="6" [rowCount]="4" />
+          </div>
+        } @else if (livePositions().length > 0) {
           <div class="table-responsive-mobile">
             <table cTable [small]="true" [hover]="true" [striped]="true" class="mb-0">
               <thead>
@@ -325,7 +347,11 @@
         </a>
       </c-card-header>
       <c-card-body class="p-0">
-        @if (recentSignals().length > 0) {
+        @if (loading()) {
+          <div class="p-3">
+            <app-skeleton-table [columns]="5" [rowCount]="4" />
+          </div>
+        } @else if (recentSignals().length > 0) {
           <table cTable [small]="true" [hover]="true" class="mb-0">
             <tbody>
               @for (sig of recentSignals(); track sig.timestamp + sig.epic) {

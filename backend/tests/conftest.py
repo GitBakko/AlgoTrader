@@ -18,6 +18,7 @@ from src.broker.models import (
     SessionTokens,
     WorkingOrder,
 )
+from src.monitoring import trade_logger as _trade_logger_module
 from src.utils.config import get_settings
 
 
@@ -27,6 +28,14 @@ def event_loop():
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_trade_logger(tmp_path):
+    """Redirect the global TradeLogger singleton to a temp dir so tests never pollute production logs."""
+    _trade_logger_module._trade_logger = _trade_logger_module.TradeLogger(log_dir=tmp_path)
+    yield
+    _trade_logger_module._trade_logger = None
 
 
 @pytest.fixture
@@ -235,7 +244,7 @@ def sample_risk_snapshot():
         "daily_start_equity": Decimal("10000.00"),
         "current_equity": Decimal("10150.00"),
         "consecutive_losses": 2,
-        "tripped_breakers": {"US500": "2026-02-15T09:00:00Z"},
+        "tripped_breakers": {"daily_loss": "Daily loss -3.00% exceeds limit -3.00%"},
         "equity_curve_points": [10000.0, 10050.0, 10100.0, 10150.0],
     }
 
@@ -243,26 +252,31 @@ def sample_risk_snapshot():
 @pytest.fixture
 def mock_risk_manager_with_state():
     """Mock RiskManager with fully initialized state for recovery tests."""
+    import threading
+    from collections import deque
     from unittest.mock import MagicMock
     from decimal import Decimal
 
     risk_manager = MagicMock()
 
-    # DrawdownMonitor with state
+    # DrawdownMonitor — code accesses dm._state directly (not .state property)
     risk_manager.drawdown_monitor = MagicMock()
-    risk_manager.drawdown_monitor.state = MagicMock()
-    risk_manager.drawdown_monitor.state.peak_equity = Decimal("10500.00")
-    risk_manager.drawdown_monitor.state.daily_start_equity = Decimal("10000.00")
-    risk_manager.drawdown_monitor.state.current_equity = Decimal("10150.00")
+    risk_manager.drawdown_monitor._state = MagicMock()
+    risk_manager.drawdown_monitor._state.peak_equity = Decimal("10500.00")
+    risk_manager.drawdown_monitor._state.daily_start_equity = Decimal("10000.00")
+    risk_manager.drawdown_monitor._state.current_equity = Decimal("10150.00")
     risk_manager.drawdown_monitor.check_all = MagicMock(return_value=[])
 
-    # CircuitBreakers
+    # CircuitBreakers — code accesses _consecutive_losses, _tripped, _tripped_at, _lock
     risk_manager.circuit_breakers = MagicMock()
-    risk_manager.circuit_breakers.tripped_breakers = {}
+    risk_manager.circuit_breakers._consecutive_losses = 0
+    risk_manager.circuit_breakers._tripped = {}
+    risk_manager.circuit_breakers._tripped_at = {}
+    risk_manager.circuit_breakers._lock = threading.Lock()
 
-    # EquityCurveFilter
+    # EquityCurveFilter — code accesses _equity_points deque
     risk_manager.equity_curve_filter = MagicMock()
-    risk_manager.equity_curve_filter.equity_curve = []
+    risk_manager.equity_curve_filter._equity_points = deque()
 
     return risk_manager
 

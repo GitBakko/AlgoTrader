@@ -37,7 +37,25 @@ class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int  # seconds
+    refresh_token: str
+    refresh_expires_in: int  # seconds
     user: 'UserResponse'  # Include user object for frontend
+
+
+class RefreshRequest(BaseModel):
+    """Request schema for token refresh."""
+
+    refresh_token: str
+
+
+class RefreshResponse(BaseModel):
+    """Response schema for token refresh."""
+
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int  # seconds
+    refresh_token: str
+    refresh_expires_in: int  # seconds
 
 
 class UserResponse(BaseModel):

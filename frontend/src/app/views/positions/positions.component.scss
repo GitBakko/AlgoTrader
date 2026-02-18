@@ -50,10 +50,16 @@
     }
   }
 
-  // Mobile table min-width
-  @media (max-width: 991.98px) {
-    table[cTable] {
-      min-width: 600px;
+  // Mobile position cards
+  .pos-mobile-card {
+    padding: 0.75rem;
+    border-radius: 8px;
+    background: var(--mantis-surface-2, #161b22);
+    border: 1px solid var(--mantis-border-subtle, rgba(255, 255, 255, 0.06));
+
+    .trailing-phase--sm {
+      font-size: 0.55rem;
+      padding: 0.0625rem 0.25rem;
     }
   }
 }

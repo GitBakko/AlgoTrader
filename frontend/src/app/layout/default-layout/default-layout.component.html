@@ -4,6 +4,8 @@
   class="d-print-none sidebar sidebar-fixed border-end"
   colorScheme="dark"
   id="sidebar1"
+  unfoldable
+  [visible]="true"
 >
   <c-sidebar-header class="border-bottom">
     <c-sidebar-brand routerLink="/dashboard">
@@ -20,11 +22,12 @@
           <span class="mantis-brand-sub">ALGO TRADING</span>
         </span>
       </span>
-      <span class="sidebar-brand-narrow px-1">
-        <svg class="mantis-logo-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="22" height="22">
-          <polygon points="32,6 52,26 46,58 18,58 12,26" fill="none" stroke="#39FF14" stroke-width="2.5" stroke-linejoin="round"/>
-          <ellipse cx="23" cy="28" rx="5.5" ry="7.5" fill="#39FF14" opacity="0.85"/>
-          <ellipse cx="41" cy="28" rx="5.5" ry="7.5" fill="#39FF14" opacity="0.85"/>
+      <span class="sidebar-brand-narrow">
+        <svg class="mantis-logo-narrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="24" height="24">
+          <ellipse cx="11" cy="15" rx="4" ry="5.5" fill="#39FF14" opacity="0.9"/>
+          <ellipse cx="21" cy="15" rx="4" ry="5.5" fill="#39FF14" opacity="0.9"/>
+          <line x1="11" y1="9" x2="6" y2="2" stroke="#39FF14" stroke-width="1.2" stroke-linecap="round" opacity="0.4"/>
+          <line x1="21" y1="9" x2="26" y2="2" stroke="#39FF14" stroke-width="1.2" stroke-linecap="round" opacity="0.4"/>
         </svg>
       </span>
     </c-sidebar-brand>
@@ -52,7 +55,7 @@
   />
   <!--app-body-->
   <div class="body flex-grow-1">
-    <c-container breakpoint="lg" class="h-auto px-2 px-sm-3 px-lg-4">
+    <c-container [fluid]="true" class="h-auto px-2 px-sm-3 px-lg-4">
       <router-outlet />
     </c-container>
   </div>

@@ -12,6 +12,8 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 from loguru import logger
 
+from sqlalchemy import text as sa_text
+
 from ..database.session import DatabaseManager
 
 
@@ -49,6 +51,7 @@ class RiskEventType(str, Enum):
 class SignalLog(BaseModel):
     """Signal generation log entry."""
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    source: str = Field(default="unknown", description="Origin: paper_trading, demo_trading, live_trading, api_test")
     epic: str
     direction: SignalType
     confidence: float = Field(ge=0.0, le=1.0)
@@ -92,6 +95,7 @@ class SignalLog(BaseModel):
 class ExecutionLog(BaseModel):
     """Trade execution log entry."""
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    source: str = Field(default="unknown", description="Origin: paper_trading, demo_trading, live_trading, api_test")
     deal_id: str | None = None
     epic: str
     direction: str  # "BUY" or "SELL"
@@ -139,6 +143,7 @@ class ExecutionLog(BaseModel):
 class RiskEventLog(BaseModel):
     """Risk management decision log."""
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    source: str = Field(default="unknown", description="Origin: paper_trading, demo_trading, live_trading, api_test")
     event_type: RiskEventType
     epic: str | None = None
     description: str
@@ -212,6 +217,7 @@ class TradeLogger:
         model_proba: dict[str, float] | None = None,
         execution_status: ExecutionStatus | None = None,
         rejection_reason: str | None = None,
+        source: str = "unknown",
     ) -> None:
         """
         Log a trading signal.
@@ -226,6 +232,7 @@ class TradeLogger:
             model_proba: Class probabilities from model
             execution_status: Execution outcome (if known)
             rejection_reason: Reason for rejection (if applicable)
+            source: Origin of signal (paper_trading, demo_trading, live_trading, api_test)
         """
         signal = SignalLog(
             epic=epic,
@@ -237,6 +244,7 @@ class TradeLogger:
             model_proba=model_proba,
             execution_status=execution_status,
             rejection_reason=rejection_reason,
+            source=source,
         )
 
         await self._write_log("signal_log", signal)
@@ -256,6 +264,7 @@ class TradeLogger:
         kelly_fraction: float | None = None,
         risk_pct: float | None = None,
         equity_at_entry: float | None = None,
+        source: str = "unknown",
     ) -> None:
         """
         Log a trade execution.
@@ -273,6 +282,7 @@ class TradeLogger:
             kelly_fraction: Kelly fraction used
             risk_pct: Risk percentage
             equity_at_entry: Account equity at entry
+            source: Origin of execution (paper_trading, demo_trading, live_trading, api_test)
         """
         execution = ExecutionLog(
             deal_id=deal_id,
@@ -287,6 +297,7 @@ class TradeLogger:
             kelly_fraction=kelly_fraction,
             risk_pct=risk_pct,
             equity_at_entry=equity_at_entry,
+            source=source,
         )
 
         await self._write_log("execution_log", execution)
@@ -307,6 +318,7 @@ class TradeLogger:
         daily_pnl: float | None = None,
         open_positions: int | None = None,
         consecutive_losses: int | None = None,
+        source: str = "unknown",
     ) -> None:
         """
         Log a risk management decision.
@@ -322,6 +334,7 @@ class TradeLogger:
             daily_pnl: Daily P&L
             open_positions: Number of open positions
             consecutive_losses: Consecutive loss count
+            source: Origin of event (paper_trading, demo_trading, live_trading, api_test)
         """
         risk_event = RiskEventLog(
             event_type=event_type,
@@ -334,6 +347,7 @@ class TradeLogger:
             open_positions=open_positions,
             consecutive_losses=consecutive_losses,
             action=action,
+            source=source,
         )
 
         await self._write_log("risk_event_log", risk_event)
@@ -364,7 +378,7 @@ class TradeLogger:
                 placeholders = ", ".join([f":{k}" for k in data.keys()])
                 query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
 
-                await session.execute(query, data)
+                await session.execute(sa_text(query), data)
                 # No explicit commit needed - DatabaseManager.session() auto-commits
 
         except Exception as e:

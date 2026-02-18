@@ -28,7 +28,7 @@ class CircuitBreakerConfig(BaseModel):
 
     daily_loss_limit: float = Field(default=0.03, ge=0.005, le=0.20)
     max_consecutive_losses: int = Field(default=5, ge=2, le=20)
-    max_open_positions: int = Field(default=6, ge=1, le=50)
+    max_open_positions: int = Field(default=20, ge=1, le=50)
     slippage_threshold_pct: float = Field(default=0.005, ge=0.001, le=0.05)
     slippage_window: int = Field(default=5, ge=2, le=50)
     heartbeat_timeout_seconds: float = Field(default=30.0, ge=5.0, le=300.0)

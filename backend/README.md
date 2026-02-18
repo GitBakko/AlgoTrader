@@ -1,111 +1,100 @@
-# AlgoTrader AI - Backend
+# MANTIS AI - Backend
 
-Backend Python per il sistema di trading algoritmico AI.
+Backend Python per la piattaforma di trading algoritmico MANTIS AI.
 
 ## Setup
 
 ### Requisiti
+
 - Python 3.12+
-- Poetry
-- PostgreSQL 16+
-- Redis 7+
-- Docker (opzionale)
+- Capital.com demo account
+- PostgreSQL (opzionale — graceful degradation)
+- Redis (opzionale — graceful degradation)
 
 ### Installazione
 
-1. Installa Poetry (se non già installato):
-```bash
-curl -sSL https://install.python-poetry.org | python3 -
-```
-
-2. Installa le dipendenze:
 ```bash
 cd backend
-poetry install
-```
 
-3. Crea il file `.env`:
-```bash
+# Crea virtual environment
+python -m venv .venv
+.venv/Scripts/activate          # Windows
+# source .venv/bin/activate     # Linux/Mac
+
+# Installa le dipendenze
+pip install -r requirements.txt
+
+# Crea il file .env
 cp .env.example .env
-# Modifica .env con le tue credenziali
+# Modifica .env con le tue credenziali Capital.com
 ```
 
-4. Avvia i servizi con Docker Compose:
+### Download dati e training
+
 ```bash
-docker-compose up -d
+# Download dati storici (21 asset x 3 timeframe)
+python scripts/download_data.py
+
+# Training modelli XGBoost (walk-forward + Optuna)
+python scripts/train_models.py
+
+# Batch OOS scorecard (valuta tutti i 20 asset tradabili)
+python scripts/batch_oos_scorecard.py
 ```
 
-5. Esegui le migrazioni del database:
+### Avvio server
+
 ```bash
-poetry run alembic upgrade head
+uvicorn src.api.main:app --reload
 ```
 
-6. Avvia il server di sviluppo:
+## Testing
+
 ```bash
-poetry run uvicorn src.api.main:app --reload
-```
+# Tutti i test (1110 test)
+python -m pytest tests/ -v
 
-## Sviluppo
+# Quick run, stop al primo fallimento
+python -m pytest tests/ -x --no-cov -q
 
-### Code Quality
-
-Formatta il codice con Black:
-```bash
-poetry run black src tests
-```
-
-Linting con Ruff:
-```bash
-poetry run ruff check src tests
-```
-
-Type checking con Mypy:
-```bash
-poetry run mypy src
-```
-
-### Testing
-
-Esegui i test:
-```bash
-poetry run pytest
-```
-
-Con coverage:
-```bash
-poetry run pytest --cov=src --cov-report=html
-```
-
-### Pre-commit Hooks
-
-Installa i pre-commit hooks:
-```bash
-poetry run pre-commit install
+# Moduli specifici
+python -m pytest tests/risk/ -v         # Risk management
+python -m pytest tests/strategy/ -v     # Strategy engine
+python -m pytest tests/features/ -v     # Feature engineering
+python -m pytest tests/external/ -v     # External API clients
+python -m pytest tests/backtest/ -v     # Backtesting + scorecard
 ```
 
 ## Struttura
 
-```
+```text
 backend/
 ├── src/
-│   ├── api/          # FastAPI endpoints
-│   ├── broker/       # Capital.com integration
-│   ├── data/         # Data pipeline
-│   ├── features/     # Feature engineering
-│   ├── models/       # ML models
-│   ├── strategy/     # Trading strategies
-│   ├── risk/         # Risk management
-│   ├── execution/    # Order execution
-│   ├── backtest/     # Backtesting engine
-│   ├── monitoring/   # System monitoring
-│   └── utils/        # Utilities
-├── tests/            # Test suite
-├── config/           # Configuration files
-└── notebooks/        # Jupyter notebooks
+│   ├── api/               # 13 REST routers + WebSocket + middleware
+│   ├── auth/              # JWT + RBAC (3 ruoli, 30+ permessi)
+│   ├── audit/             # Audit logging
+│   ├── broker/            # Capital.com API wrapper (REST + WS)
+│   ├── data/              # Data pipeline (Parquet, DuckDB)
+│   ├── database/          # PostgreSQL session, repositories
+│   ├── execution/         # Order execution + state recovery
+│   ├── external/          # Finnhub, Marketaux, yfinance clients
+│   ├── features/          # 220+ features (technical, sentiment, macro)
+│   ├── models/            # XGBoost, LSTM, calibration, Optuna tuner
+│   ├── monitoring/        # Health checks, trade logger, alerting
+│   ├── risk/              # Circuit breakers, Kelly, trailing stops
+│   ├── security/          # Encrypted secrets (Fernet)
+│   ├── strategy/          # ML, Squeeze, VWAP, Pairs, Router
+│   ├── trading/           # Paper trading loop (21 asset)
+│   └── utils/             # Config, constants, event bus
+├── tests/                 # 1110 pytest test
+├── scripts/               # download, train, backtest, scorecard
+├── data/                  # Parquet, modelli, avatar, log
+└── alembic/               # Database migrations
 ```
 
 ## API Documentation
 
-Una volta avviato il server, la documentazione Swagger è disponibile a:
-- http://localhost:8000/docs (Swagger UI)
-- http://localhost:8000/redoc (ReDoc)
+Con il server avviato, la documentazione Swagger e disponibile a:
+
+- `http://localhost:8000/docs` (Swagger UI)
+- `http://localhost:8000/redoc` (ReDoc)

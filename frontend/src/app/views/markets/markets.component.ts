@@ -13,6 +13,7 @@ import { TvChartComponent, OhlcDataPoint } from '../../shared/components/tv-char
 import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
 import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.component';
 import { NewsWidgetComponent } from '../../shared/components/news-widget/news-widget.component';
+import { SkeletonCardComponent } from '../../shared/components/skeleton-card/skeleton-card.component';
 
 const EPICS = [
   // Existing 8 assets (EURUSD excluded)
@@ -39,6 +40,7 @@ const TIMEFRAMES = [
     ColComponent, RowComponent, TableDirective, BadgeComponent,
     ButtonGroupComponent, ButtonDirective,
     TvChartComponent, PriceFormatPipe, EpicLogoComponent, NewsWidgetComponent,
+    SkeletonCardComponent,
   ],
   template: `
     <!-- Header -->
@@ -56,6 +58,13 @@ const TIMEFRAMES = [
 
     <!-- Asset Cards Grid -->
     <c-row class="mb-4">
+      @if (livePrices().length === 0) {
+        @for (_ of [1,2,3,4,5,6,7,8]; track $index) {
+          <c-col xs="6" md="4" lg="3" class="mb-3">
+            <app-skeleton-card [rows]="2" [showHeader]="false" />
+          </c-col>
+        }
+      }
       @for (p of livePrices(); track p.epic) {
         <c-col xs="6" md="4" lg="3" class="mb-3">
           <c-card class="h-100 asset-card"

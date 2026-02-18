@@ -15,6 +15,7 @@ from src.models.calibration import ConfidenceCalibrator
 from src.models.schemas import ModelMetadata, PredictionResult, SignalClass
 from src.models.versioning import ModelVersioning
 from src.models.xgboost_model import XGBoostClassifier
+from src.utils.constants import TRADABLE_ASSETS
 
 
 class PredictionService:
@@ -29,17 +30,8 @@ class PredictionService:
     # EURUSD: tiny ATR (~0.003) causes massive positions → -99% OOS, 0% win rate
     EXCLUDED_EPICS = {"EURUSD"}
 
-    # Active trading epics (EURUSD excluded due to unviable OOS performance)
-    ACTIVE_EPICS = [
-        # Existing 8 assets (EURUSD excluded)
-        "XAUUSD", "BTCUSD", "US500", "WTIUSD",
-        "NVDA", "TSLA", "XAGUSD", "DE40",
-        # New 12 assets - Phase 12: Portfolio Expansion
-        "SOLUSD", "ETHUSD", "BNBUSD", "DOGUSD", "DASHUSD", "ICPUSD",
-        "NATGAS", "COPPER", "PLATINUM",
-        "GBPUSD", "USDJPY",
-        "NAS100",
-    ]
+    # Active trading epics (from centralized constants)
+    ACTIVE_EPICS = TRADABLE_ASSETS
 
     def __init__(
         self,
@@ -200,23 +192,34 @@ class PredictionService:
 
     def get_market_data(self, epic: str, timeframe: str = "1h") -> dict | None:
         """
-        Extract current price and ATR from latest data.
+        Extract current price, ATR, ADX, RSI, and regime from latest data.
         Reuses cached candles from predict() when available to avoid double query.
 
         Returns:
-            Dict with current_price and atr, or None if no data
+            Dict with current_price, atr, adx, rsi, regime (or None if no data)
         """
+        from src.features.regime import RegimeDetector
+
         # Reuse candles cached by predict() if same epic/timeframe
         cached = self._last_candles_cache.get(epic)
         if cached and cached[0] == timeframe:
             df = cached[1]
         else:
-            df = self.data_access.get_candles(epic, timeframe, limit=30)
+            # Need 300 bars for EMA-50 + ADX-14 stabilization
+            df = self.data_access.get_candles(epic, timeframe, limit=300)
         if df.is_empty():
             return None
 
         df = TechnicalIndicators.add_atr(df, period=14)
         df = TechnicalIndicators.add_adx(df, period=14)
+        df = TechnicalIndicators.add_rsi(df, period=14)
+        df = TechnicalIndicators.add_ema(df, periods=[50])
+
+        # Regime detection (requires adx + ema_50)
+        detector = RegimeDetector()
+        if "adx" in df.columns and "ema_50" in df.columns:
+            df = detector.detect(df)
+
         last = df.tail(1).row(0, named=True)
 
         result = {
@@ -224,10 +227,20 @@ class PredictionService:
             "atr": float(last.get("atr_14", last["close"] * 0.01)),
         }
 
-        # Include ADX for strategy filtering
+        # ADX for strategy filtering
         adx_val = last.get("adx")
         if adx_val is not None:
             result["adx"] = float(adx_val)
+
+        # RSI for overbought/oversold filtering
+        rsi_val = last.get("rsi_14")
+        if rsi_val is not None:
+            result["rsi"] = float(rsi_val)
+
+        # Regime for strategy routing and parameter adaptation
+        regime_val = last.get("regime")
+        if regime_val is not None:
+            result["regime"] = str(regime_val)
 
         return result
 

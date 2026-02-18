@@ -19,10 +19,19 @@ from src.api.schemas import error_response, success_response
 limiter = Limiter(key_func=get_remote_address)
 from src.auth.dependencies import get_current_user
 from src.auth.jwt import create_access_token
-from src.auth.models import Role, User
+from src.auth.models import RefreshToken, Role, User
 from src.auth.password import hash_password, verify_password
 from src.auth.rbac import RBACManager
-from src.auth.schemas import LoginRequest, LoginResponse, RegisterRequest, TokenResponse, UserResponse, PermissionResponse
+from src.auth.schemas import (
+    LoginRequest,
+    LoginResponse,
+    RefreshRequest,
+    RefreshResponse,
+    RegisterRequest,
+    TokenResponse,
+    UserResponse,
+    PermissionResponse,
+)
 from src.database.session import get_db_session
 from src.utils.config import get_settings
 from src.utils.avatar_handler import save_avatar, delete_avatar, get_avatar_file_path
@@ -103,13 +112,25 @@ async def login(
     token_data = {"sub": str(user.id)}
     access_token = create_access_token(token_data)
 
+    # Create refresh token (7 days default)
+    refresh_token = RefreshToken(
+        user_id=user.id,
+        expires_at=datetime.now(timezone.utc).replace(tzinfo=None)
+        + timedelta(days=settings.refresh_token_expire_days),
+    )
+    session.add(refresh_token)
+    await session.commit()
+    await session.refresh(refresh_token)
+
     logger.info(f"User {user.username} logged in successfully with {len(permissions)} permissions")
 
     return success_response(
         LoginResponse(
             access_token=access_token,
             token_type="bearer",
-            expires_in=settings.access_token_expire_minutes * 60,  # Convert to seconds
+            expires_in=settings.access_token_expire_minutes * 60,
+            refresh_token=refresh_token.token,
+            refresh_expires_in=settings.refresh_token_expire_days * 86400,
             user=UserResponse(
                 id=user.id,
                 username=user.username,
@@ -118,6 +139,7 @@ async def login(
                 role_name=role.name if role else "UNKNOWN",
                 is_active=user.is_active,
                 last_login=user.last_login,
+                avatar_url=user.avatar_url,
                 permissions=[
                     PermissionResponse(id=p.id, resource=p.resource, action=p.action)
                     for p in permissions
@@ -274,6 +296,124 @@ async def get_user_permissions(
     permissions = await rbac.get_user_permissions(current_user.id)
 
     return success_response({"permissions": permissions})
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Token Refresh & Logout
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+@router.post("/refresh")
+async def refresh_token(
+    body: RefreshRequest,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+):
+    """
+    Refresh access token using a valid refresh token (token rotation).
+
+    The old refresh token is revoked and a new pair (access + refresh) is issued.
+    Also cleans up expired tokens older than 30 days for the same user.
+    """
+    # Find the refresh token
+    stmt = select(RefreshToken).where(
+        RefreshToken.token == body.refresh_token,
+        RefreshToken.is_revoked == False,  # noqa: E712
+    )
+    result = await session.execute(stmt)
+    rt = result.scalar_one_or_none()
+
+    if not rt:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or revoked refresh token",
+        )
+
+    # Check expiration
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if rt.expires_at < now:
+        rt.is_revoked = True
+        await session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token expired",
+        )
+
+    # Revoke old token
+    rt.is_revoked = True
+
+    # Load the user
+    stmt_user = select(User).where(User.id == rt.user_id, User.is_active == True)  # noqa: E712
+    result_user = await session.execute(stmt_user)
+    user = result_user.scalar_one_or_none()
+
+    if not user:
+        await session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found or inactive",
+        )
+
+    # Create new access token
+    settings = get_settings()
+    access_token = create_access_token({"sub": str(user.id)})
+
+    # Create new refresh token (rotation)
+    new_rt = RefreshToken(
+        user_id=user.id,
+        expires_at=now + timedelta(days=settings.refresh_token_expire_days),
+    )
+    session.add(new_rt)
+
+    # Cleanup: delete expired tokens older than 30 days for this user
+    cutoff = now - timedelta(days=30)
+    stmt_cleanup = select(RefreshToken).where(
+        RefreshToken.user_id == user.id,
+        RefreshToken.expires_at < cutoff,
+    )
+    result_cleanup = await session.execute(stmt_cleanup)
+    old_tokens = result_cleanup.scalars().all()
+    for old_t in old_tokens:
+        await session.delete(old_t)
+
+    await session.commit()
+    await session.refresh(new_rt)
+
+    logger.info(f"Token refreshed for user {user.username}")
+
+    return success_response(
+        RefreshResponse(
+            access_token=access_token,
+            token_type="bearer",
+            expires_in=settings.access_token_expire_minutes * 60,
+            refresh_token=new_rt.token,
+            refresh_expires_in=settings.refresh_token_expire_days * 86400,
+        ).model_dump()
+    )
+
+
+@router.post("/logout")
+async def logout(
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+):
+    """
+    Logout user by revoking all their refresh tokens.
+    """
+    stmt = select(RefreshToken).where(
+        RefreshToken.user_id == current_user.id,
+        RefreshToken.is_revoked == False,  # noqa: E712
+    )
+    result = await session.execute(stmt)
+    tokens = result.scalars().all()
+
+    for token in tokens:
+        token.is_revoked = True
+
+    await session.commit()
+
+    logger.info(f"User {current_user.username} logged out, {len(tokens)} refresh tokens revoked")
+
+    return success_response({"message": "Logged out successfully"})
 
 
 # ═════════════════════════════════════════════════════════════════════════════

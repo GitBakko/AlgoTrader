@@ -7,6 +7,8 @@ import asyncio
 
 from loguru import logger
 
+from src.utils.constants import ALL_ASSETS
+
 
 async def initial_data_download(app_state) -> None:
     """
@@ -45,12 +47,7 @@ async def initial_data_download(app_state) -> None:
 
         # Download 1 year of 1h, 4h, 1d for all 21 assets (Phase 12: Portfolio Expansion)
         results = await downloader.download_all_assets(
-            assets=[
-                "XAUUSD", "BTCUSD", "US500", "WTIUSD", "EURUSD",
-                "NVDA", "TSLA", "XAGUSD", "DE40",
-                "SOLUSD", "ETHUSD", "BNBUSD", "DOGUSD", "DASHUSD", "ICPUSD",
-                "NATGAS", "COPPER", "PLATINUM", "GBPUSD", "USDJPY", "NAS100",
-            ],
+            assets=ALL_ASSETS,
             timeframes=["1h", "4h", "1d"],
             days_back=365,
         )

@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.execution.execution_engine import ExecutionEngine
 from src.execution.schemas import ExecutionMode
+from src.risk.kelly_sizer import AdaptiveKellySizer
 from src.risk.risk_manager import RiskManager
 from src.risk.schemas import RiskLimits
 from src.strategy.strategy_manager import StrategyManager
@@ -181,8 +182,9 @@ def init_services(app) -> None:
     app.state.risk_manager = RiskManager(
         initial_equity=10000.0,
         limits=limits,
+        kelly_sizer=AdaptiveKellySizer(),
     )
-    app.state.strategy_manager = StrategyManager()
+    app.state.strategy_manager = StrategyManager.from_optimal_thresholds()
 
     # In-memory stores (fallback when DB not available)
     app.state.signal_history = []
