@@ -175,6 +175,7 @@ def init_services(app) -> None:
         max_risk_per_trade=settings.max_risk_per_trade,
         max_daily_drawdown=settings.max_daily_drawdown,
         max_total_drawdown=settings.max_total_drawdown,
+        max_total_exposure=settings.max_total_exposure,
     )
 
     # Core trading services

@@ -1,6 +1,6 @@
 """
 Alert delivery channels.
-Email, Slack, and Webhook notification channels.
+Email, Slack, Telegram, and Webhook notification channels.
 """
 
 import asyncio
@@ -204,4 +204,51 @@ class WebhookChannel(AlertChannel):
 
         except Exception as e:
             logger.error(f"Failed to send webhook alert: {e}")
+            return False
+
+
+class TelegramChannel(AlertChannel):
+    """
+    Telegram alert channel using the Telegram Bot API.
+    Uses httpx (already installed) — no extra dependency required.
+
+    Setup:
+      1. Create a bot via @BotFather and get the token.
+      2. Send any message to the bot to get the chat_id.
+      3. Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env.
+    """
+
+    _TELEGRAM_API = "https://api.telegram.org"
+
+    def __init__(self, bot_token: str, chat_id: str, parse_mode: str = "Markdown"):
+        self.bot_token = bot_token
+        self.chat_id = chat_id
+        self.parse_mode = parse_mode
+
+    async def send(self, alert: Alert) -> bool:
+        """Send alert via Telegram Bot API sendMessage."""
+        if not self.bot_token or not self.chat_id:
+            logger.warning("Telegram channel: bot_token or chat_id not configured")
+            return False
+
+        try:
+            url = f"{self._TELEGRAM_API}/bot{self.bot_token}/sendMessage"
+            payload = {
+                "chat_id": self.chat_id,
+                "text": alert.format_markdown(),
+                "parse_mode": self.parse_mode,
+                "disable_web_page_preview": True,
+            }
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, json=payload, timeout=10.0)
+                data = response.json()
+                if response.status_code == 200 and data.get("ok"):
+                    logger.info("Alert sent to Telegram successfully")
+                    return True
+                else:
+                    logger.error(f"Telegram API error: {response.status_code} - {data}")
+                    return False
+
+        except Exception as e:
+            logger.error(f"Failed to send Telegram alert: {e}")
             return False

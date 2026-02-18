@@ -8,7 +8,9 @@ from typing import Any
 
 from loguru import logger
 
-from src.monitoring.alerting.channels import AlertChannel, EmailChannel, SlackChannel, WebhookChannel
+from src.monitoring.alerting.channels import (
+    AlertChannel, EmailChannel, SlackChannel, TelegramChannel, WebhookChannel,
+)
 from src.monitoring.alerting.schemas import Alert, AlertSeverity, AlertType
 from src.utils.config import get_settings
 
@@ -66,6 +68,15 @@ class AlertManager:
             if webhook_url:
                 self.channels.append(WebhookChannel(webhook_url=webhook_url))
                 logger.info("Webhook alerting enabled")
+
+        # Telegram channel
+        telegram_enabled = getattr(self.settings, "alert_telegram_enabled", False)
+        if telegram_enabled:
+            bot_token = getattr(self.settings, "telegram_bot_token", "")
+            chat_id = getattr(self.settings, "telegram_chat_id", "")
+            if bot_token and chat_id:
+                self.channels.append(TelegramChannel(bot_token=bot_token, chat_id=chat_id))
+                logger.info("Telegram alerting enabled")
 
         if not self.channels:
             logger.warning("No alert channels configured. Alerts will only be logged.")
@@ -212,6 +223,70 @@ class AlertManager:
             title=f"System Error in {component}",
             message=f"Critical error in {component}: {error}",
             details=details,
+        )
+        await self.send_alert(alert)
+
+    async def alert_trade_opened(
+        self,
+        epic: str,
+        direction: str,
+        size: float,
+        entry_price: float,
+        deal_id: str,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+    ):
+        """Send trade opened alert."""
+        sl_str = f" SL={stop_loss:.4f}" if stop_loss else ""
+        tp_str = f" TP={take_profit:.4f}" if take_profit else ""
+        alert = Alert(
+            alert_type=AlertType.TRADE_OPENED,
+            severity=AlertSeverity.INFO,
+            title=f"Trade Opened: {epic} {direction}",
+            message=(
+                f"{direction} {epic} size={size:.4f} @ {entry_price:.4f}"
+                f"{sl_str}{tp_str} deal={deal_id}"
+            ),
+            epic=epic,
+            details={
+                "direction": direction,
+                "size": size,
+                "entry_price": entry_price,
+                "deal_id": deal_id,
+                "stop_loss": stop_loss,
+                "take_profit": take_profit,
+            },
+        )
+        await self.send_alert(alert)
+
+    async def alert_trade_closed(
+        self,
+        epic: str,
+        direction: str,
+        deal_id: str,
+        exit_price: float,
+        pnl: float,
+        reason: str,
+    ):
+        """Send trade closed alert."""
+        severity = AlertSeverity.INFO if pnl >= 0 else AlertSeverity.WARNING
+        sign = "+" if pnl >= 0 else ""
+        alert = Alert(
+            alert_type=AlertType.TRADE_CLOSED,
+            severity=severity,
+            title=f"Trade Closed: {epic} P&L={sign}{pnl:.2f}",
+            message=(
+                f"Closed {direction} {epic} @ {exit_price:.4f} "
+                f"P&L={sign}{pnl:.2f} reason={reason} deal={deal_id}"
+            ),
+            epic=epic,
+            details={
+                "direction": direction,
+                "deal_id": deal_id,
+                "exit_price": exit_price,
+                "pnl": pnl,
+                "reason": reason,
+            },
         )
         await self.send_alert(alert)
 

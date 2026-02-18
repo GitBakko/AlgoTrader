@@ -306,6 +306,25 @@ class TradeLogger:
             f"status={status.value} deal_id={deal_id}"
         )
 
+        # Fire alert for trade executions in DEMO/LIVE mode
+        if status == ExecutionStatus.EXECUTED and source in ("demo_trading", "live_trading"):
+            try:
+                from src.monitoring.alerting.alert_manager import get_alert_manager
+                from src.utils.config import get_settings
+                if getattr(get_settings(), "alerts_enabled", False):
+                    am = get_alert_manager()
+                    await am.alert_trade_opened(
+                        epic=epic,
+                        direction=direction,
+                        size=size,
+                        entry_price=entry_price,
+                        deal_id=deal_id or "UNKNOWN",
+                        stop_loss=stop_loss,
+                        take_profit=take_profit,
+                    )
+            except Exception as alert_err:
+                logger.debug(f"Trade open alert failed (non-critical): {alert_err}")
+
     async def log_risk_decision(
         self,
         event_type: RiskEventType,
@@ -354,6 +373,21 @@ class TradeLogger:
         logger.warning(
             f"[RISK] {event_type.value} - {description} → {action}"
         )
+
+        # Fire alert for circuit breaker events
+        if event_type == RiskEventType.CIRCUIT_BREAKER:
+            try:
+                from src.monitoring.alerting.alert_manager import get_alert_manager
+                from src.utils.config import get_settings
+                if getattr(get_settings(), "alerts_enabled", False):
+                    am = get_alert_manager()
+                    await am.alert_circuit_breaker(
+                        epic=epic or "GLOBAL",
+                        reason=description,
+                        consecutive_losses=consecutive_losses or 0,
+                    )
+            except Exception as alert_err:
+                logger.debug(f"Circuit breaker alert failed (non-critical): {alert_err}")
 
     async def _write_log(
         self,

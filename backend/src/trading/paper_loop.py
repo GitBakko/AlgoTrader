@@ -72,6 +72,15 @@ class PaperTradingLoop:
         self.interval_seconds = interval_seconds
         self.epics = epics or list(TRADABLE_ASSETS)
 
+        # Derive log source from execution mode
+        from src.execution.schemas import ExecutionMode
+        mode = execution_engine.mode if execution_engine else ExecutionMode.PAPER
+        self._log_source = {
+            ExecutionMode.PAPER: "paper_trading",
+            ExecutionMode.DEMO: "demo_trading",
+            ExecutionMode.LIVE: "live_trading",
+        }.get(mode, "paper_trading")
+
         # Phase 8/14: trailing stop manager (use recovered one or create new)
         self.trailing_stop_manager = trailing_stop_manager or TrailingStopManager(trailing_stop_config)
         # In-memory trade history for Kelly sizing (last 200 trades, auto-discards old entries)
@@ -543,7 +552,7 @@ class PaperTradingLoop:
                     epic=epic, direction=_signal_type, confidence=signal.confidence,
                     strategy=signal.strategy_name or "unknown",
                     execution_status=ExecutionStatus.HOLD,
-                    source="paper_trading",
+                    source=self._log_source,
                 )
             except Exception:
                 pass
@@ -601,14 +610,14 @@ class PaperTradingLoop:
                     strategy=signal.strategy_name or "unknown",
                     execution_status=ExecutionStatus.REJECTED,
                     rejection_reason=risk_result.rejection_reason,
-                    source="paper_trading",
+                    source=self._log_source,
                 )
                 await tl.log_risk_decision(
                     event_type=RiskEventType.POSITION_LIMIT, epic=epic,
                     description=risk_result.rejection_reason or "Risk check failed",
                     action="rejected_trade", current_equity=equity,
                     open_positions=len(open_positions),
-                    source="paper_trading",
+                    source=self._log_source,
                 )
             except Exception:
                 pass
@@ -670,14 +679,14 @@ class PaperTradingLoop:
                     epic=epic, direction=_signal_type, confidence=signal.confidence,
                     strategy=signal.strategy_name or "unknown",
                     execution_status=ExecutionStatus.EXECUTED,
-                    source="paper_trading",
+                    source=self._log_source,
                 )
                 await tl.log_execution(
                     epic=epic, direction=signal.direction.value,
                     size=risk_result.position_size, entry_price=exec_result.fill_price or signal.entry_price,
                     status=ExecutionStatus.EXECUTED, deal_id=exec_result.deal_id,
                     stop_loss=risk_result.stop_loss, take_profit=risk_result.take_profit,
-                    equity_at_entry=equity, source="paper_trading",
+                    equity_at_entry=equity, source=self._log_source,
                 )
             except Exception:
                 pass
@@ -701,13 +710,13 @@ class PaperTradingLoop:
                     strategy=signal.strategy_name or "unknown",
                     execution_status=ExecutionStatus.EXEC_FAILED,
                     rejection_reason=exec_result.error,
-                    source="paper_trading",
+                    source=self._log_source,
                 )
                 await tl.log_execution(
                     epic=epic, direction=signal.direction.value,
                     size=risk_result.position_size, entry_price=signal.entry_price,
                     status=ExecutionStatus.EXEC_FAILED, error_message=exec_result.error,
-                    source="paper_trading",
+                    source=self._log_source,
                 )
             except Exception:
                 pass
@@ -771,6 +780,25 @@ class PaperTradingLoop:
                     )
                     if result.success:
                         logger.info(f"[{epic}] TP1 hit: closed 50% of position")
+                        # In DEMO/LIVE mode, partial_close returns a NEW deal_id
+                        # (close + reopen). Update trailing stop tracking if changed.
+                        new_deal_id = result.deal_id
+                        if new_deal_id and new_deal_id != deal_id:
+                            state = self.trailing_stop_manager.get_state(deal_id)
+                            if state:
+                                self.trailing_stop_manager.unregister_position(deal_id)
+                                self.trailing_stop_manager.register_position(
+                                    deal_id=new_deal_id,
+                                    epic=state.epic,
+                                    direction=state.direction,
+                                    entry_price=state.entry_price,
+                                    stop_loss=state.current_stop,
+                                    atr=None,
+                                )
+                                logger.info(
+                                    f"[{epic}] Trailing stop migrated: "
+                                    f"{deal_id} -> {new_deal_id}"
+                                )
                 except Exception as e:
                     logger.warning(f"[{epic}] TP1 partial close failed: {e}")
 
@@ -887,7 +915,7 @@ class PaperTradingLoop:
                                     entry_price=entry_price,
                                     status=ExecutionStatus.EXECUTED, deal_id=deal_id,
                                     exit_price=current_price, realized_pnl=round(pnl, 2),
-                                    source="paper_trading",
+                                    source=self._log_source,
                                 )
                             except Exception:
                                 pass

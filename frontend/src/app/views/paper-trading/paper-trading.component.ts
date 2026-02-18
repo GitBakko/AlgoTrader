@@ -100,6 +100,16 @@ interface GroupedPosition {
           }
           {{ status()?.running ? 'Stop' : 'Start' }}
         </button>
+        @if (status()?.running || livePositions().length > 0) {
+          <button cButton color="danger" size="sm" class="ms-2 emergency-stop-btn"
+                  (click)="emergencyStop()"
+                  [disabled]="emergencyStopInProgress()">
+            @if (emergencyStopInProgress()) {
+              <c-spinner size="sm" class="me-1"></c-spinner>
+            }
+            EMERGENCY STOP
+          </button>
+        }
       </div>
     </div>
 
@@ -677,6 +687,7 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   readonly newsService = inject(NewsService);
 
   readonly actionInProgress = signal(false);
+  readonly emergencyStopInProgress = signal(false);
   readonly currentEpic = signal<string>('XAUUSD');
   readonly currentMarketStatus = signal<MarketStatusResponse | null>(null);
   readonly selectedEpic = signal<string | null>(null);
@@ -868,6 +879,26 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.toast.error(err?.error?.error || 'Operazione fallita');
         this.actionInProgress.set(false);
+      }
+    });
+  }
+
+  emergencyStop(): void {
+    const confirmed = window.confirm(
+      'ATTENZIONE: Questo fermerà il trading e chiuderà TUTTE le posizioni aperte. Procedere?'
+    );
+    if (!confirmed) return;
+
+    this.emergencyStopInProgress.set(true);
+    this.trading.emergencyStop().subscribe({
+      next: (data) => {
+        this.toast.success(data.message);
+        this.emergencyStopInProgress.set(false);
+        this.loadAll();
+      },
+      error: (err) => {
+        this.toast.error(err?.error?.error || 'Emergency stop fallito');
+        this.emergencyStopInProgress.set(false);
       }
     });
   }

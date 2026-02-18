@@ -117,3 +117,82 @@ async def trading_signals(request: Request):
         return success_response([])
 
     return success_response(loop.get_signal_history())
+
+
+@router.post("/emergency-stop")
+@limiter.limit("5/minute")
+async def emergency_stop(request: Request):
+    """
+    Emergency stop: halt the trading loop and close ALL open positions.
+
+    This is a destructive operation — it stops the loop immediately and
+    attempts to close every position via the broker (or paper tracker).
+    """
+    loop = _get_loop(request)
+    if loop is None:
+        return error_response("Trading loop not initialized", 503)
+
+    result: dict = {"loop_stopped": False, "positions_closed": [], "errors": []}
+
+    # 1. Stop the loop
+    if loop.is_running:
+        loop.stop()
+        result["loop_stopped"] = True
+        logger.warning("[EMERGENCY STOP] Trading loop stopped")
+    else:
+        result["loop_stopped"] = True  # already stopped
+        logger.info("[EMERGENCY STOP] Trading loop was already stopped")
+
+    # 2. Fetch open positions
+    try:
+        positions = await asyncio.wait_for(
+            loop.get_positions_async(), timeout=_BROKER_TIMEOUT
+        )
+    except (asyncio.TimeoutError, Exception) as e:
+        logger.warning(f"[EMERGENCY STOP] Async positions failed ({e}), trying sync")
+        positions = loop.get_paper_positions()
+
+    # 3. Close each position
+    for pos in positions:
+        deal_id = pos.get("deal_id") or pos.get("dealId")
+        if not deal_id:
+            continue
+        try:
+            close_result = await asyncio.wait_for(
+                loop.execution_engine.close_position(deal_id, reason="EMERGENCY_STOP"),
+                timeout=_BROKER_TIMEOUT,
+            )
+            if close_result.success:
+                result["positions_closed"].append(deal_id)
+            else:
+                result["errors"].append(
+                    f"{deal_id}: {close_result.error or 'close failed'}"
+                )
+        except Exception as e:
+            result["errors"].append(f"{deal_id}: {e}")
+
+    closed = len(result["positions_closed"])
+    errors = len(result["errors"])
+    logger.warning(
+        f"[EMERGENCY STOP] Complete: {closed} closed, {errors} errors"
+    )
+
+    # 4. Fire alert (non-critical)
+    try:
+        from src.monitoring.alerting.alert_manager import get_alert_manager
+        from src.utils.config import get_settings
+        if getattr(get_settings(), "alerts_enabled", False):
+            am = get_alert_manager()
+            await am.alert_circuit_breaker(
+                epic="ALL",
+                reason=f"EMERGENCY STOP: {closed} positions closed, {errors} errors",
+                consecutive_losses=0,
+            )
+    except Exception:
+        pass
+
+    return success_response({
+        "message": f"Emergency stop eseguito: {closed} posizioni chiuse"
+                   + (f", {errors} errori" if errors else ""),
+        **result,
+    })

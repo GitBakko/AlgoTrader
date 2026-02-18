@@ -38,6 +38,12 @@ class RiskLimits(BaseModel):
         le=50,
         description="Maximum total open positions across all assets"
     )
+    max_total_exposure: float = Field(
+        default=1.0,
+        ge=0.01,
+        le=1.0,
+        description="Maximum total exposure as fraction of equity (1.0 = no cap)"
+    )
 
 
 class DrawdownState(BaseModel):

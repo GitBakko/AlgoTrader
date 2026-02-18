@@ -363,6 +363,14 @@
     }
   }
 
+  // Emergency stop button
+  .emergency-stop-btn {
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+  }
+
   // Mobile table min-width
   @media (max-width: 991.98px) {
     table[cTable] {

@@ -116,7 +116,25 @@ class RiskManager:
                 rejection_reason=reason,
             )
 
-        # 1c. Check legacy drawdown circuit breaker
+        # 1c. Check total exposure cap
+        if self.limits.max_total_exposure < 1.0 and open_positions and equity > 0:
+            total_notional = sum(
+                abs(p.get("size", 0) * p.get("level", p.get("entry_price", 0)))
+                for p in open_positions
+            )
+            exposure_ratio = total_notional / equity
+            if exposure_ratio >= self.limits.max_total_exposure:
+                reason = (
+                    f"Total exposure {exposure_ratio:.1%} >= limit "
+                    f"{self.limits.max_total_exposure:.0%}"
+                )
+                logger.warning(f"Trade rejected: {reason}")
+                return RiskCheckResult(
+                    approved=False,
+                    rejection_reason=reason,
+                )
+
+        # 1d. Check legacy drawdown circuit breaker
         if self.drawdown_monitor.is_circuit_breaker_active():
             reason = self.drawdown_monitor.state.circuit_breaker_reason or "Circuit breaker active"
             logger.warning(f"Trade rejected: {reason}")

@@ -116,3 +116,57 @@ class TestRiskManager:
         assert result.approved is False
         assert "Max total positions reached" in result.rejection_reason
         assert "3/3" in result.rejection_reason
+
+    def test_rejects_when_total_exposure_exceeded(self):
+        """Reject trades when total notional / equity exceeds max_total_exposure."""
+        limits = RiskLimits(max_total_exposure=0.50)
+        rm = RiskManager(initial_equity=10000.0, limits=limits)
+
+        # Positions with notional = 0.5 * 2000 + 1.0 * 68000 = 69000
+        # exposure = 69000 / 10000 = 6.9 → way over 0.50
+        open_positions = [
+            {"epic": "XAUUSD", "direction": "BUY", "size": 0.5, "level": 2000.0},
+            {"epic": "BTCUSD", "direction": "BUY", "size": 1.0, "level": 68000.0},
+        ]
+        signal = _make_signal(epic="US500")
+        result = rm.check_trade(
+            signal=signal, equity=10000.0, atr=20.0,
+            open_positions=open_positions,
+        )
+        assert result.approved is False
+        assert "Total exposure" in result.rejection_reason
+
+    def test_approves_when_exposure_under_limit(self):
+        """Approve trades when exposure is below the cap."""
+        limits = RiskLimits(max_total_exposure=0.50)
+        rm = RiskManager(initial_equity=100000.0, limits=limits)
+
+        # Notional = 0.01 * 2000 = 20, exposure = 20 / 100000 ≈ 0.0002
+        open_positions = [
+            {"epic": "XAUUSD", "direction": "BUY", "size": 0.01, "level": 2000.0},
+        ]
+        signal = _make_signal(epic="BTCUSD")
+        result = rm.check_trade(
+            signal=signal, equity=100000.0, atr=20.0,
+            open_positions=open_positions,
+        )
+        assert result.approved is True
+
+    def test_exposure_check_skipped_when_default(self):
+        """Default max_total_exposure=1.0 skips the check entirely."""
+        rm = RiskManager(initial_equity=10000.0)
+        assert rm.limits.max_total_exposure == 1.0
+
+        # Even with huge notional, should pass (cap disabled)
+        open_positions = [
+            {"epic": "BTCUSD", "direction": "BUY", "size": 10.0, "level": 68000.0},
+        ]
+        signal = _make_signal(epic="XAUUSD")
+        result = rm.check_trade(
+            signal=signal, equity=10000.0, atr=20.0,
+            open_positions=open_positions,
+        )
+        # Should NOT be rejected for exposure (may be rejected for other reasons
+        # but not for "Total exposure")
+        if not result.approved:
+            assert "Total exposure" not in (result.rejection_reason or "")

@@ -209,6 +209,7 @@ class Settings(BaseSettings):
     execution_mode: str = Field(default="PAPER", alias="EXECUTION_MODE")
     min_confidence_threshold: float = Field(default=0.65, alias="MIN_CONFIDENCE_THRESHOLD")
     max_total_open_positions: int = Field(default=5, alias="MAX_TOTAL_OPEN_POSITIONS")
+    max_total_exposure: float = Field(default=1.0, alias="MAX_TOTAL_EXPOSURE")
 
     # ===== External APIs =====
     finnhub_api_key: str = Field(default="", alias="FINNHUB_API_KEY")
@@ -256,6 +257,9 @@ class Settings(BaseSettings):
     alert_slack_webhook_url: str = Field(default="", alias="ALERT_SLACK_WEBHOOK_URL")
     alert_webhook_enabled: bool = Field(default=False, alias="ALERT_WEBHOOK_ENABLED")
     alert_webhook_url: str = Field(default="", alias="ALERT_WEBHOOK_URL")
+    alert_telegram_enabled: bool = Field(default=False, alias="ALERT_TELEGRAM_ENABLED")
+    telegram_bot_token: str = Field(default="", alias="TELEGRAM_BOT_TOKEN")
+    telegram_chat_id: str = Field(default="", alias="TELEGRAM_CHAT_ID")
     alert_drawdown_threshold_pct: float = Field(default=10.0, alias="ALERT_DRAWDOWN_THRESHOLD_PCT")
     alert_consecutive_losses_threshold: int = Field(
         default=5, alias="ALERT_CONSECUTIVE_LOSSES_THRESHOLD"

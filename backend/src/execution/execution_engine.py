@@ -305,13 +305,75 @@ class ExecutionEngine:
                 fill_price=position.get("level"),
             )
 
-        # Live: close via broker (need to reopen smaller position)
-        result = await self._order_manager.close_order(deal_id)
-        if not result.success:
-            return result
+        # DEMO/LIVE: Capital.com has no partial-close API.
+        # Strategy: close full position, reopen with remaining size.
 
-        logger.info(f"Partial close (live): {deal_id} -{close_pct:.0%} reason={reason}")
-        return result
+        # Step 1: Read position details before closing
+        position = await self._position_tracker.get_position(deal_id)
+        if position is None:
+            return ExecutionResult(
+                success=False,
+                deal_id=deal_id,
+                error=f"Position not found for partial close: {deal_id}",
+            )
+
+        original_size = position.get("size", 0)
+        remaining_size = round(original_size * (1.0 - close_pct), 6)
+        direction = position.get("direction", "BUY")
+        epic = position.get("epic", "")
+        stop_level = position.get("stop_level")
+        profit_level = position.get("profit_level")
+        entry_price = position.get("level", 0.0)
+
+        # Step 2: Close full position via broker
+        close_result = await self._order_manager.close_order(deal_id)
+        if not close_result.success:
+            return close_result
+
+        # Remove old position from local tracker
+        self._position_tracker.close_paper_position(deal_id)
+
+        # Step 3: Reopen with remaining size
+        reopen_order = ExecutionOrder(
+            epic=epic,
+            direction=direction,
+            size=remaining_size,
+            entry_price=close_result.fill_price or entry_price,
+            stop_loss=stop_level,
+            take_profit=profit_level,
+        )
+        reopen_result = await self._order_manager.submit_order(reopen_order)
+
+        if reopen_result.success and reopen_result.deal_id:
+            # Register new position in local tracker
+            self._position_tracker.open_paper_position(
+                order=reopen_order,
+                fill_price=reopen_result.fill_price or entry_price,
+                deal_id=reopen_result.deal_id,
+            )
+            logger.info(
+                f"Partial close (DEMO): closed {deal_id} -{close_pct:.0%}, "
+                f"reopened as {reopen_result.deal_id} size={remaining_size:.4f} "
+                f"reason={reason}"
+            )
+            # Return new deal_id so caller can update trailing stop tracking
+            return ExecutionResult(
+                success=True,
+                deal_id=reopen_result.deal_id,
+                fill_price=reopen_result.fill_price,
+            )
+
+        # Position was closed but reopen failed — report with error note
+        logger.error(
+            f"Partial close (DEMO): closed {deal_id} but failed to reopen "
+            f"remaining {remaining_size:.4f}: {reopen_result.error}"
+        )
+        return ExecutionResult(
+            success=True,
+            deal_id=deal_id,
+            fill_price=close_result.fill_price,
+            error=f"Reopen of remaining {remaining_size:.4f} failed: {reopen_result.error}",
+        )
 
     async def get_open_positions(self, epic: str | None = None) -> list[dict]:
         """

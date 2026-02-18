@@ -1,10 +1,11 @@
 """Tests for partial close functionality in ExecutionEngine and PositionTracker."""
 
 import pytest
+from unittest.mock import AsyncMock, MagicMock
 
 from src.execution.execution_engine import ExecutionEngine
 from src.execution.position_tracker import PositionTracker
-from src.execution.schemas import ExecutionMode, ExecutionOrder
+from src.execution.schemas import ExecutionMode, ExecutionOrder, ExecutionResult
 
 
 @pytest.fixture
@@ -212,3 +213,111 @@ class TestExecutionEnginePartialClose:
         assert pos["stop_level"] == 2140.0
         assert pos["profit_level"] == 2020.0
         assert pos["size"] == pytest.approx(1.34, rel=1e-2)  # 2.0 * (1 - 0.33)
+
+
+@pytest.mark.unit
+@pytest.mark.execution
+class TestExecutionEnginePartialCloseDemo:
+    """Tests for partial_close in DEMO/LIVE mode (close-then-reopen)."""
+
+    @pytest.fixture
+    def demo_engine(self):
+        """Create an execution engine in DEMO mode with mocked broker."""
+        mock_broker = MagicMock()
+        engine = ExecutionEngine(broker=mock_broker, mode=ExecutionMode.DEMO)
+        return engine
+
+    @pytest.mark.asyncio
+    async def test_demo_partial_close_closes_and_reopens(self, demo_engine):
+        """DEMO partial close: closes full position, reopens with reduced size."""
+        # Pre-inject a position into the tracker
+        order = ExecutionOrder(
+            epic="XAUUSD", direction="BUY", size=1.0,
+            entry_price=2000.0, stop_loss=1960.0, take_profit=2080.0,
+        )
+        demo_engine._position_tracker.open_paper_position(order, 2000.0, "DEAL-001")
+
+        # Mock close_order → success
+        demo_engine._order_manager.close_order = AsyncMock(
+            return_value=ExecutionResult(
+                success=True, deal_id="DEAL-001", fill_price=2005.0
+            )
+        )
+        # Mock submit_order → success with new deal_id
+        demo_engine._order_manager.submit_order = AsyncMock(
+            return_value=ExecutionResult(
+                success=True, deal_id="REOPEN-001", fill_price=2005.0
+            )
+        )
+
+        result = await demo_engine.partial_close("DEAL-001", 0.5, "TP1_HIT")
+
+        assert result.success is True
+        assert result.deal_id == "REOPEN-001"  # new deal_id from reopen
+        demo_engine._order_manager.close_order.assert_awaited_once_with("DEAL-001")
+        demo_engine._order_manager.submit_order.assert_awaited_once()
+
+        # Verify reopened position has correct size (0.5 of 1.0)
+        reopen_order = demo_engine._order_manager.submit_order.call_args[0][0]
+        assert reopen_order.size == pytest.approx(0.5)
+        assert reopen_order.stop_loss == 1960.0
+        assert reopen_order.take_profit == 2080.0
+
+    @pytest.mark.asyncio
+    async def test_demo_partial_close_position_not_found(self, demo_engine):
+        """Returns error when position not found in tracker."""
+        result = await demo_engine.partial_close("UNKNOWN", 0.5)
+        assert result.success is False
+        assert "not found" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_demo_partial_close_reopen_failure(self, demo_engine):
+        """If reopen fails, returns success=True (close happened) with error note."""
+        order = ExecutionOrder(
+            epic="XAUUSD", direction="BUY", size=1.0,
+            entry_price=2000.0,
+        )
+        demo_engine._position_tracker.open_paper_position(order, 2000.0, "DEAL-002")
+
+        # Mock close → success
+        demo_engine._order_manager.close_order = AsyncMock(
+            return_value=ExecutionResult(
+                success=True, deal_id="DEAL-002", fill_price=2005.0
+            )
+        )
+        # Mock reopen → failure
+        demo_engine._order_manager.submit_order = AsyncMock(
+            return_value=ExecutionResult(
+                success=False, deal_id=None, error="InsufficientFunds"
+            )
+        )
+
+        result = await demo_engine.partial_close("DEAL-002", 0.5, "TP1_HIT")
+
+        assert result.success is True  # close succeeded
+        assert result.error is not None  # reopen failure noted
+        assert "failed" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_demo_partial_close_broker_close_fails(self, demo_engine):
+        """If broker close fails, returns the failure immediately."""
+        order = ExecutionOrder(
+            epic="BTCUSD", direction="SELL", size=0.5,
+            entry_price=68000.0,
+        )
+        demo_engine._position_tracker.open_paper_position(order, 68000.0, "DEAL-003")
+
+        # Mock close → failure
+        demo_engine._order_manager.close_order = AsyncMock(
+            return_value=ExecutionResult(
+                success=False, deal_id="DEAL-003", error="BrokerRejected"
+            )
+        )
+
+        result = await demo_engine.partial_close("DEAL-003", 0.5)
+
+        assert result.success is False
+        assert "BrokerRejected" in result.error
+        # submit_order should NOT have been called
+        demo_engine._order_manager.submit_order = AsyncMock()
+        demo_engine._order_manager.submit_order.assert_not_awaited()

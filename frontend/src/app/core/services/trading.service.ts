@@ -218,4 +218,13 @@ export class TradingService {
   stopPaperTrading() {
     return this.api.post<PaperTradingStatus & { message: string }>('/api/trading/stop');
   }
+
+  emergencyStop() {
+    return this.api.post<{
+      message: string;
+      loop_stopped: boolean;
+      positions_closed: string[];
+      errors: string[];
+    }>('/api/trading/emergency-stop');
+  }
 }

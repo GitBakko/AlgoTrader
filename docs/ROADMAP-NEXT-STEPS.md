@@ -1,8 +1,9 @@
 # MANTIS AI - Roadmap & Next Steps
 
-> Current status: P3 complete (2026-02-18). 1110 tests, 0 errors. Production readiness ~99%.
+> Current status: P4 complete (2026-02-18). 1136 tests, 0 errors. Production readiness ~99%.
 > ML models: 20/20 tradable assets have trained XGBoost models (EURUSD excluded — ATR too small).
 > Infrastructure: CI/CD (GitHub Actions), JSON logging, Prometheus/Grafana, security headers, Docker prod override.
+> DEMO readiness: partial_close fix, Telegram alerts, AlertManager wired, emergency kill switch, max_total_exposure.
 
 ---
 
@@ -65,20 +66,34 @@
 
 ---
 
-## P4 — Toward Live Trading (Future)
+## P4 — DEMO Trading Readiness [COMPLETE]
 
-### Demo Trading on Capital.com
+- [x] **Fix partial_close() for DEMO/LIVE**: Close-then-reopen pattern (Capital.com has no partial close API)
+- [x] **Telegram alert channel**: New `TelegramChannel` class + `TRADE_OPENED`, `TRADE_CLOSED`, `SIGNAL_GENERATED` AlertTypes
+- [x] **Wire AlertManager**: TradeLogger hooks fire alerts in DEMO/LIVE mode; `source` field dynamic per execution mode
+- [x] **Emergency kill switch**: `POST /api/trading/emergency-stop` endpoint + frontend button with Italian confirmation
+- [x] **max_total_exposure risk limit**: Portfolio-level exposure cap in `RiskLimits` (default 1.0 = no cap, backward-compatible)
+- [x] All alert code guarded by `ALERTS_ENABLED=false` (default off) + `try/except` wrappers
+- [x] 1136 tests passing, 0 failures
 
-- [ ] Switch from PAPER to DEMO (real broker, fake money)
+---
+
+## P5 — Live Trading (Future)
+
+### Demo Validation
+
+- [ ] Switch `EXECUTION_MODE=DEMO` and run 2+ weeks on Capital.com demo
+- [ ] Configure Telegram alerts (`ALERT_TELEGRAM_ENABLED=true`)
+- [ ] Monitor partial_close reopen pattern in real market conditions
 - [ ] Test latency, slippage, order rejections
-- [ ] Minimum 2 weeks profitable demo trading
+- [ ] Tune `MAX_TOTAL_EXPOSURE` (start at 0.30 = 30% of equity)
 
 ### Live Preparation
 
-- [ ] 0.5% risk per trade, 5% max total exposure
-- [ ] Email/Slack alerts for every trade and circuit breaker
-- [ ] Emergency kill switch (frontend + API)
-- [ ] Gradual position size increase based on live performance
+- [ ] 0.5% risk per trade, gradual increase based on demo performance
+- [ ] Review all circuit breaker thresholds for live conditions
+- [ ] Emergency kill switch stress test
+- [ ] Gradual position size increase based on live Sharpe ratio
 
 ### Advanced Models (Research)
 
@@ -97,4 +112,5 @@
 | P1 | Regime detection + scorecard + sentiment | 12h | ML hardening | **COMPLETE** |
 | P2 | Toast + skeletons + token refresh + mobile | 13h | UX polish | **COMPLETE** |
 | P3 | CI/CD + logging + metrics + security + Docker | 8h | DevOps maturity | **COMPLETE** |
-| **P4** | **Demo -> live trading** | **2+ weeks** | **Revenue generation** | **NEXT** |
+| P4 | DEMO readiness (partial_close, alerts, kill switch) | 6h | DEMO trading | **COMPLETE** |
+| **P5** | **Live trading (2+ weeks demo first)** | **2+ weeks** | **Revenue generation** | **NEXT** |

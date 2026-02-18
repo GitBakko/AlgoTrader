@@ -33,15 +33,15 @@ AlgoTrader/
 │   │   ├── data/              # Data pipeline (collection, cleaning, storage)
 │   │   ├── database/          # PostgreSQL session, repositories, backup manager
 │   │   ├── features/          # Feature engineering (220 features: technical, candlestick, fibonacci, keltner, vwap, market structure)
-│   │   ├── execution/         # Order execution engine + state recovery
+│   │   ├── execution/         # Order execution engine + state recovery + partial close (DEMO: close-then-reopen)
 │   │   ├── models/            # ML models (XGBoost, LSTM, calibration, tuner, versioning)
-│   │   ├── monitoring/        # Health checks, trade logger, log analyzer, alerting, metrics
+│   │   ├── monitoring/        # Health checks, trade logger, log analyzer, alerting (Email/Slack/Telegram/Webhook), metrics
 │   │   ├── risk/              # Risk management (circuit breakers, Kelly, trailing stops, equity curve filter)
 │   │   ├── security/          # Encrypted secrets (Fernet), security models
 │   │   ├── strategy/          # Strategies (ML, squeeze, VWAP, pairs, strategy router)
-│   │   ├── trading/           # Paper trading loop
+│   │   ├── trading/           # Paper/demo trading loop + emergency stop
 │   │   └── utils/             # Config, avatar handler, event bus, sanitization
-│   ├── tests/                 # 1110+ pytest tests (69% coverage, 80%+ on critical modules)
+│   ├── tests/                 # 1136+ pytest tests (69% coverage, 80%+ on critical modules)
 │   ├── scripts/               # init_permissions.py, promote_user_to_god.py, train/download scripts
 │   ├── alembic/               # Database migrations
 │   └── data/                  # Local storage (historical, models, avatars, logs, backups)
@@ -152,6 +152,8 @@ AlgoTrader/
 4. **Paper trading first** - Always validate on demo before live trading
 5. **Graceful degradation** - App works without PostgreSQL, Redis, or DuckDB
 6. **State recovery** - PAPER→PostgreSQL, DEMO/LIVE→Broker API+DB fallback
+7. **Alert system** - TradeLogger fires alerts (Email/Slack/Telegram/Webhook) in DEMO/LIVE mode; off by default (`ALERTS_ENABLED=false`)
+8. **Emergency kill switch** - `POST /api/trading/emergency-stop` stops loop + closes all positions + fires CRITICAL alert
 
 ---
 
