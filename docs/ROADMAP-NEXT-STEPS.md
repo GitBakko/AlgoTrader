@@ -1,7 +1,8 @@
 # MANTIS AI - Roadmap & Next Steps
 
-> Current status: P3 complete. 1110 tests, 0 errors. Production readiness ~99%.
+> Current status: P3 complete (2026-02-18). 1110 tests, 0 errors. Production readiness ~99%.
 > ML models: 20/20 tradable assets have trained XGBoost models (EURUSD excluded — ATR too small).
+> Infrastructure: CI/CD (GitHub Actions), JSON logging, Prometheus/Grafana, security headers, Docker prod override.
 
 ---
 

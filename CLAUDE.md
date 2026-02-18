@@ -55,8 +55,10 @@ AlgoTrader/
 │   │   ├── views/             # Page components (dashboard, markets, positions, signals, backtest, etc.)
 │   │   └── layout/            # Default layout with sidebar, header, user dropdown
 │   └── src/scss/              # MANTIS AI theme (_custom.scss, _palette.scss)
+├── infra/                     # Prometheus config, Grafana dashboards
 ├── docs/                      # Architecture and development docs
-└── docker-compose.yml
+├── docker-compose.yml         # Dev stack (PG, Redis, backend, frontend, pgAdmin, Redis Commander)
+└── docker-compose.prod.yml    # Production override (4 workers, memory limits, no bind mounts)
 ```
 
 ---
@@ -125,6 +127,21 @@ AlgoTrader/
 - Rate limiting: slowapi on auth endpoints (10/min login, 5/hour register)
 - GZip compression on responses > 1KB
 - WebSocket for real-time price streaming and trade updates
+- Security headers: CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, HSTS (production only)
+- CORS: explicit `allow_methods`/`allow_headers` (not wildcards)
+- Request correlation: `X-Request-ID` header on all responses, injected via `logger.contextualize`
+
+### Logging & Monitoring
+
+- **Loguru** structured logging: text sink (`logs/mantis.log`) + JSON sink (`logs/mantis.json.log`, `serialize=True`)
+- **Request correlation IDs**: UUID per request in `X-Request-ID` header, auto-injected into log `extra`
+- **Prometheus metrics**: `/metrics` endpoint (guarded by `ENABLE_METRICS=true`), MetricsCollector wired into signals, executions, predictions, circuit breakers
+- **Grafana dashboards**: `docker-compose --profile monitoring up` → Prometheus (:9090) + Grafana (:3000)
+
+### CI/CD
+
+- `.github/workflows/ci.yml`: pip-based (not Poetry), `backend-lint` (ruff+black) → `backend-tests` (pytest, coverage 80%) → `docker-build`
+- Pre-commit hooks (backend): ruff, black, mypy, bandit
 
 ---
 
