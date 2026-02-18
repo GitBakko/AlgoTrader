@@ -126,6 +126,44 @@ services:
     profiles:
       - tools  # Start only with: docker-compose --profile tools up
 
+  # Prometheus (Metrics collection)
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    container_name: mantis-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - mantis-network
+    profiles:
+      - monitoring  # Start with: docker-compose --profile monitoring up
+
+  # Grafana (Metrics dashboards)
+  grafana:
+    image: grafana/grafana:11.5.2
+    container_name: mantis-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: mantis
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - mantis-network
+    profiles:
+      - monitoring  # Start with: docker-compose --profile monitoring up
+
 volumes:
   postgres_data:
     driver: local
@@ -134,6 +172,10 @@ volumes:
   pgadmin_data:
     driver: local
   backend_cache:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
     driver: local
 
 networks:

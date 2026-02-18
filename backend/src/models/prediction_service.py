@@ -3,6 +3,7 @@ Prediction service: orchestrates real-time ML inference.
 Pipeline: DataAccess -> FeatureBuilder -> XGBoost -> PredictionResult
 """
 
+import time as _time
 from datetime import datetime, timezone
 
 import numpy as np
@@ -167,6 +168,7 @@ class PredictionService:
 
         # Run inference
         try:
+            t0 = _time.monotonic()
             proba = model.predict_proba(X)
 
             # Apply confidence calibration if available
@@ -176,6 +178,20 @@ class PredictionService:
             proba_row = proba[0]
             predicted_class = int(np.argmax(proba_row))
             confidence = float(proba_row[predicted_class])
+            inference_duration = _time.monotonic() - t0
+
+            # Record prediction metric
+            try:
+                from src.monitoring.metrics import MetricsCollector
+                MetricsCollector.record_model_prediction(
+                    epic=epic,
+                    model_type="xgboost",
+                    predicted_class=SignalClass(predicted_class).name,
+                    confidence=confidence,
+                    duration=inference_duration,
+                )
+            except Exception:
+                pass
 
             return PredictionResult(
                 signal_class=predicted_class,

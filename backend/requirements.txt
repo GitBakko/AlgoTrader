@@ -1,0 +1,68 @@
+# MANTIS AI - Production Dependencies
+# Generated from working venv, pinned for reproducibility
+
+# Web Framework
+fastapi==0.128.7
+uvicorn[standard]==0.40.0
+pydantic==2.12.5
+pydantic-settings==2.12.0
+starlette==0.52.1
+python-multipart==0.0.22
+email-validator==2.3.0
+
+# Machine Learning
+torch==2.10.0+cpu
+xgboost==3.2.0
+scikit-learn==1.8.0
+optuna==4.7.0
+
+# Data Processing
+pandas==3.0.1
+numpy==2.4.2
+pyarrow==23.0.0
+polars==1.38.1
+
+# Database
+SQLAlchemy==2.0.46
+sqlmodel==0.0.32
+alembic==1.18.3
+psycopg2-binary==2.9.11
+asyncpg==0.31.0
+duckdb==1.4.4
+redis==7.1.1
+
+# HTTP & WebSocket
+httpx==0.28.1
+websockets==16.0
+aiohttp==3.13.3
+
+# Scheduling
+APScheduler==3.11.2
+
+# Utilities
+loguru==0.7.3
+python-dotenv==1.2.1
+cryptography==46.0.5
+PyJWT==2.11.0
+passlib==1.7.4
+bcrypt==5.0.0
+pillow==10.2.0
+psutil==7.2.2
+
+# Rate Limiting
+slowapi==0.1.9
+
+# Data Sources
+yfinance==1.2.0
+
+# NLP & Sentiment
+transformers==5.1.0
+tokenizers==0.22.2
+vaderSentiment==3.3.2
+
+# Numerical & Scientific
+scipy==1.17.0
+
+# Monitoring
+prometheus-fastapi-instrumentator==7.1.0
+prometheus_client==0.24.1

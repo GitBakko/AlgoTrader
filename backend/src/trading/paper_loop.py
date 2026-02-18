@@ -24,6 +24,7 @@ from src.execution.schemas import ExecutionMode
 from src.models.prediction_service import PredictionService
 from src.risk.risk_manager import RiskManager
 from src.risk.trailing_stop_manager import TrailingPhase, TrailingStopConfig, TrailingStopManager
+from src.monitoring.metrics import MetricsCollector
 from src.monitoring.trade_logger import get_trade_logger, SignalType, ExecutionStatus, RiskEventType
 from src.strategy.strategy_manager import StrategyManager
 from src.utils.constants import TRADABLE_ASSETS
@@ -526,6 +527,14 @@ class PaperTradingLoop:
             f"(confidence={signal.confidence:.3f})"
         )
 
+        # Record signal metric
+        MetricsCollector.record_signal(
+            epic=epic,
+            direction=signal.direction.value,
+            strategy=signal.strategy_name or "unknown",
+            confidence=signal.confidence,
+        )
+
         if signal.direction.value == "HOLD":
             signal_info["status"] = "hold"
             # Log HOLD signal
@@ -623,13 +632,22 @@ class PaperTradingLoop:
             self.risk_manager.update_equity(final_equity)
 
         # Step 5: Execute (paper mode)
+        exec_start = _time.monotonic()
         exec_result = await self.execution_engine.execute_signal(signal, risk_result)
+        exec_duration = _time.monotonic() - exec_start
+
         if exec_result.success:
             self._trade_count += 1
             signal_info["status"] = "executed"
             logger.info(
                 f"[{epic}] EXECUTED: deal_id={exec_result.deal_id}, "
                 f"fill={exec_result.fill_price:.2f}"
+            )
+            MetricsCollector.record_trade_execution(
+                epic=epic,
+                direction=signal.direction.value,
+                outcome="success",
+                duration_seconds=exec_duration,
             )
 
             # Phase 8: register position for trailing stop management
@@ -669,6 +687,12 @@ class PaperTradingLoop:
             if exec_result.error_detail:
                 signal_info["error_detail"] = exec_result.error_detail
             logger.warning(f"[{epic}] Execution failed: {exec_result.error}")
+            MetricsCollector.record_trade_execution(
+                epic=epic,
+                direction=signal.direction.value,
+                outcome="failed",
+                duration_seconds=exec_duration,
+            )
             # Log failed execution
             try:
                 tl = get_trade_logger()

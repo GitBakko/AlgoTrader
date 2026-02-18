@@ -253,13 +253,18 @@ class CircuitBreakerManager:
                 "seconds_since_heartbeat": _time.monotonic() - self._last_heartbeat,
             }
 
-    def _trip(self, cb_type: CircuitBreakerType, reason: str) -> None:
+    def _trip(self, cb_type: CircuitBreakerType, reason: str, epic: str = "global") -> None:
         """Trip a circuit breaker (thread-safe)."""
         with self._lock:
             if cb_type not in self._tripped:
                 self._tripped[cb_type] = reason
                 self._tripped_at[cb_type] = _time.monotonic()
                 logger.warning(f"CIRCUIT BREAKER [{cb_type.value}]: {reason}")
+                try:
+                    from src.monitoring.metrics import MetricsCollector
+                    MetricsCollector.record_circuit_breaker(epic=epic, reason=cb_type.value)
+                except Exception:
+                    pass
 
     def _clear(self, cb_type: CircuitBreakerType) -> None:
         """Clear a specific circuit breaker (thread-safe)."""

@@ -1,0 +1,49 @@
+# Production overrides for MANTIS AI
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  backend:
+    build:
+      target: production
+    restart: always
+    environment:
+      - ENVIRONMENT=production
+      - ENABLE_METRICS=true
+    volumes:
+      # No bind mounts in production — use built image only
+      - backend_data:/app/data
+      - backend_logs:/app/logs
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --workers 4
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "2.0"
+
+  frontend:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  postgres:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  redis:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+volumes:
+  backend_data:
+    driver: local
+  backend_logs:
+    driver: local

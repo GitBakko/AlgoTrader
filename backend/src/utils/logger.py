@@ -70,6 +70,17 @@ def setup_logger() -> None:
         enqueue=True,
     )
 
+    # JSON structured log file (for log aggregation / parsing)
+    logger.add(
+        log_dir / "mantis.json.log",
+        level="INFO",
+        rotation="100 MB",
+        retention="30 days",
+        compression="zip",
+        serialize=True,  # Built-in JSON serialization (includes extra fields like request_id)
+        enqueue=True,
+    )
+
     logger.info(
         f"Logger initialized - Environment: {settings.environment}, "
         f"Log level: {settings.log_level}"

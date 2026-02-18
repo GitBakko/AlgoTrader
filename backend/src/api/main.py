@@ -6,6 +6,7 @@ Main entry point for the backend API.
 import asyncio
 import signal
 import sys
+import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
@@ -424,13 +425,18 @@ app = FastAPI(
 # Configure GZip compression (responses > 1KB)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
+# Configure security headers
+from src.api.security_headers import SecurityHeadersMiddleware
+
+app.add_middleware(SecurityHeadersMiddleware)
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
 )
 
 # Configure audit logging middleware
@@ -475,27 +481,34 @@ _LOG_SKIP_PREFIXES = ("/health", "/ws/")
 # Request logging middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    """Log all incoming requests (skips health checks and WebSocket upgrades)."""
+    """Log all incoming requests with correlation ID (skips health checks and WS)."""
     path = request.url.path
     skip_log = any(path.startswith(p) for p in _LOG_SKIP_PREFIXES)
 
+    # Generate request correlation ID (use incoming header or create new)
+    request_id = request.headers.get("X-Request-ID", uuid.uuid4().hex[:8])
+
     if skip_log:
-        return await call_next(request)
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
 
     start_time = datetime.now(timezone.utc)
 
-    try:
-        response = await call_next(request)
-        duration = (datetime.now(timezone.utc) - start_time).total_seconds()
-        logger.info(
-            f"{request.method} {path} - "
-            f"Status: {response.status_code} - Duration: {duration:.3f}s"
-        )
-        return response
-    except Exception as e:
-        duration = (datetime.now(timezone.utc) - start_time).total_seconds()
-        logger.error(f"{request.method} {path} - Error: {e} - Duration: {duration:.3f}s")
-        raise
+    with logger.contextualize(request_id=request_id):
+        try:
+            response = await call_next(request)
+            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
+            logger.info(
+                f"{request.method} {path} - "
+                f"Status: {response.status_code} - Duration: {duration:.3f}s"
+            )
+            response.headers["X-Request-ID"] = request_id
+            return response
+        except Exception as e:
+            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
+            logger.error(f"{request.method} {path} - Error: {e} - Duration: {duration:.3f}s")
+            raise
 
 
 # Global exception handler
