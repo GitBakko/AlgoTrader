@@ -208,7 +208,7 @@ class ExecutionEngine:
 
             # Update database: use session factory (preferred) or injected repos
             db_result = await self._persist_close_to_db(
-                deal_id, reason, result.fill_price, epic, direction
+                deal_id, reason, result.fill_price, epic, direction, size, entry_price
             )
             if db_result:
                 epic, direction, pnl = db_result
@@ -234,10 +234,11 @@ class ExecutionEngine:
 
     async def _persist_close_to_db(
         self, deal_id: str, reason: str, fill_price: float | None,
-        epic: str, direction: str,
+        epic: str, direction: str, size: float = 0, entry_price: float = 0,
     ) -> tuple[str, str, float] | None:
         """
         Persist position close to DB. Returns (epic, direction, pnl) from DB if found.
+        If position was never saved (e.g. opened before timezone fix), creates it as CLOSED.
         Uses session factory (preferred) or injected repos.
         """
         # Normalize close reason
@@ -252,13 +253,16 @@ class ExecutionEngine:
         if self._db_session_factory is not None:
             try:
                 from src.database.models import Position, Trade
+                now = datetime.now(timezone.utc).replace(tzinfo=None)
+
                 async with self._db_session_factory() as session:
                     repo = PositionRepository(session)
                     position_db = await repo.get_by_deal_id(deal_id)
 
                     if position_db:
+                        # Update existing position to CLOSED
                         position_db.status = "CLOSED"
-                        position_db.closed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                        position_db.closed_at = now
                         position_db.close_reason = db_reason
                         if fill_price:
                             position_db.current_price = Decimal(str(fill_price))
@@ -267,31 +271,56 @@ class ExecutionEngine:
                                 price_diff = -price_diff
                             position_db.profit_loss = price_diff * position_db.size
                         await session.flush()
+                    elif epic != "UNKNOWN" and size > 0:
+                        # Position was never persisted at open — create it as CLOSED
+                        calc_pnl = Decimal("0")
+                        if fill_price and entry_price:
+                            price_diff = Decimal(str(fill_price)) - Decimal(str(entry_price))
+                            if direction == "SELL":
+                                price_diff = -price_diff
+                            calc_pnl = price_diff * Decimal(str(size))
 
-                        # Create CLOSE trade record
-                        trade_db = Trade(
-                            position_id=position_db.id,
-                            deal_reference=deal_id,
-                            trade_type="CLOSE",
-                            epic=position_db.epic,
-                            direction=position_db.direction,
-                            size=position_db.size,
-                            price=Decimal(str(fill_price)) if fill_price else position_db.entry_price,
-                            profit_loss=position_db.profit_loss,
-                            executed_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                        position_db = Position(
+                            deal_id=deal_id,
+                            epic=epic,
+                            direction=direction,
+                            size=Decimal(str(size)),
+                            entry_price=Decimal(str(entry_price)),
+                            current_price=Decimal(str(fill_price)) if fill_price else None,
+                            profit_loss=calc_pnl,
+                            status="CLOSED",
+                            opened_at=now,
+                            closed_at=now,
+                            close_reason=db_reason,
                         )
-                        session.add(trade_db)
-                        await session.commit()
-
-                        logger.debug(f"Position closed in DB: {deal_id} P&L={position_db.profit_loss}")
-                        return (
-                            position_db.epic,
-                            position_db.direction,
-                            float(position_db.profit_loss or 0),
-                        )
+                        position_db = await repo.create(position_db)
+                        logger.info(f"Created CLOSED position in DB (never persisted at open): {deal_id} {epic}")
                     else:
                         await session.commit()
-                        logger.warning(f"Position {deal_id} not found in DB for close update")
+                        logger.warning(f"Position {deal_id} not found in DB and insufficient info to create")
+                        return None
+
+                    # Create CLOSE trade record
+                    trade_db = Trade(
+                        position_id=position_db.id,
+                        deal_reference=deal_id,
+                        trade_type="CLOSE",
+                        epic=position_db.epic,
+                        direction=position_db.direction,
+                        size=position_db.size,
+                        price=Decimal(str(fill_price)) if fill_price else position_db.entry_price,
+                        profit_loss=position_db.profit_loss,
+                        executed_at=now,
+                    )
+                    session.add(trade_db)
+                    await session.commit()
+
+                    logger.debug(f"Position closed in DB: {deal_id} P&L={position_db.profit_loss}")
+                    return (
+                        position_db.epic,
+                        position_db.direction,
+                        float(position_db.profit_loss or 0),
+                    )
             except Exception as e:
                 logger.error(f"Database close (session factory) failed: {e}")
             return None
