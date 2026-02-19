@@ -1,15 +1,26 @@
 # MANTIS AI - Roadmap & Next Steps
 
-> Current status: Phase 18b complete (2026-02-19). ~1136 tests, 0 errors. Production readiness ~99%.
+> Current status: Phase 18c complete (2026-02-19). ~1136 tests, 0 errors. Production readiness ~99%.
 > ML models: 20/20 tradable assets have trained XGBoost models (EURUSD excluded — ATR too small).
 > Infrastructure: CI/CD (GitHub Actions), JSON logging, Prometheus/Grafana, security headers, Docker prod override.
 > DEMO readiness: partial_close fix, Telegram alerts, AlertManager wired, emergency kill switch, max_total_exposure.
 > Trading history: Closed positions persisted to PostgreSQL, performance analytics, dashboard P&L fix.
 > Bug fixes: Timezone mismatch (asyncpg), UNKNOWN toast on close, duplicate toast notifications, ExecutionEngine DB access.
+> UX: LoadingButtonComponent — inline spinner + disable on async action buttons (close, start/stop, emergency stop).
 
 ---
 
 ## Recently Completed
+
+### Phase 18c — LoadingButtonComponent [COMPLETE]
+
+> Reusable shared component to prevent duplicate API calls from rapid button clicks.
+
+- [x] `LoadingButtonComponent` — inline `<c-spinner>` + disabled state during async operations
+- [x] Inputs: `loading`, `disabled`, `color`, `size`, `variant`, `type` + `(clicked)` output
+- [x] Integrated in positions close button (tracks `closingDealId` signal per position)
+- [x] Integrated in paper trading Start/Stop + EMERGENCY STOP buttons
+- [x] Removed manual spinner patterns from `paper-trading.component.ts`
 
 ### Phase 18b — Critical Bug Fixes (Timezone + Toast + DB Persistence) [COMPLETE]
 
@@ -181,4 +192,5 @@
 | P3 | CI/CD + logging + metrics + security + Docker | 8h | DevOps maturity | **COMPLETE** |
 | P4 | DEMO readiness (partial_close, alerts, kill switch) | 6h | DEMO trading | **COMPLETE** |
 | -- | Phase 18: Positions history + performance + P&L fix | 8h | Trading analytics | **COMPLETE** |
+| -- | Phase 18c: LoadingButton + UX anti-spam | 1h | UX safety | **COMPLETE** |
 | **P5** | **Live trading (2+ weeks demo first)** | **2+ weeks** | **Revenue generation** | **NEXT** |

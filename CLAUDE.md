@@ -395,6 +395,13 @@ Rules:
 - Destructive actions (close position, delete): red `color="danger"`
 - Max 2 buttons per card header
 - Icon-only buttons: use `cButton [variant]="'ghost'" size="sm"`
+- **Async action buttons**: Use `<app-loading-button>` (shows inline spinner, disables during operation):
+
+```html
+<app-loading-button color="danger" size="sm" [loading]="isClosing()" (clicked)="close()">
+  Chiudi
+</app-loading-button>
+```
 
 ### Direction Indicators (BUY/SELL)
 ```html
