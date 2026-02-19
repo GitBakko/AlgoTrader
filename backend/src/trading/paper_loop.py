@@ -342,7 +342,7 @@ class PaperTradingLoop:
         """
         Detect positions closed by the broker (SL/TP hit on Capital.com side).
         Compares current broker positions with previous iteration to find disappeared ones.
-        Persists closures to DB so they appear in position history.
+        Persists closures to DB, pushes WebSocket events, and logs for System Logs page.
         """
         if self.execution_engine.mode == ExecutionMode.PAPER:
             # PAPER mode: we manage all closes locally, no broker reconciliation needed
@@ -356,7 +356,7 @@ class PaperTradingLoop:
             return
 
         # Find positions that disappeared (closed by broker)
-        for deal_id, prev_pos in self._previous_positions.items():
+        for deal_id, prev_pos in list(self._previous_positions.items()):
             if deal_id in current_deals:
                 continue  # Still open
 
@@ -367,31 +367,51 @@ class PaperTradingLoop:
             stop_level = prev_pos.get("stop_level")
             profit_level = prev_pos.get("profit_level")
 
-            # Try to determine close reason from SL/TP levels vs last known price
+            # Determine close reason from SL/TP levels set on the position.
+            # The broker closed this position, so if SL/TP was set, it was likely
+            # triggered. We use the SL/TP level as the exit price for accurate P&L.
             close_reason = "EXTERNAL"
             exit_price = entry_price  # Fallback
-            try:
-                latest = self.data_access.get_latest_price(epic, timeframe="1h")
-                if latest:
-                    exit_price = latest.get("close", entry_price)
-                    if stop_level and stop_level > 0:
-                        if direction == "BUY" and exit_price <= stop_level:
-                            close_reason = "SL"
-                            exit_price = stop_level
-                        elif direction == "SELL" and exit_price >= stop_level:
-                            close_reason = "SL"
-                            exit_price = stop_level
-                    if close_reason == "EXTERNAL" and profit_level and profit_level > 0:
-                        if direction == "BUY" and exit_price >= profit_level:
-                            close_reason = "TP"
-                            exit_price = profit_level
-                        elif direction == "SELL" and exit_price <= profit_level:
-                            close_reason = "TP"
-                            exit_price = profit_level
-            except Exception:
-                pass
 
-            # Calculate P&L
+            if stop_level and stop_level > 0 and profit_level and profit_level > 0:
+                # Both SL and TP were set — infer from which would generate the observed P&L direction
+                if direction == "BUY":
+                    # BUY: SL is below entry, TP is above entry
+                    # If position closed with loss (price went down) → SL
+                    # Try to get a recent price hint
+                    close_reason = "SL"
+                    exit_price = stop_level
+                    # Check if a recent price is closer to TP
+                    try:
+                        latest = self.data_access.get_latest_price(epic, timeframe="1h")
+                        if latest:
+                            last_close = latest.get("close", 0)
+                            if last_close and last_close >= profit_level:
+                                close_reason = "TP"
+                                exit_price = profit_level
+                    except Exception:
+                        pass  # SL assumption is safe default for BUY with loss
+                else:
+                    # SELL: SL is above entry, TP is below entry
+                    close_reason = "SL"
+                    exit_price = stop_level
+                    try:
+                        latest = self.data_access.get_latest_price(epic, timeframe="1h")
+                        if latest:
+                            last_close = latest.get("close", 0)
+                            if last_close and last_close <= profit_level:
+                                close_reason = "TP"
+                                exit_price = profit_level
+                    except Exception:
+                        pass
+            elif stop_level and stop_level > 0:
+                close_reason = "SL"
+                exit_price = stop_level
+            elif profit_level and profit_level > 0:
+                close_reason = "TP"
+                exit_price = profit_level
+
+            # Calculate P&L using actual exit price (SL/TP level)
             if direction == "BUY":
                 pnl = (exit_price - entry_price) * size
             else:
@@ -399,7 +419,7 @@ class PaperTradingLoop:
 
             logger.warning(
                 f"[{epic}] Position {deal_id} closed by broker "
-                f"(reason={close_reason}, P&L=${pnl:.2f})"
+                f"(reason={close_reason}, exit={exit_price:.2f}, P&L=${pnl:.2f})"
             )
 
             # Record in trade history for Kelly sizing
@@ -416,18 +436,31 @@ class PaperTradingLoop:
             if deal_id in self.trailing_stop_manager.tracked_positions:
                 self.trailing_stop_manager.unregister_position(deal_id)
 
-            # Log trade event
+            # Broadcast trade_closed event to frontend via WebSocket
             try:
-                from src.monitoring.trade_logger import TradeLogger
-                tl = TradeLogger.get_instance()
-                await tl.log_execution(
+                from src.api.websocket import ws_manager
+                await ws_manager.broadcast("trades", {
+                    "type": "trade_closed",
+                    "deal_id": deal_id,
+                    "epic": epic,
+                    "direction": direction,
+                    "pnl": round(pnl, 2),
+                    "close_reason": close_reason,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                })
+            except Exception as e:
+                logger.debug(f"WS broadcast trade_closed failed: {e}")
+
+            # Log execution close for System Logs page
+            try:
+                await get_trade_logger().log_execution(
                     epic=epic, direction=direction, size=size,
-                    entry_price=entry_price, status="closed",
-                    profit_loss=pnl, close_reason=close_reason,
+                    entry_price=entry_price,
+                    status=ExecutionStatus.EXECUTED, deal_id=deal_id,
                     source=self._log_source,
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"TradeLogger log_execution failed for broker-closed {deal_id}: {e}")
 
         # Update previous positions for next iteration
         self._previous_positions = {p.get("deal_id"): p for p in current_positions if p.get("deal_id")}
@@ -1181,11 +1214,10 @@ class PaperTradingLoop:
                                     epic=epic, direction=direction, size=size,
                                     entry_price=entry_price,
                                     status=ExecutionStatus.EXECUTED, deal_id=deal_id,
-                                    exit_price=current_price, realized_pnl=round(pnl, 2),
                                     source=self._log_source,
                                 )
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                logger.debug(f"TradeLogger log_execution failed for {deal_id}: {e}")
 
                             status = "sl_hit" if stop_violated else "tp_hit"
                             self._signal_history.append({
