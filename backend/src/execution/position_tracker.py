@@ -146,10 +146,17 @@ class PositionTracker:
         Returns:
             Position dict or None
         """
-        if self._mode in (ExecutionMode.PAPER, ExecutionMode.DEMO):
-            with self._lock:
-                return self._paper_positions.get(deal_id)
+        # Check local memory first (all modes)
+        with self._lock:
+            local = self._paper_positions.get(deal_id)
+        if local:
+            return local
 
+        # PAPER mode: local memory is the only source
+        if self._mode == ExecutionMode.PAPER:
+            return None
+
+        # DEMO/LIVE: query broker API as fallback
         positions = await self.sync_positions()
         for p in positions:
             if p.get("deal_id") == deal_id:

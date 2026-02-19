@@ -31,6 +31,7 @@ class ExecutionEngine:
         mode: ExecutionMode = ExecutionMode.PAPER,
         position_repository: PositionRepository | None = None,
         trade_repository: TradeRepository | None = None,
+        db_session_factory=None,
     ):
         """
         Initialize execution engine.
@@ -40,21 +41,26 @@ class ExecutionEngine:
             mode: Execution mode (PAPER or LIVE)
             position_repository: Repository for persisting positions (optional, graceful degradation)
             trade_repository: Repository for persisting trade audit trail (optional, graceful degradation)
+            db_session_factory: Async session factory for on-demand DB access (preferred over injected repos)
         """
         self._mode = mode
         self._position_tracker = PositionTracker(broker=broker, mode=mode)
         self._order_manager = OrderManager(broker=broker, mode=mode, position_tracker=self._position_tracker)
         self._slippage_tracker = SlippageTracker()
 
-        # CRITICAL FIX (CRIT-2): Add database persistence to prevent data loss
+        # Database persistence: prefer session factory (creates own sessions per-operation)
         self._position_repository = position_repository
         self._trade_repository = trade_repository
+        self._db_session_factory = db_session_factory
 
-        if position_repository is None or trade_repository is None:
+        has_db = (position_repository is not None and trade_repository is not None) or db_session_factory is not None
+        if not has_db:
             logger.warning(
                 "ExecutionEngine initialized WITHOUT database persistence - "
                 "trades will NOT be saved (testing mode only!)"
             )
+        elif db_session_factory is not None:
+            logger.info("ExecutionEngine initialized with session factory for DB persistence")
 
     @property
     def mode(self) -> ExecutionMode:
@@ -123,7 +129,7 @@ class ExecutionEngine:
                         stop_loss=Decimal(str(risk_result.stop_loss)) if risk_result.stop_loss else None,
                         take_profit=Decimal(str(risk_result.take_profit)) if risk_result.take_profit else None,
                         status="OPEN",
-                        opened_at=datetime.now(timezone.utc),
+                        opened_at=datetime.now(timezone.utc).replace(tzinfo=None),
                     )
                     position_db = await self._position_repository.create(position_db)
 
@@ -137,7 +143,7 @@ class ExecutionEngine:
                         direction=signal.direction.value,
                         size=Decimal(str(risk_result.position_size)),
                         price=Decimal(str(result.fill_price)),
-                        executed_at=datetime.now(timezone.utc),
+                        executed_at=datetime.now(timezone.utc).replace(tzinfo=None),
                     )
                     await self._trade_repository.create(trade_db)
 
@@ -169,65 +175,47 @@ class ExecutionEngine:
         Returns:
             ExecutionResult
         """
+        # Snapshot position info BEFORE closing (broker API won't have it after)
+        pre_close_position = await self._position_tracker.get_position(deal_id)
+
         result = await self._order_manager.close_order(deal_id)
 
         if result.success:
             # Remove from local tracking
             closed_position = self._position_tracker.close_paper_position(deal_id)
 
-            # CRITICAL FIX (CRIT-2): Update database
-            if self._position_repository and self._trade_repository and closed_position:
-                try:
-                    # Get Position from DB
-                    position_db = await self._position_repository.get_by_deal_id(deal_id)
-                    if position_db:
-                        # Update Position to CLOSED
-                        position_db.status = "CLOSED"
-                        position_db.closed_at = datetime.now(timezone.utc)
-                        position_db.close_reason = reason
-                        # Calculate P&L if close price available
-                        if result.fill_price:
-                            position_db.current_price = Decimal(str(result.fill_price))
-                            # P&L calculation (simplified - should account for direction)
-                            price_diff = Decimal(str(result.fill_price)) - position_db.entry_price
-                            if position_db.direction == "SELL":
-                                price_diff = -price_diff
-                            position_db.profit_loss = price_diff * position_db.size
+            # Resolve position info: prefer local tracking, fallback to pre-close snapshot
+            epic = "UNKNOWN"
+            direction = "UNKNOWN"
+            pnl = 0.0
+            size = 0.0
+            entry_price = 0.0
 
-                        await self._position_repository.update(position_db)
+            # Try local tracking first, then pre-close broker snapshot
+            pos_info = closed_position or pre_close_position
+            if pos_info:
+                epic = pos_info.get("epic", "UNKNOWN")
+                direction = pos_info.get("direction", "UNKNOWN")
+                entry_price = pos_info.get("level") or pos_info.get("entry_price", 0)
+                size = pos_info.get("size", 0)
 
-                        # Create CLOSE Trade record
-                        from src.database.models import Trade
-                        trade_db = Trade(
-                            position_id=position_db.id,
-                            deal_reference=deal_id,
-                            trade_type="CLOSE",
-                            epic=position_db.epic,
-                            direction=position_db.direction,
-                            size=position_db.size,
-                            price=Decimal(str(result.fill_price)) if result.fill_price else position_db.entry_price,
-                            profit_loss=position_db.profit_loss,
-                            executed_at=datetime.now(timezone.utc),
-                        )
-                        await self._trade_repository.create(trade_db)
+            # Calculate P&L
+            if result.fill_price and entry_price and size:
+                if direction == "BUY":
+                    pnl = (result.fill_price - entry_price) * size
+                else:
+                    pnl = (entry_price - result.fill_price) * size
 
-                        logger.debug(f"✅ Position closed in DB: position_id={position_db.id} P&L={position_db.profit_loss}")
-                except Exception as e:
-                    logger.error(f"❌ Database close update failed: {e}")
+            # Update database: use session factory (preferred) or injected repos
+            db_result = await self._persist_close_to_db(
+                deal_id, reason, result.fill_price, epic, direction
+            )
+            if db_result:
+                epic, direction, pnl = db_result
 
             # Broadcast trade_closed event to frontend via WebSocket
             try:
                 from src.api.websocket import ws_manager
-                pnl = 0.0
-                epic = "UNKNOWN"
-                direction = "UNKNOWN"
-                if closed_position:
-                    epic = closed_position.get("epic", "UNKNOWN")
-                    direction = closed_position.get("direction", "UNKNOWN")
-                    entry = closed_position.get("level") or closed_position.get("entry_price", 0)
-                    size = closed_position.get("size", 0)
-                    if result.fill_price and entry:
-                        pnl = (result.fill_price - entry) * size if direction == "BUY" else (entry - result.fill_price) * size
                 await ws_manager.broadcast("trades", {
                     "type": "trade_closed",
                     "deal_id": deal_id,
@@ -240,9 +228,115 @@ class ExecutionEngine:
             except Exception as e:
                 logger.debug(f"WS broadcast trade_closed failed: {e}")
 
-            logger.info(f"Position closed: {deal_id} reason={reason}")
+            logger.info(f"Position closed: {deal_id} epic={epic} pnl={pnl:.2f} reason={reason}")
 
         return result
+
+    async def _persist_close_to_db(
+        self, deal_id: str, reason: str, fill_price: float | None,
+        epic: str, direction: str,
+    ) -> tuple[str, str, float] | None:
+        """
+        Persist position close to DB. Returns (epic, direction, pnl) from DB if found.
+        Uses session factory (preferred) or injected repos.
+        """
+        # Normalize close reason
+        reason_map = {
+            "STOP_LOSS_HIT": "SL", "TAKE_PROFIT_HIT": "TP",
+            "TP1_HIT": "TP", "API close request": "MANUAL",
+            "Graceful shutdown": "MANUAL",
+        }
+        db_reason = reason_map.get(reason, reason)
+
+        # Try session factory first (DEMO/LIVE mode)
+        if self._db_session_factory is not None:
+            try:
+                from src.database.models import Position, Trade
+                async with self._db_session_factory() as session:
+                    repo = PositionRepository(session)
+                    position_db = await repo.get_by_deal_id(deal_id)
+
+                    if position_db:
+                        position_db.status = "CLOSED"
+                        position_db.closed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                        position_db.close_reason = db_reason
+                        if fill_price:
+                            position_db.current_price = Decimal(str(fill_price))
+                            price_diff = Decimal(str(fill_price)) - position_db.entry_price
+                            if position_db.direction == "SELL":
+                                price_diff = -price_diff
+                            position_db.profit_loss = price_diff * position_db.size
+                        await session.flush()
+
+                        # Create CLOSE trade record
+                        trade_db = Trade(
+                            position_id=position_db.id,
+                            deal_reference=deal_id,
+                            trade_type="CLOSE",
+                            epic=position_db.epic,
+                            direction=position_db.direction,
+                            size=position_db.size,
+                            price=Decimal(str(fill_price)) if fill_price else position_db.entry_price,
+                            profit_loss=position_db.profit_loss,
+                            executed_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                        )
+                        session.add(trade_db)
+                        await session.commit()
+
+                        logger.debug(f"Position closed in DB: {deal_id} P&L={position_db.profit_loss}")
+                        return (
+                            position_db.epic,
+                            position_db.direction,
+                            float(position_db.profit_loss or 0),
+                        )
+                    else:
+                        await session.commit()
+                        logger.warning(f"Position {deal_id} not found in DB for close update")
+            except Exception as e:
+                logger.error(f"Database close (session factory) failed: {e}")
+            return None
+
+        # Fallback: injected repos (PAPER mode or tests)
+        if self._position_repository and self._trade_repository:
+            try:
+                position_db = await self._position_repository.get_by_deal_id(deal_id)
+                if position_db:
+                    position_db.status = "CLOSED"
+                    position_db.closed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                    position_db.close_reason = db_reason
+                    if fill_price:
+                        position_db.current_price = Decimal(str(fill_price))
+                        price_diff = Decimal(str(fill_price)) - position_db.entry_price
+                        if position_db.direction == "SELL":
+                            price_diff = -price_diff
+                        position_db.profit_loss = price_diff * position_db.size
+
+                    await self._position_repository.update(position_db)
+
+                    from src.database.models import Trade
+                    trade_db = Trade(
+                        position_id=position_db.id,
+                        deal_reference=deal_id,
+                        trade_type="CLOSE",
+                        epic=position_db.epic,
+                        direction=position_db.direction,
+                        size=position_db.size,
+                        price=Decimal(str(fill_price)) if fill_price else position_db.entry_price,
+                        profit_loss=position_db.profit_loss,
+                        executed_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                    )
+                    await self._trade_repository.create(trade_db)
+
+                    logger.debug(f"Position closed in DB: {deal_id} P&L={position_db.profit_loss}")
+                    return (
+                        position_db.epic,
+                        position_db.direction,
+                        float(position_db.profit_loss or 0),
+                    )
+            except Exception as e:
+                logger.error(f"Database close update failed: {e}")
+
+        return None
 
     async def update_stops(self, deal_id: str, new_stop: float) -> ExecutionResult:
         """

@@ -1,14 +1,40 @@
 # MANTIS AI - Roadmap & Next Steps
 
-> Current status: Phase 18 complete (2026-02-19). ~1136 tests, 0 errors. Production readiness ~99%.
+> Current status: Phase 18b complete (2026-02-19). ~1136 tests, 0 errors. Production readiness ~99%.
 > ML models: 20/20 tradable assets have trained XGBoost models (EURUSD excluded — ATR too small).
 > Infrastructure: CI/CD (GitHub Actions), JSON logging, Prometheus/Grafana, security headers, Docker prod override.
 > DEMO readiness: partial_close fix, Telegram alerts, AlertManager wired, emergency kill switch, max_total_exposure.
 > Trading history: Closed positions persisted to PostgreSQL, performance analytics, dashboard P&L fix.
+> Bug fixes: Timezone mismatch (asyncpg), UNKNOWN toast on close, duplicate toast notifications, ExecutionEngine DB access.
 
 ---
 
 ## Recently Completed
+
+### Phase 18b — Critical Bug Fixes (Timezone + Toast + DB Persistence) [COMPLETE]
+
+> Fixed 4 critical bugs discovered during live DEMO trading on Capital.com.
+
+**Bug 1: Position persistence silently failing (timezone mismatch)**
+
+- **Root cause**: `datetime.now(timezone.utc)` produces timezone-aware datetimes, but PostgreSQL columns are `TIMESTAMP WITHOUT TIME ZONE`. asyncpg strictly rejects the mismatch with `DataError: can't subtract offset-naive and offset-aware datetimes`. All persistence methods caught the exception silently.
+- **Fix**: Added `.replace(tzinfo=None)` to all datetime values going into PostgreSQL
+- **Files**: `models.py` (16 occurrences), `paper_loop.py` (6), `execution_engine.py` (4), `position_repository.py` (2)
+
+**Bug 2: Toast showing "UNKNOWN UNKNOWN - P&L 0.00"**
+
+- **Root cause**: `execution_engine.close_position()` used `position_tracker.get_position()` which in DEMO mode only checked in-memory `_paper_positions` dict — empty after restart. No fallback to broker API or DB.
+- **Fix**: `PositionTracker.get_position()` now queries broker API as fallback in DEMO/LIVE mode. Plus `ExecutionEngine._persist_close_to_db()` resolves epic/direction/pnl from DB.
+
+**Bug 3: Duplicate toasts (3-4 on position close)**
+
+- **Root cause**: Three separate toast sources listened to the same `lastTrade()` signal: (1) `positions.component.ts`, (2) `default-layout.component.ts`, (3) `notification.service.ts`
+- **Fix**: Removed toast from `positions.component.ts` and entire `effect()` block from `default-layout.component.ts`. Single source: `NotificationService`.
+
+**Bug 4: ExecutionEngine without DB access in DEMO mode**
+
+- **Root cause**: `main.py` created `ExecutionEngine(broker=broker, mode=mode)` without passing `position_repository`/`trade_repository` (they're request-scoped). Engine had no DB access for closing positions.
+- **Fix**: Added `db_session_factory` parameter to `ExecutionEngine`. Creates own sessions per-operation (same pattern as `PaperTradingLoop`). Wired in `main.py` lifespan.
 
 ### Phase 18 — Positions History + Performance + P&L Fix [COMPLETE]
 

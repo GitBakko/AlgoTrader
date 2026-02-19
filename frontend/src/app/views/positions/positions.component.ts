@@ -513,7 +513,7 @@ export class PositionsComponent implements OnInit, OnDestroy {
   closePosition(dealId: string): void {
     this.trading.closePosition(dealId).subscribe({
       next: () => {
-        this.toast.success('Posizione chiusa');
+        // Toast notification handled by NotificationService via WebSocket event
         this.trading.loadPaperPositions();
       },
       error: (err) => {

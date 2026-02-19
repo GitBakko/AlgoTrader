@@ -224,6 +224,7 @@ class TestExecutionEnginePartialCloseDemo:
     def demo_engine(self):
         """Create an execution engine in DEMO mode with mocked broker."""
         mock_broker = MagicMock()
+        mock_broker.list_positions = AsyncMock(return_value=[])
         engine = ExecutionEngine(broker=mock_broker, mode=ExecutionMode.DEMO)
         return engine
 

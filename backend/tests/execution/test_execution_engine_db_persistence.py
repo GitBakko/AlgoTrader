@@ -192,6 +192,13 @@ class TestExecutionEngineDbPersistence:
         engine._order_manager.close_order = AsyncMock(side_effect=mock_close_order)
 
         # Mock position tracker
+        engine._position_tracker.get_position = AsyncMock(return_value={
+            "deal_id": "DEAL-123",
+            "epic": "XAUUSD",
+            "direction": "BUY",
+            "level": 2000.0,
+            "size": 1.0,
+        })
         engine._position_tracker.close_paper_position = MagicMock(return_value={
             "deal_id": "DEAL-123",
             "epic": "XAUUSD",

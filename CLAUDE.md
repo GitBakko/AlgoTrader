@@ -101,6 +101,7 @@ AlgoTrader/
 - Configuration via **pydantic-settings** with `.env` files (never commit secrets)
 - Use **pip** (venv) for dependency management — NOT poetry
 - Use `datetime.now(timezone.utc)` — NEVER `datetime.utcnow()` (deprecated)
+- **CRITICAL**: For PostgreSQL writes, use `datetime.now(timezone.utc).replace(tzinfo=None)` — asyncpg rejects timezone-aware datetimes with `TIMESTAMP WITHOUT TIME ZONE` columns
 - Technical indicators: pure **Polars/numpy** — no ta-lib dependency
 
 ### Angular (Frontend)

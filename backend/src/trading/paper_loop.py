@@ -241,7 +241,7 @@ class PaperTradingLoop:
                     stop_loss=Decimal(str(stop_loss)) if stop_loss else None,
                     take_profit=Decimal(str(take_profit)) if take_profit else None,
                     status="OPEN",
-                    opened_at=datetime.now(timezone.utc),
+                    opened_at=datetime.now(timezone.utc).replace(tzinfo=None),
                 )
                 pos = await repo.create(pos)
 
@@ -254,7 +254,7 @@ class PaperTradingLoop:
                     direction=direction,
                     size=Decimal(str(size)),
                     price=Decimal(str(entry_price)),
-                    executed_at=datetime.now(timezone.utc),
+                    executed_at=datetime.now(timezone.utc).replace(tzinfo=None),
                 )
                 session.add(trade)
                 await session.commit()
@@ -303,8 +303,8 @@ class PaperTradingLoop:
                         stop_loss=None,
                         take_profit=None,
                         status="CLOSED",
-                        opened_at=datetime.now(timezone.utc),
-                        closed_at=datetime.now(timezone.utc),
+                        opened_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                        closed_at=datetime.now(timezone.utc).replace(tzinfo=None),
                         close_reason=close_reason,
                     )
                     pos = await repo.create(pos)
@@ -313,7 +313,7 @@ class PaperTradingLoop:
                     pos.status = "CLOSED"
                     pos.current_price = Decimal(str(exit_price))
                     pos.profit_loss = Decimal(str(round(pnl, 2)))
-                    pos.closed_at = datetime.now(timezone.utc)
+                    pos.closed_at = datetime.now(timezone.utc).replace(tzinfo=None)
                     pos.close_reason = close_reason
                     await session.flush()
                     await session.refresh(pos)
@@ -328,7 +328,7 @@ class PaperTradingLoop:
                     size=Decimal(str(size)),
                     price=Decimal(str(exit_price)),
                     profit_loss=Decimal(str(round(pnl, 2))),
-                    executed_at=datetime.now(timezone.utc),
+                    executed_at=datetime.now(timezone.utc).replace(tzinfo=None),
                 )
                 session.add(trade)
                 await session.commit()

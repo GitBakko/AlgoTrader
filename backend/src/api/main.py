@@ -113,7 +113,8 @@ async def lifespan(app: FastAPI):
             if use_demo or use_live:
                 mode = ExecutionMode.DEMO if use_demo else ExecutionMode.LIVE
                 app.state.execution_engine = ExecutionEngine(
-                    broker=broker, mode=mode
+                    broker=broker, mode=mode,
+                    db_session_factory=getattr(app.state, "db_session_factory", None),
                 )
                 logger.info(f"Execution engine upgraded to {mode.value} mode (broker-connected)")
 
