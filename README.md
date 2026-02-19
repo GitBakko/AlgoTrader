@@ -11,7 +11,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.12+-blue?logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/angular-21-dd0031?logo=angular&logoColor=white" alt="Angular">
-  <img src="https://img.shields.io/badge/tests-1110_passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-1136_passing-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/assets-21_instruments-blueviolet" alt="Assets">
   <img src="https://img.shields.io/badge/features-220+-9cf" alt="Features">
   <img src="https://img.shields.io/badge/broker-Capital.com-orange" alt="Broker">
@@ -42,13 +42,14 @@ MANTIS AI is a full-stack algorithmic trading system that combines **XGBoost ML 
 - **Per-Asset Thresholds**: Walk-forward OOS scorecard with KEEP/REVIEW/EXCLUDE decisions per asset
 - **Multi-Tier Sentiment**: Tier 1 (stocks) = 5 features, Tier 2 (all others) = news sentiment
 - **Macro Overlay**: VIX, DXY, 10Y yield via yfinance with daily asof-join to hourly bars
-- **Real Paper Trading**: 2 trades executed on Capital.com demo with real ML confidence scores
+- **Real Trading**: Trades executed on Capital.com demo with real ML confidence scores, full position tracking and history
 
 ---
 
 ## Features
 
 ### ML Pipeline
+
 - **XGBoost 3-class classifier** (BUY / HOLD / SELL) with Optuna hyperparameter tuning
 - **220+ features**: technical indicators, candlestick patterns (8), Fibonacci clusters (7), market structure (3), Keltner channels, VWAP bands, sentiment (5), macro (6)
 - **Walk-forward optimization** with train/val/test split, purge, and embargo
@@ -58,6 +59,7 @@ MANTIS AI is a full-stack algorithmic trading system that combines **XGBoost ML 
 - **F1 macro**: 0.53-0.61 across assets
 
 ### Risk Management (TRADING MAGNA AI)
+
 - **6 Circuit Breakers**: daily loss, consecutive losses, max positions, slippage anomaly, heartbeat timeout, volatility spike
 - **4-Phase Trailing Stop**: Initial -> Breakeven -> TP1 Lock -> ATR Trailing
 - **Multi-Target Exit**: TP1 (1xR) with 50% partial close, TP2 (2xR) full exit
@@ -66,25 +68,39 @@ MANTIS AI is a full-stack algorithmic trading system that combines **XGBoost ML 
 - **Correlation Guard**: prevents over-exposure to correlated assets
 
 ### Strategy Engine
+
 - **Regime-based Strategy Router**: trending -> ML, ranging -> [Squeeze, VWAP, ML]
 - **Volatility Squeeze Breakout**: BB-inside-KC detection with momentum/volume confirmation
 - **VWAP Reversion**: mean-reversion at +/-2 SD bands in ranging markets
 - **Pairs Trading**: Gold-BTC cointegration with z-score entry/exit (dollar-neutral)
 - **Monte Carlo Validation**: permutation, bootstrap, sign-flip tests with confidence intervals
 
+### Execution and Tracking
+
+- **Paper + DEMO + LIVE modes**: seamless mode switching via `EXECUTION_MODE` env var
+- **Position persistence**: all opens/closes saved to PostgreSQL with close reason normalization
+- **Broker-closed detection**: positions closed by Capital.com (SL/TP) are automatically detected and persisted
+- **State recovery**: PAPER from PostgreSQL, DEMO/LIVE from broker API + DB fallback
+- **Partial close**: TP1 at 50%, DEMO/LIVE uses close-then-reopen pattern (Capital.com limitation)
+- **Emergency kill switch**: stops loop + closes all positions + fires CRITICAL alert
+
 ### Dashboard
+
 - **Angular 21 + CoreUI** with MANTIS AI dark theme (neon green `#39FF14` accents)
 - **12 views**: Dashboard, Paper Trading, Backtest, Positions, Signals, Markets, News, Strategy, AI Models, Trade Journal, Settings, System Logs
 - **Real-time**: WebSocket price streaming, live P&L updates
 - **TradingView Lightweight Charts** for candlestick visualization
+- **Positions history**: tab-based (Open/History), filters, close reason badges, KPI summary
+- **Performance analytics**: win rate, profit factor, P&L by asset, equity curve
 - **Mobile responsive**: Bottom nav, scroll strips, 44px touch targets
 - **Auth**: JWT + RBAC (3 roles, 30+ permissions), avatar upload
+- **Alerting**: Email, Slack, Telegram, Webhook channels (configurable, off by default)
 
 ---
 
 ## Architecture
 
-```
+```text
                     MANTIS AI - System Architecture
 
     +------------------+         +-------------------+
@@ -116,7 +132,7 @@ MANTIS AI is a full-stack algorithmic trading system that combines **XGBoost ML 
                                           |
                             +-------------+-------------+
                             |     Execution Engine      |
-                            |  Paper + Live + Partial   |
+                            |  Paper + DEMO + Live      |
                             |  State Recovery + Persist |
                             +---------------------------+
 ```
@@ -134,6 +150,8 @@ MANTIS AI is a full-stack algorithmic trading system that combines **XGBoost ML 
 | **Database** | PostgreSQL, SQLAlchemy, Alembic |
 | **Frontend** | Angular 21, CoreUI Free, TradingView LWC |
 | **Broker** | Capital.com REST API + WebSocket |
+| **Monitoring** | Prometheus, Grafana, JSON structured logging |
+| **CI/CD** | GitHub Actions (lint, test, docker) |
 
 All databases are optional — the app degrades gracefully without PostgreSQL, Redis, or DuckDB.
 
@@ -141,7 +159,7 @@ All databases are optional — the app degrades gracefully without PostgreSQL, R
 
 ## Project Structure
 
-```
+```text
 AlgoTrader/
 ├── backend/
 │   ├── src/
@@ -154,22 +172,27 @@ AlgoTrader/
 │   │   ├── models/            # XGBoost, LSTM, calibration, Optuna tuner
 │   │   ├── strategy/          # ML, Squeeze, VWAP, Pairs, Router
 │   │   ├── risk/              # Circuit breakers, Kelly, trailing stops
-│   │   ├── execution/         # Paper + live execution, state recovery
+│   │   ├── execution/         # Paper + DEMO + live execution, state recovery
 │   │   ├── backtest/          # Walk-forward, Monte Carlo, scorecard
 │   │   ├── trading/           # Paper trading loop (21 assets)
-│   │   ├── monitoring/        # Health, trade logger, alerting
+│   │   ├── monitoring/        # Health, trade logger, alerting, metrics
 │   │   └── utils/             # Config, constants, event bus
-│   ├── tests/                 # 1110 pytest tests
+│   ├── tests/                 # 1136+ pytest tests
 │   ├── scripts/               # download, train, backtest, scorecard
 │   └── data/                  # Parquet files, saved models, logs
 ├── frontend/                  # Angular 21 MANTIS AI dashboard
 │   ├── src/app/
 │   │   ├── core/              # Services, guards, interceptors
-│   │   ├── shared/            # Chart, avatar, epic-logo, news-widget
+│   │   ├── shared/            # Chart, avatar, epic-logo, loading-button
 │   │   ├── views/             # 12 page components
 │   │   └── layout/            # Sidebar, header, footer, bottom-nav
 │   └── src/scss/              # MANTIS AI design system (6-level surfaces)
-├── docs/                      # Architecture, ML strategy, API reference
+├── docs/
+│   ├── architecture/          # System architecture, API reference, state recovery
+│   ├── trading/               # ML strategy, Capital.com API, trading concepts
+│   ├── guides/                # Setup guide, frontend guide
+│   ├── planning/              # Development roadmap, next steps
+│   └── archive/               # Historical research docs
 └── docker-compose.yml
 ```
 
@@ -242,8 +265,9 @@ Or use the **Paper Trading** page in the dashboard.
 |--------|---------|-------------|
 | GET | `/health` | System health + data freshness |
 | POST | `/api/auth/login` | JWT authentication |
-| GET | `/api/dashboard/overview` | Portfolio KPIs + P&L |
+| GET | `/api/dashboard/overview` | Portfolio KPIs + realized P&L |
 | GET | `/api/positions/paper` | Open paper positions |
+| GET | `/api/positions/closed` | Closed positions history (paginated, filtered) |
 | GET | `/api/signals/history` | Signal history |
 | POST | `/api/signals/predict/{epic}` | Run ML prediction pipeline |
 | GET | `/api/markets/candles/{epic}` | OHLC candle data |
@@ -251,6 +275,8 @@ Or use the **Paper Trading** page in the dashboard.
 | POST | `/api/trading/start` | Start paper trading loop |
 | POST | `/api/trading/stop` | Stop paper trading loop |
 | GET | `/api/trading/status` | Paper trading status + regime distribution |
+| GET | `/api/trading/performance` | Trading performance stats |
+| POST | `/api/trading/emergency-stop` | Emergency kill switch |
 | GET | `/api/strategy/` | Strategy configs per asset |
 | GET | `/api/models/` | Loaded ML model info |
 | WS | `/ws/prices` | Real-time price stream |
@@ -277,9 +303,10 @@ python -m pytest tests/strategy/ -v     # Strategy engine
 python -m pytest tests/features/ -v     # Feature engineering
 python -m pytest tests/external/ -v     # External API clients
 python -m pytest tests/backtest/ -v     # Backtesting + scorecard
+python -m pytest tests/execution/ -v    # Execution + state recovery
 ```
 
-**1110 tests** passing (Feb 2026) covering: broker integration, data pipeline, feature engineering, ML models, strategy engine, risk management, execution, API endpoints, external clients, backtest scorecard, and paper trading.
+**1136 tests** passing (Feb 2026) covering: broker integration, data pipeline, feature engineering, ML models, strategy engine, risk management, execution, API endpoints, external clients, backtest scorecard, paper trading, and alerting.
 
 ---
 
@@ -287,18 +314,44 @@ python -m pytest tests/backtest/ -v     # Backtesting + scorecard
 
 | Phase | Status | Highlights |
 |-------|--------|-----------|
-| 1-4 | COMPLETE | Foundation, ML, trading engine, dashboard |
-| 5 | COMPLETE | End-to-end wiring, paper trading loop |
-| 6 | COMPLETE | 3-class XGBoost, Optuna, calibration, 9→21 assets |
+| 1-5 | COMPLETE | Foundation, ML, trading engine, dashboard |
+| 6 | COMPLETE | 3-class XGBoost, Optuna, calibration |
 | 7-9 | COMPLETE | Paper trading UI, TRADING MAGNA AI (15 improvements), coverage |
 | 10 | COMPLETE | MANTIS AI branding, dark theme, OnPush optimization |
-| 11 | COMPLETE | 21-asset expansion, rate limiting, graceful shutdown |
-| 14-16 | COMPLETE | State recovery, UI/UX, best practices & docs |
-| **P0** | **COMPLETE** | Log cleanup, Kelly sizing, first real paper trading session |
+| 11 | COMPLETE | 21-asset expansion, monitoring, smart polling |
+| 12-13 | COMPLETE | Portfolio expansion (9 to 21), ML training (all assets) |
+| 14-16 | COMPLETE | State recovery, UI/UX + avatar, best practices |
+| **P0** | **COMPLETE** | Log cleanup, Kelly sizing, first real trading session |
 | **P1** | **COMPLETE** | Regime detection, OOS scorecard, sentiment + macro features |
-| P2 | PLANNED | Toast notifications, loading skeletons, mobile UX, token refresh |
-| P3 | PLANNED | CI/CD, Docker optimization, advanced models |
-| P4 | FUTURE | Demo trading → live trading on Capital.com |
+| **P2** | **COMPLETE** | Toast notifications, skeletons, token refresh, mobile UX |
+| **P3** | **COMPLETE** | CI/CD, JSON logging, Prometheus/Grafana, security headers |
+| **P4** | **COMPLETE** | DEMO readiness: partial close, Telegram alerts, kill switch |
+| **Phase 18** | **COMPLETE** | Positions history, performance analytics, P&L fix |
+| **Phase 18b-d** | **COMPLETE** | Bug fixes, LoadingButton, broker-closed detection |
+| **P5** | **NEXT** | Live trading (2+ weeks demo validation first) |
+
+---
+
+## Documentation
+
+```text
+docs/
+├── architecture/
+│   ├── 01-ARCHITECTURE.md          # System architecture and data flow
+│   ├── 08-API-REFERENCE.md         # REST API endpoint documentation
+│   └── 14-STATE-RECOVERY.md        # State recovery system design
+├── trading/
+│   ├── 03-ML-STRATEGY.md           # ML pipeline and model strategy
+│   ├── 04-CAPITAL-COM-API.md       # Capital.com broker integration
+│   └── 07-TRADING-GURU-SYNTHESIS.md # Advanced trading concepts
+├── guides/
+│   ├── 05-FRONTEND-GUIDE.md        # Angular frontend development guide
+│   └── 06-SETUP-GUIDE.md           # Environment setup instructions
+├── planning/
+│   ├── 02-DEVELOPMENT-ROADMAP.md   # Full development roadmap
+│   └── ROADMAP-NEXT-STEPS.md       # Current status and next steps
+└── archive/                         # Historical research docs
+```
 
 ---
 
@@ -314,6 +367,13 @@ CAPITAL_COM_DEMO=true
 # Optional services (system works without them)
 DATABASE_URL=postgresql://user:pass@localhost:5432/mantis
 REDIS_URL=redis://localhost:6379/0
+
+# Execution mode
+EXECUTION_MODE=PAPER  # PAPER, DEMO, or LIVE
+
+# Alerting (off by default)
+ALERTS_ENABLED=false
+ALERT_TELEGRAM_ENABLED=false
 ```
 
 ---

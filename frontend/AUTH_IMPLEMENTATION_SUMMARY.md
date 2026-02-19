@@ -251,4 +251,4 @@ Check browser console for:
 For detailed documentation, see:
 - [AUTH_SYSTEM.md](./AUTH_SYSTEM.md) - Complete system documentation
 - [CLAUDE.md](../CLAUDE.md) - Project conventions
-- [05-FRONTEND-GUIDE.md](../docs/05-FRONTEND-GUIDE.md) - Frontend architecture
+- [05-FRONTEND-GUIDE.md](../docs/guides/05-FRONTEND-GUIDE.md) - Frontend architecture

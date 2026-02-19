@@ -56,7 +56,12 @@ AlgoTrader/
 │   │   └── layout/            # Default layout with sidebar, header, user dropdown
 │   └── src/scss/              # MANTIS AI theme (_custom.scss, _palette.scss)
 ├── infra/                     # Prometheus config, Grafana dashboards
-├── docs/                      # Architecture and development docs
+├── docs/                      # Project documentation
+│   ├── architecture/          # System design, API reference, state recovery
+│   ├── trading/               # ML strategy, Capital.com API, trading concepts
+│   ├── guides/                # Setup guide, frontend guide
+│   ├── planning/              # Development roadmap, next steps
+│   └── archive/               # Historical research docs
 ├── docker-compose.yml         # Dev stack (PG, Redis, backend, frontend, pgAdmin, Redis Commander)
 └── docker-compose.prod.yml    # Production override (4 workers, memory limits, no bind mounts)
 ```

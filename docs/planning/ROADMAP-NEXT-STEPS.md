@@ -1,16 +1,25 @@
 # MANTIS AI - Roadmap & Next Steps
 
-> Current status: Phase 18c complete (2026-02-19). ~1136 tests, 0 errors. Production readiness ~99%.
+> Current status: Phase 18d complete (2026-02-19). ~1136 tests, 0 errors. Production readiness ~99%.
 > ML models: 20/20 tradable assets have trained XGBoost models (EURUSD excluded — ATR too small).
 > Infrastructure: CI/CD (GitHub Actions), JSON logging, Prometheus/Grafana, security headers, Docker prod override.
 > DEMO readiness: partial_close fix, Telegram alerts, AlertManager wired, emergency kill switch, max_total_exposure.
 > Trading history: Closed positions persisted to PostgreSQL, performance analytics, dashboard P&L fix.
-> Bug fixes: Timezone mismatch (asyncpg), UNKNOWN toast on close, duplicate toast notifications, ExecutionEngine DB access.
+> Bug fixes: Timezone mismatch (asyncpg), UNKNOWN toast on close, duplicate toast, ExecutionEngine DB access, broker-closed detection.
 > UX: LoadingButtonComponent — inline spinner + disable on async action buttons (close, start/stop, emergency stop).
 
 ---
 
 ## Recently Completed
+
+### Phase 18d — Broker-Closed Position Detection [COMPLETE]
+
+> Detect positions closed by Capital.com (SL/TP hit on broker side) and persist them to history.
+
+- [x] `PaperTradingLoop._detect_broker_closed()` — compares positions between iterations
+- [x] When a position disappears from broker, infers SL/TP/EXTERNAL from price vs levels
+- [x] Persists closure to DB, records in trade history, logs trade event
+- [x] Wired into `_run_iteration()` right after position fetch
 
 ### Phase 18c — LoadingButtonComponent [COMPLETE]
 
@@ -193,4 +202,5 @@
 | P4 | DEMO readiness (partial_close, alerts, kill switch) | 6h | DEMO trading | **COMPLETE** |
 | -- | Phase 18: Positions history + performance + P&L fix | 8h | Trading analytics | **COMPLETE** |
 | -- | Phase 18c: LoadingButton + UX anti-spam | 1h | UX safety | **COMPLETE** |
+| -- | Phase 18d: Broker-closed position detection | 1h | Trading integrity | **COMPLETE** |
 | **P5** | **Live trading (2+ weeks demo first)** | **2+ weeks** | **Revenue generation** | **NEXT** |

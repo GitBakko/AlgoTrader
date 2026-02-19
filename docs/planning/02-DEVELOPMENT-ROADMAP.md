@@ -282,7 +282,7 @@
 
 ## Phase 6A: Trading Guru ML Upgrades [COMPLETE]
 
-> Basata sull'analisi di `docs/addestramento.md` e sintesi in `docs/07-TRADING-GURU-SYNTHESIS.md`
+> Basata sull'analisi di `docs/archive/addestramento.md` e sintesi in `docs/trading/07-TRADING-GURU-SYNTHESIS.md`
 
 ### 6A.1 Migrazione 5→3 Classi [COMPLETE]
 

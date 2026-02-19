@@ -345,5 +345,5 @@ Potential improvements:
 ## Related Documentation
 
 - [CLAUDE.md](../CLAUDE.md) - Project overview
-- [05-FRONTEND-GUIDE.md](../docs/05-FRONTEND-GUIDE.md) - Frontend architecture
-- [01-ARCHITECTURE.md](../docs/01-ARCHITECTURE.md) - System architecture
+- [05-FRONTEND-GUIDE.md](../docs/guides/05-FRONTEND-GUIDE.md) - Frontend architecture
+- [01-ARCHITECTURE.md](../docs/architecture/01-ARCHITECTURE.md) - System architecture
