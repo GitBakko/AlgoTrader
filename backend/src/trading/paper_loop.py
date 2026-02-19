@@ -111,6 +111,8 @@ class PaperTradingLoop:
         self._market_cache_ts: dict[str, float] = {}
         # Regime distribution tracking per epic (Step 7: regime detection)
         self._regime_counts: dict[str, dict[str, int]] = {}
+        # Track positions from previous iteration to detect broker-closed positions
+        self._previous_positions: dict[str, dict] = {}
 
     @property
     def is_running(self) -> bool:
@@ -336,6 +338,100 @@ class PaperTradingLoop:
         except Exception as e:
             logger.warning(f"Position close persistence failed for {deal_id}: {e}")
 
+    async def _detect_broker_closed(self, current_positions: list[dict]) -> None:
+        """
+        Detect positions closed by the broker (SL/TP hit on Capital.com side).
+        Compares current broker positions with previous iteration to find disappeared ones.
+        Persists closures to DB so they appear in position history.
+        """
+        if self.execution_engine.mode == ExecutionMode.PAPER:
+            # PAPER mode: we manage all closes locally, no broker reconciliation needed
+            return
+
+        current_deals = {p.get("deal_id") for p in current_positions if p.get("deal_id")}
+
+        # First iteration: just record positions, nothing to compare yet
+        if not self._previous_positions:
+            self._previous_positions = {p.get("deal_id"): p for p in current_positions if p.get("deal_id")}
+            return
+
+        # Find positions that disappeared (closed by broker)
+        for deal_id, prev_pos in self._previous_positions.items():
+            if deal_id in current_deals:
+                continue  # Still open
+
+            epic = prev_pos.get("epic", "UNKNOWN")
+            direction = prev_pos.get("direction", "BUY")
+            size = prev_pos.get("size", 0)
+            entry_price = prev_pos.get("level", 0)
+            stop_level = prev_pos.get("stop_level")
+            profit_level = prev_pos.get("profit_level")
+
+            # Try to determine close reason from SL/TP levels vs last known price
+            close_reason = "EXTERNAL"
+            exit_price = entry_price  # Fallback
+            try:
+                latest = self.data_access.get_latest_price(epic, timeframe="1h")
+                if latest:
+                    exit_price = latest.get("close", entry_price)
+                    if stop_level and stop_level > 0:
+                        if direction == "BUY" and exit_price <= stop_level:
+                            close_reason = "SL"
+                            exit_price = stop_level
+                        elif direction == "SELL" and exit_price >= stop_level:
+                            close_reason = "SL"
+                            exit_price = stop_level
+                    if close_reason == "EXTERNAL" and profit_level and profit_level > 0:
+                        if direction == "BUY" and exit_price >= profit_level:
+                            close_reason = "TP"
+                            exit_price = profit_level
+                        elif direction == "SELL" and exit_price <= profit_level:
+                            close_reason = "TP"
+                            exit_price = profit_level
+            except Exception:
+                pass
+
+            # Calculate P&L
+            if direction == "BUY":
+                pnl = (exit_price - entry_price) * size
+            else:
+                pnl = (entry_price - exit_price) * size
+
+            logger.warning(
+                f"[{epic}] Position {deal_id} closed by broker "
+                f"(reason={close_reason}, P&L=${pnl:.2f})"
+            )
+
+            # Record in trade history for Kelly sizing
+            self._on_position_closed(deal_id, pnl)
+
+            # Persist to database
+            await self._persist_position_close(
+                deal_id=deal_id, epic=epic, direction=direction,
+                size=size, entry_price=entry_price, exit_price=exit_price,
+                pnl=pnl, close_reason=close_reason,
+            )
+
+            # Clean up trailing stop if tracked
+            if deal_id in self.trailing_stop_manager.tracked_positions:
+                self.trailing_stop_manager.unregister_position(deal_id)
+
+            # Log trade event
+            try:
+                from src.monitoring.trade_logger import TradeLogger
+                tl = TradeLogger.get_instance()
+                await tl.log_execution(
+                    epic=epic, direction=direction, size=size,
+                    entry_price=entry_price, status="closed",
+                    profit_loss=pnl, close_reason=close_reason,
+                    source=self._log_source,
+                )
+            except Exception:
+                pass
+
+        # Update previous positions for next iteration
+        self._previous_positions = {p.get("deal_id"): p for p in current_positions if p.get("deal_id")}
+
     async def _persist_trailing_stop_state(self, deal_id: str) -> None:
         """
         Persist trailing stop state for a specific position.
@@ -538,6 +634,9 @@ class PaperTradingLoop:
         except (asyncio.TimeoutError, Exception) as e:
             logger.warning(f"Position fetch timed out/failed ({e}), using local cache")
             current_positions = self.get_paper_positions()
+
+        # Detect positions closed by broker (SL/TP hit on Capital.com side)
+        await self._detect_broker_closed(current_positions)
 
         # Phase 8: update trailing stops for open positions
         await self._update_trailing_stops(current_positions)
