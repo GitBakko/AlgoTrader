@@ -85,6 +85,7 @@ class PositionTracker:
                 "level": p.level,
                 "stop_level": p.stop_level,
                 "profit_level": p.profit_level,
+                "opened_at": p.created_date.isoformat() if p.created_date else None,
             }
 
             # CRITICAL: Merge local SL/TP data if broker doesn't have them.

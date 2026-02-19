@@ -267,6 +267,8 @@ FastAPI server exposing REST + WebSocket for the frontend.
 **Key Endpoints:**
 - `GET /api/dashboard` - Overview data (P&L, positions, signals)
 - `GET /api/positions` - Current open positions
+- `GET /api/positions/closed` - Closed positions history (paginated, filtered)
+- `GET /api/trading/performance` - Trading performance stats (win rate, P&L by asset)
 - `GET /api/signals` - Active trading signals
 - `POST /api/backtest/run` - Run walk-forward backtest
 - `POST /api/strategy/activate` - Enable/disable strategies
@@ -286,7 +288,7 @@ FastAPI server exposing REST + WebSocket for the frontend.
 - **Dashboard** - Full-width equity curve, 8-asset price grid, risk metric cards
 - **Markets** - Real-time charts for 21 assets with TradingView Lightweight Charts
 - **Signals** - ML signal history with confidence scores
-- **Positions** - Open positions with live P&L via WebSocket
+- **Positions** - Open + closed positions (tab view), live P&L, history with filters
 - **Paper Trading** - Start/stop trading, live signal monitor
 - **Trade Journal** - Full signal history with filters and stats
 - **Backtest** - Walk-forward backtest runner with equity curves
@@ -321,9 +323,9 @@ FastAPI server exposing REST + WebSocket for the frontend.
 **Auto-Persistence Hooks**:
 
 - After each trading iteration: Save risk state
-- After position open: Save trailing stop state
+- After position open: Save trailing stop state + persist position to DB
 - After trailing stop update: Save updated state
-- After position close: Save final risk state
+- After position close: Persist position close to DB + save final risk state
 
 **Monitoring**: `GET /api/system/recovery-report` endpoint provides recovery status and warnings
 

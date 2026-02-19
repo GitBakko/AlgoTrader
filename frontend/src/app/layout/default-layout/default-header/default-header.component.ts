@@ -20,6 +20,7 @@ import {
 
 import { IconDirective } from '@coreui/icons-angular';
 import { WebSocketService } from '../../../core/services/websocket.service';
+import { NavUsageService } from '../../../core/services/nav-usage.service';
 import { UserDropdownComponent } from './user-dropdown/user-dropdown.component';
 
 @Component({
@@ -38,8 +39,10 @@ export class DefaultHeaderComponent extends HeaderComponent {
 
   readonly #colorModeService = inject(ColorModeService);
   readonly #ws = inject(WebSocketService);
+  readonly #navUsage = inject(NavUsageService);
   readonly colorMode = this.#colorModeService.colorMode;
   readonly wsConnected = this.#ws.connected;
+  readonly topLinks = this.#navUsage.topLinks;
 
   readonly colorModes = [
     { name: 'light', text: 'Light', icon: 'cilSun' },

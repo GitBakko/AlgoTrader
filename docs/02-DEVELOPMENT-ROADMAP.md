@@ -26,6 +26,7 @@
 | P1.7 | Regime Detection Fix | get_market_data() regime+rsi, RegimeAdapter activation | COMPLETE |
 | P1.6 | Walk-Forward OOS Scorecard | Per-asset KEEP/REVIEW/EXCLUDE, optimal_thresholds.json | COMPLETE |
 | P1.8 | Sentiment & Macro Features | Tiered sentiment, ticker mapping, VIX/DXY/yield macro | COMPLETE |
+| 18 | Positions History + Performance | Closed positions, performance analytics, P&L fix, DB persistence | COMPLETE |
 
 ---
 
@@ -721,6 +722,49 @@
 
 ---
 
+## Phase 18: Positions History + Performance + P&L Fix [COMPLETE]
+
+> Full closed-positions history, performance analytics, dashboard P&L fix, and position DB persistence.
+
+### Backend — New Endpoints & Repository Methods
+
+- [x] `GET /api/positions/closed` — paginated closed positions with filters (date_from, date_to, epic, close_reason)
+- [x] `GET /api/trading/performance` — performance stats (win rate, profit factor, P&L by asset, equity curve)
+- [x] `PositionRepository.get_closed_positions()` — filtered, paginated query with aggregates (total_pnl, win_count, loss_count, win_rate, avg_win, avg_loss)
+- [x] `PositionRepository.get_performance_stats()` — win/loss rates, profit factor, best/worst trade, P&L by epic, equity curve
+- [x] `PositionRepository.get_closed_in_period()` — period-based realized P&L summation
+
+### Backend — Dashboard P&L Fix
+
+- [x] Fix `total_pnl` in `GET /api/dashboard/overview`: now uses `realized_pnl` from DB (sum of closed positions P&L), fallback to `paper_loop._trade_history` in-memory
+- [x] Fix `GET /api/dashboard/equity-curve`: uses `position_repo.get_performance_stats()` for cumulative equity curve data
+
+### Backend — Position Persistence (Critical Bug Fix)
+
+- [x] `PaperTradingLoop._persist_position_open()` — saves positions to PostgreSQL when trade executed
+- [x] `PaperTradingLoop._persist_position_close()` — updates position to CLOSED in DB when SL/TP hit or manual close
+- [x] Close reason normalization map: `STOP_LOSS_HIT→SL`, `TAKE_PROFIT_HIT→TP`, `TP1_HIT→TP`, `API close request→MANUAL`, `Graceful shutdown→MANUAL`
+- [x] Idempotent open (checks existing deal_id before create), fallback close (creates as CLOSED if never persisted at open)
+- [x] Both OPEN and CLOSE `Trade` records created for audit trail
+
+### Frontend — Positions History Tab
+
+- [x] Tab-based positions view: "Aperte" (open) + "Storico" (history)
+- [x] History filter bar: asset select, close_reason select, date range pickers
+- [x] Inline KPI summary: Total P&L, Win Rate, Avg Win, Avg Loss
+- [x] Close reason badges: SL (red), TP (green), MANUAL (cyan), EXTERNAL (amber)
+- [x] Pagination support via CoreUI
+- [x] New models: `ClosedPosition`, `PositionAggregates`, `TradingPerformance`
+- [x] `TradingService`: `closedPositions`, `closedAggregates`, `performance` signals + `loadClosedPositions()`, `loadPerformance()`
+
+### Frontend — Dashboard Performance Section
+
+- [x] Performance KPI cards: Win Rate, Profit Factor, Total P&L, Best/Worst Trade
+- [x] P&L per Asset: horizontal bar visualization (green profit / red loss)
+- [x] Data loaded from `GET /api/trading/performance`
+
+---
+
 ## Testing Progression
 
 | Phase | Tests | Notes |
@@ -731,4 +775,5 @@
 | Phase 9 | 865 | 80%+ coverage |
 | Phase 16 | 1065 | Best practices |
 | P0 (17a/b) | 1081 | Real trading fixes |
-| **P1 (Steps 6-8)** | **1110** | **Scorecard + sentiment + macro** |
+| P1 (Steps 6-8) | 1110 | Scorecard + sentiment + macro |
+| **Phase 18** | **~1136** | **Positions history + performance + P&L fix** |

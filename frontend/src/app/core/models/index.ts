@@ -301,6 +301,50 @@ export interface PaperSignal {
   _showRaw?: boolean;  // UI-only: toggle for raw error display
 }
 
+// Closed Positions History
+export interface ClosedPosition {
+  deal_id: string;
+  epic: string;
+  direction: string;
+  size: number;
+  entry_price: number;
+  exit_price: number | null;
+  profit_loss: number | null;
+  stop_loss: number | null;
+  take_profit: number | null;
+  close_reason: string | null;
+  opened_at: string | null;
+  closed_at: string | null;
+  duration_minutes: number | null;
+}
+
+export interface PositionAggregates {
+  total_pnl: number;
+  win_count: number;
+  loss_count: number;
+  win_rate: number;
+  avg_win: number;
+  avg_loss: number;
+}
+
+export interface TradingPerformance {
+  trade_count: number;
+  win_count: number;
+  loss_count: number;
+  win_rate: number;
+  total_pnl: number;
+  avg_win: number;
+  avg_loss: number;
+  profit_factor: number;
+  max_consecutive_wins: number;
+  max_consecutive_losses: number;
+  best_trade: number;
+  worst_trade: number;
+  pnl_by_epic: Record<string, number>;
+  equity_curve: { date: string; value: number }[];
+  source: string;
+}
+
 // News and Sentiment
 export * from './news.model';
 

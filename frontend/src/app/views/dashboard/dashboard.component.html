@@ -196,6 +196,104 @@
   </c-card-body>
 </c-card>
 
+<!-- Performance KPIs + P&L per Asset -->
+@if (performance(); as perf) {
+  @if (perf.trade_count > 0) {
+    <c-row class="g-3 mb-4">
+      <c-col sm="6" xl="3">
+        <c-card class="dash-kpi-card h-100">
+          <c-card-body class="p-3">
+            <div class="dash-kpi-card__label">Win Rate</div>
+            <div class="dash-kpi-card__value">{{ (perf.win_rate * 100) | number:'1.1-1' }}%</div>
+            <div class="dash-kpi-card__detail">
+              {{ perf.win_count }}W / {{ perf.loss_count }}L
+            </div>
+          </c-card-body>
+          <div class="dash-kpi-card__accent dash-kpi-card__accent--primary"></div>
+        </c-card>
+      </c-col>
+      <c-col sm="6" xl="3">
+        <c-card class="dash-kpi-card h-100">
+          <c-card-body class="p-3">
+            <div class="dash-kpi-card__label">Profit Factor</div>
+            <div class="dash-kpi-card__value">{{ perf.profit_factor | number:'1.2-2' }}</div>
+            <div class="dash-kpi-card__detail">
+              {{ perf.trade_count }} trades ({{ perf.source }})
+            </div>
+          </c-card-body>
+          <div class="dash-kpi-card__accent dash-kpi-card__accent--primary"></div>
+        </c-card>
+      </c-col>
+      <c-col sm="6" xl="3">
+        <c-card class="dash-kpi-card h-100">
+          <c-card-body class="p-3">
+            <div class="dash-kpi-card__label">Best Trade</div>
+            <div class="dash-kpi-card__value text-success">
+              $ +{{ perf.best_trade | number:'1.2-2' }}
+            </div>
+            <div class="dash-kpi-card__detail">
+              Avg Win: <span class="mantis-mono text-success">$ +{{ perf.avg_win | number:'1.2-2' }}</span>
+            </div>
+          </c-card-body>
+          <div class="dash-kpi-card__accent dash-kpi-card__accent--profit"></div>
+        </c-card>
+      </c-col>
+      <c-col sm="6" xl="3">
+        <c-card class="dash-kpi-card h-100">
+          <c-card-body class="p-3">
+            <div class="dash-kpi-card__label">Worst Trade</div>
+            <div class="dash-kpi-card__value text-danger">
+              $ {{ perf.worst_trade | number:'1.2-2' }}
+            </div>
+            <div class="dash-kpi-card__detail">
+              Avg Loss: <span class="mantis-mono text-danger">$ {{ perf.avg_loss | number:'1.2-2' }}</span>
+            </div>
+          </c-card-body>
+          <div class="dash-kpi-card__accent dash-kpi-card__accent--loss"></div>
+        </c-card>
+      </c-col>
+    </c-row>
+
+    <!-- P&L per Asset (horizontal bars) -->
+    @if (pnlByAsset().length > 0) {
+      <c-card class="mb-4 border-top border-top-3 border-top-primary">
+        <c-card-header class="d-flex align-items-center justify-content-between py-2">
+          <span class="fw-semibold small text-body-secondary">P&amp;L per Asset (30g)</span>
+          <span class="text-body-secondary small mantis-mono"
+                [class.text-success]="perf.total_pnl >= 0"
+                [class.text-danger]="perf.total_pnl < 0">
+            Totale: $ {{ perf.total_pnl >= 0 ? '+' : '' }}{{ perf.total_pnl | number:'1.2-2' }}
+          </span>
+        </c-card-header>
+        <c-card-body class="p-3">
+          <div class="pnl-bars">
+            @for (item of pnlByAsset(); track item.epic) {
+              <div class="pnl-bar-row">
+                <div class="pnl-bar-row__label">
+                  <app-epic-logo [epic]="item.epic" [size]="18" [rounded]="true" />
+                  <span class="small fw-semibold">{{ item.epic }}</span>
+                </div>
+                <div class="pnl-bar-row__track">
+                  <div class="pnl-bar-row__fill"
+                       [class.pnl-bar-row__fill--profit]="item.pnl >= 0"
+                       [class.pnl-bar-row__fill--loss]="item.pnl < 0"
+                       [style.width.%]="(Math.abs(item.pnl) / maxAbsPnl()) * 100">
+                  </div>
+                </div>
+                <span class="pnl-bar-row__value mantis-mono small"
+                      [class.text-success]="item.pnl >= 0"
+                      [class.text-danger]="item.pnl < 0">
+                  $ {{ item.pnl >= 0 ? '+' : '' }}{{ item.pnl | number:'1.2-2' }}
+                </span>
+              </div>
+            }
+          </div>
+        </c-card-body>
+      </c-card>
+    }
+  }
+}
+
 <!-- ═══════ SECTION: Markets ═══════ -->
 <div class="section-divider">
   <span class="section-divider__label">Markets</span>

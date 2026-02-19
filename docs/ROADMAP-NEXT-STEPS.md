@@ -1,13 +1,54 @@
 # MANTIS AI - Roadmap & Next Steps
 
-> Current status: P4 complete (2026-02-18). 1136 tests, 0 errors. Production readiness ~99%.
+> Current status: Phase 18 complete (2026-02-19). ~1136 tests, 0 errors. Production readiness ~99%.
 > ML models: 20/20 tradable assets have trained XGBoost models (EURUSD excluded — ATR too small).
 > Infrastructure: CI/CD (GitHub Actions), JSON logging, Prometheus/Grafana, security headers, Docker prod override.
 > DEMO readiness: partial_close fix, Telegram alerts, AlertManager wired, emergency kill switch, max_total_exposure.
+> Trading history: Closed positions persisted to PostgreSQL, performance analytics, dashboard P&L fix.
 
 ---
 
 ## Recently Completed
+
+### Phase 18 — Positions History + Performance + P&L Fix [COMPLETE]
+
+> Full closed-positions history, performance analytics, dashboard P&L fix, and position DB persistence.
+
+**Backend — New Endpoints & Queries:**
+
+- [x] `GET /api/positions/closed` — paginated closed positions with filters (date, epic, close_reason)
+- [x] `GET /api/trading/performance` — trading performance stats (win rate, profit factor, P&L by asset, equity curve)
+- [x] `PositionRepository.get_closed_positions()` — filtered, paginated query with aggregates
+- [x] `PositionRepository.get_performance_stats()` — win/loss rates, profit factor, best/worst trade, P&L by epic
+- [x] `PositionRepository.get_closed_in_period()` — period-based P&L summation
+
+**Backend — Dashboard P&L Fix:**
+
+- [x] Fix `total_pnl` in `GET /api/dashboard/overview`: now uses `realized_pnl` from DB (sum of closed positions P&L), fallback to `paper_loop._trade_history`
+- [x] Fix `GET /api/dashboard/equity-curve`: now uses `position_repo.get_performance_stats()` for cumulative equity curve
+
+**Backend — Position Persistence (Critical Bug Fix):**
+
+- [x] `PaperTradingLoop._persist_position_open()` — saves positions to PostgreSQL when opened
+- [x] `PaperTradingLoop._persist_position_close()` — updates positions to CLOSED when SL/TP hit or manual close
+- [x] Close reason normalization: `STOP_LOSS_HIT→SL`, `TAKE_PROFIT_HIT→TP`, `TP1_HIT→TP`, `API close request→MANUAL`
+- [x] Idempotent open (check existing deal_id), fallback close (create if never persisted)
+- [x] Trade records created for both OPEN and CLOSE events
+
+**Frontend — Positions History Tab:**
+
+- [x] Tab-based positions view: "Aperte" (open) + "Storico" (history)
+- [x] History tab: filter bar (asset, close_reason, date range), KPI summary (total P&L, win rate, avg win/loss)
+- [x] Close reason badges: SL (red), TP (green), MANUAL (cyan), EXTERNAL (amber)
+- [x] Pagination support for large position histories
+- [x] New models: `ClosedPosition`, `PositionAggregates`, `TradingPerformance`
+- [x] `TradingService`: `closedPositions`, `closedAggregates`, `performance` signals + load methods
+
+**Frontend — Dashboard Performance Section:**
+
+- [x] Performance KPI cards: Win Rate, Profit Factor, Total P&L, Best/Worst Trade
+- [x] P&L per Asset: horizontal bar visualization (green profit / red loss)
+- [x] Performance data loaded from `/api/trading/performance`
 
 ### Phase 17a (P0) — Make Real Trading Work [COMPLETE]
 
@@ -113,4 +154,5 @@
 | P2 | Toast + skeletons + token refresh + mobile | 13h | UX polish | **COMPLETE** |
 | P3 | CI/CD + logging + metrics + security + Docker | 8h | DevOps maturity | **COMPLETE** |
 | P4 | DEMO readiness (partial_close, alerts, kill switch) | 6h | DEMO trading | **COMPLETE** |
+| -- | Phase 18: Positions history + performance + P&L fix | 8h | Trading analytics | **COMPLETE** |
 | **P5** | **Live trading (2+ weeks demo first)** | **2+ weeks** | **Revenue generation** | **NEXT** |

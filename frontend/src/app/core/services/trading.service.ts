@@ -18,6 +18,9 @@ import {
   PaperTradingStatus,
   PaperPosition,
   PaperSignal,
+  ClosedPosition,
+  PositionAggregates,
+  TradingPerformance,
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -53,6 +56,12 @@ export class TradingService {
   readonly paperStatus = signal<PaperTradingStatus | null>(null);
   readonly paperPositions = signal<PaperPosition[]>([]);
   readonly paperSignals = signal<PaperSignal[]>([]);
+
+  // Closed Positions & Performance
+  readonly closedPositions = signal<ClosedPosition[]>([]);
+  readonly closedTotal = signal<number>(0);
+  readonly closedAggregates = signal<PositionAggregates | null>(null);
+  readonly performance = signal<TradingPerformance | null>(null);
 
   // ── Dashboard ──
 
@@ -217,6 +226,46 @@ export class TradingService {
 
   stopPaperTrading() {
     return this.api.post<PaperTradingStatus & { message: string }>('/api/trading/stop');
+  }
+
+  // ── Closed Positions & Performance ──
+
+  loadClosedPositions(params: {
+    page?: number; page_size?: number;
+    date_from?: string; date_to?: string;
+    close_reason?: string; epic?: string;
+  } = {}): void {
+    const q: Record<string, string | number> = {};
+    if (params.page) q['page'] = params.page;
+    if (params.page_size) q['page_size'] = params.page_size;
+    if (params.date_from) q['date_from'] = params.date_from;
+    if (params.date_to) q['date_to'] = params.date_to;
+    if (params.close_reason) q['close_reason'] = params.close_reason;
+    if (params.epic) q['epic'] = params.epic;
+
+    this.api.get<{
+      positions: ClosedPosition[];
+      total: number;
+      aggregates: PositionAggregates;
+    }>('/api/positions/closed', q)
+      .subscribe({
+        next: data => {
+          this.closedPositions.set(data.positions);
+          this.closedTotal.set(data.total);
+          this.closedAggregates.set(data.aggregates);
+        },
+        error: () => {},
+      });
+  }
+
+  loadPerformance(days = 30, epic?: string): void {
+    const q: Record<string, string | number> = { days };
+    if (epic) q['epic'] = epic;
+    this.api.get<TradingPerformance>('/api/trading/performance', q)
+      .subscribe({
+        next: data => this.performance.set(data),
+        error: () => {},
+      });
   }
 
   emergencyStop() {

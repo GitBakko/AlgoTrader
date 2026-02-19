@@ -163,6 +163,54 @@ List of recently executed trades.
 
 List all open positions from broker.
 
+### GET `/api/positions/closed`
+
+List closed positions with pagination and filtering.
+
+**Query Parameters:**
+- `page` (int): Page number (default: 1)
+- `page_size` (int): Items per page (default: 20, max: 100)
+- `date_from` (string, optional): ISO date for start filter
+- `date_to` (string, optional): ISO date for end filter
+- `close_reason` (string, optional): Filter by close reason (`SL`, `TP`, `MANUAL`, `EXTERNAL`)
+- `epic` (string, optional): Filter by asset
+
+**Response:**
+```json
+{
+  "data": {
+    "positions": [
+      {
+        "deal_id": "DEAL-123",
+        "epic": "BTCUSD",
+        "direction": "BUY",
+        "size": 0.1,
+        "entry_price": 68406.0,
+        "exit_price": 67500.0,
+        "profit_loss": -90.6,
+        "stop_loss": 67000.0,
+        "take_profit": 72000.0,
+        "close_reason": "SL",
+        "opened_at": "2026-02-18T14:30:00Z",
+        "closed_at": "2026-02-18T16:45:00Z",
+        "duration_minutes": 135
+      }
+    ],
+    "total": 42,
+    "page": 1,
+    "page_size": 20,
+    "aggregates": {
+      "total_pnl": 1250.50,
+      "win_count": 28,
+      "loss_count": 14,
+      "win_rate": 0.667,
+      "avg_win": 89.30,
+      "avg_loss": -45.20
+    }
+  }
+}
+```
+
 ### GET `/api/positions/{deal_id}`
 
 Get details for a specific position.
@@ -294,6 +342,44 @@ Get paper trading status (running, last iteration, errors).
     "last_iteration": "2026-02-16T10:30:00Z",
     "errors_count": 0,
     "assets_configured": 21
+  }
+}
+```
+
+### GET `/api/trading/performance`
+
+Get trading performance statistics.
+
+**Query Parameters:**
+- `days` (int): Look-back period in days (default: 30)
+- `epic` (string, optional): Filter by asset
+
+**Response:**
+```json
+{
+  "data": {
+    "trade_count": 42,
+    "win_count": 28,
+    "loss_count": 14,
+    "win_rate": 0.667,
+    "total_pnl": 1250.50,
+    "avg_win": 89.30,
+    "avg_loss": -45.20,
+    "profit_factor": 2.76,
+    "max_consecutive_wins": 7,
+    "max_consecutive_losses": 3,
+    "best_trade": 350.00,
+    "worst_trade": -120.00,
+    "pnl_by_epic": {
+      "BTCUSD": 450.00,
+      "XAUUSD": 320.50,
+      "XAGUSD": -80.00
+    },
+    "equity_curve": [
+      {"date": "2026-02-01", "value": 10000.0},
+      {"date": "2026-02-15", "value": 10850.0}
+    ],
+    "source": "database"
   }
 }
 ```

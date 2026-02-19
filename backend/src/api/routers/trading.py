@@ -4,12 +4,14 @@ Controls the trading loop: start, stop, status, positions, signals.
 """
 
 import asyncio
+from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Query, Request
 from loguru import logger
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from src.api.dependencies import get_position_repo
 from src.api.schemas import error_response, success_response
 
 # Timeout for broker-dependent async calls (seconds)
@@ -117,6 +119,54 @@ async def trading_signals(request: Request):
         return success_response([])
 
     return success_response(loop.get_signal_history())
+
+
+@router.get("/performance")
+async def trading_performance(
+    request: Request,
+    days: int = Query(default=30, ge=1, le=365),
+    epic: str | None = Query(default=None),
+    position_repo=Depends(get_position_repo),
+):
+    """Get trading performance statistics from closed positions."""
+    if position_repo is not None:
+        try:
+            date_from = datetime.now(timezone.utc) - timedelta(days=days)
+            stats = await position_repo.get_performance_stats(
+                date_from=date_from, epic=epic,
+            )
+            stats["source"] = "database"
+            return success_response(stats)
+        except Exception as e:
+            logger.debug(f"DB performance stats failed: {e}")
+
+    # Fallback: compute from in-memory trade history
+    loop = _get_loop(request)
+    if loop is None:
+        return success_response({"trade_count": 0, "source": "none"})
+
+    history = list(loop._trade_history)
+    pnls = [h.get("pnl", 0) for h in history if "pnl" in h]
+    wins = [v for v in pnls if v > 0]
+    losses = [v for v in pnls if v <= 0]
+
+    return success_response({
+        "trade_count": len(pnls),
+        "win_count": len(wins),
+        "loss_count": len(losses),
+        "win_rate": round(len(wins) / len(pnls), 4) if pnls else 0,
+        "total_pnl": round(sum(pnls), 2),
+        "avg_win": round(sum(wins) / len(wins), 2) if wins else 0,
+        "avg_loss": round(sum(losses) / len(losses), 2) if losses else 0,
+        "profit_factor": 0,
+        "max_consecutive_wins": 0,
+        "max_consecutive_losses": 0,
+        "best_trade": round(max(pnls), 2) if pnls else 0,
+        "worst_trade": round(min(pnls), 2) if pnls else 0,
+        "pnl_by_epic": {},
+        "equity_curve": [],
+        "source": "in_memory",
+    })
 
 
 @router.post("/emergency-stop")

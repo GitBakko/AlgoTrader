@@ -4,7 +4,7 @@ Position repository with trading-specific queries.
 
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import Position
@@ -187,3 +187,126 @@ class PositionRepository(BaseRepository[Position]):
         await self.session.flush()
         await self.session.refresh(position)
         return position
+
+    async def get_closed_positions(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+        close_reason: str | None = None,
+        epic: str | None = None,
+    ) -> tuple[list[Position], int]:
+        """
+        Get closed positions with filters and pagination.
+
+        Returns:
+            Tuple of (positions list, total count)
+        """
+        base = select(Position).where(Position.status == "CLOSED")
+        count_q = select(func.count(Position.id)).where(Position.status == "CLOSED")
+
+        if date_from:
+            base = base.where(Position.closed_at >= date_from)
+            count_q = count_q.where(Position.closed_at >= date_from)
+        if date_to:
+            base = base.where(Position.closed_at <= date_to)
+            count_q = count_q.where(Position.closed_at <= date_to)
+        if close_reason:
+            base = base.where(Position.close_reason == close_reason)
+            count_q = count_q.where(Position.close_reason == close_reason)
+        if epic:
+            base = base.where(Position.epic == epic)
+            count_q = count_q.where(Position.epic == epic)
+
+        total = (await self.session.execute(count_q)).scalar() or 0
+        query = base.order_by(Position.closed_at.desc()).offset(offset).limit(limit)
+        positions = list((await self.session.execute(query)).scalars().all())
+
+        return positions, total
+
+    async def get_performance_stats(
+        self,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+        epic: str | None = None,
+    ) -> dict:
+        """
+        Get comprehensive performance statistics from closed positions.
+
+        Returns:
+            Dict with trade_count, win/loss stats, profit_factor, pnl_by_epic, equity_curve
+        """
+        query = (
+            select(Position)
+            .where(Position.status == "CLOSED")
+            .where(Position.profit_loss.is_not(None))
+        )
+        if date_from:
+            query = query.where(Position.closed_at >= date_from)
+        if date_to:
+            query = query.where(Position.closed_at <= date_to)
+        if epic:
+            query = query.where(Position.epic == epic)
+        query = query.order_by(Position.closed_at.asc())
+
+        positions = list((await self.session.execute(query)).scalars().all())
+        if not positions:
+            return {"trade_count": 0}
+
+        pnls = [float(p.profit_loss) for p in positions]
+        wins = [v for v in pnls if v > 0]
+        losses = [v for v in pnls if v <= 0]
+
+        # Max consecutive wins/losses
+        max_cw = max_cl = cur_w = cur_l = 0
+        for pnl in pnls:
+            if pnl > 0:
+                cur_w += 1
+                cur_l = 0
+                max_cw = max(max_cw, cur_w)
+            else:
+                cur_l += 1
+                cur_w = 0
+                max_cl = max(max_cl, cur_l)
+
+        gross_profit = sum(wins) if wins else 0
+        gross_loss = abs(sum(losses)) if losses else 0
+        profit_factor = (
+            gross_profit / gross_loss if gross_loss > 0
+            else float("inf") if gross_profit > 0
+            else 0
+        )
+
+        # P&L by epic
+        pnl_by_epic: dict[str, float] = {}
+        for p in positions:
+            pnl_by_epic[p.epic] = pnl_by_epic.get(p.epic, 0) + float(p.profit_loss)
+
+        # Equity curve (cumulative P&L over time)
+        equity_points: list[dict] = []
+        cumulative = 0.0
+        for p in positions:
+            cumulative += float(p.profit_loss)
+            if p.closed_at:
+                equity_points.append({
+                    "date": p.closed_at.strftime("%Y-%m-%d"),
+                    "value": round(cumulative, 2),
+                })
+
+        return {
+            "trade_count": len(pnls),
+            "win_count": len(wins),
+            "loss_count": len(losses),
+            "win_rate": len(wins) / len(pnls) if pnls else 0,
+            "total_pnl": round(sum(pnls), 2),
+            "avg_win": round(sum(wins) / len(wins), 2) if wins else 0,
+            "avg_loss": round(sum(losses) / len(losses), 2) if losses else 0,
+            "profit_factor": round(profit_factor, 2) if profit_factor != float("inf") else 999.99,
+            "max_consecutive_wins": max_cw,
+            "max_consecutive_losses": max_cl,
+            "best_trade": round(max(pnls), 2) if pnls else 0,
+            "worst_trade": round(min(pnls), 2) if pnls else 0,
+            "pnl_by_epic": {k: round(v, 2) for k, v in pnl_by_epic.items()},
+            "equity_curve": equity_points,
+        }

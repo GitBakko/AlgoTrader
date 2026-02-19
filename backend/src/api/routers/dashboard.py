@@ -66,10 +66,32 @@ async def get_overview(
         except Exception as e:
             logger.debug(f"DB trade summary query failed: {e}")
 
+    # Compute realized P&L from closed positions (not equity delta)
+    realized_pnl = 0.0
+    if position_repo is not None:
+        try:
+            closed = await position_repo.get_closed_in_period(
+                datetime(2020, 1, 1, tzinfo=timezone.utc),
+                datetime.now(timezone.utc),
+            )
+            realized_pnl = sum(
+                float(p.profit_loss) for p in closed if p.profit_loss is not None
+            )
+        except Exception as e:
+            logger.debug(f"DB realized P&L query failed: {e}")
+
+    # Fallback: in-memory trade history from paper loop
+    if realized_pnl == 0.0:
+        paper_loop = getattr(request.app.state, "paper_loop", None)
+        if paper_loop is not None:
+            realized_pnl = sum(
+                h.get("pnl", 0) for h in paper_loop._trade_history
+            )
+
     overview = DashboardOverview(
         equity=state.current_equity,
         daily_pnl=state.daily_pnl,
-        total_pnl=state.current_equity - risk_mgr.initial_equity,
+        total_pnl=round(realized_pnl, 2),
         open_positions_count=open_count,
         win_rate=win_rate,
         circuit_breaker_active=state.circuit_breaker_active,
@@ -96,11 +118,31 @@ async def get_overview(
 @router.get("/equity-curve")
 async def get_equity_curve(
     days: int = Query(default=30, ge=1, le=365),
+    position_repo=Depends(get_position_repo),
 ):
     """
-    Get equity curve data points.
-    Returns placeholder data (full equity curve tracking requires account snapshots).
+    Get equity curve data points from closed positions.
+    Falls back to placeholder if no DB data available.
     """
+    if position_repo is not None:
+        try:
+            date_from = datetime.now(timezone.utc) - timedelta(days=days)
+            stats = await position_repo.get_performance_stats(date_from=date_from)
+            curve = stats.get("equity_curve", [])
+            if curve:
+                points = [
+                    EquityCurvePoint(
+                        date=pt["date"],
+                        equity=10000.0 + pt["value"],
+                        drawdown_pct=0.0,
+                    ).model_dump()
+                    for pt in curve
+                ]
+                return success_response(points)
+        except Exception as e:
+            logger.debug(f"Equity curve from DB failed: {e}")
+
+    # Fallback: single placeholder point
     now = datetime.now(timezone.utc).isoformat()
     points = [
         EquityCurvePoint(date=now, equity=10000.0, drawdown_pct=0.0).model_dump()

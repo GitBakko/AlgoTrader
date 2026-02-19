@@ -13,12 +13,13 @@
       <c-nav-item>
         <a cNavLink routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
       </c-nav-item>
-      <c-nav-item>
-        <a cNavLink routerLink="/paper-trading" routerLinkActive="active">Paper Trading</a>
-      </c-nav-item>
-      <c-nav-item>
-        <a cNavLink routerLink="/backtest" routerLinkActive="active">Backtest</a>
-      </c-nav-item>
+      @for (link of topLinks(); track link.url) {
+        <c-nav-item>
+          <a cNavLink [routerLink]="link.url" routerLinkActive="active">
+            {{ link.name }}
+          </a>
+        </c-nav-item>
+      }
     </c-header-nav>
 
     <c-header-nav class="ms-auto">

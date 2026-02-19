@@ -4,10 +4,13 @@ Manages open positions: list, close, modify stop-loss/take-profit.
 Dual-mode: uses DB when available, falls back to in-memory engine.
 """
 
-from fastapi import APIRouter, Depends, Path
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, Path, Query
 
 from src.api.dependencies import get_execution_engine, get_position_repo
 from src.api.schemas import (
+    ClosedPositionResponse,
     ModifyStopsRequest,
     PositionResponse,
     error_response,
@@ -45,6 +48,81 @@ def _position_from_engine(p: dict) -> dict:
         take_profit=p.get("profit_level"),
         opened_at=p.get("opened_at"),
     ).model_dump()
+
+
+def _closed_position_from_db(p) -> dict:
+    """Convert a DB Position (closed) to ClosedPositionResponse dict."""
+    duration = None
+    if p.opened_at and p.closed_at:
+        duration = int((p.closed_at - p.opened_at).total_seconds() / 60)
+    return ClosedPositionResponse(
+        deal_id=p.deal_id,
+        epic=p.epic,
+        direction=p.direction,
+        size=float(p.size),
+        entry_price=float(p.entry_price),
+        exit_price=float(p.current_price) if p.current_price else None,
+        profit_loss=float(p.profit_loss) if p.profit_loss else None,
+        stop_loss=float(p.stop_loss) if p.stop_loss else None,
+        take_profit=float(p.take_profit) if p.take_profit else None,
+        close_reason=p.close_reason,
+        opened_at=p.opened_at.isoformat() if p.opened_at else None,
+        closed_at=p.closed_at.isoformat() if p.closed_at else None,
+        duration_minutes=duration,
+    ).model_dump()
+
+
+@router.get("/closed")
+async def list_closed_positions(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=200),
+    date_from: str | None = Query(default=None),
+    date_to: str | None = Query(default=None),
+    close_reason: str | None = Query(default=None),
+    epic: str | None = Query(default=None),
+    position_repo=Depends(get_position_repo),
+):
+    """List closed positions with filters, pagination, and aggregates."""
+    if position_repo is None:
+        return success_response({
+            "positions": [], "total": 0, "page": 1,
+            "page_size": page_size, "aggregates": {},
+        })
+
+    from_dt = datetime.fromisoformat(date_from) if date_from else None
+    to_dt = datetime.fromisoformat(date_to) if date_to else None
+
+    offset = (page - 1) * page_size
+    positions, total = await position_repo.get_closed_positions(
+        limit=page_size, offset=offset,
+        date_from=from_dt, date_to=to_dt,
+        close_reason=close_reason, epic=epic,
+    )
+
+    # Compute aggregates from ALL matching positions (not just current page)
+    all_positions, _ = await position_repo.get_closed_positions(
+        limit=10000, offset=0,
+        date_from=from_dt, date_to=to_dt,
+        close_reason=close_reason, epic=epic,
+    )
+    pnl_values = [float(p.profit_loss) for p in all_positions if p.profit_loss is not None]
+    wins = [v for v in pnl_values if v > 0]
+    losses = [v for v in pnl_values if v <= 0]
+
+    return success_response({
+        "positions": [_closed_position_from_db(p) for p in positions],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "aggregates": {
+            "total_pnl": round(sum(pnl_values), 2) if pnl_values else 0,
+            "win_count": len(wins),
+            "loss_count": len(losses),
+            "win_rate": round(len(wins) / len(pnl_values), 4) if pnl_values else 0,
+            "avg_win": round(sum(wins) / len(wins), 2) if wins else 0,
+            "avg_loss": round(sum(losses) / len(losses), 2) if losses else 0,
+        },
+    })
 
 
 @router.get("/")

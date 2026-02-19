@@ -32,6 +32,7 @@ export const EPIC_SYMBOLS: Record<string, string> = {
   // Indices
   US500: '📊',      // S&P 500 (chart)
   DE40: '🇩🇪',      // DAX (German flag)
+  NAS100: '📈',     // NASDAQ 100 (chart trending up)
 };
 
 /**

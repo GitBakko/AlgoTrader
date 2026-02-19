@@ -206,6 +206,7 @@ async def _process_epic(self, epic):
     # ... execute signal ...
     if exec_result.success:
         await self._persist_trailing_stop_state(exec_result.deal_id)
+        await self._persist_position_open(deal_id, epic, direction, size, entry_price, sl, tp)
 ```
 
 ### After Trailing Stop Update
@@ -219,10 +220,21 @@ async def _update_trailing_stops(self, positions):
 
 ### After Position Close
 ```python
-def _on_position_closed(self, deal_id, pnl):
-    # ... record results ...
-    asyncio.create_task(self._persist_risk_state())
+async def _check_stop_losses(self):
+    # ... detect SL/TP hit ...
+    await self._persist_position_close(deal_id, epic, direction, size, entry, exit, pnl, reason)
+    await self._persist_risk_state()
 ```
+
+### Position Persistence (Phase 18)
+
+Two dedicated methods handle position lifecycle persistence:
+
+- `_persist_position_open()` — Creates Position (OPEN) + Trade (OPEN) records in PostgreSQL
+- `_persist_position_close()` — Updates Position to CLOSED, creates Trade (CLOSE) record
+- Close reason normalization: `STOP_LOSS_HIT→SL`, `TAKE_PROFIT_HIT→TP`, `TP1_HIT→TP`, `MANUAL`, `EXTERNAL`
+- Idempotent: checks for existing deal_id before creating
+- Fallback: if position was never persisted at open, creates it directly as CLOSED
 
 ## Monitoring & API
 

@@ -138,8 +138,25 @@ class PaperTradingLoop:
         return dict(self._last_signals)
 
     async def get_positions_async(self) -> list[dict]:
-        """Get positions for all modes (async, works with broker or in-memory)."""
-        return await self.execution_engine.get_open_positions()
+        """Get positions for all modes (async, works with broker or in-memory).
+
+        Enriches each position with trailing_stop_phase from TrailingStopManager.
+        """
+        positions = await self.execution_engine.get_open_positions()
+        for pos in positions:
+            deal_id = pos.get("deal_id", "")
+            state = self.trailing_stop_manager.get_state(deal_id)
+            if state is None:
+                # Try matching by epic (broker deal_ids can differ)
+                for tracked_id in self.trailing_stop_manager.tracked_positions:
+                    ts = self.trailing_stop_manager.get_state(tracked_id)
+                    if ts and ts.epic == pos.get("epic"):
+                        state = ts
+                        break
+            if state:
+                from src.risk.trailing_stop_manager import TrailingPhase
+                pos["trailing_stop_phase"] = TrailingPhase(state.phase).name
+        return positions
 
     def get_paper_positions(self) -> list[dict]:
         """Get paper positions (sync, PAPER mode only, for backward compat)."""
@@ -190,6 +207,134 @@ class PaperTradingLoop:
                 logger.debug("Persisted risk state to database")
         except Exception as e:
             logger.warning(f"Risk state persistence failed: {e}")
+
+    async def _persist_position_open(
+        self, deal_id: str, epic: str, direction: str,
+        size: float, entry_price: float,
+        stop_loss: float | None, take_profit: float | None,
+    ) -> None:
+        """Persist a newly opened position to the database."""
+        if self._db_session_factory is None:
+            return
+
+        try:
+            from decimal import Decimal
+            from src.database.models import Position, Trade
+            from src.database.repositories import PositionRepository
+
+            async with self._db_session_factory() as session:
+                repo = PositionRepository(session)
+
+                # Check for existing (idempotency)
+                existing = await repo.get_by_deal_id(deal_id)
+                if existing:
+                    logger.debug(f"Position {deal_id} already in DB, skipping")
+                    await session.commit()
+                    return
+
+                pos = Position(
+                    deal_id=deal_id,
+                    epic=epic,
+                    direction=direction,
+                    size=Decimal(str(size)),
+                    entry_price=Decimal(str(entry_price)),
+                    stop_loss=Decimal(str(stop_loss)) if stop_loss else None,
+                    take_profit=Decimal(str(take_profit)) if take_profit else None,
+                    status="OPEN",
+                    opened_at=datetime.now(timezone.utc),
+                )
+                pos = await repo.create(pos)
+
+                # Also create an OPEN trade record
+                trade = Trade(
+                    position_id=pos.id,
+                    deal_reference=deal_id,
+                    trade_type="OPEN",
+                    epic=epic,
+                    direction=direction,
+                    size=Decimal(str(size)),
+                    price=Decimal(str(entry_price)),
+                    executed_at=datetime.now(timezone.utc),
+                )
+                session.add(trade)
+                await session.commit()
+                logger.debug(f"Persisted OPEN position to DB: {deal_id} ({epic} {direction})")
+        except Exception as e:
+            logger.warning(f"Position open persistence failed for {deal_id}: {e}")
+
+    async def _persist_position_close(
+        self, deal_id: str, epic: str, direction: str,
+        size: float, entry_price: float, exit_price: float,
+        pnl: float, close_reason: str,
+    ) -> None:
+        """Persist position close to the database (update status + create CLOSE trade)."""
+        if self._db_session_factory is None:
+            return
+
+        # Normalize close_reason to short form expected by frontend
+        reason_map = {
+            "STOP_LOSS_HIT": "SL",
+            "TAKE_PROFIT_HIT": "TP",
+            "TP1_HIT": "TP",
+            "API close request": "MANUAL",
+            "Graceful shutdown": "MANUAL",
+        }
+        close_reason = reason_map.get(close_reason, close_reason)
+
+        try:
+            from decimal import Decimal
+            from src.database.models import Position, Trade
+            from src.database.repositories import PositionRepository
+
+            async with self._db_session_factory() as session:
+                repo = PositionRepository(session)
+                pos = await repo.get_by_deal_id(deal_id)
+
+                if pos is None:
+                    # Position was never persisted at open — create it as CLOSED
+                    pos = Position(
+                        deal_id=deal_id,
+                        epic=epic,
+                        direction=direction,
+                        size=Decimal(str(size)),
+                        entry_price=Decimal(str(entry_price)),
+                        current_price=Decimal(str(exit_price)),
+                        profit_loss=Decimal(str(round(pnl, 2))),
+                        stop_loss=None,
+                        take_profit=None,
+                        status="CLOSED",
+                        opened_at=datetime.now(timezone.utc),
+                        closed_at=datetime.now(timezone.utc),
+                        close_reason=close_reason,
+                    )
+                    pos = await repo.create(pos)
+                else:
+                    # Update existing
+                    pos.status = "CLOSED"
+                    pos.current_price = Decimal(str(exit_price))
+                    pos.profit_loss = Decimal(str(round(pnl, 2)))
+                    pos.closed_at = datetime.now(timezone.utc)
+                    pos.close_reason = close_reason
+                    await session.flush()
+                    await session.refresh(pos)
+
+                # Create CLOSE trade record
+                trade = Trade(
+                    position_id=pos.id,
+                    deal_reference=deal_id,
+                    trade_type="CLOSE",
+                    epic=epic,
+                    direction=direction,
+                    size=Decimal(str(size)),
+                    price=Decimal(str(exit_price)),
+                    profit_loss=Decimal(str(round(pnl, 2))),
+                    executed_at=datetime.now(timezone.utc),
+                )
+                session.add(trade)
+                await session.commit()
+                logger.info(f"Persisted CLOSED position to DB: {deal_id} ({epic} P&L={pnl:.2f} reason={close_reason})")
+        except Exception as e:
+            logger.warning(f"Position close persistence failed for {deal_id}: {e}")
 
     async def _persist_trailing_stop_state(self, deal_id: str) -> None:
         """
@@ -672,6 +817,17 @@ class PaperTradingLoop:
                 # Phase 14: persist trailing stop state
                 await self._persist_trailing_stop_state(exec_result.deal_id)
 
+            # Persist position to database
+            await self._persist_position_open(
+                deal_id=exec_result.deal_id or "",
+                epic=epic,
+                direction=signal.direction.value,
+                size=risk_result.position_size,
+                entry_price=exec_result.fill_price or signal.entry_price,
+                stop_loss=risk_result.stop_loss,
+                take_profit=risk_result.take_profit,
+            )
+
             # Log executed signal + execution
             try:
                 tl = get_trade_logger()
@@ -892,6 +1048,18 @@ class PaperTradingLoop:
                             )
 
                             self._on_position_closed(deal_id, pnl)
+
+                            # Persist closed position to database
+                            await self._persist_position_close(
+                                deal_id=deal_id,
+                                epic=epic,
+                                direction=direction,
+                                size=size,
+                                entry_price=entry_price,
+                                exit_price=current_price,
+                                pnl=pnl,
+                                close_reason=close_reason,
+                            )
 
                             # Broadcast trade_closed event to frontend via WebSocket
                             try:

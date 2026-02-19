@@ -89,6 +89,24 @@ class PositionResponse(BaseModel):
     opened_at: str | None = None
 
 
+class ClosedPositionResponse(BaseModel):
+    """Closed position for API responses."""
+
+    deal_id: str
+    epic: str
+    direction: str
+    size: float
+    entry_price: float
+    exit_price: float | None = None
+    profit_loss: float | None = None
+    stop_loss: float | None = None
+    take_profit: float | None = None
+    close_reason: str | None = None
+    opened_at: str | None = None
+    closed_at: str | None = None
+    duration_minutes: int | None = None
+
+
 class ModifyStopsRequest(BaseModel):
     """Request to modify SL/TP levels."""
 

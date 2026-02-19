@@ -15,6 +15,7 @@ from src.data.historical_downloader import HistoricalDownloader
 from src.data.models import OHLCBar
 from src.data.quality_checks import DataQualityChecker
 from src.data.storage import ParquetStorageManager
+from src.utils.constants import TRADABLE_ASSETS
 
 
 class DataScheduler:
@@ -41,11 +42,20 @@ class DataScheduler:
         self.quality_checker = DataQualityChecker()
         self.scheduler = AsyncIOScheduler()
 
-        self._assets = ["XAUUSD", "BTCUSD", "US500"]
+        self._assets = list(TRADABLE_ASSETS)
         self._timeframes = ["1h", "4h", "1d"]
 
     def setup(self) -> None:
         """Register all scheduled jobs."""
+
+        # 0. Hourly candle refresh - every hour at :05 (for live trading)
+        self.scheduler.add_job(
+            self.job_hourly_refresh,
+            CronTrigger(minute=5),
+            id="hourly_refresh",
+            name="Hourly candle refresh (1h)",
+            replace_existing=True,
+        )
 
         # 1. EOD download - weekdays at 22:00 UTC (after most markets close)
         self.scheduler.add_job(
@@ -83,7 +93,7 @@ class DataScheduler:
             replace_existing=True,
         )
 
-        logger.info("Data scheduler configured with 4 jobs")
+        logger.info("Data scheduler configured with 5 jobs")
 
     def start(self) -> None:
         """Start the scheduler."""
@@ -94,6 +104,32 @@ class DataScheduler:
         """Stop the scheduler."""
         self.scheduler.shutdown(wait=False)
         logger.info("Data scheduler stopped")
+
+    async def job_hourly_refresh(self) -> None:
+        """
+        Hourly candle refresh for live/demo trading.
+        Downloads last 3 hours of 1h candles for all tradable assets,
+        then invalidates the data access cache so the trading loop
+        picks up fresh candles immediately.
+        """
+        logger.info("Running hourly candle refresh...")
+        start_date = datetime.now(timezone.utc) - timedelta(hours=3)
+        downloaded = 0
+
+        for epic in self._assets:
+            try:
+                result = await self.downloader.download(
+                    epic=epic,
+                    timeframe="1h",
+                    start_date=start_date,
+                )
+                downloaded += result.downloaded_candles
+            except Exception as e:
+                logger.error(f"Hourly refresh failed for {epic}: {e}")
+
+        # Invalidate cache so trading loop sees fresh data
+        self.data_access.invalidate_cache()
+        logger.info(f"Hourly refresh complete: {downloaded} candles across {len(self._assets)} assets")
 
     async def job_eod_download(self) -> None:
         """
@@ -119,6 +155,7 @@ class DataScheduler:
                 except Exception as e:
                     logger.error(f"EOD download failed for {epic}/{timeframe}: {e}")
 
+        self.data_access.invalidate_cache()
         logger.info("EOD download job completed")
 
     async def job_quality_checks(self) -> None:

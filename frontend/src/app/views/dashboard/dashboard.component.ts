@@ -39,6 +39,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly marketStatus = inject(MarketStatusService);
   readonly newsService = inject(NewsService);
 
+  readonly Math = Math; // expose for template
   readonly overview = this.trading.overview;
   readonly riskStatus = this.trading.riskStatus;
   readonly paperStatus = this.trading.paperStatus;
@@ -185,6 +186,26 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.pollTimer = setTimeout(() => poll(), this.pollingInterval());
   }
 
+  // Performance data
+  readonly performance = this.trading.performance;
+
+  // P&L by asset sorted by absolute value (for bar chart display)
+  readonly pnlByAsset = computed(() => {
+    const perf = this.performance();
+    if (!perf?.pnl_by_epic) return [];
+    return Object.entries(perf.pnl_by_epic)
+      .map(([epic, pnl]) => ({ epic, pnl }))
+      .sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl))
+      .slice(0, 10);
+  });
+
+  // Max absolute P&L for bar width calculation
+  readonly maxAbsPnl = computed(() => {
+    const items = this.pnlByAsset();
+    if (items.length === 0) return 1;
+    return Math.max(...items.map(i => Math.abs(i.pnl)));
+  });
+
   private loadAll(): void {
     this.trading.loadOverview();
     this.trading.loadEquityCurve();
@@ -193,6 +214,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.trading.loadPaperStatus();
     this.trading.loadPaperPositions();
     this.trading.loadPaperSignals();
+    this.trading.loadPerformance(30);
   }
 
   directionColor(dir: string): string {

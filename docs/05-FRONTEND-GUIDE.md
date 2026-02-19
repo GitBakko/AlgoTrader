@@ -35,7 +35,7 @@ frontend/src/app/
 │   ├── services/
 │   │   ├── api.service.ts         # HTTP client with ApiResponse<T> envelope
 │   │   ├── auth.service.ts        # Login, register, JWT, avatar, currentUser signal
-│   │   ├── trading.service.ts     # Trading state (positions, signals, paper status)
+│   │   ├── trading.service.ts     # Trading state (positions, signals, paper status, closed history, performance)
 │   │   └── websocket.service.ts   # WebSocket with exponential backoff reconnection
 │   └── models/
 │       ├── index.ts               # TypeScript interfaces (Position, Signal, etc.)
@@ -186,7 +186,7 @@ Login and register pages use a split-screen layout:
 | Page          | Route            | Description                                         |
 | ------------- | ---------------- | --------------------------------------------------- |
 | Dashboard     | `/dashboard`     | Equity curve, 8-asset grid, risk metric cards       |
-| Posizioni     | `/positions`     | Open positions with live P&L (WebSocket)            |
+| Posizioni     | `/positions`     | Open + closed positions (tabs), live P&L, history   |
 | Segnali       | `/signals`       | ML signal feed with confidence scores               |
 | Mercati       | `/markets`       | Market overview per asset (21 assets)               |
 | Paper Trading | `/paper-trading` | Start/stop trading, live signals & positions        |

@@ -589,10 +589,13 @@ The main page. Must show at-a-glance trading status:
 3. **Positions Summary**: Mini table of open positions with live P&L
 4. **Recent Signals**: Last 5 signals with status badges
 5. **Market Status**: Market open/closed indicator with next open time
+6. **Performance Section**: Win Rate, Profit Factor, Total P&L, Best/Worst Trade KPIs + P&L per Asset bars
 
 ### Positions (`views/positions/`)
-- Full-width table with all open/closed positions
-- Columns: Asset, Direction, Size, Entry, Current, P&L (€), P&L (%), Risk, Duration, Actions
+- Tab-based view: "Aperte" (open) + "Storico" (history)
+- **Open tab**: Asset, Direction, Size, Entry, Live Price, P&L, SL/TP, Duration, Actions
+- **History tab**: Filter bar (asset, close_reason, date range), KPI summary, paginated table
+- Close reason badges: SL (red), TP (green), MANUAL (cyan), EXTERNAL (amber)
 - Row highlight: green tint for profit, red tint for loss
 - Action buttons: Close (danger), Modify SL/TP
 
