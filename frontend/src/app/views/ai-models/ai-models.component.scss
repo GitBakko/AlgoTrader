@@ -84,7 +84,7 @@
     &__close {
       background: none;
       border: none;
-      color: rgba(255, 255, 255, 0.5);
+      color: var(--mantis-text-muted, rgba(255, 255, 255, 0.5));
       font-size: 1.25rem;
       cursor: pointer;
       padding: 0.25rem;
@@ -92,7 +92,7 @@
       transition: color 0.15s ease;
 
       &:hover {
-        color: white;
+        color: var(--mantis-text-primary, white);
       }
     }
   }

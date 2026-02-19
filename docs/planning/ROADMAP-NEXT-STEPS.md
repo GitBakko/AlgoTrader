@@ -1,16 +1,49 @@
 # MANTIS AI - Roadmap & Next Steps
 
-> Current status: Phase 18d complete (2026-02-19). ~1136 tests, 0 errors. Production readiness ~99%.
+> Current status: Phase 19 complete (2026-02-19). ~1136 tests, 0 errors. Production readiness ~99%.
 > ML models: 20/20 tradable assets have trained XGBoost models (EURUSD excluded — ATR too small).
 > Infrastructure: CI/CD (GitHub Actions), JSON logging, Prometheus/Grafana, security headers, Docker prod override.
 > DEMO readiness: partial_close fix, Telegram alerts, AlertManager wired, emergency kill switch, max_total_exposure.
 > Trading history: Closed positions persisted to PostgreSQL, performance analytics, dashboard P&L fix.
-> Bug fixes: Timezone mismatch (asyncpg), UNKNOWN toast on close, duplicate toast, ExecutionEngine DB access, broker-closed detection.
-> UX: LoadingButtonComponent — inline spinner + disable on async action buttons (close, start/stop, emergency stop).
+> UX/UI Polish: Trade Journal notes, CSV export, Light theme, filter bar redesign.
+> Bug fixes: Timezone mismatch (asyncpg), UNKNOWN toast, duplicate toast, ExecutionEngine DB, broker-closed detection, Alembic migration.
 
 ---
 
 ## Recently Completed
+
+### Phase 19 — UX/UI Polish [COMPLETE]
+
+> Trade Journal notes, CSV export, Light theme, filter panel redesign.
+
+**Trade Journal Notes:**
+
+- [x] `TradeJournalNote` DB model + Alembic migration (`trade_journal_notes` table)
+- [x] `TradeJournalNoteRepository` — get_by_signal, upsert_note, delete_note, get_all_notes
+- [x] API endpoints: `PUT/GET/DELETE /api/trading/signals/notes`
+- [x] Frontend: pencil icon per signal, note modal (textarea, 2000 chars max, save/cancel)
+- [x] `TradingService.signalNotes` signal + `loadSignalNotes()` / `updateSignalNote()`
+
+**Export CSV:**
+
+- [x] Backend: `GET /api/export/positions/csv` — StreamingResponse with filters (date, epic, close_reason)
+- [x] Frontend Trade Journal: client-side CSV from `filteredSignals()` with BOM for Excel
+- [x] Frontend Positions (Storico): server-side CSV download via `getBlob()`
+- [x] `ApiService.getBlob()` method for binary responses
+
+**Light Theme:**
+
+- [x] `frontend/src/scss/_light-theme.scss` — full `[data-coreui-theme="light"]` variable set
+- [x] 9 component SCSS files fixed: replaced hardcoded dark colors with CSS custom properties
+- [x] `index.html` loading screen adapts to `prefers-color-scheme: light`
+- [x] Auth pages remain dark-only (pragmatic decision)
+
+**Bugfixes (Phase 19 follow-up):**
+
+- [x] Missing Alembic migration for `trade_journal_notes` (manually created — autogenerate was dangerous)
+- [x] CoreUI `cFormSelect` → `cSelect` (correct directive selector)
+- [x] Trade Journal filter panel redesigned to inline flex layout (matching Positions pattern)
+- [x] Defensive try/except on `GET /signals/notes` endpoint
 
 ### Phase 18d — Broker-Closed Position Detection [COMPLETE]
 
@@ -203,4 +236,5 @@
 | -- | Phase 18: Positions history + performance + P&L fix | 8h | Trading analytics | **COMPLETE** |
 | -- | Phase 18c: LoadingButton + UX anti-spam | 1h | UX safety | **COMPLETE** |
 | -- | Phase 18d: Broker-closed position detection | 1h | Trading integrity | **COMPLETE** |
+| -- | Phase 19: UX/UI Polish (notes, CSV, light theme) | 6h | User experience | **COMPLETE** |
 | **P5** | **Live trading (2+ weeks demo first)** | **2+ weeks** | **Revenue generation** | **NEXT** |

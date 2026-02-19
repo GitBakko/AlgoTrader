@@ -4,9 +4,10 @@ import { FormsModule } from '@angular/forms';
 import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
   ColComponent, RowComponent, BadgeComponent,
-  ButtonDirective, FormControlDirective, FormLabelDirective,
-  TableDirective,
+  ButtonDirective, FormControlDirective,
+  FormSelectDirective, TableDirective,
 } from '@coreui/angular';
+import { IconDirective } from '@coreui/icons-angular';
 import { TradingService } from '../../core/services/trading.service';
 import { NewsService } from '../../core/services/news.service';
 import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
@@ -26,8 +27,8 @@ type SortDir = 'asc' | 'desc';
     CommonModule, FormsModule,
     CardComponent, CardBodyComponent, CardHeaderComponent,
     ColComponent, RowComponent, BadgeComponent,
-    ButtonDirective, FormControlDirective, FormLabelDirective,
-    TableDirective,
+    ButtonDirective, FormControlDirective,
+    FormSelectDirective, TableDirective, IconDirective,
     PriceFormatPipe,
     EpicLogoComponent,
     NewsWidgetComponent,
@@ -38,58 +39,58 @@ type SortDir = 'asc' | 'desc';
       <h5 class="mb-0 fw-semibold">Trade Journal</h5>
       <div class="d-flex align-items-center gap-2">
         <c-badge color="info">{{ filteredSignals().length }} risultati</c-badge>
+        <button cButton color="primary" variant="outline" size="sm"
+                [disabled]="filteredSignals().length === 0"
+                (click)="exportToCsv()">
+          <svg cIcon name="cilCloudDownload" size="sm" class="me-1"></svg>
+          Esporta CSV
+        </button>
         <button cButton color="secondary" size="sm" (click)="resetFilters()">Reset filtri</button>
       </div>
     </div>
 
     <!-- Filters -->
     <c-card class="mb-4 border-top border-top-3 border-top-primary">
-      <c-card-body class="py-2">
-        <c-row class="g-2 align-items-end">
-          <c-col sm="3" lg="2">
-            <label cLabel class="small text-body-secondary mb-1">Asset</label>
-            <select cFormSelect [ngModel]="filterEpic()" (ngModelChange)="filterEpic.set($event)" class="form-select-sm">
-              <option value="">Tutti</option>
-              @for (e of allEpics(); track e) {
-                <option [value]="e">{{ e }}</option>
-              }
-            </select>
-          </c-col>
-          <c-col sm="3" lg="2">
-            <label cLabel class="small text-body-secondary mb-1">Direzione</label>
-            <select cFormSelect [ngModel]="filterDirection()" (ngModelChange)="filterDirection.set($event)" class="form-select-sm">
-              <option value="">Tutte</option>
-              <option value="BUY">BUY</option>
-              <option value="SELL">SELL</option>
-              <option value="HOLD">HOLD</option>
-            </select>
-          </c-col>
-          <c-col sm="3" lg="2">
-            <label cLabel class="small text-body-secondary mb-1">Stato</label>
-            <select cFormSelect [ngModel]="filterStatus()" (ngModelChange)="filterStatus.set($event)" class="form-select-sm">
-              <option value="">Tutti</option>
-              <option value="executed">Eseguito</option>
-              <option value="rejected">Rifiutato</option>
-              <option value="hold">Hold</option>
-              <option value="market_closed">Chiuso</option>
-              <option value="exec_failed">Fallito</option>
-            </select>
-          </c-col>
-          <c-col sm="3" lg="2">
-            <label cLabel class="small text-body-secondary mb-1">Strategia</label>
-            <select cFormSelect [ngModel]="filterStrategy()" (ngModelChange)="filterStrategy.set($event)" class="form-select-sm">
-              <option value="">Tutte</option>
-              <option value="ml_ensemble">ML</option>
-              <option value="squeeze_breakout">Squeeze</option>
-              <option value="vwap_reversion">VWAP</option>
-            </select>
-          </c-col>
-          <c-col sm="6" lg="2">
-            <label cLabel class="small text-body-secondary mb-1">Conf. min</label>
-            <input cFormControl type="number" min="0" max="100" step="5" class="form-control-sm"
+      <c-card-body class="py-2 px-3">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <select cSelect class="form-select form-select-sm tj-filter-select"
+                  [ngModel]="filterEpic()" (ngModelChange)="filterEpic.set($event)">
+            <option value="">Tutti gli asset</option>
+            @for (e of allEpics(); track e) {
+              <option [value]="e">{{ e }}</option>
+            }
+          </select>
+          <select cSelect class="form-select form-select-sm tj-filter-select"
+                  [ngModel]="filterDirection()" (ngModelChange)="filterDirection.set($event)">
+            <option value="">Tutte le direzioni</option>
+            <option value="BUY">BUY</option>
+            <option value="SELL">SELL</option>
+            <option value="HOLD">HOLD</option>
+          </select>
+          <select cSelect class="form-select form-select-sm tj-filter-select"
+                  [ngModel]="filterStatus()" (ngModelChange)="filterStatus.set($event)">
+            <option value="">Tutti gli stati</option>
+            <option value="executed">Eseguito</option>
+            <option value="rejected">Rifiutato</option>
+            <option value="hold">Hold</option>
+            <option value="market_closed">Chiuso</option>
+            <option value="exec_failed">Fallito</option>
+          </select>
+          <select cSelect class="form-select form-select-sm tj-filter-select"
+                  [ngModel]="filterStrategy()" (ngModelChange)="filterStrategy.set($event)">
+            <option value="">Tutte le strategie</option>
+            <option value="ml_ensemble">ML</option>
+            <option value="squeeze_breakout">Squeeze</option>
+            <option value="vwap_reversion">VWAP</option>
+          </select>
+          <div class="d-flex align-items-center gap-1 tj-filter-conf">
+            <span class="text-body-secondary small text-nowrap">Conf. min</span>
+            <input cFormControl type="number" min="0" max="100" step="5"
+                   class="form-control form-control-sm"
+                   style="width: 72px"
                    [ngModel]="filterMinConfidence()" (ngModelChange)="filterMinConfidence.set($event)">
-          </c-col>
-        </c-row>
+          </div>
+        </div>
       </c-card-body>
     </c-card>
 
@@ -161,6 +162,7 @@ type SortDir = 'asc' | 'desc';
                   </th>
                   <th>Stato</th>
                   <th class="d-mobile-none">Dettaglio</th>
+                  <th class="text-center d-mobile-none" style="width: 44px;">Note</th>
                 </tr>
               </thead>
               <tbody>
@@ -201,6 +203,14 @@ type SortDir = 'asc' | 'desc';
                       } @else {
                         <span class="text-body-secondary">-</span>
                       }
+                    </td>
+                    <td class="text-center d-mobile-none">
+                      <button cButton variant="ghost" size="sm" class="p-0"
+                              [class.text-success]="hasNote(sig)"
+                              [class.text-body-secondary]="!hasNote(sig)"
+                              (click)="openNoteEditor(sig); $event.stopPropagation()">
+                        <svg cIcon name="cilPencil" size="sm"></svg>
+                      </button>
                     </td>
                   </tr>
                 }
@@ -246,6 +256,37 @@ type SortDir = 'asc' | 'desc';
         </div>
       </div>
     }
+
+    <!-- ═══════ NOTE MODAL ═══════ -->
+    @if (showNoteModal()) {
+      <div class="tj-modal-backdrop" (click)="closeNoteModal()">
+        <div class="tj-modal" style="max-width: 500px" (click)="$event.stopPropagation()">
+          <div class="tj-modal__header">
+            <div class="tj-modal__title">
+              <svg cIcon name="cilPencil" size="lg" class="me-2"></svg>
+              Nota — {{ editingNoteEpic() }}
+            </div>
+            <button class="tj-modal__close" (click)="closeNoteModal()">&times;</button>
+          </div>
+          <div class="tj-modal__body">
+            <textarea cFormControl rows="5" class="mb-3"
+                      [ngModel]="editingNoteText()"
+                      (ngModelChange)="editingNoteText.set($event)"
+                      placeholder="Scrivi le tue note su questo segnale..."
+                      maxlength="2000"></textarea>
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="text-body-secondary small">{{ editingNoteText().length }}/2000</span>
+              <div class="d-flex gap-2">
+                <button cButton color="secondary" size="sm" (click)="closeNoteModal()">Annulla</button>
+                <button cButton color="primary" size="sm" (click)="saveNote()" [disabled]="savingNote()">
+                  {{ savingNote() ? 'Salvataggio...' : 'Salva' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
   `,
 })
 export class TradeJournalComponent implements OnInit {
@@ -254,6 +295,13 @@ export class TradeJournalComponent implements OnInit {
 
   readonly selectedEpic = signal<string | null>(null);
   readonly showNewsModal = signal(false);
+
+  // Note editing
+  readonly showNoteModal = signal(false);
+  readonly editingNoteKey = signal('');
+  readonly editingNoteEpic = signal('');
+  readonly editingNoteText = signal('');
+  readonly savingNote = signal(false);
 
   // Filter signals
   readonly filterEpic = signal('');
@@ -330,6 +378,7 @@ export class TradeJournalComponent implements OnInit {
 
   ngOnInit(): void {
     this.trading.loadPaperSignals();
+    this.trading.loadSignalNotes();
   }
 
   resetFilters(): void {
@@ -418,5 +467,88 @@ export class TradeJournalComponent implements OnInit {
   closeNewsModal(): void {
     this.showNewsModal.set(false);
     this.selectedEpic.set(null);
+  }
+
+  // ── Note editing ──
+
+  hasNote(sig: PaperSignal): boolean {
+    const key = `${sig.epic}|${sig.timestamp}`;
+    return !!this.trading.signalNotes()[key];
+  }
+
+  openNoteEditor(sig: PaperSignal): void {
+    const key = `${sig.epic}|${sig.timestamp}`;
+    this.editingNoteKey.set(key);
+    this.editingNoteEpic.set(sig.epic);
+    this.editingNoteText.set(this.trading.signalNotes()[key] || '');
+    this.showNoteModal.set(true);
+  }
+
+  closeNoteModal(): void {
+    this.showNoteModal.set(false);
+  }
+
+  saveNote(): void {
+    const key = this.editingNoteKey();
+    const [epic, timestamp] = key.split('|');
+    const text = this.editingNoteText();
+    this.savingNote.set(true);
+
+    this.trading.updateSignalNote(epic, timestamp, text).subscribe({
+      next: () => {
+        const notes = { ...this.trading.signalNotes() };
+        if (text.trim()) {
+          notes[key] = text;
+        } else {
+          delete notes[key];
+        }
+        this.trading.signalNotes.set(notes);
+        this.savingNote.set(false);
+        this.closeNoteModal();
+      },
+      error: () => {
+        this.savingNote.set(false);
+      },
+    });
+  }
+
+  // ── CSV Export ──
+
+  exportToCsv(): void {
+    const signals = this.filteredSignals();
+    if (signals.length === 0) return;
+
+    const headers = ['Data/Ora', 'Asset', 'Direzione', 'Strategia', 'Confidenza %', 'Prezzo', 'Stato', 'Dettaglio', 'Note'];
+    const notes = this.trading.signalNotes();
+    const rows = signals.map(s => [
+      s.timestamp,
+      s.epic,
+      s.direction,
+      s.strategy_name ?? '',
+      (s.confidence * 100).toFixed(0),
+      s.entry_price,
+      s.status,
+      s.error_detail?.summary ?? s.rejection_reason ?? '',
+      notes[`${s.epic}|${s.timestamp}`] ?? '',
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
+    this.downloadBlob(blob, `mantis_signals_${timestamp}.csv`);
+  }
+
+  private downloadBlob(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 }

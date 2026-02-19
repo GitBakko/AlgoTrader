@@ -31,7 +31,7 @@
     transition: all 150ms ease;
 
     &:hover:not(&--active) {
-      color: #c9d1d9;
+      color: var(--mantis-text-primary, #c9d1d9);
       background: rgba(255, 255, 255, 0.04);
     }
 
@@ -149,7 +149,7 @@
     max-width: 160px;
     background-color: var(--mantis-surface-3, #1c2128);
     border-color: var(--mantis-border-default, rgba(255, 255, 255, 0.1));
-    color: #c9d1d9;
+    color: var(--mantis-text-primary, #c9d1d9);
     font-size: 0.8125rem;
 
     &:focus {
@@ -162,7 +162,7 @@
     max-width: 140px;
     background-color: var(--mantis-surface-3, #1c2128);
     border-color: var(--mantis-border-default, rgba(255, 255, 255, 0.1));
-    color: #c9d1d9;
+    color: var(--mantis-text-primary, #c9d1d9);
     font-size: 0.8125rem;
 
     &:focus {

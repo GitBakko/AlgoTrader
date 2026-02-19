@@ -63,6 +63,9 @@ export class TradingService {
   readonly closedAggregates = signal<PositionAggregates | null>(null);
   readonly performance = signal<TradingPerformance | null>(null);
 
+  // Signal Notes (Trade Journal annotations)
+  readonly signalNotes = signal<Record<string, string>>({});
+
   // ── Dashboard ──
 
   loadOverview(): void {
@@ -275,5 +278,33 @@ export class TradingService {
       positions_closed: string[];
       errors: string[];
     }>('/api/trading/emergency-stop');
+  }
+
+  // ── Signal Notes (Trade Journal) ──
+
+  loadSignalNotes(): void {
+    this.api.get<Record<string, string>>('/api/trading/signals/notes')
+      .subscribe({ next: data => this.signalNotes.set(data), error: () => {} });
+  }
+
+  updateSignalNote(epic: string, signalTimestamp: string, notes: string) {
+    return this.api.put<{ epic: string; signal_timestamp: string; notes: string } | { deleted: boolean }>(
+      '/api/trading/signals/notes',
+      { epic, signal_timestamp: signalTimestamp, notes },
+    );
+  }
+
+  // ── CSV Export ──
+
+  exportClosedPositionsCsv(params: {
+    date_from?: string; date_to?: string;
+    close_reason?: string; epic?: string;
+  } = {}) {
+    const q: Record<string, string> = {};
+    if (params.date_from) q['date_from'] = params.date_from;
+    if (params.date_to) q['date_to'] = params.date_to;
+    if (params.close_reason) q['close_reason'] = params.close_reason;
+    if (params.epic) q['epic'] = params.epic;
+    return this.api.getBlob('/api/export/positions/csv', q);
   }
 }

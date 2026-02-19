@@ -87,6 +87,10 @@ h1, h2, h3, h4, h5, h6,
   --mantis-border-accent: #{$mantis-border-accent};
   --mantis-border-strong: #{$mantis-border-strong};
 
+  // Glass / tint backgrounds (for components)
+  --mantis-glass-bg: rgba(22, 27, 34, 0.6);
+  --mantis-tint-subtle: rgba(255, 255, 255, 0.04);
+
   // Shadows
   --mantis-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
   --mantis-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);

@@ -390,6 +390,30 @@ class TrailingStopState(SQLModel, table=True):
     )
 
 
+class TradeJournalNote(SQLModel, table=True):
+    """
+    User notes/annotations for trade journal entries (signals).
+    Keyed by the signal's natural identifier (epic + timestamp).
+    """
+
+    __tablename__ = "trade_journal_notes"
+
+    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    epic: str = Field(max_length=50, nullable=False, index=True)
+    signal_timestamp: str = Field(max_length=50, nullable=False)
+    notes: str = Field(nullable=False)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        nullable=False,
+        sa_column_kwargs={"server_default": text("NOW()")},
+    )
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        nullable=False,
+        sa_column_kwargs={"server_default": text("NOW()"), "onupdate": text("NOW()")},
+    )
+
+
 class RiskStateSnapshot(SQLModel, table=True):
     """
     Periodic snapshots of RiskManager internal state.

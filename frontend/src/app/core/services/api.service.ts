@@ -26,4 +26,11 @@ export class ApiService {
       .put<ApiResponse<T>>(`${this.baseUrl}${path}`, body)
       .pipe(map(res => res.data));
   }
+
+  getBlob(path: string, params?: Record<string, string>): Observable<Blob> {
+    return this.http.get(`${this.baseUrl}${path}`, {
+      params: params as any,
+      responseType: 'blob',
+    });
+  }
 }

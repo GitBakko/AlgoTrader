@@ -114,6 +114,14 @@ class ModifyStopsRequest(BaseModel):
     take_profit: float | None = None
 
 
+class UpdateTradeNoteRequest(BaseModel):
+    """Request to create/update a trade journal note."""
+
+    epic: str
+    signal_timestamp: str
+    notes: str = Field(max_length=2000)
+
+
 # ── Signal DTOs ──
 
 

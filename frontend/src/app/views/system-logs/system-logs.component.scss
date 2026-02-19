@@ -1,15 +1,12 @@
-@use 'sass:color';
-
-// MANTIS AI Theme Colors
-$mantis-green: #39FF14;
-$mantis-muted: #00d97e;
-$dark-bg: #0d1117;
-$dark-surface: #161b22;
+// ═══════════════════════════════════════════════════════════
+// System Logs Component Styles
+// Uses CSS custom properties for theme compatibility
+// ═══════════════════════════════════════════════════════════
 
 // Health Score Card
 .health-score-card {
-  background: linear-gradient(135deg, $dark-surface 0%, color.adjust($dark-surface, $lightness: 5%) 100%);
-  border: 1px solid rgba($mantis-green, 0.2);
+  background: linear-gradient(135deg, var(--mantis-surface-2, #161b22) 0%, var(--mantis-surface-3, #1c2128) 100%);
+  border: 1px solid var(--mantis-border-accent, rgba(0, 217, 126, 0.15));
 
   .health-score-circle {
     position: relative;
@@ -21,54 +18,54 @@ $dark-surface: #161b22;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: radial-gradient(circle, rgba($mantis-green, 0.1) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(0, 217, 126, 0.1) 0%, transparent 70%);
     border: 3px solid;
 
     &[data-score="success"] {
-      border-color: $mantis-green;
-      box-shadow: 0 0 20px rgba($mantis-green, 0.3);
+      border-color: var(--mantis-profit, #39FF14);
+      box-shadow: 0 0 20px rgba(57, 255, 20, 0.3);
     }
 
     &[data-score="warning"] {
-      border-color: #ffc107;
-      box-shadow: 0 0 20px rgba(#ffc107, 0.3);
+      border-color: var(--mantis-warning, #ffc107);
+      box-shadow: 0 0 20px rgba(255, 193, 7, 0.3);
     }
 
     &[data-score="danger"] {
-      border-color: #dc3545;
-      box-shadow: 0 0 20px rgba(#dc3545, 0.3);
+      border-color: var(--mantis-loss, #dc3545);
+      box-shadow: 0 0 20px rgba(220, 53, 69, 0.3);
     }
 
     .score-value {
       font-size: 2.5rem;
       font-weight: 700;
       line-height: 1;
-      color: $mantis-green;
+      color: var(--mantis-green, #39FF14);
     }
 
     .score-max {
       font-size: 0.875rem;
-      color: rgba(white, 0.5);
+      color: var(--mantis-text-muted, rgba(255, 255, 255, 0.5));
     }
   }
 }
 
 // Metric Cards
 .metric-card {
-  background: $dark-surface;
-  border: 1px solid rgba(white, 0.1);
+  background: var(--mantis-surface-2, #161b22);
+  border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.1));
   transition: all 0.3s ease;
 
   &:hover {
-    border-color: rgba($mantis-green, 0.3);
+    border-color: var(--mantis-border-accent, rgba(0, 217, 126, 0.15));
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba($mantis-green, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 217, 126, 0.1);
   }
 
   h3 {
     font-size: 2rem;
     font-weight: 700;
-    color: white;
+    color: var(--mantis-text-primary, white);
   }
 
   .metric-detail {
@@ -79,14 +76,14 @@ $dark-surface: #161b22;
 // Metric Box (for risk events grid)
 .metric-box {
   padding: 1rem;
-  background: rgba($dark-surface, 0.5);
+  background: var(--mantis-surface-2, #161b22);
   border-radius: 8px;
-  border: 1px solid rgba(white, 0.1);
+  border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.1));
   text-align: center;
 
   .metric-label {
     font-size: 0.75rem;
-    color: rgba(white, 0.6);
+    color: var(--mantis-text-secondary, rgba(255, 255, 255, 0.6));
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 0.5rem;
@@ -95,46 +92,46 @@ $dark-surface: #161b22;
   .metric-value {
     font-size: 1.5rem;
     font-weight: 700;
-    color: white;
+    color: var(--mantis-text-primary, white);
   }
 }
 
 // Table Enhancements
 table {
   th {
-    color: rgba(white, 0.7);
+    color: var(--mantis-text-secondary, rgba(255, 255, 255, 0.7));
     font-weight: 600;
     font-size: 0.875rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    border-color: rgba(white, 0.1);
+    border-color: var(--mantis-border-default, rgba(255, 255, 255, 0.1));
   }
 
   td {
-    border-color: rgba(white, 0.05);
+    border-color: var(--mantis-border-subtle, rgba(255, 255, 255, 0.05));
   }
 
   tbody tr {
     transition: background-color 0.2s ease;
 
     &:hover {
-      background-color: rgba($mantis-green, 0.05) !important;
+      background-color: rgba(0, 217, 126, 0.05) !important;
     }
   }
 }
 
 // Cards
 c-card {
-  background: $dark-surface;
-  border-color: rgba(white, 0.1);
+  background: var(--mantis-surface-2, #161b22);
+  border-color: var(--mantis-border-default, rgba(255, 255, 255, 0.1));
 }
 
 c-card-header {
-  background: rgba(black, 0.2);
-  border-bottom-color: rgba(white, 0.1);
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom-color: var(--mantis-border-default, rgba(255, 255, 255, 0.1));
 
   h5, h6 {
-    color: white;
+    color: var(--mantis-text-primary, white);
   }
 }
 
@@ -150,7 +147,7 @@ button[cButton] {
 
   &:hover:not(:disabled) {
     transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba($mantis-green, 0.2);
+    box-shadow: 0 2px 8px rgba(0, 217, 126, 0.2);
   }
 }
 

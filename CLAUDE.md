@@ -205,7 +205,7 @@ cd backend
 ## Design Philosophy
 
 MANTIS AI follows a **"Bloomberg meets modern fintech"** design language:
-- **Dark-first**: Trading platforms are used in dark environments. Light mode is NOT supported
+- **Dark-first**: Trading platforms are used in dark environments. Light theme supported via `_light-theme.scss` but dark is the primary design target
 - **Data-dense but not cluttered**: Every pixel serves a purpose
 - **Hierarchy through elevation**: Use surface levels, not borders, to create depth
 - **Neon accent as signal**: Green (#39FF14) draws attention to actionable/important elements — use sparingly
@@ -775,7 +775,7 @@ Tasks:
 ```
 ❌ More than 3 accent colors on one page
 ❌ Neon green (#39FF14) for large areas (only for accents/highlights)
-❌ White background anywhere (this is a dark-only theme)
+❌ White background in dark mode (use CSS variables, light theme handles white surfaces via _light-theme.scss)
 ❌ Inconsistent border-radius (use 4px, 8px, or 12px only)
 ❌ Shadows on dark backgrounds (use border or elevation instead)
 ❌ Animating table rows or data that updates frequently
@@ -802,6 +802,7 @@ When something looks wrong in the UI:
 |-------------------------|------------------------------------------------------|
 | Color palette           | `frontend/src/scss/_palette.scss`                    |
 | Global custom styles    | `frontend/src/scss/_custom.scss`                     |
+| Light theme             | `frontend/src/scss/_light-theme.scss`                |
 | Theme overrides         | `frontend/src/scss/_theme.scss`                      |
 | Chart styles            | `frontend/src/scss/_charts.scss`                     |
 | Main style entry        | `frontend/src/scss/styles.scss`                      |

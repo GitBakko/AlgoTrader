@@ -5,32 +5,51 @@
   <base href="./">
   <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport" />
   <meta content="MANTIS AI - Algorithmic Trading Platform powered by Machine Learning" name="description" />
-  <meta name="theme-color" content="#0d1117" />
+  <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f6f8fa" media="(prefers-color-scheme: light)" />
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
   <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <title>MANTIS AI</title>
+  <style>
+    /* Loading screen — adapts to color scheme */
+    .mantis-loading {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0d1117; color: #39FF14;
+    }
+    .mantis-loading__logo { margin-bottom: 16px; animation: mantis-pulse 2s ease-in-out infinite; }
+    .mantis-loading__bar { margin-top: 20px; width: 40px; height: 2px; background: #39FF14; border-radius: 1px; animation: mantis-bar 1.2s ease-in-out infinite; }
+    .mantis-loading__title { letter-spacing: 0.2em; font-weight: 700; font-size: 1.1rem; }
+    .mantis-loading__sub { letter-spacing: 0.3em; font-size: 0.65rem; opacity: 0.5; margin-top: 4px; }
+    @keyframes mantis-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes mantis-bar { 0% { width: 20px; opacity: 0.3; } 50% { width: 60px; opacity: 1; } 100% { width: 20px; opacity: 0.3; } }
+
+    @media (prefers-color-scheme: light) {
+      .mantis-loading { background: #f6f8fa; color: #00a86b; }
+      .mantis-loading svg polygon { stroke: #00a86b; }
+      .mantis-loading svg ellipse { fill: #00a86b; }
+      .mantis-loading svg line { stroke: #00a86b; }
+      .mantis-loading__bar { background: #00a86b; }
+    }
+  </style>
 </head>
 <body>
 <noscript>You need to enable JavaScript to run this app.</noscript>
 <app-root>
-  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#0d1117;color:#39FF14;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="56" height="56" style="margin-bottom:16px;animation:mantis-pulse 2s ease-in-out infinite;">
+  <div class="mantis-loading">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="56" height="56" class="mantis-loading__logo">
       <polygon points="32,6 52,26 46,58 18,58 12,26" fill="none" stroke="#39FF14" stroke-width="3" stroke-linejoin="round"/>
       <ellipse cx="23" cy="28" rx="6" ry="8" fill="#39FF14" opacity="0.9"/>
       <ellipse cx="41" cy="28" rx="6" ry="8" fill="#39FF14" opacity="0.9"/>
       <line x1="23" y1="20" x2="12" y2="4" stroke="#39FF14" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
       <line x1="41" y1="20" x2="52" y2="4" stroke="#39FF14" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
     </svg>
-    <div style="letter-spacing:0.2em;font-weight:700;font-size:1.1rem;">MANTIS AI</div>
-    <div style="letter-spacing:0.3em;font-size:0.65rem;opacity:0.5;margin-top:4px;">ALGO TRADING</div>
-    <div style="margin-top:20px;width:40px;height:2px;background:#39FF14;border-radius:1px;animation:mantis-bar 1.2s ease-in-out infinite;"></div>
-    <style>
-      @keyframes mantis-pulse{0%,100%{opacity:1}50%{opacity:0.5}}
-      @keyframes mantis-bar{0%{width:20px;opacity:0.3}50%{width:60px;opacity:1}100%{width:20px;opacity:0.3}}
-    </style>
+    <div class="mantis-loading__title">MANTIS AI</div>
+    <div class="mantis-loading__sub">ALGO TRADING</div>
+    <div class="mantis-loading__bar"></div>
   </div>
 </app-root>
 </body>

@@ -8,6 +8,7 @@ import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
   TableDirective, ButtonDirective, TooltipDirective,
 } from '@coreui/angular';
+import { IconDirective } from '@coreui/icons-angular';
 import { TradingService } from '../../core/services/trading.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
@@ -28,6 +29,7 @@ type Tab = 'open' | 'history';
     CardComponent, CardBodyComponent, CardHeaderComponent,
     TableDirective, ButtonDirective, TooltipDirective,
     PriceFormatPipe, EpicLogoComponent, LoadingButtonComponent,
+    IconDirective,
   ],
   template: `
     <!-- Tab bar -->
@@ -300,13 +302,21 @@ type Tab = 'open' | 'history';
 
       <!-- Closed positions table -->
       <c-card class="mb-4 border-top border-top-3 border-top-primary">
-        <c-card-header>
+        <c-card-header class="d-flex align-items-center justify-content-between">
           <span class="fw-semibold small text-body-secondary">
             Storico Posizioni Chiuse
             @if (trading.closedTotal() > 0) {
               <span class="text-body-secondary ms-1">({{ trading.closedTotal() }})</span>
             }
           </span>
+          @if (trading.closedPositions().length > 0) {
+            <button cButton color="primary" variant="outline" size="sm"
+                    [disabled]="exporting()"
+                    (click)="exportHistoryCsv()">
+              <svg cIcon name="cilCloudDownload" size="sm" class="me-1"></svg>
+              {{ exporting() ? 'Esportando...' : 'Esporta CSV' }}
+            </button>
+          }
         </c-card-header>
         <c-card-body class="p-0">
           @if (trading.closedPositions().length === 0) {
@@ -453,6 +463,8 @@ export class PositionsComponent implements OnInit, OnDestroy {
   readonly currentPage = signal(1);
   readonly pageSize = 50;
 
+  readonly exporting = signal(false);
+
   readonly totalPages = computed(() =>
     Math.max(1, Math.ceil(this.trading.closedTotal() / this.pageSize))
   );
@@ -528,6 +540,30 @@ export class PositionsComponent implements OnInit, OnDestroy {
         this.closingDealId.set(null);
         this.toast.error(err?.error?.error || 'Errore nella chiusura');
       }
+    });
+  }
+
+  exportHistoryCsv(): void {
+    this.exporting.set(true);
+    this.trading.exportClosedPositionsCsv({
+      epic: this.filterEpic() || undefined,
+      close_reason: this.filterReason() || undefined,
+      date_from: this.filterFrom() || undefined,
+      date_to: this.filterTo() || undefined,
+    }).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `mantis-positions-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.exporting.set(false);
+      },
+      error: () => {
+        this.toast.error('Errore nell\'esportazione CSV');
+        this.exporting.set(false);
+      },
     });
   }
 

@@ -11,8 +11,8 @@ from loguru import logger
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from src.api.dependencies import get_position_repo
-from src.api.schemas import error_response, success_response
+from src.api.dependencies import get_journal_note_repo, get_position_repo
+from src.api.schemas import UpdateTradeNoteRequest, error_response, success_response
 
 # Timeout for broker-dependent async calls (seconds)
 _BROKER_TIMEOUT = 8.0
@@ -245,4 +245,50 @@ async def emergency_stop(request: Request):
         "message": f"Emergency stop eseguito: {closed} posizioni chiuse"
                    + (f", {errors} errori" if errors else ""),
         **result,
+    })
+
+
+# ── Signal Notes (Trade Journal annotations) ──
+
+
+@router.get("/signals/notes")
+async def list_signal_notes(
+    note_repo=Depends(get_journal_note_repo),
+):
+    """Get all trade journal notes (keyed by 'epic|timestamp')."""
+    if note_repo is None:
+        return success_response({})
+
+    try:
+        notes = await note_repo.get_all_notes()
+        return success_response(notes)
+    except Exception as e:
+        logger.warning(f"Failed to load signal notes: {e}")
+        return success_response({})
+
+
+@router.put("/signals/notes")
+async def upsert_signal_note(
+    body: UpdateTradeNoteRequest,
+    note_repo=Depends(get_journal_note_repo),
+):
+    """Create or update a note for a trade journal signal entry."""
+    if note_repo is None:
+        return error_response("Database not available", 503)
+
+    # Empty notes = delete
+    if not body.notes.strip():
+        await note_repo.delete_note(body.epic, body.signal_timestamp)
+        return success_response({"deleted": True})
+
+    note = await note_repo.upsert_note(
+        epic=body.epic,
+        signal_timestamp=body.signal_timestamp,
+        notes=body.notes.strip(),
+    )
+    return success_response({
+        "epic": note.epic,
+        "signal_timestamp": note.signal_timestamp,
+        "notes": note.notes,
+        "updated_at": note.updated_at.isoformat() if note.updated_at else None,
     })

@@ -23,6 +23,7 @@ from src.api.routers import (
     auth,
     backtest,
     dashboard,
+    export,
     markets,
     models,
     monitoring,
@@ -438,6 +439,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+    expose_headers=["Content-Disposition"],
 )
 
 # Configure audit logging middleware
@@ -593,6 +595,7 @@ app.include_router(strategy.router, prefix="/api/strategy", tags=["Strategy"])
 app.include_router(models.router, prefix="/api/models", tags=["Models"])
 app.include_router(system.router, prefix="/api/system", tags=["System"])
 app.include_router(trading.router, prefix="/api/trading", tags=["Trading"])
+app.include_router(export.router, prefix="/api/export", tags=["Export"])
 app.include_router(monitoring.router, prefix="/api", tags=["Monitoring"])
 
 # ===== WebSocket Endpoints =====

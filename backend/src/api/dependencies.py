@@ -28,6 +28,7 @@ if TYPE_CHECKING:
         PositionRepository,
         SignalRepository,
         StrategyRepository,
+        TradeJournalNoteRepository,
         TradeRepository,
     )
     from src.external.finnhub_client import FinnhubClient
@@ -159,6 +160,16 @@ async def get_strategy_repo(
         return None
     from src.database.repositories import StrategyRepository
     return StrategyRepository(session)
+
+
+async def get_journal_note_repo(
+    session: AsyncSession | None = Depends(get_db_session),
+) -> TradeJournalNoteRepository | None:
+    """Get TradeJournalNoteRepository for this request (None if no DB)."""
+    if session is None:
+        return None
+    from src.database.repositories import TradeJournalNoteRepository
+    return TradeJournalNoteRepository(session)
 
 
 # ── Initialization ──

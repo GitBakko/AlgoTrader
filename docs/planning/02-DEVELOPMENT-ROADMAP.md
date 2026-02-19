@@ -27,6 +27,7 @@
 | P1.6 | Walk-Forward OOS Scorecard | Per-asset KEEP/REVIEW/EXCLUDE, optimal_thresholds.json | COMPLETE |
 | P1.8 | Sentiment & Macro Features | Tiered sentiment, ticker mapping, VIX/DXY/yield macro | COMPLETE |
 | 18 | Positions History + Performance | Closed positions, performance analytics, P&L fix, DB persistence | COMPLETE |
+| 19 | UX/UI Polish | Trade Journal notes, CSV export, Light theme | COMPLETE |
 
 ---
 
@@ -765,6 +766,45 @@
 
 ---
 
+## Phase 19: UX/UI Polish [COMPLETE]
+
+> Trade Journal notes/annotations, CSV export, Light theme support.
+
+### Trade Journal Notes
+
+- [x] `TradeJournalNote` DB model (epic, signal_timestamp, notes TEXT max 2000, unique constraint)
+- [x] Alembic migration: `add_trade_journal_notes_table` (manually created — autogenerate was dangerous)
+- [x] `TradeJournalNoteRepository`: get_by_signal, upsert_note, delete_note, get_all_notes
+- [x] API endpoints: `PUT /api/trading/signals/notes` (upsert), `GET` (all), `DELETE` (by epic+timestamp)
+- [x] Dependency: `get_journal_note_repo()` in `dependencies.py`
+- [x] Frontend `TradingService`: `signalNotes` signal, `loadSignalNotes()`, `updateSignalNote()`
+- [x] Trade Journal UI: pencil icon per signal (green if note exists), note modal with textarea
+
+### Export CSV
+
+- [x] Backend: `GET /api/export/positions/csv` — StreamingResponse, reuses `PositionRepository.get_closed_positions()`
+- [x] New router: `backend/src/api/routers/export.py`, registered in `main.py`
+- [x] Frontend `ApiService.getBlob()` — binary HTTP response method
+- [x] Trade Journal: client-side CSV from `filteredSignals()` with UTF-8 BOM for Excel
+- [x] Positions (Storico): server-side CSV download via blob
+
+### Light Theme
+
+- [x] `frontend/src/scss/_light-theme.scss` — full `[data-coreui-theme="light"]` variable overrides
+- [x] Light palette: white surfaces, dark text, toned-down greens (#00a86b, #16a34a), solid sidebar
+- [x] 9 component SCSS files fixed: dashboard, positions, paper-trading, system-logs, user-profile, markets, backtest, ai-models, trade-journal
+- [x] `index.html`: loading screen adapts to `prefers-color-scheme: light`
+- [x] Auth pages: kept dark-only (pragmatic — heavy glassmorphism redesign not worth it)
+
+### Bugfixes (Phase 19 follow-up)
+
+- [x] Missing Alembic migration for `trade_journal_notes` table
+- [x] CoreUI `cFormSelect` → `cSelect` (correct directive selector attribute)
+- [x] Trade Journal filter panel redesigned: inline flex layout matching Positions pattern
+- [x] Defensive try/except on `GET /signals/notes` endpoint
+
+---
+
 ## Testing Progression
 
 | Phase | Tests | Notes |
@@ -776,4 +816,5 @@
 | Phase 16 | 1065 | Best practices |
 | P0 (17a/b) | 1081 | Real trading fixes |
 | P1 (Steps 6-8) | 1110 | Scorecard + sentiment + macro |
-| **Phase 18** | **~1136** | **Positions history + performance + P&L fix** |
+| Phase 18 | ~1136 | Positions history + performance + P&L fix |
+| **Phase 19** | **~1136** | **UX/UI Polish (notes, CSV, light theme)** |
