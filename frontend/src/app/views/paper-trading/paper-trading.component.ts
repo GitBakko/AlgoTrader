@@ -3,7 +3,6 @@ import { CommonModule, DecimalPipe } from '@angular/common';
 import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
   ColComponent, RowComponent, BadgeComponent, ProgressComponent, ProgressBarComponent,
-  ButtonDirective, SpinnerComponent,
   TableDirective, AlertComponent, TooltipDirective,
 } from '@coreui/angular';
 
@@ -14,6 +13,7 @@ import { NewsService } from '../../core/services/news.service';
 import { ToastService } from '../../shared/services/toast.service';
 import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
 import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.component';
+import { LoadingButtonComponent } from '../../shared/components/loading-button/loading-button.component';
 import { NewsWidgetComponent } from '../../shared/components/news-widget/news-widget.component';
 import { PaperPosition, PaperSignal } from '../../core/models';
 
@@ -40,7 +40,7 @@ interface GroupedPosition {
     CommonModule, DecimalPipe,
     CardComponent, CardBodyComponent, CardHeaderComponent,
     ColComponent, RowComponent, BadgeComponent, ProgressComponent, ProgressBarComponent,
-    ButtonDirective, SpinnerComponent,
+    LoadingButtonComponent,
     TableDirective, AlertComponent, TooltipDirective,
     PriceFormatPipe,
     EpicLogoComponent,
@@ -93,22 +93,18 @@ interface GroupedPosition {
           </span>
         }
         <span class="pt-chip pt-chip--muted">Poll: {{ (pollingInterval() / 1000) }}s</span>
-        <button cButton [color]="status()?.running ? 'danger' : 'success'" size="sm"
-                (click)="togglePaperTrading()" [disabled]="actionInProgress() || !statusLoaded()">
-          @if (actionInProgress()) {
-            <c-spinner size="sm" class="me-1"></c-spinner>
-          }
+        <app-loading-button [color]="status()?.running ? 'danger' : 'success'" size="sm"
+                            [loading]="actionInProgress()"
+                            [disabled]="!statusLoaded()"
+                            (clicked)="togglePaperTrading()">
           {{ status()?.running ? 'Stop' : 'Start' }}
-        </button>
+        </app-loading-button>
         @if (status()?.running || livePositions().length > 0) {
-          <button cButton color="danger" size="sm" class="ms-2 emergency-stop-btn"
-                  (click)="emergencyStop()"
-                  [disabled]="emergencyStopInProgress()">
-            @if (emergencyStopInProgress()) {
-              <c-spinner size="sm" class="me-1"></c-spinner>
-            }
+          <app-loading-button color="danger" size="sm" class="ms-2 emergency-stop-btn"
+                              [loading]="emergencyStopInProgress()"
+                              (clicked)="emergencyStop()">
             EMERGENCY STOP
-          </button>
+          </app-loading-button>
         }
       </div>
     </div>

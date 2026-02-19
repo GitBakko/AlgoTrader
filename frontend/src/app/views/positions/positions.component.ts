@@ -13,6 +13,7 @@ import { WebSocketService } from '../../core/services/websocket.service';
 import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
 import { ToastService } from '../../shared/services/toast.service';
 import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.component';
+import { LoadingButtonComponent } from '../../shared/components/loading-button/loading-button.component';
 import { TRADABLE_ASSETS } from '../../shared/constants/assets';
 
 type Tab = 'open' | 'history';
@@ -26,7 +27,7 @@ type Tab = 'open' | 'history';
     CommonModule, FormsModule,
     CardComponent, CardBodyComponent, CardHeaderComponent,
     TableDirective, ButtonDirective, TooltipDirective,
-    PriceFormatPipe, EpicLogoComponent,
+    PriceFormatPipe, EpicLogoComponent, LoadingButtonComponent,
   ],
   template: `
     <!-- Tab bar -->
@@ -110,9 +111,11 @@ type Tab = 'open' | 'history';
                         </span>
                       }
                     </div>
-                    <button cButton color="danger" size="sm" (click)="closePosition(pos.deal_id)">
+                    <app-loading-button color="danger" size="sm"
+                                        [loading]="closingDealId() === pos.deal_id"
+                                        (clicked)="closePosition(pos.deal_id)">
                       Chiudi
-                    </button>
+                    </app-loading-button>
                   </div>
                 </div>
               }
@@ -199,9 +202,11 @@ type Tab = 'open' | 'history';
                         $ {{ pos.live_pnl >= 0 ? '+' : '' }}{{ pos.live_pnl | number:'1.2-2' }}
                       </td>
                       <td class="text-end">
-                        <button cButton color="danger" size="sm" (click)="closePosition(pos.deal_id)">
+                        <app-loading-button color="danger" size="sm"
+                                            [loading]="closingDealId() === pos.deal_id"
+                                            (clicked)="closePosition(pos.deal_id)">
                           Chiudi
-                        </button>
+                        </app-loading-button>
                       </td>
                     </tr>
                   }
@@ -438,6 +443,7 @@ export class PositionsComponent implements OnInit, OnDestroy {
 
   readonly assets = TRADABLE_ASSETS;
   readonly activeTab = signal<Tab>('open');
+  readonly closingDealId = signal<string | null>(null);
 
   // History filters
   readonly filterEpic = signal('');
@@ -511,12 +517,15 @@ export class PositionsComponent implements OnInit, OnDestroy {
   }
 
   closePosition(dealId: string): void {
+    this.closingDealId.set(dealId);
     this.trading.closePosition(dealId).subscribe({
       next: () => {
+        this.closingDealId.set(null);
         // Toast notification handled by NotificationService via WebSocket event
         this.trading.loadPaperPositions();
       },
       error: (err) => {
+        this.closingDealId.set(null);
         this.toast.error(err?.error?.error || 'Errore nella chiusura');
       }
     });
