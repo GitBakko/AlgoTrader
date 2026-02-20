@@ -1,0 +1,165 @@
+<c-container fluid>
+  <c-row class="mb-3">
+    <c-col>
+      <h4 class="mb-0">Notifiche</h4>
+    </c-col>
+  </c-row>
+
+  <!-- Filter Bar -->
+  <c-row class="mb-3">
+    <c-col>
+      <c-card class="border-top border-top-3 border-top-primary">
+        <c-card-body class="p-3">
+          <div class="d-flex flex-wrap align-items-end gap-3">
+            <div>
+              <label class="form-label small text-body-secondary mb-1">Tipo</label>
+              <select cSelect class="form-select form-select-sm" style="min-width: 180px"
+                [value]="filterAlertType()"
+                (change)="filterAlertType.set($any($event.target).value); applyFilters()">
+                <option value="">Tutti</option>
+                @for (t of alertTypes; track t) {
+                  <option [value]="t">{{ t }}</option>
+                }
+              </select>
+            </div>
+            <div>
+              <label class="form-label small text-body-secondary mb-1">Severità</label>
+              <select cSelect class="form-select form-select-sm" style="min-width: 140px"
+                [value]="filterSeverity()"
+                (change)="filterSeverity.set($any($event.target).value); applyFilters()">
+                <option value="">Tutte</option>
+                @for (s of severities; track s) {
+                  <option [value]="s">{{ s }}</option>
+                }
+              </select>
+            </div>
+            <div>
+              <label class="form-label small text-body-secondary mb-1">Asset</label>
+              <input type="text" class="form-control form-control-sm" style="min-width: 120px"
+                placeholder="es. XAUUSD"
+                [value]="filterEpic()"
+                (change)="filterEpic.set($any($event.target).value); applyFilters()">
+            </div>
+            <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
+              <input class="form-check-input" type="checkbox" role="switch" id="unreadOnly"
+                [checked]="filterUnreadOnly()"
+                (change)="filterUnreadOnly.set($any($event.target).checked); applyFilters()">
+              <label class="form-check-label small" for="unreadOnly">Solo non lette</label>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary" (click)="resetFilters()">Reset</button>
+            <button class="btn btn-sm btn-outline-primary ms-auto" (click)="markAllRead()">
+              Segna tutte lette
+            </button>
+          </div>
+        </c-card-body>
+      </c-card>
+    </c-col>
+  </c-row>
+
+  <!-- Notifications Table -->
+  <c-row>
+    <c-col>
+      <c-card class="border-top border-top-3 border-top-primary">
+        <c-card-header class="d-flex align-items-center justify-content-between py-2">
+          <span class="fw-semibold small text-body-secondary">
+            {{ total() }} notifiche totali
+          </span>
+          @if (totalPages > 1) {
+            <span class="small text-body-secondary">
+              Pagina {{ page() }} di {{ totalPages }}
+            </span>
+          }
+        </c-card-header>
+        <c-card-body class="p-0">
+          <div class="table-responsive">
+            <table cTable [hover]="true" [small]="true" class="mb-0">
+              <thead>
+                <tr class="text-body-secondary">
+                  <th class="fw-semibold small" style="width: 40px"></th>
+                  <th class="fw-semibold small">Titolo</th>
+                  <th class="fw-semibold small d-none d-md-table-cell">Messaggio</th>
+                  <th class="fw-semibold small" style="width: 90px">Asset</th>
+                  <th class="fw-semibold small" style="width: 90px">Severità</th>
+                  <th class="fw-semibold small" style="width: 80px">Tempo</th>
+                  <th class="fw-semibold small text-end" style="width: 100px">Azioni</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (n of notifications(); track n.id) {
+                  <tr [class.notification-row--unread]="!n.is_read">
+                    <td>{{ n.emoji }}</td>
+                    <td>
+                      <div class="fw-medium small" [class.fw-semibold]="!n.is_read">{{ n.title }}</div>
+                    </td>
+                    <td class="d-none d-md-table-cell">
+                      <div class="small text-body-secondary text-truncate" style="max-width: 300px">
+                        {{ n.message }}
+                      </div>
+                    </td>
+                    <td>
+                      @if (n.epic) {
+                        <span class="mantis-mono small">{{ n.epic }}</span>
+                      }
+                    </td>
+                    <td>
+                      <c-badge [color]="severityColor(n.severity)" shape="rounded-pill" class="small">
+                        {{ n.severity }}
+                      </c-badge>
+                    </td>
+                    <td class="small text-body-secondary">{{ timeAgo(n.created_at) }}</td>
+                    <td class="text-end">
+                      @if (!n.is_read) {
+                        <button class="btn btn-sm btn-ghost-primary p-1" title="Segna come letta"
+                          (click)="markAsRead(n.id)">
+                          <svg cIcon name="cilCheckAlt" size="sm"></svg>
+                        </button>
+                      }
+                      <button class="btn btn-sm btn-ghost-danger p-1" title="Elimina"
+                        (click)="deleteNotification(n.id)">
+                        <svg cIcon name="cilTrash" size="sm"></svg>
+                      </button>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="7">
+                      <div class="empty-state">
+                        <div class="empty-state__icon">🔔</div>
+                        <div class="empty-state__text">Nessuna notifica</div>
+                        <div class="empty-state__hint">Le notifiche appariranno qui quando il sistema genererà eventi</div>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          @if (totalPages > 1) {
+            <div class="d-flex justify-content-center gap-2 py-3">
+              <button class="btn btn-sm btn-outline-secondary"
+                [disabled]="page() <= 1"
+                (click)="goToPage(page() - 1)">
+                Precedente
+              </button>
+              @for (p of [].constructor(totalPages); track $index) {
+                <button class="btn btn-sm"
+                  [class.btn-primary]="page() === $index + 1"
+                  [class.btn-outline-secondary]="page() !== $index + 1"
+                  (click)="goToPage($index + 1)">
+                  {{ $index + 1 }}
+                </button>
+              }
+              <button class="btn btn-sm btn-outline-secondary"
+                [disabled]="page() >= totalPages"
+                (click)="goToPage(page() + 1)">
+                Successiva
+              </button>
+            </div>
+          }
+        </c-card-body>
+      </c-card>
+    </c-col>
+  </c-row>
+</c-container>

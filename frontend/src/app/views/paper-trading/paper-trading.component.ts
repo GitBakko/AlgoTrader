@@ -5,6 +5,7 @@ import {
   ColComponent, RowComponent, BadgeComponent, ProgressComponent, ProgressBarComponent,
   TableDirective, AlertComponent, TooltipDirective,
 } from '@coreui/angular';
+import { IconDirective } from '@coreui/icons-angular';
 
 import { TradingService } from '../../core/services/trading.service';
 import { WebSocketService } from '../../core/services/websocket.service';
@@ -40,7 +41,7 @@ interface GroupedPosition {
     CommonModule, DecimalPipe,
     CardComponent, CardBodyComponent, CardHeaderComponent,
     ColComponent, RowComponent, BadgeComponent, ProgressComponent, ProgressBarComponent,
-    LoadingButtonComponent,
+    LoadingButtonComponent, IconDirective,
     TableDirective, AlertComponent, TooltipDirective,
     PriceFormatPipe,
     EpicLogoComponent,
@@ -211,8 +212,11 @@ interface GroupedPosition {
                 <c-badge color="success" class="badge-sm">OK</c-badge>
               } @else {
                 <div class="d-flex flex-wrap gap-1 justify-content-end cb-badges">
-                  @for (b of circuitBreakersTripped(); track b) {
-                    <c-badge color="danger" class="badge-sm">{{ b }}</c-badge>
+                  @for (cb of circuitBreakersTripped(); track cb.key) {
+                    <c-badge class="badge-sm cb-badge-warning" [cTooltip]="cb.reason">
+                      <svg cIcon [name]="cb.icon" size="xs"></svg>
+                      {{ cb.label }}
+                    </c-badge>
                   }
                 </div>
               }
@@ -682,6 +686,16 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   readonly toast = inject(ToastService);
   readonly newsService = inject(NewsService);
 
+  /** Circuit breaker type → Italian label + icon */
+  readonly cbTypeMap: Record<string, { label: string; icon: string }> = {
+    'daily_loss':         { label: 'Perdita Giornaliera',  icon: 'cilArrowBottom' },
+    'consecutive_losses': { label: 'Perdite Consecutive',  icon: 'cilChartLine' },
+    'max_positions':      { label: 'Max Posizioni',        icon: 'cilLayers' },
+    'slippage_anomaly':   { label: 'Anomalia Slippage',    icon: 'cilBolt' },
+    'heartbeat_timeout':  { label: 'Timeout Heartbeat',    icon: 'cilReload' },
+    'volatility_spike':   { label: 'Spike Volatilita',     icon: 'cilChartPie' },
+  };
+
   readonly actionInProgress = signal(false);
   readonly emergencyStopInProgress = signal(false);
   readonly currentEpic = signal<string>('XAUUSD');
@@ -800,12 +814,16 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     return this.recentSignals().filter(s => s.status === 'rejected' || s.status === 'exec_failed').length;
   });
 
-  // Phase 8: circuit breakers list
-  readonly circuitBreakersTripped = computed<string[]>(() => {
+  // Phase 8: circuit breakers list (structured with Italian labels + icons)
+  readonly circuitBreakersTripped = computed(() => {
     const raw = this.status()?.circuit_breakers_tripped;
-    if (!raw) return [];
-    if (Array.isArray(raw)) return raw;
-    return Object.entries(raw).map(([k, v]) => `${k}: ${v}`);
+    if (!raw || Array.isArray(raw)) return [];
+    return Object.entries(raw).map(([key, reason]) => ({
+      key,
+      label: this.cbTypeMap[key]?.label ?? key,
+      icon: this.cbTypeMap[key]?.icon ?? 'cilShieldAlt',
+      reason: String(reason),
+    }));
   });
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;

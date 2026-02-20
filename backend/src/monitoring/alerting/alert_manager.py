@@ -11,6 +11,7 @@ from loguru import logger
 from src.monitoring.alerting.channels import (
     AlertChannel, EmailChannel, SlackChannel, TelegramChannel, WebhookChannel,
 )
+from src.monitoring.alerting.in_app_channel import InAppChannel
 from src.monitoring.alerting.schemas import Alert, AlertSeverity, AlertType
 from src.utils.config import get_settings
 
@@ -25,6 +26,9 @@ class AlertManager:
         """Initialize alert manager with configured channels."""
         self.channels: list[AlertChannel] = []
         self.settings = get_settings()
+        # In-app channel is always active (DB + WS broadcast)
+        self.in_app_channel = InAppChannel()
+        self.channels.append(self.in_app_channel)
         self._initialize_channels()
 
     def _initialize_channels(self):
@@ -78,8 +82,8 @@ class AlertManager:
                 self.channels.append(TelegramChannel(bot_token=bot_token, chat_id=chat_id))
                 logger.info("Telegram alerting enabled")
 
-        if not self.channels:
-            logger.warning("No alert channels configured. Alerts will only be logged.")
+        if len(self.channels) <= 1:  # Only InAppChannel
+            logger.warning("No external alert channels configured. Alerts will only be in-app.")
 
     async def send_alert(self, alert: Alert) -> dict[str, bool]:
         """
@@ -91,10 +95,6 @@ class AlertManager:
         Returns:
             Dict of channel results {channel_name: success}
         """
-        if not self.channels:
-            logger.warning(f"Alert not sent (no channels): {alert.title}")
-            return {}
-
         # Send to all channels concurrently
         tasks = [channel.send(alert) for channel in self.channels]
         results = await asyncio.gather(*tasks, return_exceptions=True)

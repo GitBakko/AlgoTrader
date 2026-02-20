@@ -28,13 +28,14 @@ from src.api.routers import (
     models,
     monitoring,
     news,
+    notifications,
     positions,
     signals,
     strategy,
     system,
     trading,
 )
-from src.api.websocket import prices_endpoint, trades_endpoint
+from src.api.websocket import notifications_endpoint, prices_endpoint, trades_endpoint
 from src.database.session import DatabaseManager
 from src.monitoring.health import HealthChecker
 from src.utils.config import get_settings
@@ -272,16 +273,72 @@ async def lifespan(app: FastAPI):
         trailing_stop_manager=app.state.recovered_trailing_stop_manager,
     )
 
-    # Phase 14: Inject recovered trade history for Kelly sizing
+    # Phase 14: Inject recovered trade history for Kelly sizing + circuit breaker
     if recovery_report.trade_history_count > 0:
         trade_history = await recovery_service._restore_trade_history_list()
         app.state.paper_loop._trade_history = trade_history
-        logger.info(f"Injected {len(trade_history)} trades into Kelly history")
+        # Reset CB counter before replay — _restore_risk_state() already set it from
+        # the snapshot, but the snapshot value may be stale. Replaying the full trade
+        # history gives the authoritative consecutive_losses count.
+        from src.risk.circuit_breakers import CircuitBreakerType
+        cb = app.state.paper_loop.risk_manager.circuit_breakers
+        cb._consecutive_losses = 0
+        cb._tripped.pop(CircuitBreakerType.CONSECUTIVE_LOSSES, None)
+        cb._tripped_at.pop(CircuitBreakerType.CONSECUTIVE_LOSSES, None)
+        # trade_history is newest-first (from DB), reverse for chronological replay
+        for t in reversed(trade_history):
+            pnl = t.get("pnl", 0)
+            cb.record_trade_result(is_win=(pnl > 0))
+        logger.info(f"Injected {len(trade_history)} trades into Kelly history + circuit breaker (consecutive_losses={cb._consecutive_losses})")
+
+    # ══════════════════════════════════════════════════════════
+    # 📦 PRE-FETCH MARKET SPECS (minDealSize cache)
+    # ══════════════════════════════════════════════════════════
+    environment = "DEMO" if settings.use_demo else "LIVE"
+    db_sf = getattr(app.state, "db_session_factory", None)
+
+    # 1. Instant load from DB (no API calls)
+    from src.trading.market_spec_prefetch import (
+        load_market_specs_from_db,
+        prefetch_market_specs,
+    )
+
+    try:
+        db_specs = await load_market_specs_from_db(db_sf, environment)
+        if db_specs:
+            app.state.paper_loop.seed_min_deal_sizes(db_specs)
+            logger.info(f"Seeded {len(db_specs)} min deal sizes from DB")
+    except Exception as e:
+        logger.warning(f"DB market spec load failed: {e}")
+
+    # 2. Background pre-fetch from broker (updates DB + memory)
+    if app.state.broker_client:
+        async def _prefetch_and_seed():
+            try:
+                fresh = await prefetch_market_specs(
+                    app.state.broker_client, db_sf, environment
+                )
+                if fresh:
+                    app.state.paper_loop.seed_min_deal_sizes(fresh)
+            except Exception as e:
+                logger.warning(f"Background market spec pre-fetch failed: {e}")
+
+        prefetch_task = asyncio.create_task(
+            _prefetch_and_seed(), name="market_spec_prefetch"
+        )
+        prefetch_task.add_done_callback(_bg_task_done)
 
     logger.info(
         f"Trading loop initialized in {mode_label} mode "
         f"(use POST /api/trading/start to begin, state persistence: {'enabled' if app.state.db_session_factory else 'disabled'})"
     )
+
+    # Inject DB factory into InAppChannel for notification persistence
+    from src.monitoring.alerting.alert_manager import get_alert_manager
+    alert_mgr = get_alert_manager()
+    if hasattr(alert_mgr, 'in_app_channel') and app.state.db_session_factory:
+        alert_mgr.in_app_channel.set_db_session_factory(app.state.db_session_factory)
+        logger.info("InAppChannel DB session factory injected")
 
     # Register signal handlers for graceful shutdown
     try:
@@ -597,10 +654,12 @@ app.include_router(system.router, prefix="/api/system", tags=["System"])
 app.include_router(trading.router, prefix="/api/trading", tags=["Trading"])
 app.include_router(export.router, prefix="/api/export", tags=["Export"])
 app.include_router(monitoring.router, prefix="/api", tags=["Monitoring"])
+app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
 
 # ===== WebSocket Endpoints =====
 app.websocket("/ws/prices")(prices_endpoint)
 app.websocket("/ws/trades")(trades_endpoint)
+app.websocket("/ws/notifications")(notifications_endpoint)
 
 
 if __name__ == "__main__":

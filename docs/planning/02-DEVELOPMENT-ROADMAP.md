@@ -28,6 +28,7 @@
 | P1.8 | Sentiment & Macro Features | Tiered sentiment, ticker mapping, VIX/DXY/yield macro | COMPLETE |
 | 18 | Positions History + Performance | Closed positions, performance analytics, P&L fix, DB persistence | COMPLETE |
 | 19 | UX/UI Polish | Trade Journal notes, CSV export, Light theme | COMPLETE |
+| 20 | Trading Robustness | MinDealSize pre-fetch, position dates, Telegram fix | COMPLETE |
 
 ---
 
@@ -805,6 +806,40 @@
 
 ---
 
+## Phase 20: Trading Robustness [COMPLETE]
+
+> MinDealSize pre-fetch & validation, position history dates, broker error parser, Telegram alert fix.
+
+### MinDealSize Pre-fetch & Validation
+
+- [x] `MarketSpec` DB model (epic, environment, min/max deal size, market_name, fetched_at)
+- [x] Alembic migration `f5a8b3c2d1e0`: `market_specs` table with unique(epic, environment)
+- [x] `MarketSpecRepository`: get_by_epic, get_all_for_environment, upsert, bulk_upsert
+- [x] `market_spec_prefetch.py`: batch parallel fetch (5 concurrent, 0.6s delay, ~3s total)
+- [x] Startup: instant DB load → background broker pre-fetch → `seed_min_deal_sizes()`
+- [x] `PaperTradingLoop._min_deal_size_cache` with 3-level fallback chain
+- [x] Pre-order validation: rejects orders below minDealSize with structured error detail
+
+### Position History Date Fix
+
+- [x] `_persist_position_close()` accepts `opened_at` parameter
+- [x] Callers pass actual opened_at from in-memory position data
+- [x] Frontend: "Aperta" column added to history table
+
+### Broker Error Parser + Telegram Alert Fix
+
+- [x] Enhanced `error.invalid.size.minvalue` pattern detection
+- [x] Capital.com `errorCode` field extraction, enriched rejection details
+- [x] `Alert._escape_telegram_md()` for Telegram Markdown v1 compatibility
+- [x] `TelegramChannel.send()` plain text fallback on Markdown rejection
+- [x] Alert error log bumped from debug to warning
+
+### Dashboard
+
+- [x] Win/loss count on Best/Worst Trade KPI cards
+
+---
+
 ## Testing Progression
 
 | Phase | Tests | Notes |
@@ -817,4 +852,5 @@
 | P0 (17a/b) | 1081 | Real trading fixes |
 | P1 (Steps 6-8) | 1110 | Scorecard + sentiment + macro |
 | Phase 18 | ~1136 | Positions history + performance + P&L fix |
-| **Phase 19** | **~1136** | **UX/UI Polish (notes, CSV, light theme)** |
+| Phase 19 | ~1136 | UX/UI Polish (notes, CSV, light theme) |
+| **Phase 20** | **~1182** | **Trading Robustness (minDealSize, dates, Telegram, error parser)** |

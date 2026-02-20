@@ -341,7 +341,8 @@ Get paper trading status (running, last iteration, errors).
     "iteration_count": 42,
     "last_iteration": "2026-02-16T10:30:00Z",
     "errors_count": 0,
-    "assets_configured": 21
+    "assets_configured": 21,
+    "min_deal_sizes_cached": 21
   }
 }
 ```

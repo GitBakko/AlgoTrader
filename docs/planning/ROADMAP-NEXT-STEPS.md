@@ -1,16 +1,57 @@
 # MANTIS AI - Roadmap & Next Steps
 
-> Current status: Phase 19 complete (2026-02-19). ~1136 tests, 0 errors. Production readiness ~99%.
+> Current status: Phase 20 complete (2026-02-20). ~1182 tests, 0 errors. Production readiness ~99%.
 > ML models: 20/20 tradable assets have trained XGBoost models (EURUSD excluded — ATR too small).
 > Infrastructure: CI/CD (GitHub Actions), JSON logging, Prometheus/Grafana, security headers, Docker prod override.
 > DEMO readiness: partial_close fix, Telegram alerts, AlertManager wired, emergency kill switch, max_total_exposure.
 > Trading history: Closed positions persisted to PostgreSQL, performance analytics, dashboard P&L fix.
 > UX/UI Polish: Trade Journal notes, CSV export, Light theme, filter bar redesign.
+> Trading robustness: MinDealSize pre-fetch & validation, position history dates, broker error parser, Telegram Markdown fix.
 > Bug fixes: Timezone mismatch (asyncpg), UNKNOWN toast, duplicate toast, ExecutionEngine DB, broker-closed detection, Alembic migration.
 
 ---
 
 ## Recently Completed
+
+### Phase 20 — Trading Robustness [COMPLETE]
+
+> MinDealSize pre-fetch, position history dates, broker error parser, Telegram alert fix.
+
+**MinDealSize Pre-fetch & Validation:**
+
+- [x] `MarketSpec` DB model + Alembic migration (`market_specs` table, unique epic+environment)
+- [x] `MarketSpecRepository` — get_by_epic, get_all_for_environment, upsert, bulk_upsert
+- [x] `market_spec_prefetch.py` — `prefetch_market_specs()` (batch 5 parallel, 0.6s delay) + `load_market_specs_from_db()`
+- [x] Startup integration: instant DB load → background broker pre-fetch → `seed_min_deal_sizes()`
+- [x] `PaperTradingLoop._min_deal_size_cache` + 3-level fallback: market_info_cache → min_deal_size_cache → None
+- [x] Pre-order validation in `_process_epic()`: rejects orders below minDealSize with structured error
+- [x] `get_status()` includes `"min_deal_sizes_cached"` count
+
+**Position History Date Fix:**
+
+- [x] `_persist_position_close()` accepts `opened_at: datetime | None` parameter
+- [x] Both callers (`_detect_broker_closed`, `_check_stop_losses`) pass actual `opened_at` from position dict
+- [x] Fallback Position creation uses real `opened_at` (handles ISO strings, tz-aware datetimes)
+- [x] Frontend: "Aperta" column added to history table
+
+**Broker Error Parser Improvements:**
+
+- [x] Enhanced `error.invalid.size.minvalue` pattern detection in `parse_broker_error()`
+- [x] Added Capital.com `errorCode` field extraction from rejection responses
+- [x] Enriched rejection error details with order parameters (epic, size, direction, SL, TP)
+- [x] Trade Journal: tooltip + inline display for execution failures
+
+**Telegram Alert Fix:**
+
+- [x] `Alert._escape_telegram_md()` escapes `_`, `*`, `` ` ``, `[` for Telegram Markdown v1
+- [x] `format_markdown()` applies escaping to title, message, detail keys
+- [x] `TelegramChannel.send()` retries as plain text if Markdown rejected by API
+- [x] Alert error log bumped from `logger.debug` to `logger.warning`
+
+**Dashboard KPI Enhancements:**
+
+- [x] Win count displayed on Best Trade KPI card
+- [x] Loss count displayed on Worst Trade KPI card
 
 ### Phase 19 — UX/UI Polish [COMPLETE]
 
@@ -202,8 +243,8 @@
 
 ### Demo Validation
 
-- [ ] Switch `EXECUTION_MODE=DEMO` and run 2+ weeks on Capital.com demo
-- [ ] Configure Telegram alerts (`ALERT_TELEGRAM_ENABLED=true`)
+- [x] Switch `EXECUTION_MODE=DEMO` and run on Capital.com demo (in progress)
+- [x] Configure Telegram alerts (`ALERT_TELEGRAM_ENABLED=true`) — configured and fixed
 - [ ] Monitor partial_close reopen pattern in real market conditions
 - [ ] Test latency, slippage, order rejections
 - [ ] Tune `MAX_TOTAL_EXPOSURE` (start at 0.30 = 30% of equity)
@@ -237,4 +278,5 @@
 | -- | Phase 18c: LoadingButton + UX anti-spam | 1h | UX safety | **COMPLETE** |
 | -- | Phase 18d: Broker-closed position detection | 1h | Trading integrity | **COMPLETE** |
 | -- | Phase 19: UX/UI Polish (notes, CSV, light theme) | 6h | User experience | **COMPLETE** |
+| -- | Phase 20: Trading Robustness (minDealSize, dates, Telegram) | 4h | Trading integrity | **COMPLETE** |
 | **P5** | **Live trading (2+ weeks demo first)** | **2+ weeks** | **Revenue generation** | **NEXT** |

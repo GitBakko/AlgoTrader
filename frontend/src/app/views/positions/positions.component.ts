@@ -376,8 +376,9 @@ type Tab = 'open' | 'history';
                     <th class="fw-semibold small">Exit</th>
                     <th class="fw-semibold small text-end">P&amp;L</th>
                     <th class="fw-semibold small">Tipo</th>
-                    <th class="fw-semibold small">Durata</th>
+                    <th class="fw-semibold small">Aperta</th>
                     <th class="fw-semibold small">Chiusa</th>
+                    <th class="fw-semibold small">Durata</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -413,8 +414,9 @@ type Tab = 'open' | 'history';
                           {{ pos.close_reason ?? '—' }}
                         </span>
                       </td>
-                      <td class="text-body-secondary small">{{ formatDuration(pos.duration_minutes) }}</td>
+                      <td class="text-body-secondary small">{{ formatDate(pos.opened_at) }}</td>
                       <td class="text-body-secondary small">{{ formatDate(pos.closed_at) }}</td>
+                      <td class="text-body-secondary small">{{ formatDuration(pos.duration_minutes) }}</td>
                     </tr>
                   }
                 </tbody>

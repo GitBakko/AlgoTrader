@@ -1,0 +1,23 @@
+.notification-row--unread {
+  background: rgba(0, 217, 126, 0.03);
+}
+
+.empty-state {
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.empty-state__icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.empty-state__text {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.empty-state__hint {
+  font-size: 0.8125rem;
+  color: var(--cui-body-color-secondary);
+}

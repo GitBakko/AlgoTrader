@@ -82,6 +82,18 @@
       animation: chip-pulse 2s ease-in-out infinite;
     }
 
+    &--cb {
+      color: var(--mantis-warning, #FFB020);
+      background: rgba(255, 176, 32, 0.12);
+      border: 1px solid rgba(255, 176, 32, 0.25);
+      animation: chip-pulse 2s ease-in-out infinite;
+
+      svg {
+        width: 12px;
+        height: 12px;
+      }
+    }
+
     &--muted {
       color: var(--mantis-text-disabled, rgba(255, 255, 255, 0.35));
       background: var(--mantis-tint-subtle, rgba(255, 255, 255, 0.03));

@@ -36,11 +36,11 @@ import { environment } from '../../../../environments/environment';
       align-items: center;
       justify-content: center;
       border-radius: 50%;
-      background: linear-gradient(135deg, #2d333b 0%, #1c2128 100%);
+      background: linear-gradient(135deg, var(--mantis-surface-4, #21262d) 0%, var(--mantis-surface-3, #1c2128) 100%);
       border: 2px solid rgba(139, 148, 158, 0.25);
       overflow: hidden;
       font-weight: 600;
-      color: #adbac7;
+      color: var(--mantis-text-secondary, #adbac7);
       transition: all 0.2s ease;
       flex-shrink: 0;
     }

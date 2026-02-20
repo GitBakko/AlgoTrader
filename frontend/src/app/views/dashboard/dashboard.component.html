@@ -36,6 +36,12 @@
     @if (riskStatus()?.circuit_breaker_active) {
       <span class="dash-status-chip dash-status-chip--danger">CIRCUIT BREAKER</span>
     }
+    @for (cb of circuitBreakersTripped(); track cb.key) {
+      <span class="dash-status-chip dash-status-chip--cb" [cTooltip]="cb.reason">
+        <svg cIcon [name]="cb.icon" size="xs"></svg>
+        {{ cb.label }}
+      </span>
+    }
     <span class="dash-status-chip dash-status-chip--muted">
       <span class="mantis-mono">{{ (pollingInterval() / 1000) }}s</span> poll
     </span>
@@ -227,12 +233,16 @@
       <c-col sm="6" xl="3">
         <c-card class="dash-kpi-card h-100">
           <c-card-body class="p-3">
-            <div class="dash-kpi-card__label">Best Trade</div>
-            <div class="dash-kpi-card__value text-success">
-              $ +{{ perf.best_trade | number:'1.2-2' }}
+            <div class="dash-kpi-card__label">Best Trade <span class="text-body-secondary fw-normal">({{ perf.win_count }} vinte)</span></div>
+            <div class="dash-kpi-card__value"
+                 [class.text-success]="perf.best_trade >= 0"
+                 [class.text-danger]="perf.best_trade < 0">
+              $ {{ perf.best_trade >= 0 ? '+' : '' }}{{ perf.best_trade | number:'1.2-2' }}
             </div>
             <div class="dash-kpi-card__detail">
-              Avg Win: <span class="mantis-mono text-success">$ +{{ perf.avg_win | number:'1.2-2' }}</span>
+              Avg Win: <span class="mantis-mono"
+                             [class.text-success]="perf.avg_win >= 0"
+                             [class.text-danger]="perf.avg_win < 0">$ {{ perf.avg_win >= 0 ? '+' : '' }}{{ perf.avg_win | number:'1.2-2' }}</span>
             </div>
           </c-card-body>
           <div class="dash-kpi-card__accent dash-kpi-card__accent--profit"></div>
@@ -241,7 +251,7 @@
       <c-col sm="6" xl="3">
         <c-card class="dash-kpi-card h-100">
           <c-card-body class="p-3">
-            <div class="dash-kpi-card__label">Worst Trade</div>
+            <div class="dash-kpi-card__label">Worst Trade <span class="text-body-secondary fw-normal">({{ perf.loss_count }} perse)</span></div>
             <div class="dash-kpi-card__value text-danger">
               $ {{ perf.worst_trade | number:'1.2-2' }}
             </div>

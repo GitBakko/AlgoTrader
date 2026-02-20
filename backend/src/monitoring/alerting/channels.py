@@ -226,28 +226,50 @@ class TelegramChannel(AlertChannel):
         self.parse_mode = parse_mode
 
     async def send(self, alert: Alert) -> bool:
-        """Send alert via Telegram Bot API sendMessage."""
+        """Send alert via Telegram Bot API sendMessage.
+
+        Tries Markdown first; falls back to plain text if Telegram rejects it.
+        """
         if not self.bot_token or not self.chat_id:
             logger.warning("Telegram channel: bot_token or chat_id not configured")
             return False
 
+        url = f"{self._TELEGRAM_API}/bot{self.bot_token}/sendMessage"
+
         try:
-            url = f"{self._TELEGRAM_API}/bot{self.bot_token}/sendMessage"
-            payload = {
-                "chat_id": self.chat_id,
-                "text": alert.format_markdown(),
-                "parse_mode": self.parse_mode,
-                "disable_web_page_preview": True,
-            }
             async with httpx.AsyncClient() as client:
+                # First attempt: Markdown
+                payload = {
+                    "chat_id": self.chat_id,
+                    "text": alert.format_markdown(),
+                    "parse_mode": self.parse_mode,
+                    "disable_web_page_preview": True,
+                }
                 response = await client.post(url, json=payload, timeout=10.0)
                 data = response.json()
+
                 if response.status_code == 200 and data.get("ok"):
                     logger.info("Alert sent to Telegram successfully")
                     return True
-                else:
-                    logger.error(f"Telegram API error: {response.status_code} - {data}")
-                    return False
+
+                # Markdown rejected — retry as plain text
+                logger.warning(
+                    f"Telegram Markdown rejected ({response.status_code}), retrying as plain text"
+                )
+                payload_plain = {
+                    "chat_id": self.chat_id,
+                    "text": alert.format_text(),
+                    "disable_web_page_preview": True,
+                }
+                response2 = await client.post(url, json=payload_plain, timeout=10.0)
+                data2 = response2.json()
+
+                if response2.status_code == 200 and data2.get("ok"):
+                    logger.info("Alert sent to Telegram (plain text fallback)")
+                    return True
+
+                logger.error(f"Telegram API error: {response2.status_code} - {data2}")
+                return False
 
         except Exception as e:
             logger.error(f"Failed to send Telegram alert: {e}")

@@ -230,6 +230,22 @@ Validates strategies on historical data before live deployment.
 - `metrics.py` - Performance metrics (Sharpe, Sortino, max drawdown, etc.)
 - `reporter.py` - HTML/JSON report generation
 
+### 7b. Trading Services (`backend/src/trading/`)
+
+Trading loop and supporting services.
+
+**Sub-components:**
+
+- `paper_loop.py` - Paper/demo trading loop with iteration-based signal processing
+- `market_spec_prefetch.py` - Pre-fetches minDealSize for all 21 assets at startup (batch parallel with DB persistence)
+
+**MinDealSize Validation Flow:**
+
+```text
+Startup: DB load (instant) → Background broker fetch (3s) → seed_min_deal_sizes()
+Per-trade: market_info_cache → min_deal_size_cache → None (broker will reject)
+```
+
 ### 8. Monitoring (`backend/src/monitoring/`)
 
 Real-time system health and performance tracking.

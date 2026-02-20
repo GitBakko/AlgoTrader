@@ -237,7 +237,22 @@
 
   // Circuit breaker badges container
   .cb-badges {
-    max-width: 160px;
+    max-width: 220px;
+  }
+
+  // Amber CB badge (distinct from red danger badges)
+  .cb-badge-warning {
+    color: var(--mantis-warning, #FFB020) !important;
+    background: rgba(255, 176, 32, 0.15) !important;
+    border: 1px solid rgba(255, 176, 32, 0.3);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+
+    svg {
+      width: 10px;
+      height: 10px;
+    }
   }
 
   // Kelly detail text

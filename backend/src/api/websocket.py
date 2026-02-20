@@ -203,3 +203,17 @@ async def trades_endpoint(websocket: WebSocket) -> None:
         pass
     finally:
         ws_manager.disconnect(websocket, "trades")
+
+
+async def notifications_endpoint(websocket: WebSocket) -> None:
+    """WebSocket endpoint for real-time in-app notifications."""
+    await ws_manager.connect(websocket, "notifications")
+    try:
+        while True:
+            data = await websocket.receive_text()
+            if data == "ping":
+                await websocket.send_json({"type": "pong"})
+    except WebSocketDisconnect:
+        pass
+    finally:
+        ws_manager.disconnect(websocket, "notifications")

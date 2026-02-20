@@ -109,6 +109,8 @@ class PaperTradingLoop:
         self._market_info_cache: dict[str, dict] = {}
         self._market_cache_ttl = 3600  # 1 hour
         self._market_cache_ts: dict[str, float] = {}
+        # Dedicated min deal size cache (seeded from DB at startup, updated per-iteration)
+        self._min_deal_size_cache: dict[str, float] = {}
         # Regime distribution tracking per epic (Step 7: regime detection)
         self._regime_counts: dict[str, dict[str, int]] = {}
         # Track positions from previous iteration to detect broker-closed positions
@@ -268,6 +270,7 @@ class PaperTradingLoop:
         self, deal_id: str, epic: str, direction: str,
         size: float, entry_price: float, exit_price: float,
         pnl: float, close_reason: str,
+        opened_at: datetime | None = None,
     ) -> None:
         """Persist position close to the database (update status + create CLOSE trade)."""
         if self._db_session_factory is None:
@@ -294,6 +297,16 @@ class PaperTradingLoop:
 
                 if pos is None:
                     # Position was never persisted at open — create it as CLOSED
+                    now = datetime.now(timezone.utc).replace(tzinfo=None)
+                    actual_opened = opened_at or now
+                    if isinstance(actual_opened, str):
+                        try:
+                            actual_opened = datetime.fromisoformat(actual_opened).replace(tzinfo=None)
+                        except (ValueError, TypeError):
+                            actual_opened = now
+                    elif hasattr(actual_opened, 'tzinfo') and actual_opened.tzinfo is not None:
+                        actual_opened = actual_opened.replace(tzinfo=None)
+
                     pos = Position(
                         deal_id=deal_id,
                         epic=epic,
@@ -305,8 +318,8 @@ class PaperTradingLoop:
                         stop_loss=None,
                         take_profit=None,
                         status="CLOSED",
-                        opened_at=datetime.now(timezone.utc).replace(tzinfo=None),
-                        closed_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                        opened_at=actual_opened,
+                        closed_at=now,
                         close_reason=close_reason,
                     )
                     pos = await repo.create(pos)
@@ -367,43 +380,78 @@ class PaperTradingLoop:
             stop_level = prev_pos.get("stop_level")
             profit_level = prev_pos.get("profit_level")
 
-            # Determine close reason from SL/TP levels set on the position.
-            # The broker closed this position, so if SL/TP was set, it was likely
-            # triggered. We use the SL/TP level as the exit price for accurate P&L.
+            # Determine close reason from SL/TP levels and live broker price.
+            # The broker closed this position — we query the current market price
+            # to determine whether SL or TP was hit (since we don't have the exact
+            # exit price from the broker activity API).
             close_reason = "EXTERNAL"
             exit_price = entry_price  # Fallback
 
             if stop_level and stop_level > 0 and profit_level and profit_level > 0:
-                # Both SL and TP were set — infer from which would generate the observed P&L direction
-                if direction == "BUY":
-                    # BUY: SL is below entry, TP is above entry
-                    # If position closed with loss (price went down) → SL
-                    # Try to get a recent price hint
-                    close_reason = "SL"
-                    exit_price = stop_level
-                    # Check if a recent price is closer to TP
-                    try:
-                        latest = self.data_access.get_latest_price(epic, timeframe="1h")
-                        if latest:
-                            last_close = latest.get("close", 0)
-                            if last_close and last_close >= profit_level:
+                # Both SL and TP were set — get live price from broker to determine
+                # which level was hit. This is far more reliable than stale candle data.
+                live_price = None
+                try:
+                    market = await self.broker.get_market_details(epic)
+                    snapshot = market.get("snapshot", {})
+                    bid = snapshot.get("bid", 0)
+                    offer = snapshot.get("offer", 0)
+                    if bid and offer:
+                        live_price = (bid + offer) / 2
+                except Exception as e:
+                    logger.debug(f"Could not get live price for {epic}: {e}")
+
+                if live_price:
+                    # Use live price to determine which level was crossed
+                    if direction == "BUY":
+                        # BUY: SL below entry, TP above entry
+                        # If price is at/above TP level → TP hit
+                        # If price is at/below SL level → SL hit
+                        if live_price >= profit_level:
+                            close_reason = "TP"
+                            exit_price = profit_level
+                        elif live_price <= stop_level:
+                            close_reason = "SL"
+                            exit_price = stop_level
+                        else:
+                            # Price between SL and TP — compare distance
+                            dist_to_sl = abs(live_price - stop_level)
+                            dist_to_tp = abs(live_price - profit_level)
+                            if dist_to_tp < dist_to_sl:
                                 close_reason = "TP"
                                 exit_price = profit_level
-                    except Exception:
-                        pass  # SL assumption is safe default for BUY with loss
+                            else:
+                                close_reason = "SL"
+                                exit_price = stop_level
+                    else:
+                        # SELL: SL above entry, TP below entry
+                        # If price is at/below TP level → TP hit
+                        # If price is at/above SL level → SL hit
+                        if live_price <= profit_level:
+                            close_reason = "TP"
+                            exit_price = profit_level
+                        elif live_price >= stop_level:
+                            close_reason = "SL"
+                            exit_price = stop_level
+                        else:
+                            dist_to_sl = abs(live_price - stop_level)
+                            dist_to_tp = abs(live_price - profit_level)
+                            if dist_to_tp < dist_to_sl:
+                                close_reason = "TP"
+                                exit_price = profit_level
+                            else:
+                                close_reason = "SL"
+                                exit_price = stop_level
                 else:
-                    # SELL: SL is above entry, TP is below entry
-                    close_reason = "SL"
-                    exit_price = stop_level
-                    try:
-                        latest = self.data_access.get_latest_price(epic, timeframe="1h")
-                        if latest:
-                            last_close = latest.get("close", 0)
-                            if last_close and last_close <= profit_level:
-                                close_reason = "TP"
-                                exit_price = profit_level
-                    except Exception:
-                        pass
+                    # Fallback: no live price — cannot reliably determine SL vs TP.
+                    # Default to EXTERNAL (unknown) rather than guessing wrong.
+                    # This should rarely happen since we just queried the broker.
+                    close_reason = "EXTERNAL"
+                    exit_price = entry_price
+                    logger.warning(
+                        f"[{epic}] Cannot determine SL/TP for {deal_id} — "
+                        f"no live price available, marking as EXTERNAL"
+                    )
             elif stop_level and stop_level > 0:
                 close_reason = "SL"
                 exit_price = stop_level
@@ -419,7 +467,7 @@ class PaperTradingLoop:
 
             logger.warning(
                 f"[{epic}] Position {deal_id} closed by broker "
-                f"(reason={close_reason}, exit={exit_price:.2f}, P&L=${pnl:.2f})"
+                f"(reason={close_reason}, exit={exit_price:.6f}, P&L=${pnl:.2f})"
             )
 
             # Record in trade history for Kelly sizing
@@ -430,6 +478,7 @@ class PaperTradingLoop:
                 deal_id=deal_id, epic=epic, direction=direction,
                 size=size, entry_price=entry_price, exit_price=exit_price,
                 pnl=pnl, close_reason=close_reason,
+                opened_at=prev_pos.get("opened_at"),
             )
 
             # Clean up trailing stop if tracked
@@ -461,6 +510,24 @@ class PaperTradingLoop:
                 )
             except Exception as e:
                 logger.debug(f"TradeLogger log_execution failed for broker-closed {deal_id}: {e}")
+
+            # Fire trade-closed alert (Telegram, Email, etc.)
+            if self._log_source in ("demo_trading", "live_trading"):
+                try:
+                    from src.monitoring.alerting.alert_manager import get_alert_manager
+                    from src.utils.config import get_settings
+                    if getattr(get_settings(), "alerts_enabled", False):
+                        am = get_alert_manager()
+                        await am.alert_trade_closed(
+                            epic=epic,
+                            direction=direction,
+                            deal_id=deal_id,
+                            exit_price=exit_price,
+                            pnl=round(pnl, 2),
+                            reason=close_reason,
+                        )
+                except Exception as alert_err:
+                    logger.warning(f"Trade close alert failed: {alert_err}")
 
         # Update previous positions for next iteration
         self._previous_positions = {p.get("deal_id"): p for p in current_positions if p.get("deal_id")}
@@ -638,6 +705,10 @@ class PaperTradingLoop:
                 )
                 self._market_info_cache[epic] = info
                 self._market_cache_ts[epic] = now
+                # Sync dedicated min deal size cache
+                min_val = info.get("dealingRules", {}).get("minDealSize", {}).get("value")
+                if min_val is not None:
+                    self._min_deal_size_cache[epic] = float(min_val)
             except Exception as e:
                 logger.debug(f"[{epic}] Market info fetch failed: {e}")
                 return True, None  # Graceful: if fetch fails, try anyway
@@ -646,6 +717,33 @@ class PaperTradingLoop:
         if status != "TRADEABLE":
             return False, f"Mercato {epic} chiuso (status: {status})"
         return True, None
+
+    def _get_min_deal_size(self, epic: str) -> float | None:
+        """
+        Get minDealSize with fallback chain:
+        1. _market_info_cache (fresh data from _is_market_open each iteration)
+        2. _min_deal_size_cache (seeded at startup from DB/prefetch)
+        3. None (validation skipped, broker will reject if too small)
+        """
+        # Priority 1: Fresh data from _is_market_open() cache
+        info = self._market_info_cache.get(epic)
+        if info:
+            dealing_rules = info.get("dealingRules", {})
+            min_deal = dealing_rules.get("minDealSize", {})
+            value = min_deal.get("value")
+            if value is not None:
+                return float(value)
+
+        # Priority 2: Pre-fetched / DB-loaded cache
+        if epic in self._min_deal_size_cache:
+            return self._min_deal_size_cache[epic]
+
+        return None
+
+    def seed_min_deal_sizes(self, sizes: dict[str, float]) -> None:
+        """Seed the min deal size cache with pre-fetched or DB-loaded data."""
+        self._min_deal_size_cache.update(sizes)
+        logger.info(f"Seeded min deal size cache with {len(sizes)} entries")
 
     async def _run_iteration(self, *, force: bool = False) -> None:
         """
@@ -905,6 +1003,37 @@ class PaperTradingLoop:
             f"SL={risk_result.stop_loss}, TP={risk_result.take_profit} "
             f"sizing={risk_result.sizing_method}"
         )
+
+        # Step 4b: Validate against broker minDealSize (DEMO/LIVE only)
+        min_deal_size = self._get_min_deal_size(epic)
+        if min_deal_size is not None and risk_result.position_size < min_deal_size:
+            reason = (
+                f"Size calcolata ({risk_result.position_size:.4f}) inferiore "
+                f"al minimo del broker ({min_deal_size}) per {epic}"
+            )
+            signal_info["status"] = "rejected"
+            signal_info["rejection_reason"] = reason
+            signal_info["error_detail"] = {
+                "error_type": "min_size",
+                "summary": f"Size troppo piccola per {epic} (min: {min_deal_size})",
+                "details": f"Size calcolata: {risk_result.position_size:.4f}, minimo broker: {min_deal_size}",
+                "size": risk_result.position_size,
+                "min_deal_size": min_deal_size,
+                "direction": signal.direction.value,
+            }
+            logger.warning(f"[{epic}] MIN SIZE REJECTED: {reason}")
+            try:
+                tl = get_trade_logger()
+                await tl.log_signal(
+                    epic=epic, direction=_signal_type, confidence=signal.confidence,
+                    strategy=signal.strategy_name or "unknown",
+                    execution_status=ExecutionStatus.REJECTED,
+                    rejection_reason=reason,
+                    source=self._log_source,
+                )
+            except Exception:
+                pass
+            return
 
         # HIGH-8 FIX: Refresh equity immediately before execution
         # to catch any changes since risk check (manual trades, other systems, etc.)
@@ -1191,6 +1320,7 @@ class PaperTradingLoop:
                                 exit_price=current_price,
                                 pnl=pnl,
                                 close_reason=close_reason,
+                                opened_at=position.get("opened_at"),
                             )
 
                             # Broadcast trade_closed event to frontend via WebSocket
@@ -1305,6 +1435,7 @@ class PaperTradingLoop:
             "kelly_trade_history_size": len(self._trade_history),
             "kelly_stats": self._get_kelly_stats(),
             "regime_distribution": dict(self._regime_counts),
+            "min_deal_sizes_cached": len(self._min_deal_size_cache),
         }
 
     def _get_kelly_stats(self) -> dict | None:

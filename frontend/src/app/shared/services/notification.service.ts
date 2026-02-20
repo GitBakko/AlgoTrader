@@ -20,6 +20,17 @@ export class NotificationService {
   readonly soundEnabled = signal(true);
   private initialized = false;
   private audioCtx: AudioContext | null = null;
+  private cbAlerted = new Set<string>();
+
+  /** Circuit breaker type → Italian label */
+  private readonly cbLabels: Record<string, string> = {
+    'daily_loss':         'Perdita Giornaliera',
+    'consecutive_losses': 'Perdite Consecutive',
+    'max_positions':      'Max Posizioni',
+    'slippage_anomaly':   'Anomalia Slippage',
+    'heartbeat_timeout':  'Timeout Heartbeat',
+    'volatility_spike':   'Spike Volatilita',
+  };
 
   /**
    * Initialize watchers for trade events and circuit breakers.
@@ -64,14 +75,22 @@ export class NotificationService {
       const tripped = status.circuit_breakers_tripped;
       if (!tripped) return;
 
-      const reasons = Array.isArray(tripped) ? tripped : Object.keys(tripped);
-      if (reasons.length > 0) {
-        this.toast.warning(`Circuit Breaker: ${reasons.join(', ')}`, 8000);
+      const keys = Array.isArray(tripped) ? tripped : Object.keys(tripped);
+      // Only alert for newly tripped breakers (avoid repeated toasts on every poll)
+      const newKeys = keys.filter(k => !this.cbAlerted.has(k));
+      if (newKeys.length > 0) {
+        newKeys.forEach(k => this.cbAlerted.add(k));
+        const labels = newKeys.map(k => this.cbLabels[k] ?? k);
+        this.toast.warning(`Circuit Breaker: ${labels.join(', ')}`, 8000);
         this.send(
           '\u{1F6A8} Circuit Breaker Attivato',
-          `Motivi: ${reasons.join(', ')}`,
+          `Motivi: ${labels.join(', ')}`,
           'alert',
         );
+      }
+      // Clear alerts for breakers that are no longer tripped
+      if (keys.length === 0) {
+        this.cbAlerted.clear();
       }
     }, { injector: this.injector });
   }

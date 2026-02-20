@@ -120,6 +120,25 @@
     }
   }
 
+  // Signal row status highlights (readable in both themes)
+  .tj-row-rejected {
+    background: rgba(255, 61, 87, 0.08) !important;
+    border-left: 3px solid var(--cui-danger, #FF3D57);
+
+    td {
+      color: var(--cui-body-color, #c9d1d9) !important;
+    }
+  }
+
+  .tj-row-closed {
+    background: rgba(139, 148, 158, 0.08) !important;
+    border-left: 3px solid var(--mantis-neutral, #8B949E);
+
+    td {
+      color: var(--cui-body-color, #c9d1d9) !important;
+    }
+  }
+
   // Mobile table min-width
   @media (max-width: 991.98px) {
     table[cTable] {

@@ -139,14 +139,18 @@ def parse_broker_error(error_message: str, epic: str | None = None) -> ParsedBro
         )
 
     # --- Minimum position size ---
-    if "minimum" in msg_lower and "size" in msg_lower:
+    if (
+        ("minimum" in msg_lower and "size" in msg_lower)
+        or "minvalue" in msg_lower
+        or "error.invalid.size" in msg_lower
+    ):
         # Try to extract the minimum size value
         size_match = re.search(r"minimum.*?size.*?(\d+[\.\d]*)", msg_lower)
         size_info = f" (min: {size_match.group(1)})" if size_match else ""
         return ParsedBrokerError(
             error_type="min_size",
-            summary=f"Dimensione posizione troppo piccola per {label}{size_info}",
-            details=None,
+            summary=f"Size troppo piccola per {label}{size_info}",
+            details="La dimensione calcolata è inferiore al minimo consentito dal broker.",
             market_hours=None,
             raw=msg,
         )
@@ -172,16 +176,28 @@ def parse_broker_error(error_message: str, epic: str | None = None) -> ParsedBro
         )
 
     # --- Generic order rejected ---
-    if "rejected" in msg_lower:
-        # Extract reason after "Rejected."
+    if "reject" in msg_lower:
+        # Extract reason after "Rejected." or use full message
         reason_match = re.search(r"rejected\.?\s*(.*)", msg, re.IGNORECASE)
-        reason = reason_match.group(1).strip() if reason_match else ""
+        reason = reason_match.group(1).strip() if reason_match else msg
         summary = f"Ordine {label} rifiutato"
-        details = reason[:200] if reason else None
+        details = reason[:200] if reason and reason.lower() != "unknown rejection" else None
         return ParsedBrokerError(
             error_type="rejected",
             summary=summary,
             details=details,
+            market_hours=None,
+            raw=msg,
+        )
+
+    # --- Capital.com errorCode format: "error.xxx.yyy.zzz" ---
+    error_code_match = re.search(r"error\.(\w+(?:\.\w+)*)", msg_lower)
+    if error_code_match:
+        code = error_code_match.group(0)
+        return ParsedBrokerError(
+            error_type="broker_error_code",
+            summary=f"Errore broker per {label}: {code}",
+            details=None,
             market_hours=None,
             raw=msg,
         )

@@ -345,6 +345,9 @@ export interface TradingPerformance {
   source: string;
 }
 
+// Notifications
+export * from './notification.model';
+
 // News and Sentiment
 export * from './news.model';
 

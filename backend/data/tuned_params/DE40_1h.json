@@ -1,10 +1,10 @@
 {
-  "max_depth": 8,
-  "learning_rate": 0.040383700461943804,
-  "n_estimators": 750,
-  "subsample": 0.765836702637975,
-  "colsample_bytree": 0.5385577514297872,
-  "min_child_weight": 7,
-  "reg_alpha": 0.03641780178727832,
-  "reg_lambda": 0.11235867031208385
+  "max_depth": 7,
+  "learning_rate": 0.03031652359602407,
+  "n_estimators": 350,
+  "subsample": 0.6398085428900904,
+  "colsample_bytree": 0.5460101277993696,
+  "min_child_weight": 18,
+  "reg_alpha": 0.10820536301977875,
+  "reg_lambda": 0.34074359262948967
 }

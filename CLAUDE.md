@@ -35,25 +35,25 @@ AlgoTrader/
 │   │   ├── features/          # Feature engineering (220 features: technical, candlestick, fibonacci, keltner, vwap, market structure)
 │   │   ├── execution/         # Order execution engine + state recovery + partial close (DEMO: close-then-reopen)
 │   │   ├── models/            # ML models (XGBoost, LSTM, calibration, tuner, versioning)
-│   │   ├── monitoring/        # Health checks, trade logger, log analyzer, alerting (Email/Slack/Telegram/Webhook), metrics
+│   │   ├── monitoring/        # Health checks, trade logger, log analyzer, alerting (Email/Slack/Telegram/Webhook/InApp), metrics
 │   │   ├── risk/              # Risk management (circuit breakers, Kelly, trailing stops, equity curve filter)
 │   │   ├── security/          # Encrypted secrets (Fernet), security models
 │   │   ├── strategy/          # Strategies (ML, squeeze, VWAP, pairs, strategy router)
 │   │   ├── trading/           # Paper/demo trading loop + emergency stop
 │   │   └── utils/             # Config, avatar handler, event bus, sanitization
-│   ├── tests/                 # 1136+ pytest tests (69% coverage, 80%+ on critical modules)
+│   ├── tests/                 # 1191+ pytest tests (69% coverage, 80%+ on critical modules)
 │   ├── scripts/               # init_permissions.py, promote_user_to_god.py, train/download scripts
 │   ├── alembic/               # Database migrations
 │   └── data/                  # Local storage (historical, models, avatars, logs, backups)
 ├── frontend/                  # Angular 21 + CoreUI (MANTIS AI theme)
 │   ├── src/app/
-│   │   ├── core/              # Services (auth, trading, websocket, market-status, news, monitoring)
+│   │   ├── core/              # Services (auth, trading, websocket, market-status, news, monitoring, notification-center)
 │   │   │   ├── guards/        # Auth guard, permission guard (RBAC)
 │   │   │   ├── interceptors/  # Auth interceptor (JWT), error interceptor
 │   │   │   └── services/      # All injectable services
 │   │   ├── shared/            # Reusable components (avatar, avatar-upload, epic-logo, tv-chart, news-widget)
 │   │   ├── views/             # Page components (dashboard, markets, positions, signals, backtest, etc.)
-│   │   └── layout/            # Default layout with sidebar, header, user dropdown
+│   │   └── layout/            # Default layout with sidebar, header, user dropdown, notification bell
 │   └── src/scss/              # MANTIS AI theme (_custom.scss, _palette.scss)
 ├── infra/                     # Prometheus config, Grafana dashboards
 ├── docs/                      # Project documentation
@@ -159,7 +159,8 @@ AlgoTrader/
 5. **Graceful degradation** - App works without PostgreSQL, Redis, or DuckDB
 6. **State recovery** - PAPER→PostgreSQL, DEMO/LIVE→Broker API+DB fallback
 7. **Alert system** - TradeLogger fires alerts (Email/Slack/Telegram/Webhook) in DEMO/LIVE mode; off by default (`ALERTS_ENABLED=false`)
-8. **Emergency kill switch** - `POST /api/trading/emergency-stop` stops loop + closes all positions + fires CRITICAL alert
+8. **Notification center** - InAppChannel always active (regardless of `ALERTS_ENABLED`), persists to `notifications` DB table, broadcasts via WebSocket (`/ws/notifications`), REST API at `/api/notifications`
+9. **Emergency kill switch** - `POST /api/trading/emergency-stop` stops loop + closes all positions + fires CRITICAL alert
 
 ---
 

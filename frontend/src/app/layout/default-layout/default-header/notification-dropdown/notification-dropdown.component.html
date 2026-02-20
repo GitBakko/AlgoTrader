@@ -1,0 +1,47 @@
+<c-dropdown alignment="end" variant="nav-item">
+  <button [caret]="false" cDropdownToggle class="notification-bell" aria-label="Notifiche">
+    <svg cIcon name="cilBell" size="lg"></svg>
+    @if (unreadCount() > 0) {
+      <c-badge color="danger" shape="rounded-pill" class="notification-badge">
+        {{ unreadCount() > 99 ? '99+' : unreadCount() }}
+      </c-badge>
+    }
+  </button>
+  <div cDropdownMenu class="notification-menu pt-0">
+    <div class="notification-header d-flex align-items-center justify-content-between px-3 py-2">
+      <span class="fw-semibold small">Notifiche</span>
+      @if (unreadCount() > 0) {
+        <button class="btn btn-link btn-sm p-0 text-decoration-none small"
+          (click)="markAllRead()">
+          Segna tutte lette
+        </button>
+      }
+    </div>
+    <div class="notification-list">
+      @for (n of notifications(); track n.id) {
+        <button cDropdownItem
+          class="notification-item"
+          [class.notification-item--unread]="!n.is_read"
+          (click)="markAsRead(n.id)">
+          <span class="notification-emoji">{{ n.emoji }}</span>
+          <div class="notification-content">
+            <div class="notification-title">{{ n.title }}</div>
+            <div class="notification-time text-body-secondary">{{ timeAgo(n.created_at) }}</div>
+          </div>
+          @if (!n.is_read) {
+            <span class="notification-dot"></span>
+          }
+        </button>
+      } @empty {
+        <div class="text-center py-4 text-body-secondary small">
+          Nessuna notifica
+        </div>
+      }
+    </div>
+    <div class="notification-footer text-center border-top py-2">
+      <a routerLink="/notifications" class="small text-decoration-none">
+        Vedi tutte
+      </a>
+    </div>
+  </div>
+</c-dropdown>

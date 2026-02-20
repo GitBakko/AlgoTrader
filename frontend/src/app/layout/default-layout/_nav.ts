@@ -65,6 +65,11 @@ export const navItems: INavData[] = [
     class: 'mt-auto'
   },
   {
+    name: 'Notifiche',
+    url: '/notifications',
+    iconComponent: { name: 'cil-bell' }
+  },
+  {
     name: 'Impostazioni',
     url: '/settings',
     iconComponent: { name: 'cil-applications-settings' }

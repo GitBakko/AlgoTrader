@@ -81,6 +81,10 @@ export const routes: Routes = [
         data: { resource: 'settings', action: 'write' }
       },
       {
+        path: 'notifications',
+        loadChildren: () => import('./views/notifications/routes').then(m => m.routes)
+      },
+      {
         path: 'system-logs',
         loadChildren: () => import('./views/system-logs/routes').then(m => m.routes)
       }

@@ -7,7 +7,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import ARRAY, BigInteger, Column, ForeignKey, MetaData, String, text
+from sqlalchemy import ARRAY, BigInteger, Column, ForeignKey, MetaData, Numeric, String, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
@@ -445,5 +445,65 @@ class RiskStateSnapshot(SQLModel, table=True):
         default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
         nullable=False,
         index=True,
+        sa_column_kwargs={"server_default": text("NOW()")},
+    )
+
+
+class MarketSpec(SQLModel, table=True):
+    """
+    Cached market specifications from Capital.com broker.
+    Stores dealing rules (minDealSize, etc.) per asset per environment.
+    Survives restarts so the trading loop can validate sizes immediately.
+    """
+
+    __tablename__ = "market_specs"
+    __table_args__ = (
+        UniqueConstraint("epic", "environment", name="uq_market_spec_epic_env"),
+    )
+
+    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    epic: str = Field(max_length=50, nullable=False, index=True)
+    environment: str = Field(max_length=10, nullable=False)  # DEMO | LIVE
+    min_deal_size: Decimal = Field(sa_column=Column(Numeric(15, 6), nullable=False))
+    min_deal_size_unit: str = Field(default="UNITS", max_length=20, nullable=False)
+    max_deal_size: Optional[Decimal] = Field(
+        default=None, sa_column=Column(Numeric(15, 6), nullable=True)
+    )
+    market_name: Optional[str] = Field(default=None, max_length=200, nullable=True)
+    fetched_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        nullable=False,
+    )
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        nullable=False,
+        sa_column_kwargs={"server_default": text("NOW()")},
+    )
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        nullable=False,
+        sa_column_kwargs={"server_default": text("NOW()")},
+    )
+
+
+class Notification(SQLModel, table=True):
+    """
+    In-app notifications persisted from AlertManager.
+    Each alert generates one notification row for the UI notification center.
+    """
+
+    __tablename__ = "notifications"
+
+    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    alert_type: str = Field(max_length=50, nullable=False, index=True)
+    severity: str = Field(max_length=20, nullable=False, index=True)
+    title: str = Field(max_length=300, nullable=False)
+    message: str = Field(nullable=False)
+    epic: Optional[str] = Field(default=None, max_length=50, index=True)
+    details: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
+    is_read: bool = Field(default=False, nullable=False, index=True)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )

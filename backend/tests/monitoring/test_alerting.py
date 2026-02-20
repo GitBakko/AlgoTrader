@@ -117,7 +117,8 @@ class TestAlertManagerTelegramInit:
             am = AlertManager()
 
         assert any(isinstance(ch, TelegramChannel) for ch in am.channels)
-        assert len(am.channels) == 1
+        # InAppChannel is always present + TelegramChannel
+        assert len(am.channels) == 2
 
     def test_skips_telegram_when_disabled(self):
         """AlertManager does NOT add TelegramChannel when disabled."""

@@ -7,6 +7,7 @@ import {
   TableDirective, AlertComponent, TooltipDirective,
   PlaceholderDirective, PlaceholderAnimationDirective,
 } from '@coreui/angular';
+import { IconDirective } from '@coreui/icons-angular';
 import { TvChartComponent, LineDataPoint } from '../../shared/components/tv-chart/tv-chart.component';
 import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
 import { TradingService } from '../../core/services/trading.service';
@@ -28,7 +29,7 @@ import { SkeletonTableComponent } from '../../shared/components/skeleton-table/s
     ColComponent, RowComponent, BadgeComponent,
     TableDirective, AlertComponent, TooltipDirective,
     PlaceholderDirective, PlaceholderAnimationDirective,
-    TvChartComponent,
+    TvChartComponent, IconDirective,
     PriceFormatPipe, EpicLogoComponent, NewsWidgetComponent,
     SkeletonCardComponent, SkeletonTableComponent,
   ]
@@ -43,6 +44,28 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly overview = this.trading.overview;
   readonly riskStatus = this.trading.riskStatus;
   readonly paperStatus = this.trading.paperStatus;
+
+  /** Circuit breaker type → Italian label + icon */
+  readonly cbTypeMap: Record<string, { label: string; icon: string }> = {
+    'daily_loss':         { label: 'Perdita Giornaliera',  icon: 'cilArrowBottom' },
+    'consecutive_losses': { label: 'Perdite Consecutive',  icon: 'cilChartLine' },
+    'max_positions':      { label: 'Max Posizioni',        icon: 'cilLayers' },
+    'slippage_anomaly':   { label: 'Anomalia Slippage',    icon: 'cilBolt' },
+    'heartbeat_timeout':  { label: 'Timeout Heartbeat',    icon: 'cilReload' },
+    'volatility_spike':   { label: 'Spike Volatilita',     icon: 'cilChartPie' },
+  };
+
+  /** Parsed circuit breakers with Italian labels and icons */
+  readonly circuitBreakersTripped = computed(() => {
+    const raw = this.paperStatus()?.circuit_breakers_tripped;
+    if (!raw || Array.isArray(raw)) return [];
+    return Object.entries(raw).map(([key, reason]) => ({
+      key,
+      label: this.cbTypeMap[key]?.label ?? key,
+      icon: this.cbTypeMap[key]?.icon ?? 'cilShieldAlt',
+      reason: String(reason),
+    }));
+  });
 
   /** True until the first overview data arrives. */
   readonly loading = computed(() => this.overview() === null);

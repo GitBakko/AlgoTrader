@@ -92,10 +92,10 @@ import { LogoService } from '../../../core/services/logo.service';
     // Mantis AI theme
     :host-context(.mantis-theme) {
       .logo-fallback {
-        background-color: #39ff14;
+        background-color: var(--mantis-neon, #39ff14);
 
         .fallback-text {
-          color: #0d1117;
+          color: var(--mantis-text-on-neon, #0d1117);
         }
       }
     }

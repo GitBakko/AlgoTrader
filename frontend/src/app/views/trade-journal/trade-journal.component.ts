@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
   ColComponent, RowComponent, BadgeComponent,
-  ButtonDirective, FormControlDirective,
+  ButtonDirective, FormControlDirective, TooltipDirective,
   FormSelectDirective, TableDirective,
 } from '@coreui/angular';
 import { IconDirective } from '@coreui/icons-angular';
@@ -28,7 +28,7 @@ type SortDir = 'asc' | 'desc';
     CardComponent, CardBodyComponent, CardHeaderComponent,
     ColComponent, RowComponent, BadgeComponent,
     ButtonDirective, FormControlDirective,
-    FormSelectDirective, TableDirective, IconDirective,
+    FormSelectDirective, TableDirective, IconDirective, TooltipDirective,
     PriceFormatPipe,
     EpicLogoComponent,
     NewsWidgetComponent,
@@ -167,8 +167,8 @@ type SortDir = 'asc' | 'desc';
               </thead>
               <tbody>
                 @for (sig of paginatedSignals(); track sig.timestamp + sig.epic) {
-                  <tr [class.table-danger]="sig.status === 'rejected' || sig.status === 'exec_failed'"
-                      [class.table-secondary]="sig.status === 'market_closed'">
+                  <tr [class.tj-row-rejected]="sig.status === 'rejected' || sig.status === 'exec_failed'"
+                      [class.tj-row-closed]="sig.status === 'market_closed'">
                     <td class="small text-body-secondary text-nowrap">{{ formatDateTime(sig.timestamp) }}</td>
                     <td class="fw-semibold">
                       <div class="d-flex align-items-center gap-2 tj-epic-link" (click)="onEpicClick(sig.epic)">
@@ -195,7 +195,12 @@ type SortDir = 'asc' | 'desc';
                     </td>
                     <td class="small tj-detail-cell d-mobile-none">
                       @if (sig.error_detail) {
-                        <span class="text-danger">{{ sig.error_detail.summary }}</span>
+                        <span class="text-danger" [cTooltip]="errorTooltip(sig.error_detail)">
+                          {{ sig.error_detail.summary }}
+                          @if (sig.error_detail.details) {
+                            <br><span class="text-body-secondary" style="font-size: 0.7rem">{{ sig.error_detail.details }}</span>
+                          }
+                        </span>
                       } @else if (sig.rejection_reason) {
                         <span class="text-danger">{{ sig.rejection_reason }}</span>
                       } @else if (sig.status === 'executed') {
@@ -446,6 +451,16 @@ export class TradeJournalComponent implements OnInit {
       case 'vwap_reversion': return 'VWAP';
       default: return name;
     }
+  }
+
+  errorTooltip(detail: any): string {
+    if (!detail) return '';
+    const parts: string[] = [];
+    if (detail.error_type) parts.push(`Tipo: ${detail.error_type}`);
+    if (detail.size) parts.push(`Size: ${detail.size}`);
+    if (detail.direction) parts.push(`Dir: ${detail.direction}`);
+    if (detail.raw && detail.raw !== detail.summary) parts.push(`Raw: ${detail.raw}`);
+    return parts.join(' | ') || detail.summary || '';
   }
 
   formatDateTime(iso: string): string {

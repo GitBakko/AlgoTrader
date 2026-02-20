@@ -12,6 +12,7 @@ from src.api.dependencies import (
     get_db_session,
     get_execution_engine,
     get_feature_builder,
+    get_journal_note_repo,
     get_model_versioning,
     get_position_repo,
     get_prediction_service,
@@ -75,6 +76,7 @@ def client(engine, risk_mgr, strategy_mgr):
     app.dependency_overrides[get_signal_repo] = lambda: None
     app.dependency_overrides[get_trade_repo] = lambda: None
     app.dependency_overrides[get_strategy_repo] = lambda: None
+    app.dependency_overrides[get_journal_note_repo] = lambda: None
 
     # Populate app.state for routers that use request.app.state directly
     app.state.execution_engine = engine

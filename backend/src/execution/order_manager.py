@@ -199,16 +199,24 @@ class OrderManager:
             # Check if broker accepted the deal
             if confirmation.deal_status == "REJECTED":
                 reason = confirmation.reason or "Unknown rejection"
+                # Include confirmation status for extra context
+                extra = f" (status={confirmation.status})" if confirmation.status else ""
                 logger.warning(
                     f"Order rejected by broker: {order.epic} {order.direction} "
-                    f"reason={reason}"
+                    f"size={order.size:.4f} reason={reason}{extra}"
                 )
                 parsed = parse_broker_error(reason, epic=order.epic)
+                detail = parsed.to_dict()
+                # Enrich with order context so the UI can show useful info
+                detail["size"] = order.size
+                detail["direction"] = order.direction
+                detail["stop_loss"] = order.stop_loss
+                detail["take_profit"] = order.take_profit
                 return ExecutionResult(
                     success=False,
                     deal_id=confirmation.deal_id,
                     error=parsed.summary,
-                    error_detail=parsed.to_dict(),
+                    error_detail=detail,
                 )
 
             slippage = abs(confirmation.level - order.entry_price)
