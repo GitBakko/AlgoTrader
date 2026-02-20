@@ -304,6 +304,37 @@
   }
 }
 
+<!-- Notification Widget -->
+@if (recentAlerts().length > 0) {
+  <c-row class="mb-4">
+    <c-col xs="12">
+      <c-card class="border-top border-top-3 border-top-warning">
+        <c-card-header class="d-flex align-items-center justify-content-between py-2">
+          <span class="fw-semibold small text-body-secondary">
+            <svg cIcon name="cilBell" size="sm" class="me-1"></svg>
+            Notifiche Non Lette
+          </span>
+          <a routerLink="/notifications" class="small text-decoration-none">Vedi tutte</a>
+        </c-card-header>
+        <c-card-body class="p-0">
+          @for (n of recentAlerts(); track n.id) {
+            <div class="d-flex align-items-start gap-2 px-3 py-2 border-bottom border-opacity-10">
+              <span class="fs-5">{{ n.emoji }}</span>
+              <div class="flex-grow-1 min-w-0">
+                <div class="small fw-medium text-truncate">{{ n.title }}</div>
+                <div class="small text-body-secondary text-truncate">{{ n.message }}</div>
+              </div>
+              <c-badge [color]="n.severity === 'CRITICAL' ? 'danger' : n.severity === 'WARNING' ? 'warning' : 'info'" class="text-uppercase" style="font-size: 0.6rem">
+                {{ n.severity }}
+              </c-badge>
+            </div>
+          }
+        </c-card-body>
+      </c-card>
+    </c-col>
+  </c-row>
+}
+
 <!-- ═══════ SECTION: Markets ═══════ -->
 <div class="section-divider">
   <span class="section-divider__label">Markets</span>

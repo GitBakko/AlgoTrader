@@ -54,7 +54,7 @@ def _closed_position_from_db(p) -> dict:
     """Convert a DB Position (closed) to ClosedPositionResponse dict."""
     duration = None
     if p.opened_at and p.closed_at:
-        duration = int((p.closed_at - p.opened_at).total_seconds() / 60)
+        duration = max(0, int((p.closed_at - p.opened_at).total_seconds() / 60))
     return ClosedPositionResponse(
         deal_id=p.deal_id,
         epic=p.epic,

@@ -10,6 +10,7 @@ import { TradingService } from '../../core/services/trading.service';
 import { SystemSettings, RiskStatus } from '../../core/models';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { NotificationService } from '../../shared/services/notification.service';
+import { NotificationCenterService } from '../../core/services/notification-center.service';
 import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.component';
 
 const ASSET_INFO: { epic: string; name: string; type: string; exchange: string }[] = [
@@ -144,12 +145,29 @@ const TYPE_BADGE_COLORS: Record<string, string> = {
                      (change)="toggleBrowserNotifications()"/>
               <label cFormCheckLabel for="notifBrowser" class="small">Notifiche browser (trade, circuit breaker)</label>
             </c-form-check>
-            <c-form-check>
+            <c-form-check class="mb-3">
               <input cFormCheckInput type="checkbox" id="notifSound"
                      [checked]="notifications.soundEnabled()"
                      (change)="notifications.toggleSound()"/>
               <label cFormCheckLabel for="notifSound" class="small">Suoni alert (chime su trade)</label>
             </c-form-check>
+
+            <!-- Alert type filters -->
+            <div class="small text-body-secondary mb-2">Filtra Notifiche In-App</div>
+            <div class="d-flex flex-wrap gap-1">
+              @for (t of alertTypes; track t.key) {
+                <button class="btn btn-sm px-2 py-1"
+                  [class.btn-outline-secondary]="isAlertMuted(t.key)"
+                  [class.btn-primary]="!isAlertMuted(t.key)"
+                  [style.opacity]="isAlertMuted(t.key) ? '0.5' : '1'"
+                  (click)="toggleAlertType(t.key)">
+                  {{ t.emoji }} {{ t.label }}
+                </button>
+              }
+            </div>
+            <div class="small text-body-secondary mt-2">
+              Click per silenziare/attivare. Le notifiche silenziate non appaiono nella campanella.
+            </div>
           </c-card-body>
         </c-card>
       </c-col>
@@ -278,7 +296,23 @@ export class SettingsComponent implements OnInit, OnDestroy {
   private readonly trading = inject(TradingService);
   private readonly ws = inject(WebSocketService);
   readonly notifications = inject(NotificationService);
+  private readonly notifCenter = inject(NotificationCenterService);
   private trainTimers: ReturnType<typeof setTimeout>[] = [];
+
+  /** Alert types that can be toggled for in-app filtering */
+  readonly alertTypes = [
+    { key: 'TRADE_OPENED', label: 'Trade Aperte', emoji: '\u{1F4C8}' },
+    { key: 'TRADE_CLOSED', label: 'Trade Chiuse', emoji: '\u{1F4C9}' },
+    { key: 'SIGNAL_GENERATED', label: 'Segnali', emoji: '\u{1F3AF}' },
+    { key: 'CIRCUIT_BREAKER', label: 'Circuit Breaker', emoji: '\u{1F534}' },
+    { key: 'DRAWDOWN_EXCEEDED', label: 'Drawdown', emoji: '\u{26A0}\u{FE0F}' },
+    { key: 'BROKER_ERROR', label: 'Errori Broker', emoji: '\u{274C}' },
+    { key: 'SYSTEM_ERROR', label: 'Errori Sistema', emoji: '\u{1F6D1}' },
+  ];
+
+  readonly mutedAlertTypes = signal<Set<string>>(
+    new Set(JSON.parse(localStorage.getItem('mantis-muted-alerts') || '[]'))
+  );
 
   readonly settings = signal<SystemSettings | null>(null);
   readonly riskStatus = signal<RiskStatus | null>(null);
@@ -312,6 +346,19 @@ export class SettingsComponent implements OnInit, OnDestroy {
   toggleBrowserNotifications(): void {
     if (this.notifications.enabled()) return;
     this.notifications.requestPermission();
+  }
+
+  toggleAlertType(key: string): void {
+    const current = new Set(this.mutedAlertTypes());
+    if (current.has(key)) current.delete(key);
+    else current.add(key);
+    this.mutedAlertTypes.set(current);
+    localStorage.setItem('mantis-muted-alerts', JSON.stringify([...current]));
+    this.notifCenter.refreshMutedFilter();
+  }
+
+  isAlertMuted(key: string): boolean {
+    return this.mutedAlertTypes().has(key);
   }
 
   getTypeBadgeColor(type: string): string {

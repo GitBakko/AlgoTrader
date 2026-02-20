@@ -4,6 +4,7 @@ Position repository with trading-specific queries.
 
 from datetime import datetime, timezone
 
+import numpy as np
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -294,6 +295,49 @@ class PositionRepository(BaseRepository[Position]):
                     "value": round(cumulative, 2),
                 })
 
+        # Risk-adjusted ratios from equity curve
+        if equity_points and len(equity_points) > 1:
+            values = np.array([p["value"] for p in equity_points], dtype=np.float64)
+            # Use trade-to-trade returns (not percentage returns of cumulative equity)
+            returns = np.diff(values)
+
+            avg_return = float(np.mean(returns))
+            std_return = float(np.std(returns, ddof=1)) if len(returns) > 1 else 0.0
+            downside_returns = returns[returns < 0]
+            downside_std = (
+                float(np.std(downside_returns, ddof=1))
+                if len(downside_returns) > 1 else 0.0
+            )
+
+            # Annualize assuming ~252 trading days
+            sharpe_ratio = (
+                (avg_return / std_return * np.sqrt(252)) if std_return > 0 else 0.0
+            )
+            sortino_ratio = (
+                (avg_return / downside_std * np.sqrt(252)) if downside_std > 0 else 0.0
+            )
+
+            # Max drawdown from equity curve
+            peak = np.maximum.accumulate(values)
+            drawdowns = (peak - values) / np.maximum(np.abs(peak), 1e-10)
+            max_drawdown = float(np.max(drawdowns)) if len(drawdowns) > 0 else 0.0
+
+            # Calmar ratio (annualized return / max drawdown)
+            total_days = max(len(equity_points), 1)
+            if values[0] != 0 and total_days > 0:
+                total_return = values[-1] / max(abs(values[0]), 1e-10)
+                annualized_return = (
+                    (abs(total_return) ** (252 / total_days) - 1)
+                    * (1 if total_return >= 0 else -1)
+                )
+            else:
+                annualized_return = 0.0
+            calmar_ratio = (
+                annualized_return / max_drawdown if max_drawdown > 0 else 0.0
+            )
+        else:
+            sharpe_ratio = sortino_ratio = max_drawdown = calmar_ratio = 0.0
+
         return {
             "trade_count": len(pnls),
             "win_count": len(wins),
@@ -309,4 +353,8 @@ class PositionRepository(BaseRepository[Position]):
             "worst_trade": round(min(pnls), 2) if pnls else 0,
             "pnl_by_epic": {k: round(v, 2) for k, v in pnl_by_epic.items()},
             "equity_curve": equity_points,
+            "sharpe_ratio": round(float(sharpe_ratio), 3),
+            "sortino_ratio": round(float(sortino_ratio), 3),
+            "calmar_ratio": round(float(calmar_ratio), 3),
+            "max_drawdown": round(float(max_drawdown), 4),
         }

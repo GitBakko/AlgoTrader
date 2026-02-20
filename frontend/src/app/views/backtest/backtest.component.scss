@@ -47,6 +47,14 @@
     background: var(--cui-card-bg, var(--mantis-surface-1, #0d1117));
   }
 
+  // Comparison table
+  .bt-comparison-table {
+    .bt-comparison-metric-col {
+      width: 120px;
+      min-width: 100px;
+    }
+  }
+
   // Mobile table min-width
   @media (max-width: 991.98px) {
     table[cTable] {

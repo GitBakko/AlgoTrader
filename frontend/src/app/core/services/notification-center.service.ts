@@ -1,4 +1,4 @@
-import { Injectable, inject, signal, OnDestroy } from '@angular/core';
+import { Injectable, inject, signal, computed, OnDestroy } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { ApiResponse, AppNotification, NotificationListResponse } from '../models';
@@ -11,6 +11,28 @@ export class NotificationCenterService implements OnDestroy {
 
   readonly notifications = signal<AppNotification[]>([]);
   readonly unreadCount = signal(0);
+
+  /** Muted alert types version counter — triggers recomputation when localStorage changes */
+  private readonly mutedVersion = signal(0);
+
+  private getMutedTypes(): Set<string> {
+    return new Set(JSON.parse(localStorage.getItem('mantis-muted-alerts') || '[]'));
+  }
+
+  /** Bump this after changing localStorage muted alerts from Settings */
+  refreshMutedFilter(): void {
+    this.mutedVersion.update(v => v + 1);
+  }
+
+  readonly filteredNotifications = computed(() => {
+    this.mutedVersion(); // subscribe to version changes
+    const muted = this.getMutedTypes();
+    return this.notifications().filter(n => !muted.has(n.alert_type));
+  });
+
+  readonly filteredUnreadCount = computed(() =>
+    this.filteredNotifications().filter(n => !n.is_read).length
+  );
 
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;

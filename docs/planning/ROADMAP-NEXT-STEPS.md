@@ -1,17 +1,48 @@
 # MANTIS AI - Roadmap & Next Steps
 
-> Current status: Phase 20 complete (2026-02-20). ~1182 tests, 0 errors. Production readiness ~99%.
+> Current status: Phase 22 complete (2026-02-20). ~1191 tests, 0 errors. Production readiness ~99%.
 > ML models: 20/20 tradable assets have trained XGBoost models (EURUSD excluded — ATR too small).
 > Infrastructure: CI/CD (GitHub Actions), JSON logging, Prometheus/Grafana, security headers, Docker prod override.
 > DEMO readiness: partial_close fix, Telegram alerts, AlertManager wired, emergency kill switch, max_total_exposure.
 > Trading history: Closed positions persisted to PostgreSQL, performance analytics, dashboard P&L fix.
 > UX/UI Polish: Trade Journal notes, CSV export, Light theme, filter bar redesign.
 > Trading robustness: MinDealSize pre-fetch & validation, position history dates, broker error parser, Telegram Markdown fix.
-> Bug fixes: Timezone mismatch (asyncpg), UNKNOWN toast, duplicate toast, ExecutionEngine DB, broker-closed detection, Alembic migration.
+> Notification Center: InAppChannel (always-on), bell dropdown, /notifications page, WS real-time push.
+> Analytics: Correlation matrix, risk-adjusted metrics (Sharpe/Sortino/Calmar), Performance page, backtest comparison.
+> Bug fixes: Timezone mismatch (asyncpg), UNKNOWN toast, duplicate toast, ExecutionEngine DB, broker-closed detection, negative durations.
 
 ---
 
 ## Recently Completed
+
+### Phase 22 — Analytics & Observability [COMPLETE]
+
+> Correlation matrix, risk-adjusted metrics, performance page, notification preferences, backtest comparison.
+
+- [x] Backend: `GET /api/analytics/correlation-matrix` — Polars-based Pearson correlation for asset returns
+- [x] Risk-adjusted metrics in `PositionRepository.get_performance_stats()` — Sharpe, Sortino, Calmar ratios (numpy)
+- [x] Frontend: Performance Analytics page (`/performance`) — equity curve, KPI cards, monthly breakdown, drawdown
+- [x] Notification preferences: alert type filtering with localStorage persistence
+- [x] Dashboard notification widget: last 5 alerts with emoji + relative time
+- [x] Backtest comparison view: checkbox select (max 4), lazy-loaded details, side-by-side metrics table
+- [x] Settings: alert type toggles (trade_opened, trade_closed, circuit_breaker, drawdown, etc.)
+
+**Bugfix: Negative Position Durations**
+
+- [x] Root cause: broker `createdDate` in CET timezone, `.replace(tzinfo=None)` stripped tz without converting to UTC
+- [x] Fix: `.astimezone(timezone.utc)` before `.replace(tzinfo=None)` in `_persist_position_close()`
+- [x] Defensive: `max(0, duration)` guard in positions API + `opened_at > closed_at` guards with correction
+
+### Phase 21 — Notification Center [COMPLETE]
+
+> In-app notification system with persistence, WS real-time push, header bell dropdown.
+
+- [x] `notifications` DB table + Alembic migration + `NotificationRepository` CRUD
+- [x] `InAppChannel` — always-on AlertManager channel (persists + WS broadcast, independent of `ALERTS_ENABLED`)
+- [x] API: `GET/PATCH/DELETE /api/notifications` + `POST /api/notifications/mark-all-read` + `WS /ws/notifications`
+- [x] Frontend: `NotificationCenterService` (REST + WS reconnection), header bell dropdown
+- [x] Full `/notifications` page with filters (type, read/unread, date range)
+- [x] Telegram alert emojis: type-specific `ALERT_EMOJI` + `ALERT_ICON` dicts
 
 ### Phase 20 — Trading Robustness [COMPLETE]
 
@@ -279,4 +310,6 @@
 | -- | Phase 18d: Broker-closed position detection | 1h | Trading integrity | **COMPLETE** |
 | -- | Phase 19: UX/UI Polish (notes, CSV, light theme) | 6h | User experience | **COMPLETE** |
 | -- | Phase 20: Trading Robustness (minDealSize, dates, Telegram) | 4h | Trading integrity | **COMPLETE** |
+| -- | Phase 21: Notification Center (InApp, bell, WS, /notifications) | 6h | User experience | **COMPLETE** |
+| -- | Phase 22: Analytics & Observability (metrics, performance, comparison) | 4h | Trading analytics | **COMPLETE** |
 | **P5** | **Live trading (2+ weeks demo first)** | **2+ weeks** | **Revenue generation** | **NEXT** |

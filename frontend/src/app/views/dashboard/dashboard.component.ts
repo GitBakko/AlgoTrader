@@ -14,6 +14,7 @@ import { TradingService } from '../../core/services/trading.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { MarketStatusService, MarketStatusResponse } from '../../core/services/market-status.service';
 import { NewsService } from '../../core/services/news.service';
+import { NotificationCenterService } from '../../core/services/notification-center.service';
 import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.component';
 import { NewsWidgetComponent } from '../../shared/components/news-widget/news-widget.component';
 import { SkeletonCardComponent } from '../../shared/components/skeleton-card/skeleton-card.component';
@@ -39,6 +40,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly ws = inject(WebSocketService);
   readonly marketStatus = inject(MarketStatusService);
   readonly newsService = inject(NewsService);
+  private readonly notifCenter = inject(NotificationCenterService);
+
+  /** Recent unread alerts for dashboard widget (max 5) */
+  readonly recentAlerts = computed(() =>
+    this.notifCenter.notifications()
+      .filter(n => !n.is_read)
+      .slice(0, 5)
+  );
+  readonly alertCount = this.notifCenter.unreadCount;
 
   readonly Math = Math; // expose for template
   readonly overview = this.trading.overview;

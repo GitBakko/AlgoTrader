@@ -301,11 +301,23 @@ class PaperTradingLoop:
                     actual_opened = opened_at or now
                     if isinstance(actual_opened, str):
                         try:
-                            actual_opened = datetime.fromisoformat(actual_opened).replace(tzinfo=None)
+                            parsed = datetime.fromisoformat(actual_opened)
+                            # Convert to UTC if timezone-aware, then strip tzinfo
+                            if parsed.tzinfo is not None:
+                                parsed = parsed.astimezone(timezone.utc)
+                            actual_opened = parsed.replace(tzinfo=None)
                         except (ValueError, TypeError):
                             actual_opened = now
                     elif hasattr(actual_opened, 'tzinfo') and actual_opened.tzinfo is not None:
-                        actual_opened = actual_opened.replace(tzinfo=None)
+                        actual_opened = actual_opened.astimezone(timezone.utc).replace(tzinfo=None)
+
+                    # Guard: opened_at must never be after closed_at
+                    if actual_opened > now:
+                        logger.warning(
+                            f"Position {deal_id}: opened_at ({actual_opened}) > "
+                            f"closed_at ({now}), correcting to closed_at"
+                        )
+                        actual_opened = now
 
                     pos = Position(
                         deal_id=deal_id,
@@ -325,11 +337,19 @@ class PaperTradingLoop:
                     pos = await repo.create(pos)
                 else:
                     # Update existing
+                    now = datetime.now(timezone.utc).replace(tzinfo=None)
                     pos.status = "CLOSED"
                     pos.current_price = Decimal(str(exit_price))
                     pos.profit_loss = Decimal(str(round(pnl, 2)))
-                    pos.closed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                    pos.closed_at = now
                     pos.close_reason = close_reason
+                    # Guard: correct opened_at if it's somehow after closed_at
+                    if pos.opened_at and pos.opened_at > now:
+                        logger.warning(
+                            f"Position {deal_id}: DB opened_at ({pos.opened_at}) > "
+                            f"closed_at ({now}), correcting"
+                        )
+                        pos.opened_at = now
                     await session.flush()
                     await session.refresh(pos)
 

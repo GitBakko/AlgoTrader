@@ -123,6 +123,9 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
                 <table cTable [small]="true" [hover]="true" class="mb-0">
                   <thead>
                     <tr>
+                      <th class="text-center" style="width: 36px">
+                        <span class="small text-body-secondary" title="Confronta">VS</span>
+                      </th>
                       <th>Asset</th>
                       <th class="d-mobile-none">TF</th>
                       <th class="d-mobile-none">Periodo</th>
@@ -135,6 +138,9 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
                   <tbody>
                     @for (run of runs(); track run.id) {
                       <tr class="bt-result-row" (click)="selectRun(run)" [class.table-active]="selectedRun()?.id === run.id">
+                        <td class="text-center" (click)="toggleComparison(run.id, $event)">
+                          <input type="checkbox" class="form-check-input" [checked]="isSelectedForComparison(run.id)" />
+                        </td>
                         <td class="fw-semibold">{{ run.epic }}</td>
                         <td class="d-mobile-none">{{ getRunTimeframe(run) }}</td>
                         <td class="text-body-secondary small d-mobile-none">{{ getRunPeriod(run) }}</td>
@@ -376,6 +382,55 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
         </c-card-body>
       </c-card>
     }
+
+    <!-- ═══════ Comparison Panel ═══════ -->
+    @if (comparisonRuns().length >= 2) {
+      <div class="section-divider">
+        <span class="section-divider__label">Confronto Run ({{ comparisonRuns().length }})</span>
+        <div class="section-divider__line"></div>
+      </div>
+      <c-card class="mb-4 border-top border-top-3 border-top-info">
+        <c-card-header class="d-flex align-items-center justify-content-between py-2">
+          <span class="fw-semibold small text-body-secondary">Confronto Metriche</span>
+          <button class="btn btn-sm btn-outline-secondary" (click)="clearComparison()">
+            Chiudi confronto
+          </button>
+        </c-card-header>
+        <c-card-body class="p-0">
+          <div class="table-responsive-mobile">
+            <table cTable [small]="true" class="mb-0 bt-comparison-table">
+              <thead>
+                <tr>
+                  <th class="bt-comparison-metric-col">Metrica</th>
+                  @for (run of comparisonRuns(); track run.summary.id) {
+                    <th class="text-center">
+                      <div class="fw-semibold">{{ run.summary.epic }}</div>
+                      <div class="text-body-secondary small">{{ run.config['timeframe'] ?? '1h' }}</div>
+                    </th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (metric of comparisonMetrics; track metric.key) {
+                  <tr>
+                    <td class="text-body-secondary small">{{ metric.label }}</td>
+                    @for (run of comparisonRuns(); track run.summary.id) {
+                      <td class="text-center mantis-mono fw-semibold" [class]="getComparisonValueClass(run, metric)">
+                        {{ getComparisonValue(run, metric) }}
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </c-card-body>
+      </c-card>
+    } @else if (selectedForComparison().length === 1) {
+      <div class="text-center text-body-secondary small py-2">
+        Seleziona almeno 2 run per confrontarli ({{ selectedForComparison().length }}/4)
+      </div>
+    }
   `
 })
 export class BacktestComponent implements OnInit {
@@ -387,6 +442,15 @@ export class BacktestComponent implements OnInit {
   readonly selectedRun = signal<BacktestRun | null>(null);
   readonly detail = signal<BacktestDetail | null>(null);
   readonly metricCards = signal<MetricCard[]>([]);
+
+  // Comparison feature
+  readonly selectedForComparison = signal<string[]>([]);
+  readonly comparisonDetails = signal<Map<string, BacktestDetail>>(new Map());
+  readonly comparisonRuns = computed<BacktestDetail[]>(() => {
+    const ids = this.selectedForComparison();
+    const details = this.comparisonDetails();
+    return ids.map(id => details.get(id)).filter((d): d is BacktestDetail => !!d);
+  });
 
   // Equity curve for TvChart
   readonly equityLineData = computed<LineDataPoint[]>(() => {
@@ -556,6 +620,84 @@ export class BacktestComponent implements OnInit {
     if (pValue < 0.05) return 'success';
     if (pValue < 0.10) return 'warning';
     return 'danger';
+  }
+
+  toggleComparison(runId: string, event: Event): void {
+    event.stopPropagation();
+    const current = this.selectedForComparison();
+    if (current.includes(runId)) {
+      this.selectedForComparison.set(current.filter(id => id !== runId));
+    } else {
+      if (current.length >= 4) {
+        this.toast.error('Massimo 4 run confrontabili');
+        return;
+      }
+      this.selectedForComparison.set([...current, runId]);
+      this.loadComparisonDetail(runId);
+    }
+  }
+
+  isSelectedForComparison(runId: string): boolean {
+    return this.selectedForComparison().includes(runId);
+  }
+
+  clearComparison(): void {
+    this.selectedForComparison.set([]);
+    this.comparisonDetails.set(new Map());
+  }
+
+  private loadComparisonDetail(runId: string): void {
+    if (this.comparisonDetails().has(runId)) return;
+    this.trading.getBacktestDetail(runId).subscribe({
+      next: (data) => {
+        this.comparisonDetails.update(map => {
+          const newMap = new Map(map);
+          newMap.set(runId, data);
+          return newMap;
+        });
+      },
+      error: () => {}
+    });
+  }
+
+  readonly comparisonMetrics = [
+    { key: 'total_return_pct', label: 'Return %', type: 'summary', format: 'pct' },
+    { key: 'sharpe_ratio', label: 'Sharpe', type: 'metrics', format: 'dec2' },
+    { key: 'sortino_ratio', label: 'Sortino', type: 'metrics', format: 'dec2' },
+    { key: 'calmar_ratio', label: 'Calmar', type: 'metrics', format: 'dec2' },
+    { key: 'max_drawdown', label: 'Max DD', type: 'metrics', format: 'pct_neg' },
+    { key: 'win_rate', label: 'Win Rate', type: 'trade_metrics', format: 'pct' },
+    { key: 'profit_factor', label: 'Profit Factor', type: 'trade_metrics', format: 'dec2' },
+    { key: 'total_trades', label: 'Trades', type: 'summary', format: 'int' },
+  ];
+
+  getComparisonValue(detail: BacktestDetail, metric: { key: string; type: string; format: string }): string {
+    let val: number;
+    if (metric.type === 'summary') {
+      val = (detail.summary as unknown as Record<string, number>)[metric.key] ?? 0;
+    } else if (metric.type === 'metrics') {
+      val = detail.metrics[metric.key] ?? 0;
+    } else {
+      val = detail.trade_metrics[metric.key] ?? 0;
+    }
+    if (metric.format === 'pct') return (val * (metric.key === 'total_return_pct' ? 1 : 100)).toFixed(2) + '%';
+    if (metric.format === 'pct_neg') return (val * 100).toFixed(2) + '%';
+    if (metric.format === 'dec2') return val.toFixed(2);
+    return val.toFixed(0);
+  }
+
+  getComparisonValueClass(detail: BacktestDetail, metric: { key: string; type: string }): string {
+    let val: number;
+    if (metric.type === 'summary') {
+      val = (detail.summary as unknown as Record<string, number>)[metric.key] ?? 0;
+    } else if (metric.type === 'metrics') {
+      val = detail.metrics[metric.key] ?? 0;
+    } else {
+      val = detail.trade_metrics[metric.key] ?? 0;
+    }
+    if (metric.key === 'max_drawdown') return val > 0.1 ? 'text-danger' : '';
+    if (metric.key === 'total_trades') return '';
+    return val > 0 ? 'text-success' : val < 0 ? 'text-danger' : '';
   }
 }
 

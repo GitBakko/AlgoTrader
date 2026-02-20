@@ -81,6 +81,10 @@ export const routes: Routes = [
         data: { resource: 'settings', action: 'write' }
       },
       {
+        path: 'performance',
+        loadChildren: () => import('./views/performance/routes').then(m => m.routes)
+      },
+      {
         path: 'notifications',
         loadChildren: () => import('./views/notifications/routes').then(m => m.routes)
       },

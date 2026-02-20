@@ -27,8 +27,8 @@ import { NotificationCenterService } from '../../../../core/services/notificatio
 })
 export class NotificationDropdownComponent {
   readonly #notifService = inject(NotificationCenterService);
-  readonly unreadCount = this.#notifService.unreadCount;
-  readonly notifications = computed(() => this.#notifService.notifications().slice(0, 10));
+  readonly unreadCount = this.#notifService.filteredUnreadCount;
+  readonly notifications = computed(() => this.#notifService.filteredNotifications().slice(0, 10));
 
   markAsRead(id: number): void {
     this.#notifService.markAsRead(id);

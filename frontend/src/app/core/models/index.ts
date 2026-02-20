@@ -343,6 +343,10 @@ export interface TradingPerformance {
   pnl_by_epic: Record<string, number>;
   equity_curve: { date: string; value: number }[];
   source: string;
+  sharpe_ratio?: number;
+  sortino_ratio?: number;
+  calmar_ratio?: number;
+  max_drawdown?: number;
 }
 
 // Notifications

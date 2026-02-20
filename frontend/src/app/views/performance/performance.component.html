@@ -1,0 +1,221 @@
+<!-- Header + Period Selector -->
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <h5 class="mb-0 fw-semibold">Performance Analytics</h5>
+  <div class="d-flex gap-1">
+    @for (p of periods; track p.value) {
+      <button class="btn btn-sm"
+        [class.btn-primary]="selectedPeriod() === p.value"
+        [class.btn-outline-secondary]="selectedPeriod() !== p.value"
+        (click)="selectPeriod(p.value)">
+        {{ p.label }}
+      </button>
+    }
+  </div>
+</div>
+
+@if (performance(); as perf) {
+  @if (perf.trade_count > 0) {
+    <!-- KPI Row -->
+    <c-row class="g-3 mb-4">
+      <c-col sm="6" xl="3">
+        <c-card class="dash-kpi-card h-100">
+          <c-card-body class="p-3">
+            <div class="dash-kpi-card__label">Trades</div>
+            <div class="dash-kpi-card__value">{{ perf.trade_count }}</div>
+            <div class="dash-kpi-card__detail">{{ perf.win_count }}W / {{ perf.loss_count }}L</div>
+          </c-card-body>
+          <div class="dash-kpi-card__accent dash-kpi-card__accent--primary"></div>
+        </c-card>
+      </c-col>
+      <c-col sm="6" xl="3">
+        <c-card class="dash-kpi-card h-100">
+          <c-card-body class="p-3">
+            <div class="dash-kpi-card__label">Win Rate</div>
+            <div class="dash-kpi-card__value">{{ (perf.win_rate * 100) | number:'1.1-1' }}%</div>
+            <div class="dash-kpi-card__detail">PF: {{ perf.profit_factor | number:'1.2-2' }}</div>
+          </c-card-body>
+          <div class="dash-kpi-card__accent dash-kpi-card__accent--primary"></div>
+        </c-card>
+      </c-col>
+      <c-col sm="6" xl="3">
+        <c-card class="dash-kpi-card h-100">
+          <c-card-body class="p-3">
+            <div class="dash-kpi-card__label">Total P&amp;L</div>
+            <div class="dash-kpi-card__value"
+                 [class.text-success]="perf.total_pnl >= 0"
+                 [class.text-danger]="perf.total_pnl < 0">
+              $ {{ perf.total_pnl >= 0 ? '+' : '' }}{{ perf.total_pnl | number:'1.2-2' }}
+            </div>
+            <div class="dash-kpi-card__detail">
+              Best: <span class="text-success">+{{ perf.best_trade | number:'1.2-2' }}</span>
+              Worst: <span class="text-danger">{{ perf.worst_trade | number:'1.2-2' }}</span>
+            </div>
+          </c-card-body>
+          <div class="dash-kpi-card__accent"
+               [class.dash-kpi-card__accent--profit]="perf.total_pnl >= 0"
+               [class.dash-kpi-card__accent--loss]="perf.total_pnl < 0"></div>
+        </c-card>
+      </c-col>
+      <c-col sm="6" xl="3">
+        <c-card class="dash-kpi-card h-100">
+          <c-card-body class="p-3">
+            <div class="dash-kpi-card__label">Max Drawdown</div>
+            <div class="dash-kpi-card__value text-danger">
+              {{ ((perf.max_drawdown ?? 0) * 100) | number:'1.2-2' }}%
+            </div>
+            <div class="dash-kpi-card__detail">
+              Cons. W: {{ perf.max_consecutive_wins }} | L: {{ perf.max_consecutive_losses }}
+            </div>
+          </c-card-body>
+          <div class="dash-kpi-card__accent dash-kpi-card__accent--loss"></div>
+        </c-card>
+      </c-col>
+    </c-row>
+
+    <!-- Risk-Adjusted Metrics -->
+    <c-row class="g-3 mb-4">
+      <c-col sm="4">
+        <c-card class="dash-kpi-card h-100">
+          <c-card-body class="p-3">
+            <div class="dash-kpi-card__label">Sharpe Ratio</div>
+            <div class="dash-kpi-card__value"
+                 [class.text-success]="(perf.sharpe_ratio ?? 0) > 1"
+                 [class.text-warning]="(perf.sharpe_ratio ?? 0) > 0 && (perf.sharpe_ratio ?? 0) <= 1"
+                 [class.text-danger]="(perf.sharpe_ratio ?? 0) <= 0">
+              {{ perf.sharpe_ratio ?? 0 | number:'1.3-3' }}
+            </div>
+            <div class="dash-kpi-card__detail">Risk-adjusted return (ann.)</div>
+          </c-card-body>
+          <div class="dash-kpi-card__accent dash-kpi-card__accent--primary"></div>
+        </c-card>
+      </c-col>
+      <c-col sm="4">
+        <c-card class="dash-kpi-card h-100">
+          <c-card-body class="p-3">
+            <div class="dash-kpi-card__label">Sortino Ratio</div>
+            <div class="dash-kpi-card__value"
+                 [class.text-success]="(perf.sortino_ratio ?? 0) > 1"
+                 [class.text-warning]="(perf.sortino_ratio ?? 0) > 0 && (perf.sortino_ratio ?? 0) <= 1"
+                 [class.text-danger]="(perf.sortino_ratio ?? 0) <= 0">
+              {{ perf.sortino_ratio ?? 0 | number:'1.3-3' }}
+            </div>
+            <div class="dash-kpi-card__detail">Downside risk-adjusted (ann.)</div>
+          </c-card-body>
+          <div class="dash-kpi-card__accent dash-kpi-card__accent--primary"></div>
+        </c-card>
+      </c-col>
+      <c-col sm="4">
+        <c-card class="dash-kpi-card h-100">
+          <c-card-body class="p-3">
+            <div class="dash-kpi-card__label">Calmar Ratio</div>
+            <div class="dash-kpi-card__value"
+                 [class.text-success]="(perf.calmar_ratio ?? 0) > 1"
+                 [class.text-warning]="(perf.calmar_ratio ?? 0) > 0 && (perf.calmar_ratio ?? 0) <= 1"
+                 [class.text-danger]="(perf.calmar_ratio ?? 0) <= 0">
+              {{ perf.calmar_ratio ?? 0 | number:'1.3-3' }}
+            </div>
+            <div class="dash-kpi-card__detail">Return / Max Drawdown (ann.)</div>
+          </c-card-body>
+          <div class="dash-kpi-card__accent dash-kpi-card__accent--primary"></div>
+        </c-card>
+      </c-col>
+    </c-row>
+
+    <!-- Equity Curve -->
+    <c-card class="mb-4 border-top border-top-3 border-top-primary">
+      <c-card-header class="d-flex align-items-center justify-content-between py-2">
+        <span class="fw-semibold small text-body-secondary">Equity Curve (P&amp;L cumulativo)</span>
+        <span class="small mantis-mono"
+              [class.text-success]="perf.total_pnl >= 0"
+              [class.text-danger]="perf.total_pnl < 0">
+          $ {{ perf.total_pnl >= 0 ? '+' : '' }}{{ perf.total_pnl | number:'1.2-2' }}
+        </span>
+      </c-card-header>
+      <c-card-body class="p-0">
+        @if (equityLineData().length > 0) {
+          <app-tv-chart
+            mode="area"
+            [lineData]="equityLineData()"
+            [height]="360"
+            lineColor="#00d97e"
+            areaTopColor="rgba(0, 217, 126, 0.25)"
+            areaBottomColor="rgba(0, 217, 126, 0.01)"
+          ></app-tv-chart>
+        } @else {
+          <div class="empty-state">
+            <div class="empty-state__text">Dati insufficienti per la curva equity</div>
+          </div>
+        }
+      </c-card-body>
+    </c-card>
+
+    <!-- Charts Row -->
+    <c-row class="g-3 mb-4">
+      <!-- P&L Distribution -->
+      <c-col lg="6">
+        <c-card class="border-top border-top-3 border-top-primary h-100">
+          <c-card-header class="py-2">
+            <span class="fw-semibold small text-body-secondary">Distribuzione P&amp;L per Trade</span>
+          </c-card-header>
+          <c-card-body class="p-3">
+            @if (pnlDistChartData(); as data) {
+              <div style="height: 280px;">
+                <c-chart type="bar" [data]="data" [options]="pnlDistChartOptions"></c-chart>
+              </div>
+            } @else {
+              <div class="empty-state">
+                <div class="empty-state__text">Dati insufficienti</div>
+              </div>
+            }
+          </c-card-body>
+        </c-card>
+      </c-col>
+
+      <!-- P&L per Asset -->
+      <c-col lg="6">
+        <c-card class="border-top border-top-3 border-top-primary h-100">
+          <c-card-header class="py-2">
+            <span class="fw-semibold small text-body-secondary">P&amp;L per Asset</span>
+          </c-card-header>
+          <c-card-body class="p-3">
+            @if (pnlAssetChartData(); as data) {
+              <div [style.height.px]="Math.max(280, pnlByAsset().length * 28)">
+                <c-chart type="bar" [data]="data" [options]="pnlAssetChartOptions"></c-chart>
+              </div>
+            } @else {
+              <div class="empty-state">
+                <div class="empty-state__text">Nessun dato per asset</div>
+              </div>
+            }
+          </c-card-body>
+        </c-card>
+      </c-col>
+    </c-row>
+
+    <!-- Correlation Heatmap -->
+    @if (correlationData(); as corrData) {
+      <div class="section-divider">
+        <span class="section-divider__label">Correlazione Portfolio</span>
+        <div class="section-divider__line"></div>
+      </div>
+      <c-card class="mb-4 border-top border-top-3 border-top-primary">
+        <c-card-header class="py-2">
+          <span class="fw-semibold small text-body-secondary">
+            Matrice di Correlazione ({{ corrData.period_days }}g)
+          </span>
+        </c-card-header>
+        <c-card-body class="p-2 overflow-auto">
+          <app-correlation-heatmap [data]="correlationData()" />
+        </c-card-body>
+      </c-card>
+    }
+  } @else {
+    <div class="empty-state py-5">
+      <div class="empty-state__icon">&#x1F4CA;</div>
+      <div class="empty-state__text">Nessun trade chiuso nel periodo selezionato</div>
+      <div class="empty-state__hint">Avvia il paper trading per raccogliere dati di performance</div>
+    </div>
+  }
+} @else {
+  <div class="text-center py-5 text-body-secondary">Caricamento dati...</div>
+}

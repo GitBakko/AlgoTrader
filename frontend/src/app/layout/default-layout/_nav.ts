@@ -50,6 +50,11 @@ export const navItems: INavData[] = [
     iconComponent: { name: 'cil-history' }
   },
   {
+    name: 'Performance',
+    url: '/performance',
+    iconComponent: { name: 'cil-chart' }
+  },
+  {
     name: 'Strategia',
     url: '/strategy',
     iconComponent: { name: 'cil-settings' }
