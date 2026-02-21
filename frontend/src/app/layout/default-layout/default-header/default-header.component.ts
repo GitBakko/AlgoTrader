@@ -47,6 +47,11 @@ export class DefaultHeaderComponent extends HeaderComponent {
   readonly wsConnected = this.#ws.connected;
   readonly topLinks = this.#navUsage.topLinks;
 
+  // Price source tracking
+  readonly isMockPrices = this.#ws.isMockPrices;
+  readonly brokerReconnectAttempts = this.#ws.brokerReconnectAttempts;
+  readonly brokerMaxReconnectAttempts = this.#ws.brokerMaxReconnectAttempts;
+
   readonly colorModes = [
     { name: 'light', text: 'Light', icon: 'cilSun' },
     { name: 'dark', text: 'Dark', icon: 'cilMoon' },

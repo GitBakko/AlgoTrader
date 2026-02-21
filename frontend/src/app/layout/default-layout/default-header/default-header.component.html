@@ -25,13 +25,29 @@
     <c-header-nav class="ms-auto">
       <!-- WS Status -->
       <c-nav-item>
-        <span class="ws-status-pill"
-          [class.ws-status-pill--connected]="wsConnected()"
-          [class.ws-status-pill--disconnected]="!wsConnected()"
-          [cTooltip]="wsConnected() ? 'WebSocket connesso' : 'WebSocket disconnesso'">
-          <span [class]="wsConnected() ? 'pulse-dot' : 'pulse-dot pulse-dot--danger'"></span>
-          <span class="d-none d-lg-inline">{{ wsConnected() ? 'Live' : 'Offline' }}</span>
-        </span>
+        @if (wsConnected() && isMockPrices()) {
+          <!-- Mock prices active — broker WS disconnected, auto-reconnecting -->
+          <span class="ws-status-pill ws-status-pill--mock"
+            [cTooltip]="'Prezzi simulati — riconnessione broker ' + brokerReconnectAttempts() + '/' + brokerMaxReconnectAttempts()">
+            <span class="pulse-dot pulse-dot--warning"></span>
+            <span class="d-none d-lg-inline">Mock</span>
+            <span class="ws-retry-badge">{{ brokerReconnectAttempts() }}/{{ brokerMaxReconnectAttempts() }}</span>
+          </span>
+        } @else if (wsConnected()) {
+          <!-- Broker prices — live data -->
+          <span class="ws-status-pill ws-status-pill--connected"
+            [cTooltip]="'WebSocket connesso — prezzi live dal broker'">
+            <span class="pulse-dot"></span>
+            <span class="d-none d-lg-inline">Live</span>
+          </span>
+        } @else {
+          <!-- Disconnected -->
+          <span class="ws-status-pill ws-status-pill--disconnected"
+            [cTooltip]="'WebSocket disconnesso'">
+            <span class="pulse-dot pulse-dot--danger"></span>
+            <span class="d-none d-lg-inline">Offline</span>
+          </span>
+        }
       </c-nav-item>
       <div class="nav-item py-1">
         <div class="vr h-100 mx-2 text-body text-opacity-75"></div>

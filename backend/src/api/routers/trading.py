@@ -93,6 +93,11 @@ async def trading_status(request: Request):
     except (asyncio.TimeoutError, Exception) as e:
         logger.warning(f"Async status fetch failed ({e}), using sync fallback")
         status = loop.get_status()
+
+    # Inject WS price status
+    from src.api.websocket import ws_price_status
+    status["ws_price_status"] = dict(ws_price_status)
+
     return success_response(status)
 
 

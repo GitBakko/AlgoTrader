@@ -1,10 +1,10 @@
 """
 WebSocket manager for real-time price streaming and trade notifications.
 Dual-mode: uses broker WebSocket when available, falls back to mock random walk.
+Auto-reconnects to broker WS when mock is active.
 """
 
 import asyncio
-import json
 import random
 from datetime import datetime, timezone
 
@@ -65,6 +65,14 @@ class ConnectionManager:
 # Singleton manager
 ws_manager = ConnectionManager()
 
+# Global WS status tracking (readable from status endpoint)
+ws_price_status = {
+    "source": "disconnected",   # "broker" | "mock" | "disconnected"
+    "reconnect_attempts": 0,
+    "max_reconnect_attempts": 12,  # ~6 minutes of retries (30s each)
+    "last_reconnect_at": None,
+}
+
 # Base prices for mock ticker (paper mode) — realistic Feb 2026 values
 _BASE_PRICES = {
     "XAUUSD": 4994.0, "BTCUSD": 68500.0, "US500": 6836.0, "WTIUSD": 64.0,
@@ -73,6 +81,9 @@ _BASE_PRICES = {
     "DASHUSD": 39.8, "ICPUSD": 2.55, "NATGAS": 3.09, "COPPER": 5.84,
     "PLATINUM": 2067.0, "GBPUSD": 1.37, "USDJPY": 152.7, "NAS100": 227.0,
 }
+
+# Reconnect interval (seconds) between broker WS reconnect attempts during mock
+_RECONNECT_INTERVAL = 30
 
 
 async def _mock_price_stream(websocket: WebSocket) -> None:
@@ -92,6 +103,7 @@ async def _mock_price_stream(websocket: WebSocket) -> None:
                     "bid": round(prices[epic], 2),
                     "offer": round(prices[epic] + spread, 2),
                     "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "price_source": "mock",
                 }
                 await websocket.send_json(tick)
 
@@ -100,6 +112,94 @@ async def _mock_price_stream(websocket: WebSocket) -> None:
         pass
     except Exception as e:
         logger.debug(f"Price stream ended: {e}")
+
+
+async def _mock_price_stream_with_reconnect(
+    websocket: WebSocket, app_state
+) -> None:
+    """
+    Send mock prices while periodically attempting to reconnect to broker WS.
+    When reconnection succeeds, raises _BrokerReconnected to switch back.
+    """
+    prices = dict(_BASE_PRICES)
+    ticks_since_reconnect_check = 0
+    ticks_per_reconnect = _RECONNECT_INTERVAL  # ~30s (1 cycle/s × 30)
+
+    ws_price_status["source"] = "mock"
+    ws_price_status["reconnect_attempts"] = 0
+
+    try:
+        while True:
+            for epic, base in prices.items():
+                change = base * random.uniform(-0.001, 0.001)
+                prices[epic] = round(base + change, 2)
+                spread = base * 0.0002
+
+                tick = {
+                    "epic": epic,
+                    "bid": round(prices[epic], 2),
+                    "offer": round(prices[epic] + spread, 2),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "price_source": "mock",
+                }
+                await websocket.send_json(tick)
+
+            ticks_since_reconnect_check += 1
+            await asyncio.sleep(1.0)
+
+            # Periodically attempt broker WS reconnection
+            if ticks_since_reconnect_check >= ticks_per_reconnect:
+                ticks_since_reconnect_check = 0
+                max_attempts = ws_price_status["max_reconnect_attempts"]
+
+                if ws_price_status["reconnect_attempts"] < max_attempts:
+                    ws_price_status["reconnect_attempts"] += 1
+                    ws_price_status["last_reconnect_at"] = (
+                        datetime.now(timezone.utc).isoformat()
+                    )
+                    attempt = ws_price_status["reconnect_attempts"]
+
+                    # Send status update to frontend
+                    await websocket.send_json({
+                        "type": "ws_status",
+                        "price_source": "mock",
+                        "reconnect_attempts": attempt,
+                        "max_reconnect_attempts": max_attempts,
+                    })
+
+                    broker_ws = getattr(app_state, "broker_ws_client", None)
+                    if broker_ws:
+                        try:
+                            logger.info(
+                                f"Attempting broker WS reconnect ({attempt}/{max_attempts})..."
+                            )
+                            await broker_ws.connect()
+                            if getattr(broker_ws, "_connected", False):
+                                logger.success(
+                                    f"Broker WS reconnected after {attempt} attempts!"
+                                )
+                                ws_price_status["source"] = "broker"
+                                ws_price_status["reconnect_attempts"] = 0
+                                # Notify frontend of reconnection
+                                await websocket.send_json({
+                                    "type": "ws_status",
+                                    "price_source": "broker",
+                                    "reconnect_attempts": 0,
+                                    "max_reconnect_attempts": max_attempts,
+                                })
+                                return  # Exit mock → caller switches to broker stream
+                        except Exception as e:
+                            logger.warning(
+                                f"Broker WS reconnect attempt {attempt}/{max_attempts} "
+                                f"failed: {e}"
+                            )
+                    else:
+                        logger.debug("No broker WS client available for reconnect")
+
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logger.debug(f"Mock price stream ended: {e}")
 
 
 async def _broker_price_stream(websocket: WebSocket, broker_ws) -> None:
@@ -118,6 +218,7 @@ async def _broker_price_stream(websocket: WebSocket, broker_ws) -> None:
                 "offer": quote.offer,
                 "timestamp": quote.timestamp.isoformat() if quote.timestamp else
                     datetime.now(timezone.utc).isoformat(),
+                "price_source": "broker",
             })
         except asyncio.QueueFull:
             pass  # Drop if full — next tick arrives soon
@@ -140,6 +241,17 @@ async def _broker_price_stream(websocket: WebSocket, broker_ws) -> None:
 
     consecutive_heartbeats = 0
     max_heartbeats = 6  # 6 * 5s = 30s without data → broker is dead
+
+    ws_price_status["source"] = "broker"
+    ws_price_status["reconnect_attempts"] = 0
+
+    # Send initial status
+    await websocket.send_json({
+        "type": "ws_status",
+        "price_source": "broker",
+        "reconnect_attempts": 0,
+        "max_reconnect_attempts": ws_price_status["max_reconnect_attempts"],
+    })
 
     try:
         while True:
@@ -171,20 +283,37 @@ async def _broker_price_stream(websocket: WebSocket, broker_ws) -> None:
 async def prices_endpoint(websocket: WebSocket) -> None:
     """WebSocket endpoint for real-time price streaming.
 
-    Tries broker WS first; if it disconnects mid-stream, falls back to mock.
+    Tries broker WS first; if it disconnects, falls back to mock with
+    automatic reconnection attempts. Loops between broker → mock → broker.
     """
     await ws_manager.connect(websocket, "prices")
     try:
-        # Check if broker WebSocket is available
-        broker_ws = getattr(websocket.app.state, "broker_ws_client", None)
-        if broker_ws and getattr(broker_ws, "_connected", False):
-            try:
-                await _broker_price_stream(websocket, broker_ws)
-            except _BrokerDisconnected:
-                logger.info("Switching to mock price stream after broker disconnect")
-                await _mock_price_stream(websocket)
-        else:
-            await _mock_price_stream(websocket)
+        while True:
+            broker_ws = getattr(websocket.app.state, "broker_ws_client", None)
+
+            if broker_ws and getattr(broker_ws, "_connected", False):
+                try:
+                    await _broker_price_stream(websocket, broker_ws)
+                except _BrokerDisconnected:
+                    logger.info(
+                        "Switching to mock prices with auto-reconnect"
+                    )
+                    # Fall through to mock+reconnect below
+                else:
+                    break  # Clean exit (client disconnected)
+
+            # Mock with reconnect — returns when broker reconnects
+            await _mock_price_stream_with_reconnect(
+                websocket, websocket.app.state
+            )
+
+            # Check if reconnect succeeded (source changed to "broker")
+            if ws_price_status["source"] == "broker":
+                logger.info("Reconnected to broker, switching back to live prices")
+                continue  # Loop back to _broker_price_stream
+            else:
+                break  # Max retries exhausted or client disconnected
+
     finally:
         ws_manager.disconnect(websocket, "prices")
 

@@ -1,6 +1,6 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, computed } from '@angular/core';
 import { environment } from '../../../environments/environment';
-import { PriceTick, TradeEvent } from '../models';
+import { PriceTick, TradeEvent, WsStatus } from '../models';
 
 @Injectable({ providedIn: 'root' })
 export class WebSocketService {
@@ -17,6 +17,12 @@ export class WebSocketService {
   readonly lastTrade = signal<TradeEvent | null>(null);
   readonly connected = signal(false);
 
+  // Price source tracking — "broker" = real, "mock" = fake random walk
+  readonly priceSource = signal<'broker' | 'mock' | 'unknown'>('unknown');
+  readonly brokerReconnectAttempts = signal(0);
+  readonly brokerMaxReconnectAttempts = signal(12);
+  readonly isMockPrices = computed(() => this.priceSource() === 'mock');
+
   private getReconnectDelay(attempts: number): number {
     return Math.min(this.BASE_DELAY * Math.pow(2, attempts), this.MAX_RECONNECT_DELAY);
   }
@@ -32,8 +38,31 @@ export class WebSocketService {
     };
 
     this.priceWs.onmessage = (event) => {
-      const tick: PriceTick = JSON.parse(event.data);
-      this.prices.update(current => ({ ...current, [tick.epic]: tick }));
+      const data = JSON.parse(event.data);
+
+      // Handle ws_status messages (reconnection status updates)
+      if (data.type === 'ws_status') {
+        const status = data as WsStatus;
+        this.priceSource.set(status.price_source);
+        this.brokerReconnectAttempts.set(status.reconnect_attempts);
+        this.brokerMaxReconnectAttempts.set(status.max_reconnect_attempts);
+        return;
+      }
+
+      // Handle heartbeat messages
+      if (data.type === 'heartbeat' || data.type === 'pong') {
+        return;
+      }
+
+      // Regular price tick
+      const tick = data as PriceTick;
+      if (tick.epic) {
+        // Track price source from tick data
+        if (tick.price_source) {
+          this.priceSource.set(tick.price_source);
+        }
+        this.prices.update(current => ({ ...current, [tick.epic]: tick }));
+      }
     };
 
     this.priceWs.onclose = () => {
@@ -90,6 +119,8 @@ export class WebSocketService {
     this.priceWs = null;
     this.tradeWs = null;
     this.connected.set(false);
+    this.priceSource.set('unknown');
+    this.brokerReconnectAttempts.set(0);
     this.priceReconnectAttempts = 0;
     this.tradeReconnectAttempts = 0;
   }

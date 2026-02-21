@@ -48,6 +48,22 @@
       color: #FF3D57;
       border: 1px solid rgba(255, 61, 87, 0.12);
     }
+
+    &--mock {
+      background: rgba(255, 176, 32, 0.08);
+      color: #FFB020;
+      border: 1px solid rgba(255, 176, 32, 0.12);
+    }
+  }
+
+  .ws-retry-badge {
+    font-size: 0.5625rem;
+    font-weight: 700;
+    font-family: 'IBM Plex Mono', monospace;
+    background: rgba(255, 176, 32, 0.15);
+    padding: 0.0625rem 0.3125rem;
+    border-radius: 4px;
+    line-height: 1;
   }
 
   // Pulse dot for WebSocket status
@@ -65,6 +81,12 @@
       box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
       animation: pulse-red 2s infinite;
     }
+
+    &--warning {
+      background-color: #FFB020;
+      box-shadow: 0 0 0 0 rgba(255, 176, 32, 0.7);
+      animation: pulse-warning 2s infinite;
+    }
   }
 
   @keyframes pulse {
@@ -77,6 +99,12 @@
     0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
     70% { box-shadow: 0 0 0 6px rgba(220, 53, 69, 0); }
     100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+  }
+
+  @keyframes pulse-warning {
+    0% { box-shadow: 0 0 0 0 rgba(255, 176, 32, 0.7); }
+    70% { box-shadow: 0 0 0 6px rgba(255, 176, 32, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 176, 32, 0); }
   }
 
   // Touch-friendly sidebar toggle on mobile

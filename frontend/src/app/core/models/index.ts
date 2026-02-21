@@ -186,6 +186,14 @@ export interface PriceTick {
   bid: number;
   offer: number;
   timestamp: string;
+  price_source?: 'broker' | 'mock';
+}
+
+export interface WsStatus {
+  type: 'ws_status';
+  price_source: 'broker' | 'mock';
+  reconnect_attempts: number;
+  max_reconnect_attempts: number;
 }
 
 export interface TradeEvent {
