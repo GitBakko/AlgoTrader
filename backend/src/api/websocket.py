@@ -2,6 +2,7 @@
 WebSocket manager for real-time price streaming and trade notifications.
 Dual-mode: uses broker WebSocket when available, falls back to mock random walk.
 Auto-reconnects to broker WS when mock is active.
+Sends initial price snapshot on connect so closed markets have prices too.
 """
 
 import asyncio
@@ -10,6 +11,8 @@ from datetime import datetime, timezone
 
 from fastapi import WebSocket, WebSocketDisconnect
 from loguru import logger
+
+from src.utils.constants import ALL_ASSETS
 
 
 class _BrokerDisconnected(Exception):
@@ -73,13 +76,13 @@ ws_price_status = {
     "last_reconnect_at": None,
 }
 
-# Base prices for mock ticker (paper mode) — realistic Feb 2026 values
+# Base prices for mock ticker (paper mode) — updated 2026-02-22 from Capital.com
 _BASE_PRICES = {
-    "XAUUSD": 4994.0, "BTCUSD": 68500.0, "US500": 6836.0, "WTIUSD": 64.0,
-    "EURUSD": 1.19, "NVDA": 192.0, "TSLA": 431.0, "XAGUSD": 83.0, "DE40": 25205.0,
-    "SOLUSD": 88.0, "ETHUSD": 2085.0, "BNBUSD": 632.0, "DOGUSD": 0.11,
-    "DASHUSD": 39.8, "ICPUSD": 2.55, "NATGAS": 3.09, "COPPER": 5.84,
-    "PLATINUM": 2067.0, "GBPUSD": 1.37, "USDJPY": 152.7, "NAS100": 227.0,
+    "XAUUSD": 5107.0, "BTCUSD": 68180.0, "US500": 6910.0, "WTIUSD": 66.31,
+    "EURUSD": 1.178, "NVDA": 189.3, "TSLA": 411.0, "XAGUSD": 84.6, "DE40": 25233.0,
+    "SOLUSD": 85.15, "ETHUSD": 1980.0, "BNBUSD": 622.6, "DOGUSD": 0.0975,
+    "DASHUSD": 33.9, "ICPUSD": 2.16, "NATGAS": 2.992, "COPPER": 5.84,
+    "PLATINUM": 2067.0, "GBPUSD": 1.349, "USDJPY": 155.05, "NAS100": 227.0,
 }
 
 # Reconnect interval (seconds) between broker WS reconnect attempts during mock
@@ -280,14 +283,62 @@ async def _broker_price_stream(websocket: WebSocket, broker_ws) -> None:
             listeners.remove(on_quote)
 
 
+async def _send_initial_price_snapshot(websocket: WebSocket, app_state) -> None:
+    """
+    Fetch current prices for ALL assets from the broker REST API and send
+    them as an initial snapshot.  This ensures the frontend has prices even
+    for closed markets that won't emit WebSocket ticks.
+    """
+    broker = getattr(app_state, "broker_client", None)
+    if not broker:
+        return
+
+    from src.broker.client import EPIC_TO_BROKER
+
+    sent = 0
+    for epic in ALL_ASSETS:
+        try:
+            broker_epic = EPIC_TO_BROKER.get(epic, epic)
+            details = await broker.get_market_details(epic)
+            if not isinstance(details, dict):
+                continue
+            snap = details.get("snapshot", {})
+            bid = snap.get("bid")
+            offer = snap.get("offer")
+            if bid is not None and offer is not None:
+                await websocket.send_json({
+                    "epic": epic,
+                    "bid": bid,
+                    "offer": offer,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "price_source": "broker",
+                })
+                sent += 1
+        except WebSocketDisconnect:
+            return  # Client gone
+        except Exception as e:
+            logger.debug(f"Snapshot price fetch failed for {epic}: {e}")
+        # Small delay between API calls to respect rate limits (10 req/s)
+        await asyncio.sleep(0.12)
+
+    if sent:
+        logger.info(f"Sent initial price snapshot: {sent}/{len(ALL_ASSETS)} assets")
+
+
 async def prices_endpoint(websocket: WebSocket) -> None:
     """WebSocket endpoint for real-time price streaming.
 
+    Sends initial price snapshot via REST API, then streams live ticks.
     Tries broker WS first; if it disconnects, falls back to mock with
     automatic reconnection attempts. Loops between broker → mock → broker.
     """
     await ws_manager.connect(websocket, "prices")
     try:
+        # Send initial prices for ALL assets (including closed markets)
+        try:
+            await _send_initial_price_snapshot(websocket, websocket.app.state)
+        except Exception as e:
+            logger.warning(f"Initial price snapshot failed: {e}")
         while True:
             broker_ws = getattr(websocket.app.state, "broker_ws_client", None)
 
