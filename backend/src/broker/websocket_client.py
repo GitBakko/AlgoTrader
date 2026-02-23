@@ -128,29 +128,23 @@ class CapitalComWebSocketClient:
             BrokerConnectionError: If connection fails after max retries
         """
         # Cancel any existing background tasks before reconnecting
-        if self._receive_task and not self._receive_task.done():
-            self._receive_task.cancel()
-        if self._ping_task and not self._ping_task.done():
-            self._ping_task.cancel()
+        await self._cancel_background_tasks()
 
         for attempt in range(self.max_reconnect_attempts):
             try:
-                logger.info(f"🔌 Connecting to Capital.com WebSocket (attempt {attempt + 1})")
+                logger.info(
+                    f"🔌 Connecting to Capital.com WebSocket "
+                    f"(attempt {attempt + 1}/{self.max_reconnect_attempts})"
+                )
 
-                # Close existing socket if any
-                if self._ws:
-                    try:
-                        await self._ws.close()
-                    except Exception:
-                        pass
-                    self._ws = None
+                # Close existing socket cleanly
+                await self._close_socket()
 
                 self._ws = await websockets.connect(
                     self.ws_url, ping_interval=None  # We handle pings manually
                 )
 
                 self._connected = True
-                self._reconnecting = False  # Reset reconnection guard
                 logger.success("✅ WebSocket connected")
 
                 # Start background tasks
@@ -160,19 +154,29 @@ class CapitalComWebSocketClient:
                 # Re-subscribe to previously subscribed instruments
                 await self._resubscribe()
 
+                # Only clear reconnecting flag AFTER successful subscribe
+                self._reconnecting = False
                 return
 
             except Exception as e:
                 logger.error(f"WebSocket connection failed: {e}")
+                self._connected = False
+                await self._close_socket()
+                await self._cancel_background_tasks()
 
                 if attempt < self.max_reconnect_attempts - 1:
-                    delay = self.reconnect_delay_seconds * (2**attempt)  # Exponential backoff
+                    delay = min(
+                        self.reconnect_delay_seconds * (2 ** attempt),
+                        120,  # Cap at 2 minutes
+                    )
                     logger.info(f"Retrying in {delay} seconds...")
                     await asyncio.sleep(delay)
                 else:
                     self._reconnecting = False
                     self._connected = False
-                    raise BrokerConnectionError(f"Failed to connect after {self.max_reconnect_attempts} attempts")
+                    raise BrokerConnectionError(
+                        f"Failed to connect after {self.max_reconnect_attempts} attempts"
+                    )
 
     async def _safe_reconnect(self) -> None:
         """
@@ -185,10 +189,16 @@ class CapitalComWebSocketClient:
 
         self._reconnecting = True
         self._connected = False
+
+        # Cancel existing tasks FIRST to stop any concurrent recv() calls
+        await self._cancel_background_tasks()
+        await self._close_socket()
+
         logger.info("🔄 Scheduling safe WebSocket reconnection...")
 
         try:
-            await asyncio.sleep(self.reconnect_delay_seconds)  # Brief cooldown
+            # Brief cooldown before reconnecting
+            await asyncio.sleep(self.reconnect_delay_seconds)
             await self.connect()
         except BrokerConnectionError:
             logger.error(
@@ -200,22 +210,34 @@ class CapitalComWebSocketClient:
             logger.error(f"❌ Unexpected error during reconnection: {e}")
             self._reconnecting = False
 
+    async def _cancel_background_tasks(self) -> None:
+        """Cancel receive and ping background tasks."""
+        for task in (self._receive_task, self._ping_task):
+            if task and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except (asyncio.CancelledError, Exception):
+                    pass
+        self._receive_task = None
+        self._ping_task = None
+
+    async def _close_socket(self) -> None:
+        """Close the underlying WebSocket connection."""
+        if self._ws:
+            try:
+                await self._ws.close()
+            except Exception:
+                pass
+            self._ws = None
+
     async def disconnect(self) -> None:
         """Disconnect from WebSocket server."""
         logger.info("Disconnecting from WebSocket...")
 
         self._connected = False
-
-        # Cancel background tasks
-        if self._receive_task and not self._receive_task.done():
-            self._receive_task.cancel()
-        if self._ping_task and not self._ping_task.done():
-            self._ping_task.cancel()
-
-        # Close WebSocket
-        if self._ws:
-            await self._ws.close()
-            self._ws = None
+        await self._cancel_background_tasks()
+        await self._close_socket()
 
         logger.success("✅ WebSocket disconnected")
 
@@ -395,7 +417,34 @@ class CapitalComWebSocketClient:
     async def _resubscribe(self) -> None:
         """Re-subscribe to all previously subscribed instruments after reconnection."""
         if self._subscribed_quotes:
-            await self.subscribe_quotes(list(self._subscribed_quotes))
+            # Send subscribe message directly without re-adding to the tracking set
+            epics = list(self._subscribed_quotes)
+            broker_epics = [EPIC_TO_BROKER.get(e, e) for e in epics]
+
+            tokens = await self.session_manager.get_tokens()
+            message = {
+                "destination": WSDestination.MARKET_DATA_SUBSCRIBE.value,
+                "correlationId": f"quote-resub-{datetime.now().timestamp()}",
+                "cst": tokens.cst,
+                "securityToken": tokens.security_token,
+                "payload": {"epics": broker_epics},
+            }
+            await self._send(message)
+            logger.info(f"📊 Re-subscribed to {len(epics)} quotes")
 
         for epic, resolutions in self._subscribed_ohlc.items():
-            await self.subscribe_ohlc([epic], resolutions)
+            broker_epic = EPIC_TO_BROKER.get(epic, epic)
+            tokens = await self.session_manager.get_tokens()
+            message = {
+                "destination": WSDestination.OHLC_SUBSCRIBE.value,
+                "correlationId": f"ohlc-resub-{datetime.now().timestamp()}",
+                "cst": tokens.cst,
+                "securityToken": tokens.security_token,
+                "payload": {
+                    "epics": [broker_epic],
+                    "resolutions": resolutions,
+                    "type": "classic",
+                },
+            }
+            await self._send(message)
+            logger.info(f"📊 Re-subscribed to OHLC: {epic} @ {resolutions}")
