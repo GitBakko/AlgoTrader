@@ -48,6 +48,15 @@ async def list_notifications(
     notifications = []
     for n in items:
         emoji = ALERT_EMOJI.get(n.alert_type, SEVERITY_EMOJI.get(n.severity, "\U0001f535"))
+        # Override emoji for losing trades (TRADE_CLOSED with negative P&L)
+        if n.alert_type == "TRADE_CLOSED" and n.details:
+            pnl = n.details.get("pnl")
+            if pnl is not None:
+                try:
+                    if float(pnl) < 0:
+                        emoji = "\U0001f53b"  # 🔻 red triangle down
+                except (ValueError, TypeError):
+                    pass
         notifications.append({
             "id": n.id,
             "alert_type": n.alert_type,
