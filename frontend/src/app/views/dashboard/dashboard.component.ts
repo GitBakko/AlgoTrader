@@ -226,13 +226,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
   // Performance data
   readonly performance = this.trading.performance;
 
-  // P&L by asset sorted by absolute value (for bar chart display)
+  // P&L by asset sorted by real value: best performers on top, worst on bottom
   readonly pnlByAsset = computed(() => {
     const perf = this.performance();
     if (!perf?.pnl_by_epic) return [];
     return Object.entries(perf.pnl_by_epic)
-      .map(([epic, pnl]) => ({ epic, pnl }))
-      .sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl))
+      .map(([epic, pnl]) => ({ epic, pnl: pnl as number }))
+      .sort((a, b) => b.pnl - a.pnl)
       .slice(0, 10);
   });
 
