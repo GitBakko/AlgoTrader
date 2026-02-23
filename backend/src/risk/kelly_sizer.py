@@ -151,8 +151,18 @@ class AdaptiveKellySizer:
         kelly_frac = stats.half_kelly if self.use_half_kelly else stats.kelly_fraction
 
         if kelly_frac <= 0:
-            logger.debug("Kelly fraction <= 0, no position")
-            return 0.0, "kelly_zero"
+            # Negative Kelly = no statistical edge. Fall back to fixed-fractional
+            # at 50% size so the system keeps trading conservatively and can
+            # recover its stats instead of deadlocking.
+            fallback = self._fixed_fractional(
+                equity, stop_distance, entry_price, confidence, max_position_pct
+            ) * 0.5
+            logger.info(
+                f"Kelly negative ({stats.kelly_fraction:.4f}), "
+                f"fallback to 50% fixed-fractional: size={fallback:.4f} "
+                f"(WR={stats.win_rate:.2%}, trades={stats.num_trades})"
+            )
+            return fallback, "kelly_negative_fallback"
 
         # Risk amount = kelly fraction * equity * confidence scaling
         confidence_mult = max(0.5, min(1.5, (confidence - 0.5) * 3.33))

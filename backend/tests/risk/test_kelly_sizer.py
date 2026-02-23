@@ -74,17 +74,17 @@ class TestAdaptiveKellySizer:
         trades = [{"pnl": -50}] * 10
         assert sizer.compute_stats(trades) is None
 
-    def test_kelly_zero_fraction(self):
-        """Bad stats -> kelly_zero method."""
+    def test_kelly_negative_fallback(self):
+        """Negative Kelly falls back to 50% fixed-fractional."""
         sizer = AdaptiveKellySizer(min_trades=5)
-        # 20% win rate, 1:1 payoff -> kelly = 0.2 - 0.8/1 = -0.6 -> 0
+        # 20% win rate, 1:1 payoff -> kelly = 0.2 - 0.8/1 = -0.6
         trades = self._make_trades(2, 8, avg_win=100, avg_loss=100)
         size, method = sizer.calculate_size(
             equity=10000, entry_price=100, stop_loss=95,
             confidence=0.7, trade_history=trades,
         )
-        assert method == "kelly_zero"
-        assert size == 0.0
+        assert method == "kelly_negative_fallback"
+        assert size > 0  # Still trades, but at reduced size
 
     def test_max_position_cap(self):
         """Position capped at max_position_pct."""
