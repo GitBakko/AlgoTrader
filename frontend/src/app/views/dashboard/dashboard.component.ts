@@ -87,14 +87,18 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly currentEpic = signal<string>('XAUUSD');
   readonly currentMarketStatus = signal<MarketStatusResponse | null>(null);
 
-  // Equity curve for TvChart
+  // Equity curve for TvChart — deduplicate to last value per day
   readonly equityLineData = computed<LineDataPoint[]>(() => {
     const curve = this.trading.equityCurve();
     if (curve.length === 0) return [];
-    return curve.map(p => ({
-      time: p.date?.substring(0, 10) || '',
-      value: p.equity,
-    }));
+    const byDay = new Map<string, number>();
+    for (const p of curve) {
+      const day = p.date?.substring(0, 10) || '';
+      if (day) byDay.set(day, p.equity);
+    }
+    return Array.from(byDay.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([time, value]) => ({ time, value }));
   });
 
   // All live positions with real-time P&L from WebSocket

@@ -69,14 +69,18 @@ export class PerformanceComponent implements OnInit {
     });
   }
 
-  // Equity curve for TvChart
+  // Equity curve for TvChart — deduplicate to last value per day
   readonly equityLineData = computed<LineDataPoint[]>(() => {
     const perf = this.performance();
     if (!perf?.equity_curve) return [];
-    return perf.equity_curve.map(p => ({
-      time: p.date?.substring(0, 10) || '',
-      value: p.value,
-    }));
+    const byDay = new Map<string, number>();
+    for (const p of perf.equity_curve) {
+      const day = p.date?.substring(0, 10) || '';
+      if (day) byDay.set(day, p.value);
+    }
+    return Array.from(byDay.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([time, value]) => ({ time, value }));
   });
 
   // P&L by asset sorted
