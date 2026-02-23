@@ -268,7 +268,21 @@
     @if (pnlByAsset().length > 0) {
       <c-card class="mb-4 border-top border-top-3 border-top-primary">
         <c-card-header class="d-flex align-items-center justify-content-between py-2">
-          <span class="fw-semibold small text-body-secondary">P&amp;L per Asset (30g)</span>
+          <div class="d-flex align-items-center gap-2">
+            <span class="fw-semibold small text-body-secondary">P&amp;L per Asset (30g)</span>
+            <div class="btn-group btn-group-sm" role="group">
+              <button type="button" class="btn btn-sm py-0 px-2"
+                      [class.btn-primary]="pnlSortMode() === 'pnl'"
+                      [class.btn-outline-secondary]="pnlSortMode() !== 'pnl'"
+                      (click)="pnlSortMode.set('pnl')"
+                      style="font-size: 0.7rem; line-height: 1.4">P&amp;L</button>
+              <button type="button" class="btn btn-sm py-0 px-2"
+                      [class.btn-primary]="pnlSortMode() === 'time'"
+                      [class.btn-outline-secondary]="pnlSortMode() !== 'time'"
+                      (click)="pnlSortMode.set('time')"
+                      style="font-size: 0.7rem; line-height: 1.4">Recenti</button>
+            </div>
+          </div>
           <span class="text-body-secondary small mantis-mono"
                 [class.text-success]="perf.total_pnl >= 0"
                 [class.text-danger]="perf.total_pnl < 0">

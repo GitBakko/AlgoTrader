@@ -286,10 +286,13 @@ class PositionRepository(BaseRepository[Position]):
             else 0
         )
 
-        # P&L by epic
+        # P&L by epic + last trade time per epic
         pnl_by_epic: dict[str, float] = {}
+        last_trade_by_epic: dict[str, str] = {}
         for p in positions:
             pnl_by_epic[p.epic] = pnl_by_epic.get(p.epic, 0) + float(p.profit_loss)
+            if p.closed_at:
+                last_trade_by_epic[p.epic] = p.closed_at.isoformat()
 
         # Equity curve (cumulative P&L over time)
         equity_points: list[dict] = []
@@ -359,6 +362,7 @@ class PositionRepository(BaseRepository[Position]):
             "best_trade": round(max(pnls), 2) if pnls else 0,
             "worst_trade": round(min(pnls), 2) if pnls else 0,
             "pnl_by_epic": {k: round(v, 2) for k, v in pnl_by_epic.items()},
+            "last_trade_by_epic": last_trade_by_epic,
             "equity_curve": equity_points,
             "sharpe_ratio": round(float(sharpe_ratio), 3),
             "sortino_ratio": round(float(sortino_ratio), 3),

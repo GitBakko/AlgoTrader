@@ -226,15 +226,27 @@ export class DashboardComponent implements OnInit, OnDestroy {
   // Performance data
   readonly performance = this.trading.performance;
 
-  // P&L by asset sorted by real value: best performers on top, worst on bottom
+  // P&L by asset sort mode: 'pnl' (best to worst) or 'time' (most recent first)
+  readonly pnlSortMode = signal<'pnl' | 'time'>('pnl');
+
   readonly pnlByAsset = computed(() => {
     const perf = this.performance();
     if (!perf?.pnl_by_epic) return [];
-    return Object.entries(perf.pnl_by_epic)
-      .map(([epic, pnl]) => ({ epic, pnl: pnl as number }))
-      .sort((a, b) => b.pnl - a.pnl)
-      .slice(0, 10);
+    const items = Object.entries(perf.pnl_by_epic)
+      .map(([epic, pnl]) => ({ epic, pnl: pnl as number }));
+
+    if (this.pnlSortMode() === 'time' && perf.last_trade_by_epic) {
+      const times = perf.last_trade_by_epic;
+      items.sort((a, b) => (times[b.epic] || '').localeCompare(times[a.epic] || ''));
+    } else {
+      items.sort((a, b) => b.pnl - a.pnl);
+    }
+    return items.slice(0, 10);
   });
+
+  togglePnlSort(): void {
+    this.pnlSortMode.update(m => m === 'pnl' ? 'time' : 'pnl');
+  }
 
   // Max absolute P&L for bar width calculation
   readonly maxAbsPnl = computed(() => {

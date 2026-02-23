@@ -349,6 +349,7 @@ export interface TradingPerformance {
   best_trade: number;
   worst_trade: number;
   pnl_by_epic: Record<string, number>;
+  last_trade_by_epic?: Record<string, string>;
   equity_curve: { date: string; value: number }[];
   source: string;
   sharpe_ratio?: number;
