@@ -101,11 +101,13 @@ class PositionRepository(BaseRepository[Position]):
         Returns:
             List of closed positions
         """
+        naive_start = start_date.replace(tzinfo=None) if start_date.tzinfo else start_date
+        naive_end = end_date.replace(tzinfo=None) if end_date.tzinfo else end_date
         result = await self.session.execute(
             select(Position)
             .where(Position.status == "CLOSED")
-            .where(Position.closed_at >= start_date)
-            .where(Position.closed_at <= end_date)
+            .where(Position.closed_at >= naive_start)
+            .where(Position.closed_at <= naive_end)
             .order_by(Position.closed_at.desc())
         )
         return list(result.scalars().all())
@@ -208,11 +210,13 @@ class PositionRepository(BaseRepository[Position]):
         count_q = select(func.count(Position.id)).where(Position.status == "CLOSED")
 
         if date_from:
-            base = base.where(Position.closed_at >= date_from)
-            count_q = count_q.where(Position.closed_at >= date_from)
+            naive_from = date_from.replace(tzinfo=None) if date_from.tzinfo else date_from
+            base = base.where(Position.closed_at >= naive_from)
+            count_q = count_q.where(Position.closed_at >= naive_from)
         if date_to:
-            base = base.where(Position.closed_at <= date_to)
-            count_q = count_q.where(Position.closed_at <= date_to)
+            naive_to = date_to.replace(tzinfo=None) if date_to.tzinfo else date_to
+            base = base.where(Position.closed_at <= naive_to)
+            count_q = count_q.where(Position.closed_at <= naive_to)
         if close_reason:
             base = base.where(Position.close_reason == close_reason)
             count_q = count_q.where(Position.close_reason == close_reason)
@@ -244,9 +248,12 @@ class PositionRepository(BaseRepository[Position]):
             .where(Position.profit_loss.is_not(None))
         )
         if date_from:
-            query = query.where(Position.closed_at >= date_from)
+            # Strip tzinfo for asyncpg TIMESTAMP WITHOUT TIME ZONE columns
+            naive_from = date_from.replace(tzinfo=None) if date_from.tzinfo else date_from
+            query = query.where(Position.closed_at >= naive_from)
         if date_to:
-            query = query.where(Position.closed_at <= date_to)
+            naive_to = date_to.replace(tzinfo=None) if date_to.tzinfo else date_to
+            query = query.where(Position.closed_at <= naive_to)
         if epic:
             query = query.where(Position.epic == epic)
         query = query.order_by(Position.closed_at.asc())
