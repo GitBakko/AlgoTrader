@@ -220,11 +220,12 @@ class FeatureBuilder:
                 df, epic, config.additional_timeframes, params, start_date, end_date
             )
 
-        # Step 7: Regime detection
+        # Step 7: Regime detection + one-hot encoding for ML
         if include_regime:
             detector = RegimeDetector()
             if "adx" in df.columns and f"ema_{detector.ema_period}" in df.columns:
                 df = detector.detect(df)
+                df = self._add_regime_features(df)
 
         # Step 8: Normalize features
         feature_cols = [c for c in df.columns if c not in initial_cols and c != "regime"]
@@ -297,11 +298,12 @@ class FeatureBuilder:
         # Technical indicators
         df = self._add_technical_indicators(df, params)
 
-        # Regime
+        # Regime + one-hot encoding for ML
         if include_regime:
             detector = RegimeDetector()
             if "adx" in df.columns and f"ema_{detector.ema_period}" in df.columns:
                 df = detector.detect(df)
+                df = self._add_regime_features(df)
 
         # Normalize
         feature_cols = [c for c in df.columns if c not in initial_cols and c != "regime"]
@@ -379,15 +381,9 @@ class FeatureBuilder:
         # Session features
         df = ti.add_session_features(df)
 
-        # Candlestick patterns (8 binary features)
-        df = ti.add_candlestick_patterns(df)
-
-        # Fibonacci cluster zones (7 features)
-        df = ti.add_fibonacci_levels(
-            df,
-            swing_lookback=params.get("fib_swing_lookback", 20),
-            atr_period=params.get("atr_period", 14),
-        )
+        # NOTE: Candlestick (8) and Fibonacci (7) features removed in Phase 2.1
+        # to reduce overfitting (15 features with low predictive value)
+        # Methods kept in technical.py for potential future use
 
         # Keltner Channel + True Squeeze detection
         df = KeltnerChannel.add_keltner(
@@ -411,6 +407,23 @@ class FeatureBuilder:
             )
             df = detector.add_all(df)
 
+        return df
+
+    @staticmethod
+    def _add_regime_features(df: pl.DataFrame) -> pl.DataFrame:
+        """One-hot encode regime column for XGBoost consumption.
+
+        Creates 3 binary features: regime_trending_up, regime_trending_down, regime_ranging.
+        These allow XGBoost to learn regime-specific splits without separate models.
+        """
+        if "regime" not in df.columns:
+            return df
+
+        df = df.with_columns([
+            (pl.col("regime") == "trending_up").cast(pl.Int32).alias("regime_trending_up"),
+            (pl.col("regime") == "trending_down").cast(pl.Int32).alias("regime_trending_down"),
+            (pl.col("regime") == "ranging").cast(pl.Int32).alias("regime_ranging"),
+        ])
         return df
 
     def _add_multi_timeframe_features(

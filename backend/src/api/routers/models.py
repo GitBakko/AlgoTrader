@@ -278,3 +278,21 @@ async def train_model(epic: str = Path(...)):
     logger.info(f"Training subprocess started for {epic}")
 
     return success_response({"message": f"Training avviato per {epic}", "epic": epic})
+
+
+@router.post("/retrain-all")
+async def retrain_all(
+    prediction_service=Depends(get_prediction_service),
+):
+    """Trigger background retraining for all active assets."""
+    import asyncio
+
+    from src.models.auto_retrain import retrain_all_models
+
+    async def _run():
+        await retrain_all_models(prediction_service=prediction_service)
+
+    asyncio.create_task(_run(), name="manual_retrain_all")
+    logger.info("Manual retrain-all triggered via API")
+
+    return success_response({"message": "Retrain avviato per tutti gli asset attivi"})

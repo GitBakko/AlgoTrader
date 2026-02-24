@@ -77,14 +77,16 @@ async def start_data_scheduler(app_state) -> None:
     try:
         from src.data.scheduler import DataScheduler
 
+        prediction_service = getattr(app_state, "prediction_service", None)
         scheduler = DataScheduler(
             client=broker,
             storage=storage,
             data_access=data_access,
+            prediction_service=prediction_service,
         )
         scheduler.setup()
         scheduler.start()
         app_state.data_scheduler = scheduler
-        logger.info("Data scheduler started")
+        logger.info("Data scheduler started (with weekly model retrain)")
     except Exception as e:
         logger.error(f"Failed to start data scheduler: {e}")

@@ -361,6 +361,7 @@ class ModelTrainer:
                 timeframe=timeframe,
                 feature_names=feature_cols,
                 num_features=len(feature_cols),
+                horizon_bars=self.target_builder.horizon_bars,
                 hyperparameters=result.hyperparameters,
                 training_result=result,
             )

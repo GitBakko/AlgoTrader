@@ -27,6 +27,7 @@ from loguru import logger
 from src.data.data_access import DataAccessLayer
 from src.data.storage import ParquetStorageManager
 from src.features.builder import FeatureBuilder
+from src.models.target_builder import TargetBuilder
 from src.models.trainer import ModelTrainer
 from src.models.versioning import ModelVersioning
 from src.models.walk_forward import WalkForwardSplitter
@@ -102,12 +103,12 @@ def tune_hyperparameters(
     feature_builder: FeatureBuilder,
     splitter: WalkForwardSplitter,
     n_trials: int = 40,
+    horizon_bars: int = 6,
 ) -> dict:
     """Run Optuna tuning on the first walk-forward fold. Returns best params dict."""
-    from src.models.target_builder import TargetBuilder
     from src.models.tuner import XGBoostTuner
 
-    logger.info(f"Tuning hyperparameters for {epic} ({n_trials} trials)...")
+    logger.info(f"Tuning hyperparameters for {epic} ({n_trials} trials, horizon={horizon_bars})...")
 
     # Build features
     df, feature_meta = feature_builder.build_features(
@@ -118,7 +119,7 @@ def tune_hyperparameters(
         logger.warning(f"No data for {epic}/{timeframe}, skipping tuning")
         return {}
 
-    target_builder = TargetBuilder()
+    target_builder = TargetBuilder(horizon_bars=horizon_bars)
     df = target_builder.build_targets(df)
     df_valid = df.filter(df["target"].is_not_null())
 
@@ -279,9 +280,10 @@ def train_asset(
 def main(args: argparse.Namespace) -> None:
     """Train XGBoost models for all configured assets."""
     logger.info("=" * 60)
-    logger.info("AlgoTrader AI - Model Training")
+    logger.info("MANTIS AI - Model Training")
     if args.tune:
         logger.info(f"  Optuna tuning: {args.tune_trials} trials per asset")
+    logger.info(f"  Prediction horizon: {args.horizon} bars")
     logger.info("=" * 60)
 
     assets = args.assets
@@ -311,13 +313,16 @@ def main(args: argparse.Namespace) -> None:
 
             if xgb_params is None:
                 xgb_params = tune_hyperparameters(
-                    epic, timeframe, feature_builder, splitter, args.tune_trials
+                    epic, timeframe, feature_builder, splitter,
+                    args.tune_trials, horizon_bars=args.horizon,
                 )
                 if xgb_params:
                     save_tuned_params(epic, timeframe, xgb_params)
 
+        target_builder = TargetBuilder(horizon_bars=args.horizon)
         trainer = ModelTrainer(
             feature_builder=feature_builder,
+            target_builder=target_builder,
             versioning=versioning,
             splitter=splitter,
         )
@@ -371,6 +376,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--retune", action="store_true",
         help="Force re-tuning even if cached params exist",
+    )
+    parser.add_argument(
+        "--horizon", type=int, default=6,
+        help="Prediction horizon in bars (default: 6). Try 3 for short-term, 12 for longer",
     )
     return parser.parse_args()
 

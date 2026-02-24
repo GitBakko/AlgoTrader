@@ -154,12 +154,23 @@ class RiskManager:
                 rejection_reason=dd_reason,
             )
 
-        # 3. Calculate stop-loss (3 ATR default — gives trades room to breathe)
+        # 3. Calculate stop-loss with dynamic multiplier (volatility-scaled)
+        # Base=3 ATR, scales with current vs baseline volatility ratio
+        baseline_atr = self.circuit_breakers.get_baseline_atr(signal.epic)
+        stop_mult = StopManager.dynamic_multiplier(
+            base_multiplier=3.0,
+            current_atr=atr,
+            baseline_atr=baseline_atr,
+        )
+        if abs(stop_mult - 3.0) > 0.01:
+            adjustments.append(
+                f"Dynamic SL multiplier: {stop_mult:.2f}x (base=3.0, vol ratio={atr/baseline_atr:.2f})"
+            )
         stop_loss = StopManager.calculate_stop_loss(
             direction=signal.direction.value,
             entry_price=signal.entry_price,
             atr=atr,
-            multiplier=3.0,
+            multiplier=stop_mult,
         )
 
         # Use signal's suggested stop if tighter
@@ -173,12 +184,12 @@ class RiskManager:
                 stop_loss = max(stop_loss, signal.suggested_stop)
             adjustments.append("Using tighter suggested stop-loss")
 
-        # 4. Calculate take-profit (SL=3 ATR, TP=3*1.5=4.5 ATR)
+        # 4. Calculate take-profit (uses same dynamic multiplier for consistency)
         take_profit = StopManager.calculate_take_profit(
             direction=signal.direction.value,
             entry_price=signal.entry_price,
             atr=atr,
-            multiplier=3.0,
+            multiplier=stop_mult,
             risk_reward=1.5,
         )
 

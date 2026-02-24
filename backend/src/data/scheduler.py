@@ -27,6 +27,7 @@ class DataScheduler:
     2. Quality checks - Daily after download
     3. Gap backfill - Weekly scan and fill
     4. Parquet optimization - Weekly compaction
+    5. Weekly model retrain - After data optimization
     """
 
     def __init__(
@@ -34,10 +35,12 @@ class DataScheduler:
         client: CapitalComClient,
         storage: ParquetStorageManager,
         data_access: DataAccessLayer,
+        prediction_service=None,
     ):
         self.client = client
         self.storage = storage
         self.data_access = data_access
+        self.prediction_service = prediction_service
         self.downloader = HistoricalDownloader(client, storage)
         self.quality_checker = DataQualityChecker()
         self.scheduler = AsyncIOScheduler()
@@ -93,7 +96,16 @@ class DataScheduler:
             replace_existing=True,
         )
 
-        logger.info("Data scheduler configured with 5 jobs")
+        # 5. Weekly model retrain - Sundays at 16:00 UTC (after data optimization)
+        self.scheduler.add_job(
+            self.job_weekly_retrain,
+            CronTrigger(hour=16, day_of_week="sun"),
+            id="weekly_retrain",
+            name="Weekly model retrain",
+            replace_existing=True,
+        )
+
+        logger.info("Data scheduler configured with 6 jobs")
 
     def start(self) -> None:
         """Start the scheduler."""
@@ -221,6 +233,25 @@ class DataScheduler:
                     logger.error(f"Gap backfill failed for {epic}/{timeframe}: {e}")
 
         logger.info("Gap backfill job completed")
+
+    async def job_weekly_retrain(self) -> None:
+        """
+        Weekly model retraining.
+        Runs walk-forward training for all active assets and reloads models.
+        """
+        from src.models.auto_retrain import retrain_all_models
+
+        logger.info("Running weekly model retrain job...")
+        try:
+            results = await retrain_all_models(
+                prediction_service=self.prediction_service,
+                timeframe="1h",
+                horizon_bars=6,
+            )
+            successful = sum(1 for s in results.values() if s)
+            logger.info(f"Weekly retrain complete: {successful}/{len(results)} models")
+        except Exception as e:
+            logger.error(f"Weekly retrain job failed: {e}", exc_info=True)
 
     async def job_optimize_storage(self) -> None:
         """

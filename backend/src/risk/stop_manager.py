@@ -7,6 +7,34 @@ class StopManager:
     """Calculates stop-loss, take-profit, and trailing stop levels using ATR."""
 
     @staticmethod
+    def dynamic_multiplier(
+        base_multiplier: float,
+        current_atr: float,
+        baseline_atr: float | None,
+        min_multiplier: float = 2.0,
+        max_multiplier: float = 5.0,
+    ) -> float:
+        """
+        Scale stop multiplier based on current volatility vs baseline.
+
+        In high volatility (ATR >> baseline): widen stops to avoid premature hits.
+        In low volatility (ATR << baseline): tighten stops for better R:R.
+
+        Formula: scaled = base * (0.5 + 0.5 * ratio), clamped to [min, max]
+
+        Examples (base=3.0):
+            ratio=1.0 → 3.0 (normal)
+            ratio=2.0 → 4.5 (high vol → wider stops)
+            ratio=0.5 → 2.25 (low vol → tighter stops)
+        """
+        if not isinstance(baseline_atr, (int, float)) or baseline_atr <= 0:
+            return base_multiplier
+
+        ratio = current_atr / baseline_atr
+        scaled = base_multiplier * (0.5 + 0.5 * ratio)
+        return max(min_multiplier, min(max_multiplier, scaled))
+
+    @staticmethod
     def calculate_stop_loss(
         direction: str,
         entry_price: float,

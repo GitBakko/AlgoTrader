@@ -90,5 +90,6 @@ class ModelMetadata(BaseModel):
     training_result: TrainingResult | None = None
     train_date_start: datetime | None = None
     train_date_end: datetime | None = None
+    horizon_bars: int = 6
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     description: str = ""
