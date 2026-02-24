@@ -154,12 +154,12 @@ class RiskManager:
                 rejection_reason=dd_reason,
             )
 
-        # 3. Calculate stop-loss
+        # 3. Calculate stop-loss (3 ATR default — gives trades room to breathe)
         stop_loss = StopManager.calculate_stop_loss(
             direction=signal.direction.value,
             entry_price=signal.entry_price,
             atr=atr,
-            multiplier=2.0,
+            multiplier=3.0,
         )
 
         # Use signal's suggested stop if tighter
@@ -173,13 +173,13 @@ class RiskManager:
                 stop_loss = max(stop_loss, signal.suggested_stop)
             adjustments.append("Using tighter suggested stop-loss")
 
-        # 4. Calculate take-profit
+        # 4. Calculate take-profit (SL=3 ATR, TP=3*1.5=4.5 ATR)
         take_profit = StopManager.calculate_take_profit(
             direction=signal.direction.value,
             entry_price=signal.entry_price,
             atr=atr,
-            multiplier=2.0,
-            risk_reward=2.0,
+            multiplier=3.0,
+            risk_reward=1.5,
         )
 
         if signal.suggested_tp is not None:

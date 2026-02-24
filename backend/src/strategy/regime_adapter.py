@@ -9,18 +9,18 @@ from src.strategy.schemas import StrategyConfig
 # Regime-specific parameter overrides (calibrated for 3-class system)
 _REGIME_PARAMS: dict[str, dict[str, float]] = {
     "trending_up": {
-        "min_confidence": 0.45,
-        "stop_multiplier": 2.5,
+        "min_confidence": 0.40,
+        "stop_multiplier": 3.5,
         "counter_trend_penalty": 0.4,
     },
     "trending_down": {
-        "min_confidence": 0.55,
-        "stop_multiplier": 1.5,
+        "min_confidence": 0.45,
+        "stop_multiplier": 2.5,
         "counter_trend_penalty": 0.3,
     },
     "ranging": {
-        "min_confidence": 0.55,
-        "stop_multiplier": 1.5,
+        "min_confidence": 0.45,
+        "stop_multiplier": 2.5,
         "counter_trend_penalty": 0.7,
     },
 }
@@ -60,7 +60,7 @@ class RegimeAdapter:
             ATR multiplier for stop-loss calculation
         """
         if regime is None or regime not in _REGIME_PARAMS:
-            return 2.0
+            return 3.0
         return _REGIME_PARAMS[regime]["stop_multiplier"]
 
     @staticmethod

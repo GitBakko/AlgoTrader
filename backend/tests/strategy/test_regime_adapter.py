@@ -10,17 +10,17 @@ class TestRegimeAdapter:
     def test_trending_up_lowers_confidence(self):
         base = StrategyConfig(min_confidence=0.50)
         adapted = RegimeAdapter.adapt_params("trending_up", base)
-        assert adapted.min_confidence == 0.45
+        assert adapted.min_confidence == 0.40
 
-    def test_trending_down_raises_confidence(self):
+    def test_trending_down_adjusts_confidence(self):
         base = StrategyConfig(min_confidence=0.50)
         adapted = RegimeAdapter.adapt_params("trending_down", base)
-        assert adapted.min_confidence == 0.55
+        assert adapted.min_confidence == 0.45
 
-    def test_ranging_raises_confidence(self):
+    def test_ranging_adjusts_confidence(self):
         base = StrategyConfig(min_confidence=0.50)
         adapted = RegimeAdapter.adapt_params("ranging", base)
-        assert adapted.min_confidence == 0.55
+        assert adapted.min_confidence == 0.45
 
     def test_none_regime_no_change(self):
         base = StrategyConfig(min_confidence=0.50, stop_multiplier=2.0)
@@ -34,13 +34,13 @@ class TestRegimeAdapter:
         assert adapted.min_confidence == 0.50
 
     def test_stop_multiplier_trending_up(self):
-        assert RegimeAdapter.get_stop_multiplier("trending_up") == 2.5
+        assert RegimeAdapter.get_stop_multiplier("trending_up") == 3.5
 
     def test_stop_multiplier_trending_down(self):
-        assert RegimeAdapter.get_stop_multiplier("trending_down") == 1.5
+        assert RegimeAdapter.get_stop_multiplier("trending_down") == 2.5
 
     def test_stop_multiplier_default(self):
-        assert RegimeAdapter.get_stop_multiplier(None) == 2.0
+        assert RegimeAdapter.get_stop_multiplier(None) == 3.0
 
     def test_is_counter_trend_sell_in_uptrend(self):
         assert RegimeAdapter.is_counter_trend("SELL", "trending_up") is True

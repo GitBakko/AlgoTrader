@@ -45,10 +45,10 @@ class StrategyConfig(BaseModel):
     counter_trend_penalty: float = Field(default=0.5, ge=0.0, le=1.0)
     overbought_rsi: float = Field(default=80.0, ge=50.0, le=100.0)
     oversold_rsi: float = Field(default=20.0, ge=0.0, le=50.0)
-    stop_multiplier: float = Field(default=2.0, ge=0.5, le=5.0)
-    risk_reward_ratio: float = Field(default=2.0, ge=0.5, le=5.0)
+    stop_multiplier: float = Field(default=3.0, ge=0.5, le=5.0)
+    risk_reward_ratio: float = Field(default=1.5, ge=0.5, le=5.0)
     adx_trending_threshold: float = Field(default=25.0, ge=10.0, le=50.0)
-    adx_ranging_threshold: float = Field(default=20.0, ge=5.0, le=40.0)
+    adx_ranging_threshold: float = Field(default=15.0, ge=5.0, le=40.0)
     adx_confidence_boost: float = Field(default=0.05, ge=0.0, le=0.15)
 
 
