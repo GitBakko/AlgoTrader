@@ -19,7 +19,7 @@ _REGIME_PARAMS: dict[str, dict[str, float]] = {
         "counter_trend_penalty": 0.4,  # was 0.3 (less harsh)
     },
     "ranging": {
-        "min_confidence": 0.52,     # was 0.45
+        "min_confidence": 0.50,     # was 0.52 (aligned with trending)
         "stop_multiplier": 2.0,     # was 2.5
         "counter_trend_penalty": 0.7,  # unchanged
     },

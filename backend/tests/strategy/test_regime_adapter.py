@@ -20,7 +20,7 @@ class TestRegimeAdapter:
     def test_ranging_adjusts_confidence(self):
         base = StrategyConfig(min_confidence=0.55)
         adapted = RegimeAdapter.adapt_params("ranging", base)
-        assert adapted.min_confidence == 0.52
+        assert adapted.min_confidence == 0.50
 
     def test_none_regime_no_change(self):
         base = StrategyConfig(min_confidence=0.50, stop_multiplier=2.0)

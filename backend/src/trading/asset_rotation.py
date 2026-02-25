@@ -72,8 +72,8 @@ def compute_momentum_scores(
 
 def select_active_assets(
     momentum_scores: dict[str, float],
-    top_pct: float = 0.5,
-    min_assets: int = 8,
+    top_pct: float = 0.75,
+    min_assets: int = 10,
 ) -> list[str]:
     """
     Select top assets by risk-adjusted momentum.

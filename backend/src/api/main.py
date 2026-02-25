@@ -278,11 +278,10 @@ async def lifespan(app: FastAPI):
     if recovery_report.trade_history_count > 0:
         trade_history = await recovery_service._restore_trade_history_list()
         app.state.paper_loop._trade_history = trade_history
-        # Reset CB counter before replay — _restore_risk_state() already set it from
-        # the snapshot, but the snapshot value may be stale. Replaying the full trade
-        # history gives the authoritative consecutive_losses count.
         from src.risk.circuit_breakers import CircuitBreakerType
         cb = app.state.paper_loop.risk_manager.circuit_breakers
+        # Save snapshot value — if manually reset to 0, we honour it
+        snapshot_consecutive = cb._consecutive_losses
         cb._consecutive_losses = 0
         cb._tripped.pop(CircuitBreakerType.CONSECUTIVE_LOSSES, None)
         cb._tripped_at.pop(CircuitBreakerType.CONSECUTIVE_LOSSES, None)
@@ -290,6 +289,12 @@ async def lifespan(app: FastAPI):
         for t in reversed(trade_history):
             pnl = t.get("pnl", 0)
             cb.record_trade_result(is_win=(pnl > 0))
+        # If snapshot was manually reset to 0, honour the manual reset
+        if snapshot_consecutive == 0 and cb._consecutive_losses > 0:
+            logger.info(f"CB snapshot was manually reset to 0, overriding replay value ({cb._consecutive_losses})")
+            cb._consecutive_losses = 0
+            cb._tripped.pop(CircuitBreakerType.CONSECUTIVE_LOSSES, None)
+            cb._tripped_at.pop(CircuitBreakerType.CONSECUTIVE_LOSSES, None)
         logger.info(f"Injected {len(trade_history)} trades into Kelly history + circuit breaker (consecutive_losses={cb._consecutive_losses})")
 
     # ══════════════════════════════════════════════════════════
