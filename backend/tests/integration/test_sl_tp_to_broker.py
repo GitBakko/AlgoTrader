@@ -79,14 +79,14 @@ async def test_sl_tp_flow_to_broker(mock_risk_manager):
     assert risk_result.take_profit is not None, "RiskCheckResult must have take_profit!"
 
     # 4. Verify correct SL/TP values
-    # BUY: SL should be BELOW entry (entry - ATR*3)
+    # BUY: SL should be BELOW entry (entry - ATR*2)
     assert risk_result.stop_loss < signal.entry_price, f"BUY SL must be below entry! SL={risk_result.stop_loss} entry={signal.entry_price}"
-    expected_sl = signal.entry_price - (10.0 * 3.0)  # 2000 - 30 = 1970
+    expected_sl = signal.entry_price - (10.0 * 2.0)  # 2000 - 20 = 1980
     assert abs(risk_result.stop_loss - expected_sl) < 0.01
 
-    # TP should be ABOVE entry (entry + ATR*3*1.5)
+    # TP should be ABOVE entry (entry + ATR*2*2.5)
     assert risk_result.take_profit > signal.entry_price
-    expected_tp = signal.entry_price + (10.0 * 3.0 * 1.5)  # 2000 + 45 = 2045
+    expected_tp = signal.entry_price + (10.0 * 2.0 * 2.5)  # 2000 + 50 = 2050
     assert abs(risk_result.take_profit - expected_tp) < 0.01
 
     # 5. Create mock broker that captures the payload
@@ -155,14 +155,14 @@ async def test_sell_position_sl_tp_flow(mock_risk_manager):
         trade_history=[],
     )
 
-    # SELL: SL should be ABOVE entry (entry + ATR*3)
+    # SELL: SL should be ABOVE entry (entry + ATR*2)
     assert risk_result.stop_loss > signal.entry_price, f"SELL SL must be above entry! SL={risk_result.stop_loss} entry={signal.entry_price}"
-    expected_sl = signal.entry_price + (10.0 * 3.0)  # 2000 + 30 = 2030
+    expected_sl = signal.entry_price + (10.0 * 2.0)  # 2000 + 20 = 2020
     assert abs(risk_result.stop_loss - expected_sl) < 0.01
 
-    # TP should be BELOW entry (entry - ATR*3*1.5)
+    # TP should be BELOW entry (entry - ATR*2*2.5)
     assert risk_result.take_profit < signal.entry_price
-    expected_tp = signal.entry_price - (10.0 * 3.0 * 1.5)  # 2000 - 45 = 1955
+    expected_tp = signal.entry_price - (10.0 * 2.0 * 2.5)  # 2000 - 50 = 1950
     assert abs(risk_result.take_profit - expected_tp) < 0.01
 
 

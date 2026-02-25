@@ -76,8 +76,8 @@ def test_buy_position_sl_below_entry(mock_check_exposure):
         f"Entry={signal.entry_price}, SL={result.stop_loss}"
     )
 
-    # Expected SL = entry - (ATR * 3) = 2000 - 30 = 1970
-    expected_sl = signal.entry_price - (atr * 3.0)
+    # Expected SL = entry - (ATR * 2) = 2000 - 20 = 1980
+    expected_sl = signal.entry_price - (atr * 2.0)
     assert abs(result.stop_loss - expected_sl) < 0.01
 
 
@@ -144,8 +144,8 @@ def test_sell_position_sl_above_entry(mock_check_exposure):
         f"Entry={signal.entry_price}, SL={result.stop_loss}"
     )
 
-    # Expected SL = entry + (ATR * 3) = 2000 + 30 = 2030
-    expected_sl = signal.entry_price + (atr * 3.0)
+    # Expected SL = entry + (ATR * 2) = 2000 + 20 = 2020
+    expected_sl = signal.entry_price + (atr * 2.0)
     assert abs(result.stop_loss - expected_sl) < 0.01
 
 
@@ -181,7 +181,7 @@ def test_buy_with_suggested_stop_chooses_min(mock_check_exposure):
     risk_manager.equity_curve_filter = MagicMock()
     risk_manager.equity_curve_filter.get_size_multiplier.return_value = 1.0
 
-    # ATR-based SL would be: 2000 - 30 = 1970
+    # ATR-based SL would be: 2000 - 20 = 1980
     # Suggested SL: 1990 (tighter, closer to entry)
     signal = TradingSignal(
         epic="XAUUSD",
@@ -202,8 +202,8 @@ def test_buy_with_suggested_stop_chooses_min(mock_check_exposure):
     )
 
     # For BUY: min() chooses the LOWER value (further from entry = more conservative)
-    # ATR SL = 1970, suggested = 1990 → min(1970, 1990) = 1970
-    assert result.stop_loss == min(1970.0, 1990.0)  # = 1970
+    # ATR SL = 1980, suggested = 1990 → min(1980, 1990) = 1980
+    assert result.stop_loss == min(1980.0, 1990.0)  # = 1980
     assert result.stop_loss < signal.entry_price
 
 
@@ -238,7 +238,7 @@ def test_sell_with_suggested_stop_chooses_max(mock_check_exposure):
     risk_manager.equity_curve_filter = MagicMock()
     risk_manager.equity_curve_filter.get_size_multiplier.return_value = 1.0
 
-    # ATR-based SL would be: 2000 + 30 = 2030
+    # ATR-based SL would be: 2000 + 20 = 2020
     # Suggested SL: 2010 (tighter, closer to entry)
     signal = TradingSignal(
         epic="XAUUSD",
@@ -259,6 +259,6 @@ def test_sell_with_suggested_stop_chooses_max(mock_check_exposure):
     )
 
     # For SELL: max() gives HIGHER value (further from entry = more conservative)
-    # ATR SL = 2030, suggested = 2010 → max(2030, 2010) = 2030
-    assert result.stop_loss == max(2030.0, 2010.0)  # = 2030
+    # ATR SL = 2020, suggested = 2010 → max(2020, 2010) = 2020
+    assert result.stop_loss == max(2020.0, 2010.0)  # = 2020
     assert result.stop_loss > signal.entry_price

@@ -44,13 +44,8 @@ class PositionSizer:
         risk_amount = equity * risk_per_trade
 
         # Base position size from risk/stop distance
-        base_size = risk_amount / stop_distance
-
-        # Confidence multiplier: 0.65 -> 0.5x, 0.80 -> 1.0x, 0.95 -> 1.5x
-        confidence_mult = max(0.5, min(1.5, (confidence - 0.5) * 3.33))
-
-        # Apply confidence scaling
-        final_size = base_size * confidence_mult
+        # Note: confidence scaling is handled by RiskManager.confidence_size_multiplier()
+        final_size = risk_amount / stop_distance
 
         # Cap at max_position_pct of equity
         max_size = (equity * max_position_pct) / entry_price

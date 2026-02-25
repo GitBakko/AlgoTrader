@@ -16,19 +16,20 @@ class XGBoostTuner:
     """Tunes XGBoost hyperparameters using Optuna's TPE sampler."""
 
     PARAM_SPACE = {
-        "max_depth": (3, 8),
-        "learning_rate": (0.01, 0.3),
-        "n_estimators": (100, 800),
-        "subsample": (0.6, 1.0),
-        "colsample_bytree": (0.5, 1.0),
-        "min_child_weight": (1, 20),
-        "reg_alpha": (1e-3, 10.0),
-        "reg_lambda": (1e-3, 10.0),
+        "max_depth": (3, 5),
+        "learning_rate": (0.01, 0.1),
+        "n_estimators": (500, 1500),
+        "subsample": (0.5, 0.8),
+        "colsample_bytree": (0.4, 0.7),
+        "min_child_weight": (10, 50),
+        "reg_alpha": (0.5, 10.0),
+        "reg_lambda": (3.0, 15.0),
+        "gamma": (0.1, 2.0),
     }
 
     def __init__(
         self,
-        n_trials: int = 40,
+        n_trials: int = 80,
         timeout_seconds: int = 300,
         n_classes: int = 3,
         random_state: int = 42,
@@ -81,6 +82,7 @@ class XGBoostTuner:
                 "reg_lambda": trial.suggest_float(
                     "reg_lambda", *self.PARAM_SPACE["reg_lambda"], log=True
                 ),
+                "gamma": trial.suggest_float("gamma", *self.PARAM_SPACE["gamma"]),
                 "objective": "multi:softprob",
                 "num_class": self.n_classes,
                 "eval_metric": "mlogloss",

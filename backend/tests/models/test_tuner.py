@@ -37,7 +37,7 @@ def test_tuner_returns_params(synthetic_data):
     expected_keys = {
         "max_depth", "learning_rate", "n_estimators",
         "subsample", "colsample_bytree", "min_child_weight",
-        "reg_alpha", "reg_lambda",
+        "reg_alpha", "reg_lambda", "gamma",
     }
     assert expected_keys == set(result.keys())
 
@@ -49,12 +49,15 @@ def test_tuner_param_ranges(synthetic_data):
     tuner = XGBoostTuner(n_trials=5, timeout_seconds=60)
     result = tuner.tune(X_train, y_train, X_val, y_val)
 
-    assert 3 <= result["max_depth"] <= 8
-    assert 0.01 <= result["learning_rate"] <= 0.3
-    assert 100 <= result["n_estimators"] <= 800
-    assert 0.6 <= result["subsample"] <= 1.0
-    assert 0.5 <= result["colsample_bytree"] <= 1.0
-    assert 1 <= result["min_child_weight"] <= 20
+    assert 3 <= result["max_depth"] <= 5
+    assert 0.01 <= result["learning_rate"] <= 0.1
+    assert 500 <= result["n_estimators"] <= 1500
+    assert 0.5 <= result["subsample"] <= 0.8
+    assert 0.4 <= result["colsample_bytree"] <= 0.7
+    assert 10 <= result["min_child_weight"] <= 50
+    assert 0.5 <= result["reg_alpha"] <= 10.0
+    assert 3.0 <= result["reg_lambda"] <= 15.0
+    assert 0.1 <= result["gamma"] <= 2.0
 
 
 def test_tuner_respects_timeout():

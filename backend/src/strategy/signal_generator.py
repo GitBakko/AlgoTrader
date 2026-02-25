@@ -45,6 +45,8 @@ class SignalGenerator:
         regime: str | None = None,
         config: StrategyConfig | None = None,
         adx: float | None = None,
+        sma_50: float | None = None,
+        ema_slope: float | None = None,
     ) -> TradingSignal:
         """
         Generate a trading signal from an ML prediction.
@@ -52,6 +54,9 @@ class SignalGenerator:
         Pipeline:
         1. Check minimum confidence threshold
         2. Map SignalClass to BUY/SELL/HOLD direction
+        2.1. SMA trend filter (penalize counter-trend vs SMA50)
+        2.2. EMA slope filter (penalize flat trend)
+        2.3. Re-check confidence after trend filters
         2.5. ADX pre-signal filter (reject choppy markets, boost trending)
         3. RSI overbought/oversold filter
         4. Counter-trend penalty
@@ -67,6 +72,8 @@ class SignalGenerator:
             regime: Current market regime (optional)
             config: Strategy configuration (uses defaults if None)
             adx: Current ADX value (optional, skips ADX filter if None)
+            sma_50: SMA(50) value (optional, skips SMA filter if None)
+            ema_slope: EMA slope value (optional, skips slope filter if None)
 
         Returns:
             TradingSignal with direction, confidence, and suggested levels
@@ -90,6 +97,42 @@ class SignalGenerator:
         # 2. Map SignalClass to direction
         direction = _SIGNAL_TO_DIRECTION.get(prediction.signal_class, SignalDirection.HOLD)
         if direction == SignalDirection.HOLD:
+            return _make_hold_signal(epic, current_price, regime)
+
+        # 2.1. SMA trend filter — penalize counter-trend relative to SMA(50)
+        if sma_50 is not None and sma_50 > 0:
+            if direction == SignalDirection.BUY and current_price < sma_50 * 0.995:
+                original = confidence
+                confidence *= cfg.trend_sma_penalty
+                logger.debug(
+                    f"{epic}: SMA trend penalty (BUY below SMA50): "
+                    f"{original:.2f} -> {confidence:.2f}"
+                )
+            elif direction == SignalDirection.SELL and current_price > sma_50 * 1.005:
+                original = confidence
+                confidence *= cfg.trend_sma_penalty
+                logger.debug(
+                    f"{epic}: SMA trend penalty (SELL above SMA50): "
+                    f"{original:.2f} -> {confidence:.2f}"
+                )
+
+        # 2.2. EMA slope filter — penalize signals when trend is flat
+        if ema_slope is not None and atr > 0:
+            normalized_slope = abs(ema_slope) / atr
+            if normalized_slope < cfg.trend_ema_slope_min:
+                original = confidence
+                confidence *= cfg.trend_ema_slope_penalty
+                logger.debug(
+                    f"{epic}: EMA slope penalty (flat, slope/ATR={normalized_slope:.3f}): "
+                    f"{original:.2f} -> {confidence:.2f}"
+                )
+
+        # 2.3. Re-check confidence after trend filters
+        if confidence < cfg.min_confidence:
+            logger.debug(
+                f"{epic}: Confidence {confidence:.2f} below threshold "
+                f"after trend filters -> HOLD"
+            )
             return _make_hold_signal(epic, current_price, regime)
 
         # 2.5. ADX pre-signal filter

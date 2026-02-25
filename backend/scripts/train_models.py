@@ -73,13 +73,16 @@ ALL_ASSETS = list(_ALL_ASSETS)
 TUNED_PARAMS_DIR = Path(__file__).parent.parent / "data" / "tuned_params"
 
 
-def get_walk_forward_splitter(timeframe: str, epic: str = "") -> WalkForwardSplitter:
+def get_walk_forward_splitter(
+    timeframe: str, epic: str = "", horizon_bars: int = 12
+) -> WalkForwardSplitter:
     """Create a WalkForwardSplitter with windows scaled to the timeframe.
 
     The base windows are calibrated for daily bars (252/63/21 trading days).
     For intraday timeframes, we scale by bars_per_day to maintain the same
     calendar coverage (~1 year train, ~3 months val, ~1 month test).
     Stock epics (NVDA, TSLA) use reduced bars_per_day since they trade fewer hours.
+    Purge gap and embargo scale with horizon to prevent data leakage.
     """
     if epic in STOCK_EPICS:
         scale = STOCK_BARS_PER_DAY.get(timeframe, 1)
@@ -92,8 +95,8 @@ def get_walk_forward_splitter(timeframe: str, epic: str = "") -> WalkForwardSpli
         val_window=63 * scale,
         test_window=21 * scale,
         step_size=21 * scale,
-        purge_gap=5 * scale,
-        embargo=2 * scale,
+        purge_gap=max(5 * scale, 2 * horizon_bars),
+        embargo=max(2 * scale, horizon_bars),
     )
 
 
@@ -212,25 +215,25 @@ def train_asset(
     # Create model with tuned or default params
     if xgb_params:
         model = XGBoostClassifier(
-            max_depth=xgb_params.get("max_depth", 6),
-            learning_rate=xgb_params.get("learning_rate", 0.1),
-            n_estimators=xgb_params.get("n_estimators", 500),
-            subsample=xgb_params.get("subsample", 0.8),
-            colsample_bytree=xgb_params.get("colsample_bytree", 0.8),
-            min_child_weight=xgb_params.get("min_child_weight", 5),
-            reg_alpha=xgb_params.get("reg_alpha", 0.1),
-            reg_lambda=xgb_params.get("reg_lambda", 1.0),
+            max_depth=xgb_params.get("max_depth", 4),
+            learning_rate=xgb_params.get("learning_rate", 0.05),
+            n_estimators=xgb_params.get("n_estimators", 1000),
+            subsample=xgb_params.get("subsample", 0.7),
+            colsample_bytree=xgb_params.get("colsample_bytree", 0.6),
+            min_child_weight=xgb_params.get("min_child_weight", 20),
+            reg_alpha=xgb_params.get("reg_alpha", 1.0),
+            reg_lambda=xgb_params.get("reg_lambda", 5.0),
             early_stopping_rounds=50,
         )
     else:
         model = XGBoostClassifier(
-            max_depth=6,
-            learning_rate=0.1,
-            n_estimators=500,
-            subsample=0.8,
-            colsample_bytree=0.8,
-            min_child_weight=5,
-            early_stopping_rounds=20,
+            max_depth=4,
+            learning_rate=0.05,
+            n_estimators=1000,
+            subsample=0.7,
+            colsample_bytree=0.6,
+            min_child_weight=20,
+            early_stopping_rounds=50,
         )
 
     try:
@@ -301,7 +304,7 @@ def main(args: argparse.Namespace) -> None:
     # Train each asset
     results = {}
     for epic in assets:
-        splitter = get_walk_forward_splitter(timeframe, epic)
+        splitter = get_walk_forward_splitter(timeframe, epic, horizon_bars=args.horizon)
         logger.info(f"Walk-forward config for {epic}: {splitter.describe(0)}")
 
         # Optuna hyperparameter tuning
@@ -367,19 +370,19 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--tune", action="store_true",
-        help="Enable Optuna hyperparameter tuning (40 trials per asset)",
+        help="Enable Optuna hyperparameter tuning (80 trials per asset)",
     )
     parser.add_argument(
-        "--tune-trials", type=int, default=40,
-        help="Number of Optuna trials per asset (default: 40)",
+        "--tune-trials", type=int, default=80,
+        help="Number of Optuna trials per asset (default: 80)",
     )
     parser.add_argument(
         "--retune", action="store_true",
         help="Force re-tuning even if cached params exist",
     )
     parser.add_argument(
-        "--horizon", type=int, default=6,
-        help="Prediction horizon in bars (default: 6). Try 3 for short-term, 12 for longer",
+        "--horizon", type=int, default=12,
+        help="Prediction horizon in bars (default: 12). Try 3 for short-term, 6 for medium",
     )
     return parser.parse_args()
 

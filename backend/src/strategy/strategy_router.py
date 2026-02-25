@@ -22,8 +22,8 @@ class StrategyRouter:
 
     # Default regime-to-strategy priority map
     DEFAULT_REGIME_MAP: dict[str, list[str]] = {
-        "trending_up": ["ml_ensemble"],
-        "trending_down": ["ml_ensemble"],
+        "trending_up": ["trend_following", "ml_ensemble"],
+        "trending_down": ["trend_following", "ml_ensemble"],
         "ranging": ["squeeze_breakout", "vwap_reversion", "ml_ensemble"],
     }
 

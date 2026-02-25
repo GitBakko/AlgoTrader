@@ -210,7 +210,7 @@ class TestStrategyManagerFromThresholds:
 
         # Default config should be generated on access
         config = sm._get_config("XAUUSD")
-        assert config.min_confidence == pytest.approx(0.40)
+        assert config.min_confidence == pytest.approx(0.50)
 
 
 # ===========================================================================

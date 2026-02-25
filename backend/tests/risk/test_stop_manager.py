@@ -61,7 +61,10 @@ class TestDynamicMultiplier:
 
     def test_high_volatility_widens_stops(self):
         """ratio=2.0 → multiplier increases."""
-        result = StopManager.dynamic_multiplier(3.0, current_atr=20.0, baseline_atr=10.0)
+        result = StopManager.dynamic_multiplier(
+            3.0, current_atr=20.0, baseline_atr=10.0,
+            min_multiplier=1.5, max_multiplier=5.0,
+        )
         # scaled = 3.0 * (0.5 + 0.5 * 2.0) = 3.0 * 1.5 = 4.5
         assert result == pytest.approx(4.5)
 
@@ -74,12 +77,13 @@ class TestDynamicMultiplier:
     def test_clamped_to_max(self):
         """Very high volatility clamped to max_multiplier."""
         result = StopManager.dynamic_multiplier(3.0, current_atr=100.0, baseline_atr=10.0)
-        assert result == 5.0  # default max
+        assert result == 4.0  # default max
 
     def test_clamped_to_min(self):
         """Very low volatility clamped to min_multiplier."""
-        result = StopManager.dynamic_multiplier(3.0, current_atr=0.1, baseline_atr=10.0)
-        assert result == 2.0  # default min
+        result = StopManager.dynamic_multiplier(2.0, current_atr=0.1, baseline_atr=10.0)
+        # scaled = 2.0 * (0.5 + 0.5 * 0.01) = 2.0 * 0.505 = 1.01 → clamped to 1.5
+        assert result == 1.5  # default min
 
     def test_none_baseline_returns_base(self):
         """No baseline ATR → return base multiplier (no scaling)."""

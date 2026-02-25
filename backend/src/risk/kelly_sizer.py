@@ -164,9 +164,9 @@ class AdaptiveKellySizer:
             )
             return fallback, "kelly_negative_fallback"
 
-        # Risk amount = kelly fraction * equity * confidence scaling
-        confidence_mult = max(0.5, min(1.5, (confidence - 0.5) * 3.33))
-        risk_amount = equity * kelly_frac * confidence_mult
+        # Risk amount = kelly fraction * equity
+        # Note: confidence scaling is handled by RiskManager.confidence_size_multiplier()
+        risk_amount = equity * kelly_frac
 
         # Position size from risk / stop distance
         size = risk_amount / stop_distance
@@ -177,8 +177,7 @@ class AdaptiveKellySizer:
             size = max_size
 
         logger.debug(
-            f"Kelly sizing: fraction={kelly_frac:.4f}, "
-            f"conf_mult={confidence_mult:.2f}, size={size:.4f} "
+            f"Kelly sizing: fraction={kelly_frac:.4f}, size={size:.4f} "
             f"(WR={stats.win_rate:.2%}, payoff={stats.avg_win/stats.avg_loss:.2f})"
         )
 
@@ -193,10 +192,12 @@ class AdaptiveKellySizer:
         max_position_pct: float,
         risk_per_trade: float = 0.02,
     ) -> float:
-        """Fallback fixed-fractional sizing (mirrors PositionSizer)."""
+        """Fallback fixed-fractional sizing (mirrors PositionSizer).
+
+        Note: confidence param kept for API compatibility but no longer used
+        internally. Confidence scaling is handled by RiskManager.confidence_size_multiplier().
+        """
         risk_amount = equity * risk_per_trade
-        base_size = risk_amount / stop_distance
-        confidence_mult = max(0.5, min(1.5, (confidence - 0.5) * 3.33))
-        size = base_size * confidence_mult
+        size = risk_amount / stop_distance
         max_size = (equity * max_position_pct) / entry_price
         return max(0.0, min(size, max_size))

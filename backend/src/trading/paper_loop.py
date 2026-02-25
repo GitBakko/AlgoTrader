@@ -115,6 +115,10 @@ class PaperTradingLoop:
         self._regime_counts: dict[str, dict[str, int]] = {}
         # Track positions from previous iteration to detect broker-closed positions
         self._previous_positions: dict[str, dict] = {}
+        # Asset momentum rotation
+        self._active_assets: set[str] | None = None  # None = all assets
+        self._asset_rotation_ts: float = 0.0
+        self._per_asset_losses: dict[str, int] = {}  # consecutive loss counter per asset
 
     @property
     def is_running(self) -> bool:
@@ -490,8 +494,8 @@ class PaperTradingLoop:
                 f"(reason={close_reason}, exit={exit_price:.6f}, P&L=${pnl:.2f})"
             )
 
-            # Record in trade history for Kelly sizing
-            self._on_position_closed(deal_id, pnl)
+            # Record in trade history for Kelly sizing + per-asset CB
+            self._on_position_closed(deal_id, pnl, epic=epic)
 
             # Persist to database
             await self._persist_position_close(
@@ -806,6 +810,9 @@ class PaperTradingLoop:
             )
             return
 
+        # Asset momentum rotation: refresh active assets weekly
+        self._refresh_active_assets()
+
         epics_to_process = []
         for epic in self.epics:
             if not self.prediction_service.has_model_for(epic):
@@ -859,6 +866,15 @@ class PaperTradingLoop:
 
     async def _process_epic(self, epic: str, open_positions: list[dict]) -> None:
         """Run the full pipeline for a single epic."""
+        # Asset rotation check
+        if self._active_assets is not None and epic not in self._active_assets:
+            return  # Skip non-active assets
+
+        # Per-asset circuit breaker (5 consecutive losses)
+        if self._per_asset_losses.get(epic, 0) >= 5:
+            logger.debug(f"[{epic}] Per-asset CB: 5 consecutive losses, skipping")
+            return
+
         # Step 0: Market hours check (DEMO/LIVE only)
         is_open, closed_reason = await self._is_market_open(epic)
         if not is_open:
@@ -1328,7 +1344,7 @@ class PaperTradingLoop:
                                 f"P&L = ${pnl:.2f}"
                             )
 
-                            self._on_position_closed(deal_id, pnl)
+                            self._on_position_closed(deal_id, pnl, epic=epic)
 
                             # Persist closed position to database
                             await self._persist_position_close(
@@ -1391,10 +1407,11 @@ class PaperTradingLoop:
             except Exception as e:
                 logger.debug(f"[{epic}] Risk level check failed: {e}")
 
-    def _on_position_closed(self, deal_id: str, pnl: float) -> None:
+    def _on_position_closed(self, deal_id: str, pnl: float, epic: str = "") -> None:
         """
         Handle position close events for Phase 8 modules.
-        Records trade result for circuit breakers, equity curve, and Kelly history.
+        Records trade result for circuit breakers, equity curve, Kelly history,
+        and per-asset circuit breaker.
         """
         # Circuit breaker: track consecutive wins/losses
         self.risk_manager.circuit_breakers.record_trade_result(is_win=(pnl > 0))
@@ -1406,6 +1423,10 @@ class PaperTradingLoop:
         # Kelly: add to trade history (deque auto-discards oldest when maxlen=200 reached)
         self._trade_history.append({"pnl": pnl})
 
+        # Per-asset circuit breaker: track consecutive losses
+        if epic:
+            self._record_per_asset_result(epic, is_win=(pnl > 0))
+
         # Trailing stop: unregister
         self.trailing_stop_manager.unregister_position(deal_id)
 
@@ -1416,9 +1437,43 @@ class PaperTradingLoop:
             pass  # No event loop (called from tests)
 
         logger.debug(
-            f"Position closed: deal={deal_id} pnl={pnl:.2f} "
+            f"Position closed: deal={deal_id} epic={epic} pnl={pnl:.2f} "
             f"(history={len(self._trade_history)} trades)"
         )
+
+    def _refresh_active_assets(self) -> None:
+        """Refresh asset rotation weekly."""
+        import time
+        now = time.monotonic()
+        if self._active_assets is not None and (now - self._asset_rotation_ts) < 7 * 24 * 3600:
+            return  # Refresh weekly
+
+        try:
+            from src.trading.asset_rotation import compute_momentum_scores, select_active_assets
+            from src.data.storage import ParquetStorageManager
+            from src.data.data_access import DataAccessLayer
+
+            storage = ParquetStorageManager()
+            data_access = DataAccessLayer(storage=storage)
+            scores = compute_momentum_scores(data_access)
+
+            if scores:
+                selected = select_active_assets(scores)
+                self._active_assets = set(selected)
+                self._asset_rotation_ts = now
+                logger.info(f"Asset rotation: {len(selected)} active assets: {selected}")
+            else:
+                self._active_assets = None  # Fallback to all
+        except Exception as e:
+            logger.warning(f"Asset rotation failed: {e}")
+            self._active_assets = None
+
+    def _record_per_asset_result(self, epic: str, is_win: bool) -> None:
+        """Track consecutive losses per asset for per-asset circuit breaker."""
+        if is_win:
+            self._per_asset_losses[epic] = 0
+        else:
+            self._per_asset_losses[epic] = self._per_asset_losses.get(epic, 0) + 1
 
     def get_status(self) -> dict:
         """Get current status of the trading loop (defensive copies, sync)."""
@@ -1456,6 +1511,8 @@ class PaperTradingLoop:
             "kelly_stats": self._get_kelly_stats(),
             "regime_distribution": dict(self._regime_counts),
             "min_deal_sizes_cached": len(self._min_deal_size_cache),
+            "active_assets": len(self._active_assets) if self._active_assets else len(self.epics),
+            "per_asset_losses": {k: v for k, v in self._per_asset_losses.items() if v > 0},
         }
 
     def _get_kelly_stats(self) -> dict | None:

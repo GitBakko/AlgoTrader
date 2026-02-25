@@ -30,7 +30,7 @@ STOCK_BARS_PER_DAY = {"1h": 10, "4h": 3, "1d": 1}
 LIMITED_HOURS_BARS_PER_DAY = {"1h": 5, "4h": 2, "1d": 1}
 
 
-def _get_splitter(timeframe: str, epic: str) -> WalkForwardSplitter:
+def _get_splitter(timeframe: str, epic: str, horizon_bars: int = 12) -> WalkForwardSplitter:
     """Create walk-forward splitter scaled to timeframe and asset type."""
     if epic in STOCK_EPICS:
         scale = STOCK_BARS_PER_DAY.get(timeframe, 1)
@@ -43,15 +43,15 @@ def _get_splitter(timeframe: str, epic: str) -> WalkForwardSplitter:
         val_window=63 * scale,
         test_window=21 * scale,
         step_size=21 * scale,
-        purge_gap=5 * scale,
-        embargo=2 * scale,
+        purge_gap=max(5 * scale, 2 * horizon_bars),
+        embargo=max(2 * scale, horizon_bars),
     )
 
 
 def _train_single_asset(
     epic: str,
     timeframe: str = "1h",
-    horizon_bars: int = 6,
+    horizon_bars: int = 12,
 ) -> tuple[str, bool, str]:
     """
     Train model for a single asset (blocking/sync).
@@ -62,7 +62,7 @@ def _train_single_asset(
         data_access = DataAccessLayer(storage=storage)
         feature_builder = FeatureBuilder(data_access=data_access)
         versioning = ModelVersioning()
-        splitter = _get_splitter(timeframe, epic)
+        splitter = _get_splitter(timeframe, epic, horizon_bars=horizon_bars)
         target_builder = TargetBuilder(horizon_bars=horizon_bars)
 
         trainer = ModelTrainer(
@@ -82,13 +82,13 @@ def _train_single_asset(
             return (epic, False, f"Insufficient data ({n_bars} bars)")
 
         model = XGBoostClassifier(
-            max_depth=6,
-            learning_rate=0.1,
-            n_estimators=500,
-            subsample=0.8,
-            colsample_bytree=0.8,
-            min_child_weight=5,
-            early_stopping_rounds=20,
+            max_depth=4,
+            learning_rate=0.05,
+            n_estimators=1000,
+            subsample=0.7,
+            colsample_bytree=0.6,
+            min_child_weight=20,
+            early_stopping_rounds=50,
         )
 
         result = trainer.train(
@@ -110,7 +110,7 @@ def _train_single_asset(
 async def retrain_all_models(
     prediction_service=None,
     timeframe: str = "1h",
-    horizon_bars: int = 6,
+    horizon_bars: int = 12,
 ) -> dict[str, bool]:
     """
     Retrain all active asset models in a background thread pool.

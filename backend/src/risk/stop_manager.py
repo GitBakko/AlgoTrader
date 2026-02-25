@@ -11,8 +11,8 @@ class StopManager:
         base_multiplier: float,
         current_atr: float,
         baseline_atr: float | None,
-        min_multiplier: float = 2.0,
-        max_multiplier: float = 5.0,
+        min_multiplier: float = 1.5,
+        max_multiplier: float = 4.0,
     ) -> float:
         """
         Scale stop multiplier based on current volatility vs baseline.
@@ -22,10 +22,10 @@ class StopManager:
 
         Formula: scaled = base * (0.5 + 0.5 * ratio), clamped to [min, max]
 
-        Examples (base=3.0):
-            ratio=1.0 → 3.0 (normal)
-            ratio=2.0 → 4.5 (high vol → wider stops)
-            ratio=0.5 → 2.25 (low vol → tighter stops)
+        Examples (base=2.0):
+            ratio=1.0 → 2.0 (normal)
+            ratio=2.0 → 3.0 (high vol → wider stops)
+            ratio=0.5 → 1.5 (low vol → tighter stops)
         """
         if not isinstance(baseline_atr, (int, float)) or baseline_atr <= 0:
             return base_multiplier

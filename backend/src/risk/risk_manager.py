@@ -155,16 +155,16 @@ class RiskManager:
             )
 
         # 3. Calculate stop-loss with dynamic multiplier (volatility-scaled)
-        # Base=3 ATR, scales with current vs baseline volatility ratio
+        # Base=2 ATR, scales with current vs baseline volatility ratio
         baseline_atr = self.circuit_breakers.get_baseline_atr(signal.epic)
         stop_mult = StopManager.dynamic_multiplier(
-            base_multiplier=3.0,
+            base_multiplier=2.0,
             current_atr=atr,
             baseline_atr=baseline_atr,
         )
-        if abs(stop_mult - 3.0) > 0.01:
+        if abs(stop_mult - 2.0) > 0.01:
             adjustments.append(
-                f"Dynamic SL multiplier: {stop_mult:.2f}x (base=3.0, vol ratio={atr/baseline_atr:.2f})"
+                f"Dynamic SL multiplier: {stop_mult:.2f}x (base=2.0, vol ratio={atr/baseline_atr:.2f})"
             )
         stop_loss = StopManager.calculate_stop_loss(
             direction=signal.direction.value,
@@ -190,7 +190,7 @@ class RiskManager:
             entry_price=signal.entry_price,
             atr=atr,
             multiplier=stop_mult,
-            risk_reward=1.5,
+            risk_reward=2.5,
         )
 
         if signal.suggested_tp is not None:
@@ -231,6 +231,14 @@ class RiskManager:
         # Apply correlation multiplier
         if corr_multiplier < 1.0:
             position_size *= corr_multiplier
+
+        # 6b. Confidence tiering
+        conf_mult = self.confidence_size_multiplier(signal.confidence)
+        if conf_mult < 1.0:
+            adjustments.append(
+                f"Confidence tier: {conf_mult:.0%} (conf={signal.confidence:.2f})"
+            )
+            position_size *= conf_mult
 
         # 7. Apply equity curve filter
         eq_multiplier = self.equity_curve_filter.get_size_multiplier()
@@ -287,3 +295,20 @@ class RiskManager:
     def reset_daily(self) -> None:
         """Reset daily P&L tracking."""
         self.drawdown_monitor.reset_daily()
+
+    @staticmethod
+    def confidence_size_multiplier(confidence: float) -> float:
+        """Scale position size by confidence tier.
+
+        < 0.50: 0.0 (rejected by min_confidence)
+        0.50-0.58: 0.50x
+        0.58-0.65: 0.75x
+        >= 0.65: 1.0x
+        """
+        if confidence < 0.50:
+            return 0.0
+        elif confidence < 0.58:
+            return 0.50
+        elif confidence < 0.65:
+            return 0.75
+        return 1.0

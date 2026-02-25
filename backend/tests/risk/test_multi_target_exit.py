@@ -41,13 +41,13 @@ class TestMultiTargetExit:
         result = rm.check_trade(signal, equity=100000.0, atr=20.0)
 
         assert result.approved is True
-        # Stop loss is 3 ATR below entry: 2000 - (3 * 20) = 1940
-        # Risk distance = 2000 - 1940 = 60
-        # TP1 = 2000 + 60 = 2060
-        # TP2 = 2000 + 120 = 2120
-        assert result.stop_loss == pytest.approx(1940.0, rel=1e-4)
-        assert result.take_profit_1 == pytest.approx(2060.0, rel=1e-4)
-        assert result.take_profit_2 == pytest.approx(2120.0, rel=1e-4)
+        # Stop loss is 2 ATR below entry: 2000 - (2 * 20) = 1960
+        # Risk distance = 2000 - 1960 = 40
+        # TP1 = 2000 + 40 = 2040
+        # TP2 = 2000 + 80 = 2080
+        assert result.stop_loss == pytest.approx(1960.0, rel=1e-4)
+        assert result.take_profit_1 == pytest.approx(2040.0, rel=1e-4)
+        assert result.take_profit_2 == pytest.approx(2080.0, rel=1e-4)
 
     def test_tp1_tp2_calculated_sell(self):
         """SELL: TP1 = entry - risk, TP2 = entry - 2*risk."""
@@ -62,13 +62,13 @@ class TestMultiTargetExit:
         result = rm.check_trade(signal, equity=100000.0, atr=20.0)
 
         assert result.approved is True
-        # Stop loss is 3 ATR above entry: 2000 + (3 * 20) = 2060
-        # Risk distance = 2060 - 2000 = 60
-        # TP1 = 2000 - 60 = 1940
-        # TP2 = 2000 - 120 = 1880
-        assert result.stop_loss == pytest.approx(2060.0, rel=1e-4)
-        assert result.take_profit_1 == pytest.approx(1940.0, rel=1e-4)
-        assert result.take_profit_2 == pytest.approx(1880.0, rel=1e-4)
+        # Stop loss is 2 ATR above entry: 2000 + (2 * 20) = 2040
+        # Risk distance = 2040 - 2000 = 40
+        # TP1 = 2000 - 40 = 1960
+        # TP2 = 2000 - 80 = 1920
+        assert result.stop_loss == pytest.approx(2040.0, rel=1e-4)
+        assert result.take_profit_1 == pytest.approx(1960.0, rel=1e-4)
+        assert result.take_profit_2 == pytest.approx(1920.0, rel=1e-4)
 
     def test_partial_close_pct_default(self):
         """Default partial_close_pct is 0.50."""

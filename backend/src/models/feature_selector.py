@@ -1,12 +1,69 @@
 """
-Feature selection based on XGBoost gain importance.
+Feature importance analysis and selection.
 
-Fits on the first walk-forward fold's trained model, then prunes
-low-importance features for subsequent folds.
+Provides two mechanisms:
+1. FeatureSelector class — percentage-based pruning (used in walk_forward_backtest.py)
+2. select_top_features() — keeps top N features by XGBoost gain importance
+3. EXCLUDE_FEATURES — known problematic features to always exclude
 """
 
 import numpy as np
 from loguru import logger
+
+
+# Features to always exclude (known problematic)
+EXCLUDE_FEATURES = {
+    # Regime one-hot: perfectly collinear (3 binary = 2 are redundant)
+    "regime_trending_up",
+    "regime_trending_down",
+    "regime_ranging",
+    # Z-score versions too (normalizer appends _zscore)
+    "regime_trending_up_zscore",
+    "regime_trending_down_zscore",
+    "regime_ranging_zscore",
+}
+
+
+def select_top_features(
+    model,
+    feature_names: list[str],
+    max_features: int = 80,
+) -> list[str]:
+    """
+    Select top features by XGBoost gain importance.
+
+    Args:
+        model: Trained XGBoostClassifier (must have get_feature_importance())
+        feature_names: All feature column names
+        max_features: Maximum features to keep
+
+    Returns:
+        List of top feature names
+    """
+    importance = model.get_feature_importance()
+    if not importance:
+        logger.warning("No feature importance available, keeping all features")
+        return feature_names
+
+    # Sort by importance descending
+    sorted_features = sorted(importance.items(), key=lambda x: x[1], reverse=True)
+
+    # Keep top N
+    selected = [name for name, _ in sorted_features[:max_features]]
+
+    # Log dropped features
+    dropped = len(feature_names) - len(selected)
+    if dropped > 0:
+        logger.info(
+            f"Feature selection: kept {len(selected)}/{len(feature_names)} features "
+            f"(dropped {dropped} low-importance)"
+        )
+        # Log bottom 10 dropped
+        bottom = sorted_features[max_features:max_features + 10]
+        for name, imp in bottom:
+            logger.debug(f"  Dropped: {name} (importance={imp:.6f})")
+
+    return selected
 
 
 class FeatureSelector:

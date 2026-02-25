@@ -17,6 +17,7 @@ from src.features.builder import FeatureBuilder
 from src.models.base_model import BaseMLModel
 from src.models.calibration import ConfidenceCalibrator
 from src.models.evaluator import ModelEvaluator
+from src.models.feature_selector import EXCLUDE_FEATURES
 from src.models.schemas import FoldResult, ModelMetadata, TrainingResult
 from src.models.target_builder import TargetBuilder
 from src.models.versioning import ModelVersioning
@@ -184,6 +185,9 @@ class ModelTrainer:
         # Sort each group for deterministic ordering across environments
         feature_cols = sorted(zscore_features) + sorted(raw_features)
         feature_cols = [c for c in feature_cols if c in df_valid.columns]
+
+        # Exclude known problematic features (e.g. collinear regime one-hots)
+        feature_cols = [c for c in feature_cols if c not in EXCLUDE_FEATURES]
 
         if not feature_cols:
             raise ValueError("No feature columns found in DataFrame.")

@@ -17,38 +17,23 @@ class TestPositionSizer:
             max_position_pct=0.50,
         )
         # risk_amount = 2000, stop_distance = 2, base_size = 1000
-        # confidence_mult = (0.80 - 0.5) * 3.33 = ~1.0
         # max_size = 100000 * 0.50 / 100 = 500 -> capped
+        # Note: confidence scaling is now handled by RiskManager, not PositionSizer
         assert size > 0
         assert size == pytest.approx(500.0, rel=0.01)
 
-    def test_high_confidence_increases_size(self):
-        """Higher confidence should produce larger positions."""
+    def test_confidence_no_longer_affects_size(self):
+        """Confidence is now ignored by PositionSizer (handled by RiskManager)."""
         low = PositionSizer.calculate_size(
             equity=100000, risk_per_trade=0.001,
-            entry_price=100, stop_loss=95, confidence=0.65,
+            entry_price=100, stop_loss=95, confidence=0.55,
         )
         high = PositionSizer.calculate_size(
             equity=100000, risk_per_trade=0.001,
             entry_price=100, stop_loss=95, confidence=0.95,
         )
-        assert high > low
-
-    def test_confidence_multiplier_bounds(self):
-        """Confidence multiplier should clamp to [0.5, 1.5]."""
-        # Use small risk and high cap to avoid hitting position cap
-        low = PositionSizer.calculate_size(
-            equity=100000, risk_per_trade=0.001,
-            entry_price=100, stop_loss=98, confidence=0.30,
-            max_position_pct=0.50,
-        )
-        high = PositionSizer.calculate_size(
-            equity=100000, risk_per_trade=0.001,
-            entry_price=100, stop_loss=98, confidence=0.99,
-            max_position_pct=0.50,
-        )
-        # Ratio should be roughly 3x (1.5 / 0.5)
-        assert high / low == pytest.approx(3.0, rel=0.1)
+        # Confidence no longer affects PositionSizer output
+        assert low == pytest.approx(high, rel=1e-9)
 
     def test_max_position_cap(self):
         """Position should be capped at max_position_pct of equity."""

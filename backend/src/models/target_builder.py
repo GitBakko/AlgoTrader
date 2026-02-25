@@ -20,9 +20,9 @@ class TargetBuilder:
 
     def __init__(
         self,
-        horizon_bars: int = 6,
+        horizon_bars: int = 12,
         atr_column: str = "atr_14",
-        threshold: float = 0.5,
+        threshold: float = 0.75,
     ):
         """
         Args:
