@@ -1041,35 +1041,43 @@ class PaperTradingLoop:
         )
 
         # Step 4b: Validate against broker minDealSize (DEMO/LIVE only)
+        # If size is close to minimum (>=80%), round up instead of rejecting
         min_deal_size = self._get_min_deal_size(epic)
         if min_deal_size is not None and risk_result.position_size < min_deal_size:
-            reason = (
-                f"Size calcolata ({risk_result.position_size:.4f}) inferiore "
-                f"al minimo del broker ({min_deal_size}) per {epic}"
-            )
-            signal_info["status"] = "rejected"
-            signal_info["rejection_reason"] = reason
-            signal_info["error_detail"] = {
-                "error_type": "min_size",
-                "summary": f"Size troppo piccola per {epic} (min: {min_deal_size})",
-                "details": f"Size calcolata: {risk_result.position_size:.4f}, minimo broker: {min_deal_size}",
-                "size": risk_result.position_size,
-                "min_deal_size": min_deal_size,
-                "direction": signal.direction.value,
-            }
-            logger.warning(f"[{epic}] MIN SIZE REJECTED: {reason}")
-            try:
-                tl = get_trade_logger()
-                await tl.log_signal(
-                    epic=epic, direction=_signal_type, confidence=signal.confidence,
-                    strategy=signal.strategy_name or "unknown",
-                    execution_status=ExecutionStatus.REJECTED,
-                    rejection_reason=reason,
-                    source=self._log_source,
+            if risk_result.position_size >= min_deal_size * 0.80:
+                logger.info(
+                    f"[{epic}] Size {risk_result.position_size:.4f} rounded up "
+                    f"to min_deal_size {min_deal_size}"
                 )
-            except Exception:
-                pass
-            return
+                risk_result.position_size = min_deal_size
+            else:
+                reason = (
+                    f"Size calcolata ({risk_result.position_size:.4f}) inferiore "
+                    f"al minimo del broker ({min_deal_size}) per {epic}"
+                )
+                signal_info["status"] = "rejected"
+                signal_info["rejection_reason"] = reason
+                signal_info["error_detail"] = {
+                    "error_type": "min_size",
+                    "summary": f"Size troppo piccola per {epic} (min: {min_deal_size})",
+                    "details": f"Size calcolata: {risk_result.position_size:.4f}, minimo broker: {min_deal_size}",
+                    "size": risk_result.position_size,
+                    "min_deal_size": min_deal_size,
+                    "direction": signal.direction.value,
+                }
+                logger.warning(f"[{epic}] MIN SIZE REJECTED: {reason}")
+                try:
+                    tl = get_trade_logger()
+                    await tl.log_signal(
+                        epic=epic, direction=_signal_type, confidence=signal.confidence,
+                        strategy=signal.strategy_name or "unknown",
+                        execution_status=ExecutionStatus.REJECTED,
+                        rejection_reason=reason,
+                        source=self._log_source,
+                    )
+                except Exception:
+                    pass
+                return
 
         # HIGH-8 FIX: Refresh equity immediately before execution
         # to catch any changes since risk check (manual trades, other systems, etc.)
