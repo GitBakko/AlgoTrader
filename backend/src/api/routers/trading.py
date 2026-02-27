@@ -253,6 +253,29 @@ async def emergency_stop(request: Request):
     })
 
 
+@router.post("/reset-circuit-breakers")
+@limiter.limit("5/minute")
+async def reset_circuit_breakers(request: Request):
+    """Manually reset all circuit breakers and per-asset loss counters."""
+    loop = _get_loop(request)
+    if loop is None:
+        return error_response("Trading loop not initialized", 503)
+
+    reset_list = loop.risk_manager.circuit_breakers.reset_all()
+    loop._per_asset_losses.clear()
+
+    if reset_list:
+        logger.warning(f"[CB RESET] Manual reset: {reset_list}")
+    else:
+        logger.info("[CB RESET] Manual reset requested (no breakers were active)")
+
+    return success_response({
+        "message": f"Circuit breakers resettati: {len(reset_list)} breaker"
+                   + (f" ({', '.join(reset_list)})" if reset_list else ""),
+        "reset_breakers": reset_list,
+    })
+
+
 # ── Signal Notes (Trade Journal annotations) ──
 
 

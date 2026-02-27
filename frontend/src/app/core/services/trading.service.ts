@@ -280,6 +280,13 @@ export class TradingService {
     }>('/api/trading/emergency-stop');
   }
 
+  resetCircuitBreakers() {
+    return this.api.post<{
+      message: string;
+      reset_breakers: string[];
+    }>('/api/trading/reset-circuit-breakers');
+  }
+
   // ── Signal Notes (Trade Journal) ──
 
   loadSignalNotes(): void {

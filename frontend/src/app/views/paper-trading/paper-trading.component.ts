@@ -211,13 +211,20 @@ interface GroupedPosition {
               @if (circuitBreakersTripped().length === 0) {
                 <c-badge color="success" class="badge-sm">OK</c-badge>
               } @else {
-                <div class="d-flex flex-wrap gap-1 justify-content-end cb-badges">
+                <div class="d-flex flex-wrap gap-1 justify-content-end align-items-center cb-badges">
                   @for (cb of circuitBreakersTripped(); track cb.key) {
                     <c-badge class="badge-sm cb-badge-warning" [cTooltip]="cb.reason">
                       <svg cIcon [name]="cb.icon" size="xs"></svg>
                       {{ cb.label }}
                     </c-badge>
                   }
+                  <app-loading-button
+                    color="warning"
+                    size="sm"
+                    [loading]="resetCbInProgress()"
+                    (clicked)="resetCircuitBreakers()">
+                    Reset
+                  </app-loading-button>
                 </div>
               }
             </c-card-body>
@@ -438,6 +445,7 @@ interface GroupedPosition {
                       <th class="fw-semibold small">Asset</th>
                       <th class="fw-semibold small">Dir</th>
                       <th class="fw-semibold small">Conf</th>
+                      <th class="fw-semibold small">Ora</th>
                       <th class="fw-semibold small">Stato</th>
                     </tr>
                   </thead>
@@ -466,6 +474,7 @@ interface GroupedPosition {
                             <small class="mantis-mono">{{ (s.info.confidence * 100).toFixed(0) }}%</small>
                           </div>
                         </td>
+                        <td class="mantis-mono small">{{ formatTime(s.info.timestamp) }}</td>
                         <td>
                           @if (s.info.status) {
                             <span class="signal-status signal-status--{{ s.info.status }}">
@@ -698,6 +707,7 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
 
   readonly actionInProgress = signal(false);
   readonly emergencyStopInProgress = signal(false);
+  readonly resetCbInProgress = signal(false);
   readonly currentEpic = signal<string>('XAUUSD');
   readonly currentMarketStatus = signal<MarketStatusResponse | null>(null);
   readonly selectedEpic = signal<string | null>(null);
@@ -917,6 +927,26 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     });
   }
 
+  resetCircuitBreakers(): void {
+    const confirmed = window.confirm(
+      'Resettare tutti i circuit breakers e i contatori perdite per-asset?'
+    );
+    if (!confirmed) return;
+
+    this.resetCbInProgress.set(true);
+    this.trading.resetCircuitBreakers().subscribe({
+      next: (data) => {
+        this.toast.success(data.message);
+        this.resetCbInProgress.set(false);
+        this.loadAll();
+      },
+      error: (err) => {
+        this.toast.error(err?.error?.error || 'Reset circuit breakers fallito');
+        this.resetCbInProgress.set(false);
+      }
+    });
+  }
+
   toggleGroup(epic: string): void {
     const current = this.expandedGroups();
     const newSet = new Set(current);
@@ -991,7 +1021,8 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     if (!iso) return '—';
     try {
       return new Date(iso).toLocaleString('it-IT', {
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        day: '2-digit', month: '2-digit',
+        hour: '2-digit', minute: '2-digit',
       });
     } catch { return iso ?? '—'; }
   }
