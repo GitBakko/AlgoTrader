@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, computed } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, computed, signal, effect } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
   BadgeComponent,
@@ -29,6 +29,19 @@ export class NotificationDropdownComponent {
   readonly #notifService = inject(NotificationCenterService);
   readonly unreadCount = this.#notifService.filteredUnreadCount;
   readonly notifications = computed(() => this.#notifService.filteredNotifications().slice(0, 10));
+  readonly shaking = signal(false);
+  private prevCount = 0;
+
+  constructor() {
+    effect(() => {
+      const count = this.unreadCount();
+      if (count > this.prevCount && this.prevCount >= 0) {
+        this.shaking.set(true);
+        setTimeout(() => this.shaking.set(false), 600);
+      }
+      this.prevCount = count;
+    });
+  }
 
   markAsRead(id: number): void {
     this.#notifService.markAsRead(id);

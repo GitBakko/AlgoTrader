@@ -1,5 +1,5 @@
 <c-dropdown alignment="end" variant="nav-item">
-  <button [caret]="false" cDropdownToggle class="notification-bell" aria-label="Notifiche">
+  <button [caret]="false" cDropdownToggle class="notification-bell" [class.bell-shake]="shaking()" aria-label="Notifiche">
     <svg cIcon name="cilBell" size="lg"></svg>
     @if (unreadCount() > 0) {
       <c-badge color="danger" shape="rounded-pill" class="notification-badge"
