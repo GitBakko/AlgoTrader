@@ -10,10 +10,13 @@
       <span class="dash-status-chip dash-status-chip--inactive">INATTIVO</span>
     }
     @if (paperStatus()?.execution_mode; as mode) {
-      <span class="dash-status-chip"
+      <span class="dash-status-chip mode-badge"
             [class.dash-status-chip--live]="mode === 'LIVE'"
             [class.dash-status-chip--demo]="mode === 'DEMO'"
-            [class.dash-status-chip--paper]="mode === 'PAPER'">
+            [class.dash-status-chip--paper]="mode === 'PAPER'"
+            [class.mode-badge--live]="mode === 'LIVE'"
+            [class.mode-badge--demo]="mode === 'DEMO'"
+            [class.mode-badge--paper]="mode === 'PAPER'">
         {{ mode }}
       </span>
     }

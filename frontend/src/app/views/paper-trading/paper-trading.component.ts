@@ -61,10 +61,13 @@ interface GroupedPosition {
           <span class="pt-chip pt-chip--stopped">STOPPED</span>
         }
         @if (status()?.execution_mode; as mode) {
-          <span class="pt-chip"
+          <span class="pt-chip mode-badge"
                 [class.pt-chip--paper]="mode === 'PAPER'"
                 [class.pt-chip--demo]="mode === 'DEMO'"
-                [class.pt-chip--live]="mode === 'LIVE'">
+                [class.pt-chip--live]="mode === 'LIVE'"
+                [class.mode-badge--paper]="mode === 'PAPER'"
+                [class.mode-badge--demo]="mode === 'DEMO'"
+                [class.mode-badge--live]="mode === 'LIVE'">
             {{ mode }}
           </span>
         }

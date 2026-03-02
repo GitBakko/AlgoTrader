@@ -614,6 +614,37 @@ h1, h2, h3, h4, h5, h6,
   }
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  .section-divider__line {
+    background: linear-gradient(90deg, transparent, rgba(0, 217, 126, 0.3), transparent) !important;
+    background-size: 200% 100%;
+    animation: sectionShimmer 8s linear infinite;
+  }
+}
+
+// ── Emergency stop button glow ──
+@media (prefers-reduced-motion: no-preference) {
+  .emergency-stop-btn button {
+    animation: emergencyPulse 2s ease-in-out infinite;
+  }
+}
+
+// ── Trading mode badges ──
+.mode-badge {
+  &--demo {
+    box-shadow: 0 0 8px rgba(255, 176, 32, 0.25);
+  }
+  &--live {
+    box-shadow: 0 0 8px rgba(255, 61, 87, 0.3);
+    @media (prefers-reduced-motion: no-preference) {
+      animation: emergencyPulse 3s ease-in-out infinite;
+    }
+  }
+  &--paper {
+    box-shadow: 0 0 8px rgba(0, 229, 255, 0.25);
+  }
+}
+
 // Direction Indicators (BUY/SELL)
 .dir-indicator {
   display: inline-flex;
