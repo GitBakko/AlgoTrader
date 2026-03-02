@@ -1242,6 +1242,15 @@ h1, h2, h3, h4, h5, h6,
   }
 }
 
+// ── Confidence bar uniform height ──
+.conf-bar-wrapper {
+  height: 6px !important;
+
+  .progress-bar {
+    border-radius: 3px;
+  }
+}
+
 // ═══════════════════════════════════════════════════════════
 // 8. MOBILE & RESPONSIVE
 // ═══════════════════════════════════════════════════════════

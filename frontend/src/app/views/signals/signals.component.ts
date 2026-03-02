@@ -1,7 +1,8 @@
-import { Component, ChangeDetectionStrategy, inject, OnInit } from '@angular/core';
+import { Component, ChangeDetectionStrategy, computed, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
+  RowComponent, ColComponent,
   TableDirective,
   BadgeComponent, ButtonDirective, ProgressComponent, ProgressBarComponent
 } from '@coreui/angular';
@@ -17,6 +18,7 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
   styleUrl: './signals.component.scss',
   imports: [
     CommonModule, CardComponent, CardBodyComponent, CardHeaderComponent,
+    RowComponent, ColComponent,
     TableDirective, BadgeComponent,
     ButtonDirective, ProgressComponent, ProgressBarComponent,
     PriceFormatPipe, EpicLogoComponent,
@@ -34,6 +36,43 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
           </button>
         </div>
       </c-card-header>
+
+      <!-- KPI Summary Row -->
+      <c-row class="mb-3 g-3 px-3 pt-3">
+        <c-col xs="6" md="3">
+          <c-card class="h-100 border-top border-top-3 border-top-primary">
+            <c-card-body class="py-2 px-3">
+              <div class="text-body-secondary small">Segnali Totali</div>
+              <div class="mantis-kpi fs-5">{{ totalSignals() }}</div>
+            </c-card-body>
+          </c-card>
+        </c-col>
+        <c-col xs="6" md="3">
+          <c-card class="h-100 border-top border-top-3 border-top-primary">
+            <c-card-body class="py-2 px-3">
+              <div class="text-body-secondary small">Eseguiti</div>
+              <div class="mantis-kpi fs-5">{{ executedPct() }}%</div>
+            </c-card-body>
+          </c-card>
+        </c-col>
+        <c-col xs="6" md="3">
+          <c-card class="h-100 border-top border-top-3 border-top-primary">
+            <c-card-body class="py-2 px-3">
+              <div class="text-body-secondary small">Confidenza Media</div>
+              <div class="mantis-kpi fs-5">{{ avgConfidence() }}%</div>
+            </c-card-body>
+          </c-card>
+        </c-col>
+        <c-col xs="6" md="3">
+          <c-card class="h-100 border-top border-top-3 border-top-primary">
+            <c-card-body class="py-2 px-3">
+              <div class="text-body-secondary small">Top Strategia</div>
+              <div class="mantis-kpi fs-6">{{ topStrategy() }}</div>
+            </c-card-body>
+          </c-card>
+        </c-col>
+      </c-row>
+
       <c-card-body class="p-0">
         @if (signals().length === 0) {
           <div class="empty-state">
@@ -115,6 +154,31 @@ export class SignalsComponent implements OnInit {
   private readonly trading = inject(TradingService);
   private readonly toast = inject(ToastService);
   readonly signals = this.trading.paperSignals;
+
+  readonly totalSignals = computed(() => this.signals().length);
+
+  readonly executedPct = computed(() => {
+    const s = this.signals();
+    if (!s.length) return 0;
+    return Math.round((s.filter((x: any) => x.status === 'executed').length / s.length) * 100);
+  });
+
+  readonly avgConfidence = computed(() => {
+    const s = this.signals().filter((x: any) => x.confidence > 0);
+    if (!s.length) return 0;
+    return Math.round((s.reduce((sum: number, x: any) => sum + x.confidence, 0) / s.length) * 100);
+  });
+
+  readonly topStrategy = computed(() => {
+    const s = this.signals();
+    if (!s.length) return '—';
+    const counts: Record<string, number> = {};
+    s.forEach((x: any) => {
+      const name = x.strategy_name || 'unknown';
+      counts[name] = (counts[name] || 0) + 1;
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
+  });
 
   ngOnInit(): void {
     this.trading.loadPaperSignals();
