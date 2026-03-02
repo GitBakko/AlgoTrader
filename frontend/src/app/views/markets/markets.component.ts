@@ -57,7 +57,7 @@ const TIMEFRAMES = [
     </div>
 
     <!-- Asset Cards Grid -->
-    <c-row class="mb-4">
+    <c-row class="mb-4 animate-in">
       @if (livePrices().length === 0) {
         @for (_ of [1,2,3,4,5,6,7,8]; track $index) {
           <c-col xs="6" md="4" lg="3" class="mb-3">
@@ -96,7 +96,7 @@ const TIMEFRAMES = [
 
     <!-- Candlestick Chart -->
     @if (selectedEpic()) {
-      <c-card class="mb-4 border-top border-top-3 border-top-primary">
+      <c-card class="mb-4 border-top border-top-3 border-top-primary animate-in">
         <c-card-header class="d-flex align-items-center justify-content-between py-2">
           <span class="fw-semibold small text-body-secondary">{{ selectedEpic() }} — Grafico</span>
           <c-button-group size="sm">
@@ -142,7 +142,7 @@ const TIMEFRAMES = [
 
     <!-- Markets Table (from API) -->
     @if (markets().length > 0) {
-      <c-card class="mb-4 border-top border-top-3 border-top-primary">
+      <c-card class="mb-4 border-top border-top-3 border-top-primary animate-in">
         <c-card-header class="py-2">
           <span class="fw-semibold small text-body-secondary">Dettagli Mercati</span>
         </c-card-header>

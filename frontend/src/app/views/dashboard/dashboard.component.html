@@ -68,7 +68,7 @@
     }
   } @else {
   <!-- Equity -->
-  <c-col sm="6" xl="3">
+  <c-col sm="6" xl="3" class="animate-in stagger-1">
     <c-card class="dash-kpi-card h-100">
       <c-card-body class="p-3">
         <div class="dash-kpi-card__label">Equity (USD)</div>
@@ -86,7 +86,7 @@
   </c-col>
 
   <!-- Unrealized P&L -->
-  <c-col sm="6" xl="3">
+  <c-col sm="6" xl="3" class="animate-in stagger-2">
     <c-card class="dash-kpi-card h-100">
       <c-card-body class="p-3">
         <div class="dash-kpi-card__label">P&amp;L Non Realizzato</div>
@@ -110,7 +110,7 @@
   </c-col>
 
   <!-- Open Positions -->
-  <c-col sm="6" xl="3">
+  <c-col sm="6" xl="3" class="animate-in stagger-3">
     <c-card class="dash-kpi-card h-100">
       <c-card-body class="p-3">
         <div class="dash-kpi-card__label">Posizioni Aperte</div>
@@ -126,7 +126,7 @@
   </c-col>
 
   <!-- Drawdown -->
-  <c-col sm="6" xl="3">
+  <c-col sm="6" xl="3" class="animate-in stagger-4">
     <c-card class="dash-kpi-card h-100">
       <c-card-body class="p-3">
         <div class="dash-kpi-card__label">Drawdown</div>
@@ -156,7 +156,7 @@
 </div>
 
 <!-- Equity Curve -->
-<c-card class="mb-4 border-top border-top-3 border-top-primary">
+<c-card class="mb-4 border-top border-top-3 border-top-primary animate-in">
   <c-card-header class="d-flex align-items-center justify-content-between py-2">
     <span class="fw-semibold small text-body-secondary">Equity Curve</span>
     <div class="d-flex align-items-center gap-3 small">
@@ -266,7 +266,7 @@
 
     <!-- P&L per Asset (horizontal bars) -->
     @if (pnlByAsset().length > 0) {
-      <c-card class="mb-4 border-top border-top-3 border-top-primary">
+      <c-card class="mb-4 border-top border-top-3 border-top-primary animate-in">
         <c-card-header class="d-flex align-items-center justify-content-between py-2">
           <div class="d-flex align-items-center gap-2">
             <span class="fw-semibold small text-body-secondary">P&amp;L per Asset (30g)</span>
@@ -371,7 +371,7 @@
 </c-row>
 
 <!-- Live Prices Grid -->
-<c-card class="mb-4 border-top border-top-3 border-top-primary">
+<c-card class="mb-4 border-top border-top-3 border-top-primary animate-in">
   <c-card-header class="d-flex align-items-center justify-content-between py-2">
     <span class="fw-semibold small text-body-secondary">Prezzi Live</span>
     <span class="text-body-secondary small mantis-mono">{{ priceTickers().length }} assets</span>
@@ -417,7 +417,7 @@
 </div>
 
 <!-- Open Positions + Recent Signals -->
-<c-row class="g-3">
+<c-row class="g-3 animate-in">
   <!-- Open Positions -->
   <c-col lg="7">
     <c-card class="mb-4 border-top border-top-3 border-top-primary">

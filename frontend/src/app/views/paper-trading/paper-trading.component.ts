@@ -127,7 +127,7 @@ interface GroupedPosition {
 
     <!-- KPI Cards (left accent bar pattern) -->
     <c-row class="mb-4">
-      <c-col sm="6" xl="3">
+      <c-col sm="6" xl="3" class="animate-in stagger-1">
         <c-card class="mb-3 pt-kpi-card">
           <div class="pt-kpi-card__accent pt-kpi-card__accent--primary"></div>
           <c-card-body class="ps-4">
@@ -140,7 +140,7 @@ interface GroupedPosition {
           </c-card-body>
         </c-card>
       </c-col>
-      <c-col sm="6" xl="3">
+      <c-col sm="6" xl="3" class="animate-in stagger-2">
         <c-card class="mb-3 pt-kpi-card">
           <div class="pt-kpi-card__accent pt-kpi-card__accent--info"></div>
           <c-card-body class="ps-4">
@@ -155,7 +155,7 @@ interface GroupedPosition {
           </c-card-body>
         </c-card>
       </c-col>
-      <c-col sm="6" xl="3">
+      <c-col sm="6" xl="3" class="animate-in stagger-3">
         <c-card class="mb-3 pt-kpi-card">
           <div class="pt-kpi-card__accent"
                [class.pt-kpi-card__accent--profit]="totalPnl() >= 0"
@@ -173,7 +173,7 @@ interface GroupedPosition {
           </c-card-body>
         </c-card>
       </c-col>
-      <c-col sm="6" xl="3">
+      <c-col sm="6" xl="3" class="animate-in stagger-4">
         <c-card class="mb-3 pt-kpi-card">
           <div class="pt-kpi-card__accent"
                [class.pt-kpi-card__accent--success]="(status()?.error_count ?? 0) === 0"
@@ -204,7 +204,7 @@ interface GroupedPosition {
       </div>
 
       <c-row class="mb-4">
-        <c-col sm="6" lg="3">
+        <c-col sm="6" lg="3" class="animate-in stagger-1">
           <c-card class="h-100 border-top border-top-3 border-top-primary">
             <c-card-body class="py-2 d-flex justify-content-between align-items-center">
               <span class="text-body-secondary small">Circuit Breakers</span>
@@ -230,7 +230,7 @@ interface GroupedPosition {
             </c-card-body>
           </c-card>
         </c-col>
-        <c-col sm="6" lg="3">
+        <c-col sm="6" lg="3" class="animate-in stagger-2">
           <c-card class="h-100 border-top border-top-3 border-top-primary">
             <c-card-body class="py-2 d-flex justify-content-between align-items-center">
               <span class="text-body-secondary small">Equity Filter</span>
@@ -242,7 +242,7 @@ interface GroupedPosition {
             </c-card-body>
           </c-card>
         </c-col>
-        <c-col sm="6" lg="3">
+        <c-col sm="6" lg="3" class="animate-in stagger-3">
           <c-card class="h-100 border-top border-top-3 border-top-primary">
             <c-card-body class="py-2">
               <div class="d-flex justify-content-between align-items-center">
@@ -268,7 +268,7 @@ interface GroupedPosition {
             </c-card-body>
           </c-card>
         </c-col>
-        <c-col sm="6" lg="3">
+        <c-col sm="6" lg="3" class="animate-in stagger-4">
           <c-card class="h-100 border-top border-top-3 border-top-primary">
             <c-card-body class="py-2 d-flex justify-content-between align-items-center">
               <span class="text-body-secondary small">Trailing Stops</span>

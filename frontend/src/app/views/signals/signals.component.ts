@@ -24,7 +24,7 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
     PriceFormatPipe, EpicLogoComponent,
   ],
   template: `
-    <c-card class="mb-4 border-top border-top-3 border-top-primary">
+    <c-card class="mb-4 border-top border-top-3 border-top-primary animate-in">
       <c-card-header>
         <div class="d-flex align-items-center justify-content-between">
           <div class="d-flex align-items-center gap-2">
@@ -39,7 +39,7 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
 
       <!-- KPI Summary Row -->
       <c-row class="mb-3 g-3 px-3 pt-3">
-        <c-col xs="6" md="3">
+        <c-col xs="6" md="3" class="animate-in stagger-1">
           <c-card class="h-100 border-top border-top-3 border-top-primary">
             <c-card-body class="py-2 px-3">
               <div class="text-body-secondary small">Segnali Totali</div>
@@ -47,7 +47,7 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
             </c-card-body>
           </c-card>
         </c-col>
-        <c-col xs="6" md="3">
+        <c-col xs="6" md="3" class="animate-in stagger-2">
           <c-card class="h-100 border-top border-top-3 border-top-primary">
             <c-card-body class="py-2 px-3">
               <div class="text-body-secondary small">Eseguiti</div>
@@ -55,7 +55,7 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
             </c-card-body>
           </c-card>
         </c-col>
-        <c-col xs="6" md="3">
+        <c-col xs="6" md="3" class="animate-in stagger-3">
           <c-card class="h-100 border-top border-top-3 border-top-primary">
             <c-card-body class="py-2 px-3">
               <div class="text-body-secondary small">Confidenza Media</div>
@@ -63,7 +63,7 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
             </c-card-body>
           </c-card>
         </c-col>
-        <c-col xs="6" md="3">
+        <c-col xs="6" md="3" class="animate-in stagger-4">
           <c-card class="h-100 border-top border-top-3 border-top-primary">
             <c-card-body class="py-2 px-3">
               <div class="text-body-secondary small">Top Strategia</div>

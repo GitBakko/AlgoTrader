@@ -50,7 +50,7 @@ type Tab = 'open' | 'history';
 
     <!-- ═══════════ TAB: OPEN POSITIONS ═══════════ -->
     @if (activeTab() === 'open') {
-      <c-card class="mb-4 border-top border-top-3 border-top-primary">
+      <c-card class="mb-4 border-top border-top-3 border-top-primary animate-in">
         <c-card-header>
           <div class="d-flex align-items-center justify-content-between">
             <span class="fw-semibold small text-body-secondary">Posizioni Aperte</span>
@@ -252,7 +252,7 @@ type Tab = 'open' | 'history';
       <!-- Aggregates KPI row -->
       @if (trading.closedAggregates(); as agg) {
         <div class="row g-3 mb-3">
-          <div class="col-6 col-xl-3">
+          <div class="col-6 col-xl-3 animate-in stagger-1">
             <c-card class="h-100 border-top border-top-3 border-top-primary">
               <c-card-body class="p-3">
                 <div class="text-body-secondary small mb-1">P&amp;L Totale</div>
@@ -264,7 +264,7 @@ type Tab = 'open' | 'history';
               </c-card-body>
             </c-card>
           </div>
-          <div class="col-6 col-xl-3">
+          <div class="col-6 col-xl-3 animate-in stagger-2">
             <c-card class="h-100 border-top border-top-3 border-top-primary">
               <c-card-body class="p-3">
                 <div class="text-body-secondary small mb-1">Win Rate</div>
@@ -277,7 +277,7 @@ type Tab = 'open' | 'history';
               </c-card-body>
             </c-card>
           </div>
-          <div class="col-6 col-xl-3">
+          <div class="col-6 col-xl-3 animate-in stagger-3">
             <c-card class="h-100 border-top border-top-3 border-top-primary">
               <c-card-body class="p-3">
                 <div class="text-body-secondary small mb-1">Avg Win</div>
@@ -287,7 +287,7 @@ type Tab = 'open' | 'history';
               </c-card-body>
             </c-card>
           </div>
-          <div class="col-6 col-xl-3">
+          <div class="col-6 col-xl-3 animate-in stagger-4">
             <c-card class="h-100 border-top border-top-3 border-top-primary">
               <c-card-body class="p-3">
                 <div class="text-body-secondary small mb-1">Avg Loss</div>
@@ -301,7 +301,7 @@ type Tab = 'open' | 'history';
       }
 
       <!-- Closed positions table -->
-      <c-card class="mb-4 border-top border-top-3 border-top-primary">
+      <c-card class="mb-4 border-top border-top-3 border-top-primary animate-in">
         <c-card-header class="d-flex align-items-center justify-content-between">
           <span class="fw-semibold small text-body-secondary">
             Storico Posizioni Chiuse
