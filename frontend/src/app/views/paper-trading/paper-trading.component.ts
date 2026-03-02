@@ -319,6 +319,8 @@ interface GroupedPosition {
                     @for (group of groupedPositions(); track group.epic) {
                       <!-- GROUP HEADER ROW -->
                       <tr class="group-header" [class.group-expanded]="group.expanded"
+                          [class.pnl-row-positive]="group.totalPnl > 0"
+                          [class.pnl-row-negative]="group.totalPnl < 0"
                           (click)="toggleGroup(group.epic)">
                         <td class="text-center">
                           <svg width="16" height="16" fill="currentColor" class="chevron-icon"
@@ -364,7 +366,9 @@ interface GroupedPosition {
                       <!-- DETAIL ROWS (shown when expanded) -->
                       @if (group.expanded) {
                         @for (pos of group.positions; track pos.deal_id) {
-                          <tr class="detail-row">
+                          <tr class="detail-row"
+                              [class.pnl-row-positive]="pos.live_pnl > 0"
+                              [class.pnl-row-negative]="pos.live_pnl < 0">
                             <td></td>
                             <td class="ps-4">
                               <div class="d-flex align-items-center gap-1">

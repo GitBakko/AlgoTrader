@@ -261,6 +261,7 @@ h1, h2, h3, h4, h5, h6,
   position: relative;
   background: rgba($mantis-neon, 0.08);
   color: $mantis-neon;
+  box-shadow: -2px 0 8px rgba(0, 217, 126, 0.15);
 
   .nav-icon {
     opacity: 1;
@@ -689,6 +690,38 @@ h1, h2, h3, h4, h5, h6,
     background: rgba(#6c757d, 0.08);
     .signal-status__dot { background: #6c757d; }
   }
+}
+
+// ── Regime badge tints ──
+.regime-badge {
+  padding: 0.2em 0.5em;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+
+  &--trending_up {
+    background: rgba(57, 255, 20, 0.10);
+    color: #39ff14;
+    border: 1px solid rgba(57, 255, 20, 0.20);
+  }
+  &--trending_down {
+    background: rgba(255, 61, 87, 0.10);
+    color: #ff3d57;
+    border: 1px solid rgba(255, 61, 87, 0.20);
+  }
+  &--ranging {
+    background: rgba(255, 176, 32, 0.10);
+    color: #ffb020;
+    border: 1px solid rgba(255, 176, 32, 0.20);
+  }
+}
+
+// ── P&L row tints ──
+.pnl-row-positive {
+  background: rgba(57, 255, 20, 0.03) !important;
+}
+.pnl-row-negative {
+  background: rgba(255, 61, 87, 0.03) !important;
 }
 
 // Risk Management Badges (positions page)

@@ -383,7 +383,8 @@ type Tab = 'open' | 'history';
                 </thead>
                 <tbody>
                   @for (pos of trading.closedPositions(); track pos.deal_id) {
-                    <tr>
+                    <tr [class.pnl-row-positive]="(pos.profit_loss ?? 0) > 0"
+                        [class.pnl-row-negative]="(pos.profit_loss ?? 0) < 0">
                       <td class="fw-semibold">
                         <div class="d-flex align-items-center gap-2">
                           <app-epic-logo [epic]="pos.epic" [size]="24" [rounded]="true" />

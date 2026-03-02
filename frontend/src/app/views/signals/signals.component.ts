@@ -127,7 +127,7 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
                       <td class="mantis-mono d-mobile-none">{{ sig.suggested_tp ? (sig.suggested_tp | priceFormat:sig.epic) : '—' }}</td>
                       <td>
                         @if (sig.regime) {
-                          <c-badge [color]="regimeColor(sig.regime)" class="badge-sm">{{ sig.regime }}</c-badge>
+                          <span class="regime-badge regime-badge--{{ sig.regime }}">{{ sig.regime }}</span>
                         } @else {
                           <span class="text-body-secondary">-</span>
                         }
