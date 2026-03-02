@@ -2,7 +2,8 @@
   <button [caret]="false" cDropdownToggle class="notification-bell" aria-label="Notifiche">
     <svg cIcon name="cilBell" size="lg"></svg>
     @if (unreadCount() > 0) {
-      <c-badge color="danger" shape="rounded-pill" class="notification-badge">
+      <c-badge color="danger" shape="rounded-pill" class="notification-badge"
+        [class.notification-badge--active]="unreadCount() > 0">
         {{ unreadCount() > 99 ? '99+' : unreadCount() }}
       </c-badge>
     }

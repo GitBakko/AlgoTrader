@@ -17,8 +17,9 @@
     }
 
     &--selected {
-      border-left: 3px solid var(--mantis-green, #00d97e) !important;
-      box-shadow: 0 0 12px rgba(0, 217, 126, 0.1);
+      border-left: 3px solid var(--mantis-green, #00d97e);
+      background: rgba(0, 217, 126, 0.05);
+      box-shadow: 0 0 12px rgba(0, 217, 126, 0.12);
     }
   }
 
