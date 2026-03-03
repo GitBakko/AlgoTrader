@@ -27,10 +27,12 @@ from src.risk.trailing_stop_manager import TrailingPhase, TrailingStopConfig, Tr
 from src.monitoring.metrics import MetricsCollector
 from src.monitoring.trade_logger import get_trade_logger, SignalType, ExecutionStatus, RiskEventType
 from src.strategy.strategy_manager import StrategyManager
+from src.utils.config import get_settings
 from src.utils.constants import TRADABLE_ASSETS
 
 # How often to check for new candles (seconds)
-CHECK_INTERVAL = 300  # 5 minutes
+_settings = get_settings()
+CHECK_INTERVAL = _settings.scalp_check_interval if _settings.scalp_mode_enabled else 300
 MAX_SIGNAL_HISTORY = 200
 
 
@@ -100,7 +102,13 @@ class PaperTradingLoop:
         # HIGH-7 FIX: Track recently processed signals to prevent duplicates
         # Format: (epic, direction, entry_price_rounded) -> timestamp
         self._recent_signals: dict[tuple[str, str, float], datetime] = {}
-        self._signal_dedup_window_seconds = 60  # Ignore duplicates within 60s
+        self._signal_dedup_window_seconds = (
+            _settings.scalp_signal_dedup_seconds if _settings.scalp_mode_enabled else 60
+        )
+        # Candle resolution: 15min for scalp, 1h for swing
+        self._candle_resolution = (
+            _settings.scalp_candle_resolution if _settings.scalp_mode_enabled else "1h"
+        )
         self._last_signals: dict[str, dict] = {}
         self._signal_history: deque[dict] = deque(maxlen=MAX_SIGNAL_HISTORY)
         # Track last processed candle timestamp per epic
@@ -690,12 +698,14 @@ class PaperTradingLoop:
                 await asyncio.sleep(backoff)
 
     def _has_new_candle(self, epic: str) -> bool:
-        """Check if there's a new 1h candle since last processed."""
+        """Check if there's a new candle since last processed."""
         if self.data_access is None:
             return True  # No data access → always run (legacy behavior)
 
         try:
-            latest = self.data_access.get_latest_price(epic, timeframe="1h")
+            latest = self.data_access.get_latest_price(
+                epic, timeframe=self._candle_resolution
+            )
             if latest is None:
                 return False
 
@@ -893,7 +903,7 @@ class PaperTradingLoop:
             return
 
         # Step 1: ML Prediction
-        prediction = self.prediction_service.predict(epic)
+        prediction = self.prediction_service.predict(epic, timeframe=self._candle_resolution)
         if prediction is None:
             logger.debug(f"[{epic}] No prediction generated")
             return
@@ -904,7 +914,9 @@ class PaperTradingLoop:
         )
 
         # Step 2: Get market data
-        market_data = self.prediction_service.get_market_data(epic)
+        market_data = self.prediction_service.get_market_data(
+            epic, timeframe=self._candle_resolution
+        )
         if market_data is None:
             logger.warning(f"[{epic}] No market data available")
             return
