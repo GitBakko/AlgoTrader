@@ -211,6 +211,18 @@ class Settings(BaseSettings):
     max_total_open_positions: int = Field(default=5, alias="MAX_TOTAL_OPEN_POSITIONS")
     max_total_exposure: float = Field(default=1.0, alias="MAX_TOTAL_EXPOSURE")
 
+    # ===== Scalp Strategy =====
+    scalp_mode_enabled: bool = Field(default=False, alias="SCALP_MODE_ENABLED")
+    scalp_candle_resolution: str = Field(default="15min", alias="SCALP_CANDLE_RESOLUTION")
+    scalp_check_interval: int = Field(default=60, alias="SCALP_CHECK_INTERVAL")
+    scalp_score_threshold: int = Field(default=60, alias="SCALP_SCORE_THRESHOLD")
+    scalp_score_full_threshold: int = Field(default=75, alias="SCALP_SCORE_FULL_THRESHOLD")
+    scalp_sl_multiplier: float = Field(default=1.0, alias="SCALP_SL_MULTIPLIER")
+    scalp_tp_risk_reward: float = Field(default=2.0, alias="SCALP_TP_RISK_REWARD")
+    scalp_signal_dedup_seconds: int = Field(default=900, alias="SCALP_SIGNAL_DEDUP_SECONDS")
+    scalp_max_open_positions: int = Field(default=3, alias="SCALP_MAX_OPEN_POSITIONS")
+    scalp_max_risk_per_trade: float = Field(default=0.01, alias="SCALP_MAX_RISK_PER_TRADE")
+
     # ===== External APIs =====
     finnhub_api_key: str = Field(default="", alias="FINNHUB_API_KEY")
     marketaux_api_key: str = Field(default="", alias="MARKETAUX_API_KEY")
