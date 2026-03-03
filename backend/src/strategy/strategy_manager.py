@@ -29,6 +29,7 @@ class StrategyManager:
         self,
         configs: dict[str, StrategyConfig] | None = None,
         excluded_epics: set[str] | None = None,
+        scalp_mode: bool = False,
     ):
         """
         Initialize strategy manager.
@@ -36,9 +37,15 @@ class StrategyManager:
         Args:
             configs: Per-asset strategy configs. Uses defaults if None.
             excluded_epics: Epics to skip (decision=EXCLUDE from scorecard).
+            scalp_mode: If True, use ScalpScoreStrategy as primary signal source.
         """
         self._configs = configs or {}
         self.excluded_epics: set[str] = excluded_epics or set()
+        self.scalp_mode = scalp_mode
+        self._scalp_strategy = None
+        if scalp_mode:
+            from src.strategy.scalp_score_strategy import ScalpScoreStrategy
+            self._scalp_strategy = ScalpScoreStrategy()
 
     @classmethod
     def from_optimal_thresholds(
@@ -116,6 +123,10 @@ class StrategyManager:
             raise ValueError(f"Invalid current_price: {current_price}")
         if not (isinstance(atr, (int, float)) and atr > 0):
             raise ValueError(f"Invalid ATR: {atr}")
+
+        if self.scalp_mode and self._scalp_strategy is not None:
+            return self._process_scalp(prediction, epic, market_data)
+
         rsi = market_data.get("rsi")
         regime = market_data.get("regime")
         adx = market_data.get("adx")
@@ -145,6 +156,100 @@ class StrategyManager:
             f"conf={signal.confidence:.2f} regime={regime}"
         )
 
+        return signal
+
+    def _process_scalp(
+        self,
+        prediction: PredictionResult,
+        epic: str,
+        market_data: dict,
+    ) -> TradingSignal:
+        """Scalp mode: technical score first, ML as boost layer."""
+        import polars as pl
+        from src.strategy.schemas import SignalDirection
+        from src.models.schemas import SignalClass
+
+        current_price = float(market_data["current_price"])
+        atr = float(market_data["atr"])
+
+        config = StrategyConfig(
+            epic=epic,
+            stop_multiplier=1.0,
+            risk_reward_ratio=2.0,
+            min_confidence=0.40,
+        )
+
+        # Build current_bar from market_data
+        current_bar = {
+            "close": current_price,
+            "atr_14": atr,
+            "rsi_14": market_data.get("rsi", 50),
+            "adx_14": market_data.get("adx", 0),
+            "ema_9": market_data.get("ema_9", 0),
+            "ema_21": market_data.get("ema_21", 0),
+            "macd_histogram": market_data.get("macd_histogram", 0),
+            "macd": market_data.get("macd", 0),
+            "macd_signal": market_data.get("macd_signal", 0),
+            "volume": market_data.get("volume", 0),
+            "volume_sma_20": market_data.get("volume_sma_20", 0),
+            "bb_upper": market_data.get("bb_upper", 0),
+            "bb_lower": market_data.get("bb_lower", 0),
+            "bb_middle": market_data.get("bb_middle", 0),
+            "keltner_upper": market_data.get("keltner_upper", 0),
+            "keltner_lower": market_data.get("keltner_lower", 0),
+        }
+
+        recent_bars = pl.DataFrame({"close": [current_price]})
+
+        # Step 1: Technical score signal
+        signal = self._scalp_strategy.generate_signal(epic, current_bar, recent_bars, config)
+
+        if signal.direction == SignalDirection.HOLD:
+            logger.info(f"Scalp [{epic}]: HOLD (score too low)")
+            return signal
+
+        # Step 2: ML boost layer
+        ml_direction = {
+            SignalClass.BUY: SignalDirection.BUY,
+            SignalClass.SELL: SignalDirection.SELL,
+            SignalClass.HOLD: SignalDirection.HOLD,
+        }.get(prediction.signal_class, SignalDirection.HOLD)
+
+        if ml_direction == signal.direction and prediction.confidence > 0.40:
+            # ML agrees -> full confidence (no change)
+            logger.info(
+                f"Scalp [{epic}]: {signal.direction.value} "
+                f"(score->signal, ML agrees conf={prediction.confidence:.2f})"
+            )
+        elif ml_direction == SignalDirection.HOLD or prediction.confidence <= 0.40:
+            # ML neutral -> halve confidence
+            signal = signal.model_copy(update={"confidence": signal.confidence * 0.5})
+            logger.info(
+                f"Scalp [{epic}]: {signal.direction.value} "
+                f"(score->signal, ML neutral -> half conf={signal.confidence:.2f})"
+            )
+        else:
+            # ML disagrees (opposite direction)
+            if prediction.confidence > 0.50:
+                # Strong disagreement -> SKIP
+                logger.info(
+                    f"Scalp [{epic}]: SKIP (technical={signal.direction.value}, "
+                    f"ML={ml_direction.value} conf={prediction.confidence:.2f})"
+                )
+                return TradingSignal(
+                    epic=epic,
+                    direction=SignalDirection.HOLD,
+                    confidence=0.0,
+                    signal_class=SignalClass.HOLD,
+                    entry_price=current_price,
+                    technical_confirmation=False,
+                    strategy_name="scalp_score",
+                )
+            else:
+                # ML weakly disagrees -> halve
+                signal = signal.model_copy(update={"confidence": signal.confidence * 0.5})
+
+        signal = signal.model_copy(update={"strategy_name": "scalp_score"})
         return signal
 
     def get_allocation(self, regime: str | None = None) -> dict[str, float]:
