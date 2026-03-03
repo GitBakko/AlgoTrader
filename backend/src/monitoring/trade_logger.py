@@ -404,27 +404,19 @@ class TradeLogger:
         try:
             # Try PostgreSQL first
             async with DatabaseManager.session() as session:
-                # Use mode="json" for clean serialisation, then fix types for asyncpg
-                data = log_entry.model_dump(mode="json")
-
-                # asyncpg needs native datetime, not ISO strings
-                for key, val in data.items():
-                    if isinstance(val, str) and key.endswith(("timestamp", "_at")):
-                        try:
-                            data[key] = datetime.fromisoformat(val.replace("Z", "+00:00")).replace(tzinfo=None)
-                        except (ValueError, AttributeError):
-                            pass
-
-                # Convert remaining datetime objects (strip tz)
-                for key, val in data.items():
-                    if isinstance(val, datetime):
-                        data[key] = val.replace(tzinfo=None)
-
-                # Convert dicts/lists to JSON strings for TEXT columns
                 import json as _json
-                for key, val in data.items():
-                    if isinstance(val, (dict, list)):
+
+                # model_dump() keeps native Python types (datetime, enum, etc.)
+                data = log_entry.model_dump()
+
+                for key, val in list(data.items()):
+                    if isinstance(val, datetime):
+                        # asyncpg TIMESTAMP WITHOUT TIME ZONE rejects tz-aware
+                        data[key] = val.astimezone(timezone.utc).replace(tzinfo=None)
+                    elif isinstance(val, (dict, list)):
                         data[key] = _json.dumps(val)
+                    elif isinstance(val, Enum):
+                        data[key] = val.value
 
                 # Build INSERT statement dynamically
                 columns = ", ".join(data.keys())
