@@ -405,7 +405,19 @@ class TradeLogger:
             # Try PostgreSQL first
             async with DatabaseManager.session() as session:
                 # Convert Pydantic model to dict for SQL insertion
-                data = log_entry.model_dump(mode="json")
+                # Use model_dump() (not mode="json") to keep datetime as native objects;
+                # asyncpg rejects ISO strings, needs datetime instances.
+                # Then fix up types that asyncpg can't handle natively.
+                data = log_entry.model_dump()
+
+                # Strip timezone for asyncpg TIMESTAMP WITHOUT TIME ZONE columns
+                if "timestamp" in data and isinstance(data["timestamp"], datetime):
+                    data["timestamp"] = data["timestamp"].replace(tzinfo=None)
+
+                # Convert enum instances to their string values for asyncpg
+                for key, val in data.items():
+                    if isinstance(val, Enum):
+                        data[key] = val.value
 
                 # Build INSERT statement dynamically
                 columns = ", ".join(data.keys())
