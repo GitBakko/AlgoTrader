@@ -7,6 +7,7 @@ import time as _time
 from datetime import datetime, timezone
 
 import numpy as np
+import polars as pl
 from loguru import logger
 
 from src.data.data_access import DataAccessLayer
@@ -208,13 +209,16 @@ class PredictionService:
 
     def get_market_data(self, epic: str, timeframe: str = "1h") -> dict | None:
         """
-        Extract current price, ATR, ADX, RSI, and regime from latest data.
+        Extract current price, ATR, ADX, RSI, regime, and scalp indicators.
         Reuses cached candles from predict() when available to avoid double query.
 
         Returns:
-            Dict with current_price, atr, adx, rsi, regime (or None if no data)
+            Dict with current_price, atr, adx, rsi, regime, and (when scalp mode)
+            ema_9, ema_21, macd, macd_signal, macd_histogram, volume, volume_sma_20,
+            bb_upper, bb_lower, bb_middle, keltner_upper, keltner_lower.
         """
         from src.features.regime import RegimeDetector
+        from src.utils.config import get_settings
 
         # Reuse candles cached by predict() if same epic/timeframe
         cached = self._last_candles_cache.get(epic)
@@ -230,6 +234,19 @@ class PredictionService:
         df = TechnicalIndicators.add_adx(df, period=14)
         df = TechnicalIndicators.add_rsi(df, period=14)
         df = TechnicalIndicators.add_ema(df, periods=[50])
+
+        # Scalp mode: add extra indicators for ScalpScoreStrategy
+        settings = get_settings()
+        if settings.scalp_mode_enabled:
+            df = TechnicalIndicators.add_ema(df, periods=[9, 21])
+            df = TechnicalIndicators.add_macd(df)
+            df = TechnicalIndicators.add_bollinger_bands(df)
+            # Volume SMA (raw, not ratio)
+            df = df.with_columns(
+                pl.col("volume").rolling_mean(window_size=20).alias("volume_sma_20")
+            )
+            from src.features.keltner import KeltnerChannels
+            df = KeltnerChannels.add_keltner(df)
 
         # Regime detection (requires adx + ema_50)
         detector = RegimeDetector()
@@ -257,6 +274,28 @@ class PredictionService:
         regime_val = last.get("regime")
         if regime_val is not None:
             result["regime"] = str(regime_val)
+
+        # Scalp indicators (only present when scalp mode enabled)
+        if settings.scalp_mode_enabled:
+            for key in (
+                "ema_9", "ema_21", "macd_histogram", "macd", "macd_signal",
+                "bb_upper", "bb_lower", "bb_middle", "volume_sma_20",
+            ):
+                val = last.get(key)
+                if val is not None:
+                    result[key] = float(val)
+            # Keltner uses kc_ prefix
+            for src_key, dst_key in (
+                ("kc_upper", "keltner_upper"),
+                ("kc_lower", "keltner_lower"),
+            ):
+                val = last.get(src_key)
+                if val is not None:
+                    result[dst_key] = float(val)
+            # Raw volume
+            vol = last.get("volume")
+            if vol is not None:
+                result["volume"] = float(vol)
 
         return result
 
