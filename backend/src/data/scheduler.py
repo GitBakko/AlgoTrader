@@ -48,6 +48,16 @@ class DataScheduler:
         self._assets = list(TRADABLE_ASSETS)
         self._timeframes = ["1h", "4h", "1d"]
 
+        # Include scalp timeframe if scalp mode is enabled
+        from src.utils.config import get_settings
+        settings = get_settings()
+        self._scalp_mode = settings.scalp_mode_enabled
+        if self._scalp_mode:
+            scalp_tf = settings.scalp_candle_resolution  # e.g. "15min"
+            if scalp_tf not in self._timeframes:
+                self._timeframes.insert(0, scalp_tf)
+            self._scalp_timeframe = scalp_tf
+
     def setup(self) -> None:
         """Register all scheduled jobs."""
 
@@ -59,6 +69,16 @@ class DataScheduler:
             name="Hourly candle refresh (1h)",
             replace_existing=True,
         )
+
+        # 0b. Scalp candle refresh - every 5 min (for scalp mode)
+        if self._scalp_mode:
+            self.scheduler.add_job(
+                self.job_scalp_refresh,
+                CronTrigger(minute="*/5"),
+                id="scalp_refresh",
+                name=f"Scalp candle refresh ({self._scalp_timeframe})",
+                replace_existing=True,
+            )
 
         # 1. EOD download - weekdays at 22:00 UTC (after most markets close)
         self.scheduler.add_job(
@@ -142,6 +162,30 @@ class DataScheduler:
         # Invalidate cache so trading loop sees fresh data
         self.data_access.invalidate_cache()
         logger.info(f"Hourly refresh complete: {downloaded} candles across {len(self._assets)} assets")
+
+    async def job_scalp_refresh(self) -> None:
+        """
+        Scalp candle refresh for scalp mode trading.
+        Downloads last 2 hours of scalp-timeframe candles for all tradable assets,
+        then invalidates cache so the trading loop detects new candles.
+        """
+        logger.info(f"Running scalp candle refresh ({self._scalp_timeframe})...")
+        start_date = datetime.now(timezone.utc) - timedelta(hours=2)
+        downloaded = 0
+
+        for epic in self._assets:
+            try:
+                result = await self.downloader.download(
+                    epic=epic,
+                    timeframe=self._scalp_timeframe,
+                    start_date=start_date,
+                )
+                downloaded += result.downloaded_candles
+            except Exception as e:
+                logger.error(f"Scalp refresh failed for {epic}: {e}")
+
+        self.data_access.invalidate_cache()
+        logger.info(f"Scalp refresh complete: {downloaded} candles across {len(self._assets)} assets")
 
     async def job_eod_download(self) -> None:
         """
