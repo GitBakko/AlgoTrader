@@ -404,20 +404,27 @@ class TradeLogger:
         try:
             # Try PostgreSQL first
             async with DatabaseManager.session() as session:
-                # Convert Pydantic model to dict for SQL insertion
-                # Use model_dump() (not mode="json") to keep datetime as native objects;
-                # asyncpg rejects ISO strings, needs datetime instances.
-                # Then fix up types that asyncpg can't handle natively.
-                data = log_entry.model_dump()
+                # Use mode="json" for clean serialisation, then fix types for asyncpg
+                data = log_entry.model_dump(mode="json")
 
-                # Strip timezone for asyncpg TIMESTAMP WITHOUT TIME ZONE columns
-                if "timestamp" in data and isinstance(data["timestamp"], datetime):
-                    data["timestamp"] = data["timestamp"].replace(tzinfo=None)
-
-                # Convert enum instances to their string values for asyncpg
+                # asyncpg needs native datetime, not ISO strings
                 for key, val in data.items():
-                    if isinstance(val, Enum):
-                        data[key] = val.value
+                    if isinstance(val, str) and key.endswith(("timestamp", "_at")):
+                        try:
+                            data[key] = datetime.fromisoformat(val.replace("Z", "+00:00")).replace(tzinfo=None)
+                        except (ValueError, AttributeError):
+                            pass
+
+                # Convert remaining datetime objects (strip tz)
+                for key, val in data.items():
+                    if isinstance(val, datetime):
+                        data[key] = val.replace(tzinfo=None)
+
+                # Convert dicts/lists to JSON strings for TEXT columns
+                import json as _json
+                for key, val in data.items():
+                    if isinstance(val, (dict, list)):
+                        data[key] = _json.dumps(val)
 
                 # Build INSERT statement dynamically
                 columns = ", ".join(data.keys())
@@ -425,11 +432,9 @@ class TradeLogger:
                 query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
 
                 await session.execute(sa_text(query), data)
-                # No explicit commit needed - DatabaseManager.session() auto-commits
 
         except Exception as e:
-            # Fallback to JSON file logging
-            logger.warning(f"PostgreSQL unavailable, writing to file: {e}")
+            logger.warning(f"PostgreSQL write failed for {table_name}, falling back to file: {e}")
             await self._write_to_file(table_name, log_entry)
 
     async def _write_to_file(

@@ -125,7 +125,8 @@ class DataScheduler:
             replace_existing=True,
         )
 
-        logger.info("Data scheduler configured with 6 jobs")
+        job_count = len(self.scheduler.get_jobs())
+        logger.info(f"Data scheduler configured with {job_count} jobs")
 
     def start(self) -> None:
         """Start the scheduler."""
