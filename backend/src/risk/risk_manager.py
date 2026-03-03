@@ -16,6 +16,7 @@ from src.risk.position_sizer import PositionSizer
 from src.risk.schemas import DrawdownState, RiskCheckResult, RiskLimits
 from src.risk.stop_manager import StopManager
 from src.strategy.schemas import TradingSignal
+from src.utils.config import get_settings
 
 
 class RiskManager:
@@ -155,16 +156,24 @@ class RiskManager:
             )
 
         # 3. Calculate stop-loss with dynamic multiplier (volatility-scaled)
-        # Base=2 ATR, scales with current vs baseline volatility ratio
+        _risk_settings = get_settings()
+        if _risk_settings.scalp_mode_enabled:
+            base_sl = _risk_settings.scalp_sl_multiplier     # 1.0
+            sl_min, sl_max = 0.7, 2.0
+        else:
+            base_sl = 2.0
+            sl_min, sl_max = 1.5, 4.0
         baseline_atr = self.circuit_breakers.get_baseline_atr(signal.epic)
         stop_mult = StopManager.dynamic_multiplier(
-            base_multiplier=2.0,
+            base_multiplier=base_sl,
             current_atr=atr,
             baseline_atr=baseline_atr,
+            min_multiplier=sl_min,
+            max_multiplier=sl_max,
         )
-        if abs(stop_mult - 2.0) > 0.01:
+        if abs(stop_mult - base_sl) > 0.01:
             adjustments.append(
-                f"Dynamic SL multiplier: {stop_mult:.2f}x (base=2.0, vol ratio={atr/baseline_atr:.2f})"
+                f"Dynamic SL multiplier: {stop_mult:.2f}x (base={base_sl}, vol ratio={atr/baseline_atr:.2f})"
             )
         stop_loss = StopManager.calculate_stop_loss(
             direction=signal.direction.value,
@@ -185,12 +194,13 @@ class RiskManager:
             adjustments.append("Using tighter suggested stop-loss")
 
         # 4. Calculate take-profit (uses same dynamic multiplier for consistency)
+        rr_ratio = _risk_settings.scalp_tp_risk_reward if _risk_settings.scalp_mode_enabled else 2.5
         take_profit = StopManager.calculate_take_profit(
             direction=signal.direction.value,
             entry_price=signal.entry_price,
             atr=atr,
             multiplier=stop_mult,
-            risk_reward=2.5,
+            risk_reward=rr_ratio,
         )
 
         if signal.suggested_tp is not None:
@@ -219,9 +229,14 @@ class RiskManager:
             if sizing_method != "fixed_fractional":
                 adjustments.append(f"Sizing: {sizing_method}")
         else:
+            risk_per_trade = (
+                _risk_settings.scalp_max_risk_per_trade
+                if _risk_settings.scalp_mode_enabled
+                else self.limits.max_risk_per_trade
+            )
             position_size = PositionSizer.calculate_size(
                 equity=equity,
-                risk_per_trade=self.limits.max_risk_per_trade,
+                risk_per_trade=risk_per_trade,
                 entry_price=signal.entry_price,
                 stop_loss=stop_loss,
                 confidence=signal.confidence,
