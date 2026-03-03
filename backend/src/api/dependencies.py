@@ -198,6 +198,21 @@ def init_services(app) -> None:
     )
     app.state.strategy_manager = StrategyManager.from_optimal_thresholds()
 
+    # Enable scalp mode if configured
+    if settings.scalp_mode_enabled:
+        from src.strategy.scalp_score_strategy import ScalpScoreStrategy
+        app.state.strategy_manager.scalp_mode = True
+        app.state.strategy_manager._scalp_strategy = ScalpScoreStrategy(
+            entry_threshold=settings.scalp_score_threshold,
+            full_size_threshold=settings.scalp_score_full_threshold,
+        )
+        # Stricter circuit breaker for scalp (4 consecutive losses)
+        app.state.risk_manager.circuit_breakers.config.max_consecutive_losses = 4
+        logger.info(
+            f"Scalp mode ENABLED — {settings.scalp_candle_resolution} candles, "
+            f"check every {settings.scalp_check_interval}s, CB=4 losses"
+        )
+
     # In-memory stores (fallback when DB not available)
     app.state.signal_history = []
     app.state.backtest_runs = {}
