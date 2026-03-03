@@ -245,8 +245,8 @@ class PredictionService:
             df = df.with_columns(
                 pl.col("volume").rolling_mean(window_size=20).alias("volume_sma_20")
             )
-            from src.features.keltner import KeltnerChannels
-            df = KeltnerChannels.add_keltner(df)
+            from src.features.keltner import KeltnerChannel
+            df = KeltnerChannel.add_keltner(df)
 
         # Regime detection (requires adx + ema_50)
         detector = RegimeDetector()
