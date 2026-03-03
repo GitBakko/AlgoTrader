@@ -317,6 +317,15 @@ class ScalpScoreStrategy(BaseStrategy):
             score = sell_total
             signal_class = SignalClass.SELL
         else:
+            # Show feature details for HOLD signals during testing
+            vwap_tag = f" VWAP={vwap:.2f}" if vwap > 0 else ""
+            regime_tag = f" regime={micro_regime}" if micro_regime != "NORMAL" else ""
+            htf_tag = f" HTF={htf_bias}" if htf_bias else ""
+            sess_tag = f" sess={session_mult:.1f}" if session_mult < 1.0 else ""
+            logger.info(
+                f"[{epic}] ScalpScore: BUY={buy_total:.0f} SELL={sell_total:.0f} "
+                f"< thr={effective_threshold}{vwap_tag}{regime_tag}{htf_tag}{sess_tag}"
+            )
             return self._hold(epic, price)
 
         # Confidence: map score to [0.0, 1.0]
@@ -336,7 +345,7 @@ class ScalpScoreStrategy(BaseStrategy):
         vwap_info = f" VWAP={vwap:.2f}" if vwap > 0 else ""
         regime_info = f" regime={micro_regime}" if micro_regime != "NORMAL" else ""
         htf_info = f" HTF={htf_bias}" if htf_bias else ""
-        logger.debug(
+        logger.info(
             f"[{epic}] ScalpScore: BUY={buy_total:.0f} SELL={sell_total:.0f} "
             f"-> {direction.value} (score={score:.0f}, conf={confidence:.2f})"
             f"{vwap_info}{regime_info}{htf_info}"
