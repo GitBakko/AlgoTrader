@@ -13,8 +13,15 @@ from src.models.schemas import SignalClass
 from src.broker.models import Direction
 
 
+def _non_scalp_settings():
+    s = MagicMock()
+    s.scalp_mode_enabled = False
+    return s
+
+
+@patch("src.risk.risk_manager.get_settings", side_effect=lambda: _non_scalp_settings())
 @patch("src.risk.risk_manager.CorrelationGuard.check_exposure")
-def test_buy_position_sl_below_entry(mock_check_exposure):
+def test_buy_position_sl_below_entry(mock_check_exposure, _mock_settings):
     """Test that BUY positions have SL BELOW entry price."""
 
     # Mock static method for correlation check
@@ -81,8 +88,9 @@ def test_buy_position_sl_below_entry(mock_check_exposure):
     assert abs(result.stop_loss - expected_sl) < 0.01
 
 
+@patch("src.risk.risk_manager.get_settings", side_effect=lambda: _non_scalp_settings())
 @patch("src.risk.risk_manager.CorrelationGuard.check_exposure")
-def test_sell_position_sl_above_entry(mock_check_exposure):
+def test_sell_position_sl_above_entry(mock_check_exposure, _mock_settings):
     """Test that SELL positions have SL ABOVE entry price."""
 
     # Mock static method for correlation check
@@ -149,8 +157,9 @@ def test_sell_position_sl_above_entry(mock_check_exposure):
     assert abs(result.stop_loss - expected_sl) < 0.01
 
 
+@patch("src.risk.risk_manager.get_settings", side_effect=lambda: _non_scalp_settings())
 @patch("src.risk.risk_manager.CorrelationGuard.check_exposure")
-def test_buy_with_suggested_stop_chooses_min(mock_check_exposure):
+def test_buy_with_suggested_stop_chooses_min(mock_check_exposure, _mock_settings):
     """Test that BUY with suggested stop chooses the MIN (tighter stop)."""
 
     # Mock static method for correlation check
@@ -207,8 +216,9 @@ def test_buy_with_suggested_stop_chooses_min(mock_check_exposure):
     assert result.stop_loss < signal.entry_price
 
 
+@patch("src.risk.risk_manager.get_settings", side_effect=lambda: _non_scalp_settings())
 @patch("src.risk.risk_manager.CorrelationGuard.check_exposure")
-def test_sell_with_suggested_stop_chooses_max(mock_check_exposure):
+def test_sell_with_suggested_stop_chooses_max(mock_check_exposure, _mock_settings):
     """Test that SELL with suggested stop chooses the MAX (tighter stop)."""
 
     # Mock static method for correlation check

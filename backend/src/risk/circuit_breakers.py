@@ -21,6 +21,7 @@ class CircuitBreakerType(str, Enum):
     SLIPPAGE_ANOMALY = "slippage_anomaly"
     HEARTBEAT_TIMEOUT = "heartbeat_timeout"
     VOLATILITY_SPIKE = "volatility_spike"
+    MAX_TRADES_PER_DAY = "max_trades_per_day"
 
 
 class CircuitBreakerConfig(BaseModel):
@@ -34,6 +35,8 @@ class CircuitBreakerConfig(BaseModel):
     heartbeat_timeout_seconds: float = Field(default=30.0, ge=5.0, le=300.0)
     volatility_spike_multiplier: float = Field(default=5.0, ge=2.0, le=20.0)
     auto_reset_after_minutes: int = Field(default=60, ge=5, le=1440)
+    max_trades_per_day: int = Field(default=30, ge=1, le=200)
+    max_trades_throttle_pct: float = Field(default=0.8, ge=0.5, le=1.0)
 
 
 class CircuitBreakerManager:
@@ -58,6 +61,8 @@ class CircuitBreakerManager:
         self._slippage_history: list[float] = []
         self._last_heartbeat: float = _time.monotonic()
         self._baseline_atr: dict[str, float] = {}
+        self._daily_trade_count: int = 0
+        self._daily_trade_date: str = ""
 
     @property
     def is_tripped(self) -> bool:
@@ -145,7 +150,16 @@ class CircuitBreakerManager:
                 self._trip(CircuitBreakerType.VOLATILITY_SPIKE, reason)
                 reasons.append(reason)
 
-        # 6. Slippage anomaly (checked internally via recorded slippage)
+        # 6. Max trades per day
+        if self._daily_trade_count >= self.config.max_trades_per_day:
+            reason = (
+                f"Max trades/day ({self._daily_trade_count}) >= "
+                f"limit ({self.config.max_trades_per_day})"
+            )
+            self._trip(CircuitBreakerType.MAX_TRADES_PER_DAY, reason)
+            reasons.append(reason)
+
+        # 7. Slippage anomaly (checked internally via recorded slippage)
         if len(self._slippage_history) >= self.config.slippage_window:
             recent = self._slippage_history[-self.config.slippage_window:]
             avg_slippage = sum(recent) / len(recent)
@@ -165,6 +179,34 @@ class CircuitBreakerManager:
 
         is_ok = len(reasons) == 0
         return is_ok, reasons
+
+    def record_trade_opened(self, current_date: str | None = None) -> None:
+        """
+        Record a trade was opened for daily trade count tracking (thread-safe).
+
+        Args:
+            current_date: Date string (YYYY-MM-DD). Auto-detected if None.
+        """
+        from datetime import datetime, timezone
+        if current_date is None:
+            current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        with self._lock:
+            if self._daily_trade_date != current_date:
+                self._daily_trade_count = 0
+                self._daily_trade_date = current_date
+                # Clear the max trades breaker on new day
+                self._tripped.pop(CircuitBreakerType.MAX_TRADES_PER_DAY, None)
+                self._tripped_at.pop(CircuitBreakerType.MAX_TRADES_PER_DAY, None)
+            self._daily_trade_count += 1
+
+    def is_trade_throttled(self) -> bool:
+        """
+        Check if trades should be throttled (80% of max trades/day).
+        When throttled, caller should halve position size.
+        """
+        with self._lock:
+            threshold = int(self.config.max_trades_per_day * self.config.max_trades_throttle_pct)
+            return self._daily_trade_count >= threshold
 
     def record_trade_result(self, is_win: bool) -> None:
         """
@@ -230,6 +272,8 @@ class CircuitBreakerManager:
             self._consecutive_losses = 0
             self._slippage_history.clear()
             self._last_heartbeat = _time.monotonic()
+            self._daily_trade_count = 0
+            self._daily_trade_date = ""
             if reset_types:
                 logger.info(f"Circuit breakers manually reset: {reset_types}")
             return reset_types
@@ -251,6 +295,8 @@ class CircuitBreakerManager:
                 "consecutive_losses": self._consecutive_losses,
                 "recent_slippages": len(self._slippage_history),
                 "seconds_since_heartbeat": _time.monotonic() - self._last_heartbeat,
+                "daily_trade_count": self._daily_trade_count,
+                "daily_trade_date": self._daily_trade_date,
             }
 
     def _trip(self, cb_type: CircuitBreakerType, reason: str, epic: str = "global") -> None:

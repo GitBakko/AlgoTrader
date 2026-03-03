@@ -1,9 +1,16 @@
 """Tests for TP1/TP2 multi-target exit calculation in RiskManager."""
 
 import pytest
+from unittest.mock import MagicMock, patch
 
 from src.risk.risk_manager import RiskManager
 from src.strategy.schemas import SignalDirection, TradingSignal
+
+
+def _non_scalp_settings():
+    s = MagicMock()
+    s.scalp_mode_enabled = False
+    return s
 
 
 def _make_signal(
@@ -27,6 +34,11 @@ def _make_signal(
 @pytest.mark.risk
 class TestMultiTargetExit:
     """Tests for TP1/TP2 calculation in RiskManager."""
+
+    @pytest.fixture(autouse=True)
+    def _disable_scalp(self):
+        with patch("src.risk.risk_manager.get_settings", return_value=_non_scalp_settings()):
+            yield
 
     def test_tp1_tp2_calculated_buy(self):
         """BUY: TP1 = entry + risk, TP2 = entry + 2*risk."""

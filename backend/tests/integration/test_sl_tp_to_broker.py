@@ -18,6 +18,12 @@ from src.strategy.schemas import TradingSignal
 from src.broker.models import Direction, DealConfirmation
 
 
+def _non_scalp_settings():
+    s = MagicMock()
+    s.scalp_mode_enabled = False
+    return s
+
+
 @pytest.fixture
 def mock_risk_manager():
     """Risk manager with mocked dependencies."""
@@ -42,8 +48,9 @@ def mock_risk_manager():
     return rm
 
 
+@patch("src.risk.risk_manager.get_settings", side_effect=lambda: _non_scalp_settings())
 @pytest.mark.asyncio
-async def test_sl_tp_flow_to_broker(mock_risk_manager):
+async def test_sl_tp_flow_to_broker(_mock_settings, mock_risk_manager):
     """
     Test that SL/TP values flow correctly from RiskManager to Broker API.
 
@@ -134,8 +141,9 @@ async def test_sl_tp_flow_to_broker(mock_risk_manager):
     print(f"   CreatePositionRequest: stop_level={captured_request.stop_level:.2f} profit_level={captured_request.profit_level:.2f}")
 
 
+@patch("src.risk.risk_manager.get_settings", side_effect=lambda: _non_scalp_settings())
 @pytest.mark.asyncio
-async def test_sell_position_sl_tp_flow(mock_risk_manager):
+async def test_sell_position_sl_tp_flow(_mock_settings, mock_risk_manager):
     """Test SL/TP flow for SELL position (SL above entry)."""
     signal = TradingSignal(
         epic="XAUUSD",

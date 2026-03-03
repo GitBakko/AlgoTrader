@@ -14,6 +14,7 @@ from loguru import logger
 from src.models.schemas import SignalClass
 from src.strategy.base_strategy import BaseStrategy
 from src.strategy.schemas import SignalDirection, StrategyConfig, TradingSignal
+from src.strategy.session_filter import SessionFilter
 
 # Indicator weights (must sum to 100)
 W_EMA = 20
@@ -184,6 +185,41 @@ class ScalpScoreStrategy(BaseStrategy):
         return buy_score, sell_score
 
     # ------------------------------------------------------------------
+    # Micro-regime detection
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _detect_micro_regime(current_bar: dict, recent_bars: pl.DataFrame) -> str:
+        """
+        Detect micro-regime from current indicators.
+
+        Returns:
+            "SQUEEZE" — BB inside Keltner (breakout building)
+            "HIGH_VOL" — ATR > 2x rolling mean (volatile)
+            "NORMAL" — default
+        """
+        bb_upper = float(current_bar.get("bb_upper", 0))
+        bb_lower = float(current_bar.get("bb_lower", 0))
+        kc_upper = float(current_bar.get("keltner_upper", 0))
+        kc_lower = float(current_bar.get("keltner_lower", 0))
+
+        # Squeeze: BB bands inside Keltner channels
+        if bb_upper > 0 and kc_upper > 0:
+            bb_width = bb_upper - bb_lower
+            kc_width = kc_upper - kc_lower
+            if kc_width > 0 and bb_width < kc_width:
+                return "SQUEEZE"
+
+        # High volatility: ATR spike above 2x rolling mean
+        atr = float(current_bar.get("atr_14", 0))
+        if atr > 0 and "atr_14" in recent_bars.columns and len(recent_bars) > 10:
+            atr_mean = recent_bars.get_column("atr_14").mean()
+            if atr_mean is not None and atr_mean > 0 and atr > 2.0 * atr_mean:
+                return "HIGH_VOL"
+
+        return "NORMAL"
+
+    # ------------------------------------------------------------------
     # Main signal generation
     # ------------------------------------------------------------------
 
@@ -199,6 +235,15 @@ class ScalpScoreStrategy(BaseStrategy):
 
         if price <= 0 or atr <= 0:
             return self._hold(epic, price)
+
+        # Session awareness: block or penalise off-session trades
+        utc_hour = int(current_bar.get("utc_hour", -1))
+        session_mult = 1.0
+        if utc_hour >= 0:
+            session_mult = SessionFilter.get_session_multiplier(epic, utc_hour)
+            if session_mult == 0.0:
+                logger.debug(f"[{epic}] Session blocked (UTC hour={utc_hour})")
+                return self._hold(epic, price)
 
         # Extract indicators
         ema_9 = float(current_bar.get("ema_9", 0))
@@ -229,12 +274,45 @@ class ScalpScoreStrategy(BaseStrategy):
         buy_total = ema_buy + rsi_buy + macd_buy + vol_score + adx_score + bb_buy
         sell_total = ema_sell + rsi_sell + macd_sell + vol_score + adx_score + bb_sell
 
+        # VWAP directional filter: penalise trading against VWAP
+        vwap = float(current_bar.get("vwap", 0))
+        if vwap > 0:
+            if price < vwap:
+                buy_total *= 0.4   # 60% penalty for buying below VWAP
+            elif price > vwap:
+                sell_total *= 0.4  # 60% penalty for selling above VWAP
+
+        # Session multiplier: reduce scores outside kill zones
+        if session_mult < 1.0:
+            buy_total *= session_mult
+            sell_total *= session_mult
+
+        # Micro-regime detection: SQUEEZE bonus, HIGH_VOL penalty
+        micro_regime = self._detect_micro_regime(current_bar, recent_bars)
+        effective_threshold = self.entry_threshold
+        if micro_regime == "SQUEEZE":
+            buy_total *= 1.1   # 10% bonus — breakout energy building
+            sell_total *= 1.1
+        elif micro_regime == "HIGH_VOL":
+            buy_total *= 0.8   # 20% penalty — need stronger conviction
+            sell_total *= 0.8
+            effective_threshold = max(self.entry_threshold, 70)  # Raise threshold
+
+        # HTF confluence: penalise trading against 1H trend
+        htf_bias = current_bar.get("htf_bias")
+        if htf_bias == "bearish":
+            buy_total *= 0.3   # 70% penalty — fighting the trend
+            sell_total *= 1.1  # 10% bonus — aligned
+        elif htf_bias == "bullish":
+            sell_total *= 0.3  # 70% penalty — fighting the trend
+            buy_total *= 1.1   # 10% bonus — aligned
+
         # Determine direction: highest score wins
-        if buy_total >= sell_total and buy_total >= self.entry_threshold:
+        if buy_total >= sell_total and buy_total >= effective_threshold:
             direction = SignalDirection.BUY
             score = buy_total
             signal_class = SignalClass.BUY
-        elif sell_total > buy_total and sell_total >= self.entry_threshold:
+        elif sell_total > buy_total and sell_total >= effective_threshold:
             direction = SignalDirection.SELL
             score = sell_total
             signal_class = SignalClass.SELL
@@ -255,9 +333,13 @@ class ScalpScoreStrategy(BaseStrategy):
             stop = price + atr * sl_mult
             tp = price - atr * sl_mult * rr
 
+        vwap_info = f" VWAP={vwap:.2f}" if vwap > 0 else ""
+        regime_info = f" regime={micro_regime}" if micro_regime != "NORMAL" else ""
+        htf_info = f" HTF={htf_bias}" if htf_bias else ""
         logger.debug(
             f"[{epic}] ScalpScore: BUY={buy_total:.0f} SELL={sell_total:.0f} "
             f"-> {direction.value} (score={score:.0f}, conf={confidence:.2f})"
+            f"{vwap_info}{regime_info}{htf_info}"
         )
 
         return TradingSignal(

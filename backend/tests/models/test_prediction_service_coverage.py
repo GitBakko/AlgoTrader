@@ -324,6 +324,14 @@ class TestPredictSuccessful:
 class TestGetMarketData:
     """Tests for get_market_data() including regime detection and RSI."""
 
+    @pytest.fixture(autouse=True)
+    def _disable_scalp_mode(self):
+        """Disable scalp mode for base get_market_data tests (separate scalp tests exist)."""
+        mock_settings = MagicMock()
+        mock_settings.scalp_mode_enabled = False
+        with patch("src.utils.config.get_settings", return_value=mock_settings):
+            yield
+
     def _mock_ti_chain(self, mock_ti, candles, *, adx=None, rsi=None, ema_50=None):
         """Helper: set up the mock chain for TechnicalIndicators calls."""
         df = candles.clone()

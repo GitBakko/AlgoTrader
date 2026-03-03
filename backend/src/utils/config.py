@@ -222,6 +222,8 @@ class Settings(BaseSettings):
     scalp_signal_dedup_seconds: int = Field(default=900, alias="SCALP_SIGNAL_DEDUP_SECONDS")
     scalp_max_open_positions: int = Field(default=3, alias="SCALP_MAX_OPEN_POSITIONS")
     scalp_max_risk_per_trade: float = Field(default=0.01, alias="SCALP_MAX_RISK_PER_TRADE")
+    scalp_max_trades_per_day: int = Field(default=30, alias="SCALP_MAX_TRADES_PER_DAY")
+    scalp_htf_enabled: bool = Field(default=True, alias="SCALP_HTF_ENABLED")
 
     # ===== External APIs =====
     finnhub_api_key: str = Field(default="", alias="FINNHUB_API_KEY")

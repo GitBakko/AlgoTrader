@@ -1,10 +1,17 @@
 """Tests for risk manager orchestrator."""
 
 import pytest
+from unittest.mock import MagicMock, patch
 
 from src.risk.risk_manager import RiskManager
 from src.risk.schemas import RiskLimits
 from src.strategy.schemas import SignalDirection, TradingSignal
+
+
+def _non_scalp_settings():
+    s = MagicMock()
+    s.scalp_mode_enabled = False
+    return s
 
 
 def _make_signal(
@@ -20,6 +27,11 @@ def _make_signal(
 
 
 class TestRiskManager:
+    @pytest.fixture(autouse=True)
+    def _disable_scalp(self):
+        with patch("src.risk.risk_manager.get_settings", return_value=_non_scalp_settings()):
+            yield
+
     def test_approves_valid_trade(self):
         rm = RiskManager(initial_equity=10000.0)
         signal = _make_signal()

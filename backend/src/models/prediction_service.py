@@ -247,6 +247,9 @@ class PredictionService:
             )
             from src.features.keltner import KeltnerChannel
             df = KeltnerChannel.add_keltner(df)
+            # VWAP for directional filter
+            from src.features.vwap_bands import VWAPBands
+            df = VWAPBands.add_vwap_bands(df)
 
         # Regime detection (requires adx + ema_50)
         detector = RegimeDetector()
@@ -296,8 +299,49 @@ class PredictionService:
             vol = last.get("volume")
             if vol is not None:
                 result["volume"] = float(vol)
+            # VWAP for directional filter
+            vwap_val = last.get("vwap_rolling")
+            if vwap_val is not None:
+                result["vwap"] = float(vwap_val)
+            # Recent bars for micro-regime detection (last 100 bars with indicators)
+            result["recent_bars"] = df.tail(100)
+
+            # HTF bias from 1H candles (separate query)
+            if settings.scalp_htf_enabled:
+                htf_bias = self.get_htf_bias(epic)
+                if htf_bias is not None:
+                    result["htf_bias"] = htf_bias
 
         return result
+
+    def get_htf_bias(self, epic: str) -> str | None:
+        """
+        Get 1H higher-timeframe directional bias using EMA-50.
+
+        Returns:
+            "bullish" — price > EMA-50 by 0.2%+
+            "bearish" — price < EMA-50 by 0.2%+
+            None — no clear bias (price near EMA-50)
+        """
+        try:
+            df = self.data_access.get_candles(epic, "1h", limit=100)
+            if df.is_empty() or len(df) < 50:
+                return None
+            df = TechnicalIndicators.add_ema(df, periods=[50])
+            last = df.tail(1).row(0, named=True)
+            price = float(last["close"])
+            ema_50 = float(last.get("ema_50", 0))
+            if ema_50 <= 0 or price <= 0:
+                return None
+            spread = (price - ema_50) / ema_50
+            if spread > 0.002:
+                return "bullish"
+            elif spread < -0.002:
+                return "bearish"
+            return None
+        except Exception as e:
+            logger.debug(f"HTF bias failed for {epic}: {e}")
+            return None
 
     def get_loaded_models(self) -> dict[str, dict]:
         """Get info about currently loaded models."""

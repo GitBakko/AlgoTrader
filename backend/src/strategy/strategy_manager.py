@@ -166,11 +166,13 @@ class StrategyManager:
     ) -> TradingSignal:
         """Scalp mode: technical score first, ML as boost layer."""
         import polars as pl
+        from datetime import datetime, timezone
         from src.strategy.schemas import SignalDirection
         from src.models.schemas import SignalClass
 
         current_price = float(market_data["current_price"])
         atr = float(market_data["atr"])
+        utc_hour = datetime.now(timezone.utc).hour
 
         config = StrategyConfig(
             epic=epic,
@@ -197,9 +199,12 @@ class StrategyManager:
             "bb_middle": market_data.get("bb_middle", 0),
             "keltner_upper": market_data.get("keltner_upper", 0),
             "keltner_lower": market_data.get("keltner_lower", 0),
+            "vwap": market_data.get("vwap", 0),
+            "utc_hour": utc_hour,
+            "htf_bias": market_data.get("htf_bias"),
         }
 
-        recent_bars = pl.DataFrame({"close": [current_price]})
+        recent_bars = market_data.get("recent_bars", pl.DataFrame({"close": [current_price]}))
 
         # Step 1: Technical score signal
         signal = self._scalp_strategy.generate_signal(epic, current_bar, recent_bars, config)
