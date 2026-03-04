@@ -4,7 +4,7 @@ ScalpScoreStrategy — Multi-indicator scoring for 15-min scalping.
 Computes a composite score (0-100) from 6 technical indicators:
   EMA Trend (20), RSI (18), MACD (18), Volume (12), ADX (18), BB Squeeze (14)
 
-Score >= 60 -> entry signal (BUY or SELL depending on indicator alignment).
+Score >= 55 -> entry signal (BUY or SELL depending on indicator alignment).
 ML model acts as a boost layer externally (not inside this strategy).
 """
 
@@ -25,8 +25,8 @@ W_ADX = 18
 W_BB = 14
 
 # Score thresholds
-DEFAULT_ENTRY_THRESHOLD = 60
-DEFAULT_FULL_SIZE_THRESHOLD = 75
+DEFAULT_ENTRY_THRESHOLD = 55
+DEFAULT_FULL_SIZE_THRESHOLD = 70
 
 
 class ScalpScoreStrategy(BaseStrategy):
@@ -278,9 +278,9 @@ class ScalpScoreStrategy(BaseStrategy):
         vwap = float(current_bar.get("vwap", 0))
         if vwap > 0:
             if price < vwap:
-                buy_total *= 0.4   # 60% penalty for buying below VWAP
+                buy_total *= 0.7   # 30% penalty for buying below VWAP
             elif price > vwap:
-                sell_total *= 0.4  # 60% penalty for selling above VWAP
+                sell_total *= 0.7  # 30% penalty for selling above VWAP
 
         # Session multiplier: reduce scores outside kill zones
         if session_mult < 1.0:
@@ -294,17 +294,17 @@ class ScalpScoreStrategy(BaseStrategy):
             buy_total *= 1.1   # 10% bonus — breakout energy building
             sell_total *= 1.1
         elif micro_regime == "HIGH_VOL":
-            buy_total *= 0.8   # 20% penalty — need stronger conviction
-            sell_total *= 0.8
-            effective_threshold = max(self.entry_threshold, 70)  # Raise threshold
+            buy_total *= 0.85  # 15% penalty — need stronger conviction
+            sell_total *= 0.85
+            effective_threshold = max(self.entry_threshold, 65)  # Raise threshold
 
         # HTF confluence: penalise trading against 1H trend
         htf_bias = current_bar.get("htf_bias")
         if htf_bias == "bearish":
-            buy_total *= 0.3   # 70% penalty — fighting the trend
+            buy_total *= 0.5   # 50% penalty — fighting the trend
             sell_total *= 1.1  # 10% bonus — aligned
         elif htf_bias == "bullish":
-            sell_total *= 0.3  # 70% penalty — fighting the trend
+            sell_total *= 0.5  # 50% penalty — fighting the trend
             buy_total *= 1.1   # 10% bonus — aligned
 
         # Determine direction: highest score wins

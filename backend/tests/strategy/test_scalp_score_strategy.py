@@ -176,3 +176,44 @@ class TestScalpScoreBacktest:
         assert "signal_direction" in result.columns
         assert "signal_confidence" in result.columns
         assert len(result) == len(df)
+
+
+class TestScalpScoreSoftenedThresholds:
+    """Tests for softened penalty multipliers (2026-03-04 tuning)."""
+
+    def test_default_entry_threshold_is_55(self):
+        from src.strategy.scalp_score_strategy import DEFAULT_ENTRY_THRESHOLD
+        assert DEFAULT_ENTRY_THRESHOLD == 55
+
+    def test_default_full_size_threshold_is_70(self):
+        from src.strategy.scalp_score_strategy import DEFAULT_FULL_SIZE_THRESHOLD
+        assert DEFAULT_FULL_SIZE_THRESHOLD == 70
+
+    def test_vwap_penalty_allows_strong_buy_below_vwap(self, strategy, recent_bars, config):
+        """VWAP penalty softened from 0.4 to 0.7. Strong buy below VWAP should still pass."""
+        bar = _make_bar(
+            ema_9=105.5, ema_21=104.8,
+            rsi_14=35.0,
+            macd_histogram=0.5, macd=0.6, macd_signal=0.1,
+            adx_14=32.0,
+            volume=1500, volume_sma_20=1000,
+            vwap=106.0,  # price BELOW vwap
+        )
+        signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
+        assert signal.direction == SignalDirection.BUY
+
+    def test_htf_bearish_penalty_allows_strong_buy(self, strategy, recent_bars, config):
+        """HTF penalty softened from 0.3 to 0.5. Strong buy against bearish HTF should pass."""
+        bar = _make_bar(
+            close=105.5,                     # above bb_middle for BB squeeze score
+            ema_9=105.5, ema_21=104.8,
+            rsi_14=35.0,                     # peak RSI buy score
+            macd_histogram=0.8, macd=0.9, macd_signal=0.1,  # strong MACD
+            adx_14=40.0,                     # very strong trend for max ADX
+            volume=2000, volume_sma_20=1000, # 2x volume ratio
+            bb_upper=106.0, bb_lower=104.0, bb_middle=105.0,  # BB squeeze
+            keltner_upper=107.0, keltner_lower=103.0,         # wider KC
+            htf_bias="bearish",
+        )
+        signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
+        assert signal.direction == SignalDirection.BUY
