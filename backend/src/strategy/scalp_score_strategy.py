@@ -1,10 +1,18 @@
 """
 ScalpScoreStrategy — Multi-indicator scoring for 15-min scalping.
 
+SCALPING-GURU architecture: raw score + binary gate filters.
+
 Computes a composite score (0-100) from 6 technical indicators:
   EMA Trend (20), RSI (18), MACD (18), Volume (12), ADX (18), BB Squeeze (14)
 
-Score >= 55 -> entry signal (BUY or SELL depending on indicator alignment).
+Score >= threshold AND gate_filters_pass -> entry signal.
+
+Gate filters (binary pass/fail, NOT multiplicative):
+  - Session: kill zone or active session (off-session = hard block)
+  - VWAP: directional gate (buy only above VWAP, sell only below)
+  - HTF: additive bonus/malus (+5 aligned, -10 opposing)
+
 ML model acts as a boost layer externally (not inside this strategy).
 """
 
@@ -274,38 +282,38 @@ class ScalpScoreStrategy(BaseStrategy):
         buy_total = ema_buy + rsi_buy + macd_buy + vol_score + adx_score + bb_buy
         sell_total = ema_sell + rsi_sell + macd_sell + vol_score + adx_score + bb_sell
 
-        # VWAP directional filter: penalise trading against VWAP
+        # --- GURU GATE FILTERS (binary, not multiplicative) ---
+
+        # VWAP directional gate: zero the opposing direction
         vwap = float(current_bar.get("vwap", 0))
         if vwap > 0:
             if price < vwap:
-                buy_total *= 0.7   # 30% penalty for buying below VWAP
+                buy_total = 0  # Cannot buy below VWAP
             elif price > vwap:
-                sell_total *= 0.7  # 30% penalty for selling above VWAP
+                sell_total = 0  # Cannot sell above VWAP
 
-        # Session multiplier: reduce scores outside kill zones
-        if session_mult < 1.0:
-            buy_total *= session_mult
-            sell_total *= session_mult
-
-        # Micro-regime detection: SQUEEZE bonus, HIGH_VOL penalty
-        micro_regime = self._detect_micro_regime(current_bar, recent_bars)
+        # Session: no score penalty — only threshold adjustment
+        # (off-session hard block already handled above)
         effective_threshold = self.entry_threshold
-        if micro_regime == "SQUEEZE":
-            buy_total *= 1.1   # 10% bonus — breakout energy building
-            sell_total *= 1.1
-        elif micro_regime == "HIGH_VOL":
-            buy_total *= 0.85  # 15% penalty — need stronger conviction
-            sell_total *= 0.85
-            effective_threshold = max(self.entry_threshold, 65)  # Raise threshold
+        if session_mult < 1.0:
+            effective_threshold += 5  # Slightly higher bar outside kill zones
 
-        # HTF confluence: penalise trading against 1H trend
+        # Micro-regime: additive adjustments
+        micro_regime = self._detect_micro_regime(current_bar, recent_bars)
+        if micro_regime == "SQUEEZE":
+            buy_total += 5   # Breakout energy building
+            sell_total += 5
+        elif micro_regime == "HIGH_VOL":
+            effective_threshold = max(effective_threshold, 65)
+
+        # HTF confluence: additive bonus/malus (not multiplicative)
         htf_bias = current_bar.get("htf_bias")
         if htf_bias == "bearish":
-            buy_total *= 0.5   # 50% penalty — fighting the trend
-            sell_total *= 1.1  # 10% bonus — aligned
+            buy_total -= 10  # Fighting the trend
+            sell_total += 5  # Aligned with trend
         elif htf_bias == "bullish":
-            sell_total *= 0.5  # 50% penalty — fighting the trend
-            buy_total *= 1.1   # 10% bonus — aligned
+            sell_total -= 10  # Fighting the trend
+            buy_total += 5   # Aligned with trend
 
         # Determine direction: highest score wins
         if buy_total >= sell_total and buy_total >= effective_threshold:

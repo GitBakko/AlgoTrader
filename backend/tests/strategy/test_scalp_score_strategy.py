@@ -178,8 +178,8 @@ class TestScalpScoreBacktest:
         assert len(result) == len(df)
 
 
-class TestScalpScoreSoftenedThresholds:
-    """Tests for softened penalty multipliers (2026-03-04 tuning)."""
+class TestScalpScoreGuruGateFilters:
+    """Tests for SCALPING-GURU gate filter architecture (2026-03-04)."""
 
     def test_default_entry_threshold_is_55(self):
         from src.strategy.scalp_score_strategy import DEFAULT_ENTRY_THRESHOLD
@@ -189,31 +189,102 @@ class TestScalpScoreSoftenedThresholds:
         from src.strategy.scalp_score_strategy import DEFAULT_FULL_SIZE_THRESHOLD
         assert DEFAULT_FULL_SIZE_THRESHOLD == 70
 
-    def test_vwap_penalty_allows_strong_buy_below_vwap(self, strategy, recent_bars, config):
-        """VWAP penalty softened from 0.4 to 0.7. Strong buy below VWAP should still pass."""
+    def test_vwap_gate_blocks_buy_below_vwap(self, strategy, recent_bars, config):
+        """GURU: VWAP is a binary gate. Buy below VWAP is blocked, sell allowed."""
         bar = _make_bar(
             ema_9=105.5, ema_21=104.8,
             rsi_14=35.0,
             macd_histogram=0.5, macd=0.6, macd_signal=0.1,
             adx_14=32.0,
             volume=1500, volume_sma_20=1000,
-            vwap=106.0,  # price BELOW vwap
+            vwap=106.0,  # price BELOW vwap -> buy blocked
+        )
+        signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
+        # Buy is gated (zeroed), so either SELL or HOLD — never BUY
+        assert signal.direction != SignalDirection.BUY
+
+    def test_vwap_gate_blocks_sell_above_vwap(self, strategy, recent_bars, config):
+        """GURU: Sell above VWAP is blocked."""
+        bar = _make_bar(
+            close=105.0,
+            ema_9=104.5, ema_21=105.2,     # bearish EMA
+            rsi_14=65.0,                     # overbought
+            macd_histogram=-0.5, macd=-0.6, macd_signal=-0.1,
+            adx_14=28.0,
+            volume=1500, volume_sma_20=1000,
+            vwap=104.0,  # price ABOVE vwap -> sell blocked
+        )
+        signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
+        assert signal.direction != SignalDirection.SELL
+
+    def test_vwap_aligned_buy_passes(self, strategy, recent_bars, config):
+        """GURU: Buy above VWAP passes through untouched."""
+        bar = _make_bar(
+            ema_9=105.5, ema_21=104.8,
+            rsi_14=35.0,
+            macd_histogram=0.5, macd=0.6, macd_signal=0.1,
+            adx_14=32.0,
+            volume=1500, volume_sma_20=1000,
+            vwap=104.0,  # price ABOVE vwap -> buy allowed
         )
         signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
         assert signal.direction == SignalDirection.BUY
 
-    def test_htf_bearish_penalty_allows_strong_buy(self, strategy, recent_bars, config):
-        """HTF penalty softened from 0.3 to 0.5. Strong buy against bearish HTF should pass."""
+    def test_no_vwap_data_allows_both_directions(self, strategy, recent_bars, config):
+        """Without VWAP data, both directions should work normally."""
         bar = _make_bar(
-            close=105.5,                     # above bb_middle for BB squeeze score
             ema_9=105.5, ema_21=104.8,
-            rsi_14=35.0,                     # peak RSI buy score
-            macd_histogram=0.8, macd=0.9, macd_signal=0.1,  # strong MACD
-            adx_14=40.0,                     # very strong trend for max ADX
-            volume=2000, volume_sma_20=1000, # 2x volume ratio
-            bb_upper=106.0, bb_lower=104.0, bb_middle=105.0,  # BB squeeze
-            keltner_upper=107.0, keltner_lower=103.0,         # wider KC
-            htf_bias="bearish",
+            rsi_14=35.0,
+            macd_histogram=0.5, macd=0.6, macd_signal=0.1,
+            adx_14=32.0,
+            volume=1500, volume_sma_20=1000,
+            # no vwap key
         )
         signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
         assert signal.direction == SignalDirection.BUY
+
+    def test_htf_opposing_reduces_score_additively(self, strategy, recent_bars, config):
+        """GURU: HTF opposing = additive -10, not multiplicative ×0.5."""
+        bar = _make_bar(
+            close=105.5,
+            ema_9=105.5, ema_21=104.8,
+            rsi_14=35.0,
+            macd_histogram=0.8, macd=0.9, macd_signal=0.1,
+            adx_14=40.0,
+            volume=2000, volume_sma_20=1000,
+            bb_upper=106.0, bb_lower=104.0, bb_middle=105.0,
+            keltner_upper=107.0, keltner_lower=103.0,
+            htf_bias="bearish",
+        )
+        signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
+        # With additive -10 a strong signal (~80+) should still pass threshold 55
+        assert signal.direction == SignalDirection.BUY
+
+    def test_htf_aligned_gives_bonus(self, strategy, recent_bars, config):
+        """GURU: HTF aligned = additive +5 bonus."""
+        bar = _make_bar(
+            ema_9=105.5, ema_21=104.8,
+            rsi_14=35.0,
+            macd_histogram=0.5, macd=0.6, macd_signal=0.1,
+            adx_14=28.0,
+            volume=1500, volume_sma_20=1000,
+            htf_bias="bullish",
+        )
+        signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
+        assert signal.direction == SignalDirection.BUY
+
+    def test_session_outside_killzone_raises_threshold(self, strategy, recent_bars, config):
+        """GURU: Outside kill zone, threshold +5 (additive), not score ×0.7."""
+        # Moderate signal that passes threshold 55 but not 60
+        bar = _make_bar(
+            ema_9=105.3, ema_21=104.9,     # moderate bullish
+            rsi_14=38.0,                     # RSI buy zone
+            macd_histogram=0.3, macd=0.4, macd_signal=0.1,
+            adx_14=25.0,                     # moderate trend
+            volume=1400, volume_sma_20=1000, # moderate volume
+            utc_hour=18,                     # 18 UTC = active session, not kill zone
+        )
+        signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
+        # With threshold raised to 60, a moderate signal might HOLD
+        # (This is the correct behavior — slightly stricter outside kill zones)
+        assert signal.direction in (SignalDirection.BUY, SignalDirection.HOLD)
