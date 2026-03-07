@@ -18,14 +18,21 @@ Constraints:
   - Max 1 trade per session per asset
   - No entries after 15:30 EST (19:30 UTC)
   - Skip session if orb_range < 0.1% of price
+
+Live integration:
+  - Maintains per-epic session state across calls
+  - Receives M1 bars via recent_bars DataFrame
+  - ML filter (XGBoost) loaded from disk if available
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, time, timezone
+from dataclasses import dataclass, field
+from datetime import date, datetime, time, timezone
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import numpy as np
 import polars as pl
 from loguru import logger
 
@@ -222,14 +229,52 @@ def process_session(bars: list[dict]) -> FVGSignal | None:
 
 
 # ---------------------------------------------------------------------------
+# Per-epic session state for live trading
+# ---------------------------------------------------------------------------
+@dataclass
+class _SessionState:
+    """Tracks ORB+FVG state for one epic across a single NYSE trading day."""
+
+    session_date: date | None = None
+    orb_bars: list[dict] = field(default_factory=list)
+    scan_bars: list[dict] = field(default_factory=list)
+    orb_high: float = 0.0
+    orb_low: float = 0.0
+    orb_ready: bool = False
+    traded_today: bool = False
+    last_bar_ts: datetime | None = None
+
+    def reset(self, new_date: date) -> None:
+        self.session_date = new_date
+        self.orb_bars = []
+        self.scan_bars = []
+        self.orb_high = 0.0
+        self.orb_low = 0.0
+        self.orb_ready = False
+        self.traded_today = False
+        self.last_bar_ts = None
+
+
+# ML filter model path
+_ML_MODEL_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "models" / "orb_fvg"
+
+
+# ---------------------------------------------------------------------------
 # Strategy class (BaseStrategy implementation)
 # ---------------------------------------------------------------------------
 class OrbFvgStrategy(BaseStrategy):
     """
-    Opening Range Breakout + Fair Value Gap strategy.
+    Opening Range Breakout + Fair Value Gap strategy with ML filter.
 
     Designed for US equity session (09:30-16:00 EST) on M1 bars.
+    Maintains per-epic session state across calls for live trading.
     """
+
+    def __init__(self, ml_threshold: float = 0.50):
+        self._sessions: dict[str, _SessionState] = {}
+        self._ml_model = None
+        self._ml_threshold = ml_threshold
+        self._ml_load_attempted = False
 
     @property
     def name(self) -> str:
@@ -239,6 +284,49 @@ class OrbFvgStrategy(BaseStrategy):
     def applicable_regimes(self) -> list[str]:
         return ["trending_up", "trending_down"]
 
+    def _load_ml_filter(self) -> None:
+        """Load pre-trained XGBoost ML filter from disk (once)."""
+        if self._ml_load_attempted:
+            return
+        self._ml_load_attempted = True
+
+        model_path = _ML_MODEL_DIR / "filter_model.json"
+        if not model_path.exists():
+            logger.info("ORB+FVG: no ML filter model found, running without filter")
+            return
+
+        try:
+            import xgboost as xgb
+            self._ml_model = xgb.XGBClassifier()
+            self._ml_model.load_model(str(model_path))
+            logger.info(f"ORB+FVG: loaded ML filter from {model_path}")
+        except Exception as e:
+            logger.warning(f"ORB+FVG: failed to load ML filter: {e}")
+            self._ml_model = None
+
+    def _get_session(self, epic: str) -> _SessionState:
+        if epic not in self._sessions:
+            self._sessions[epic] = _SessionState()
+        return self._sessions[epic]
+
+    def _apply_ml_filter(
+        self, fvg: FVGSignal, day_bars: list[dict]
+    ) -> float | None:
+        """
+        Run ML filter on an FVG signal. Returns predicted probability
+        of win, or None if no model loaded.
+        """
+        self._load_ml_filter()
+        if self._ml_model is None:
+            return None
+
+        from src.backtest.orb_fvg_ml_filter import extract_features, FEATURE_NAMES
+
+        features = extract_features(day_bars, fvg, trade_pnl=0, exit_reason="")
+        X = np.array([features.to_array()])
+        prob = self._ml_model.predict_proba(X)[0][1]
+        return float(prob)
+
     def generate_signal(
         self,
         epic: str,
@@ -246,8 +334,14 @@ class OrbFvgStrategy(BaseStrategy):
         recent_bars: pl.DataFrame,
         config: StrategyConfig,
     ) -> TradingSignal:
-        """Placeholder — returns HOLD. Real-time integration is Phase 4."""
-        return TradingSignal(
+        """
+        Live ORB+FVG signal generation using M1 bars.
+
+        recent_bars must be a DataFrame of M1 OHLCV bars for today's session
+        (columns: timestamp, open, high, low, close). The strategy accumulates
+        these bars into its internal session state and scans for FVG signals.
+        """
+        hold = TradingSignal(
             epic=epic,
             direction=SignalDirection.HOLD,
             confidence=0.0,
@@ -256,11 +350,87 @@ class OrbFvgStrategy(BaseStrategy):
             strategy_name=self.name,
         )
 
+        # Need M1 bars in recent_bars
+        if recent_bars is None or recent_bars.is_empty():
+            return hold
+
+        required_cols = {"timestamp", "open", "high", "low", "close"}
+        if not required_cols.issubset(set(recent_bars.columns)):
+            logger.debug(f"ORB+FVG [{epic}]: recent_bars missing M1 columns")
+            return hold
+
+        # Convert DataFrame to list of dicts for process_session()
+        m1_bars = recent_bars.sort("timestamp").to_dicts()
+        if not m1_bars:
+            return hold
+
+        # Determine session date (NYSE date from first bar)
+        first_ts = m1_bars[0]["timestamp"]
+        if hasattr(first_ts, "date"):
+            et_dt = first_ts.replace(tzinfo=timezone.utc).astimezone(_ET)
+            session_day = et_dt.date()
+        else:
+            return hold
+
+        # Get/reset session state
+        sess = self._get_session(epic)
+        if sess.session_date != session_day:
+            sess.reset(session_day)
+            logger.debug(f"ORB+FVG [{epic}]: new session {session_day}")
+
+        if sess.traded_today:
+            return hold
+
+        # Run process_session on today's M1 bars
+        fvg = process_session(m1_bars)
+        if fvg is None:
+            return hold
+
+        # Apply ML filter
+        ml_prob = self._apply_ml_filter(fvg, m1_bars)
+        if ml_prob is not None:
+            if ml_prob < self._ml_threshold:
+                logger.info(
+                    f"ORB+FVG [{epic}]: FVG found but ML filter rejects "
+                    f"(prob={ml_prob:.3f} < {self._ml_threshold})"
+                )
+                return hold
+            logger.info(
+                f"ORB+FVG [{epic}]: ML filter approves (prob={ml_prob:.3f})"
+            )
+
+        # Mark as traded for today
+        sess.traded_today = True
+
+        # Confidence: base 0.60 + ML boost
+        confidence = 0.60
+        if ml_prob is not None:
+            confidence = min(0.50 + ml_prob * 0.40, 0.90)
+
+        signal = TradingSignal(
+            epic=epic,
+            direction=fvg.direction,
+            confidence=confidence,
+            signal_class=0 if fvg.direction == SignalDirection.BUY else 2,
+            entry_price=fvg.entry_price,
+            suggested_stop=fvg.stop_loss,
+            suggested_tp=fvg.take_profit,
+            technical_confirmation=True,
+            strategy_name=self.name,
+        )
+
+        logger.info(
+            f"ORB+FVG [{epic}]: {fvg.direction.value} signal "
+            f"entry={fvg.entry_price:.2f} SL={fvg.stop_loss:.2f} "
+            f"TP={fvg.take_profit:.2f} conf={confidence:.2f}"
+        )
+        return signal
+
     def generate_backtest_signals(
         self,
         ohlc_df: pl.DataFrame,
         epic: str,
         timeframe: str,
     ) -> pl.DataFrame:
-        """Placeholder — returns input DataFrame unchanged. Backtest wiring is Phase 5."""
+        """Placeholder — use orb_fvg_runner for backtesting."""
         return ohlc_df

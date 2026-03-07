@@ -464,3 +464,51 @@ def run_walkforward_backtest(
         "train_window": train_window,
         "total_trades_seen": len(all_features),
     }
+
+
+def train_and_save_model(
+    epic: str = "US500",
+    data_dir: str = "data/historical",
+    output_dir: str | None = None,
+) -> Path:
+    """
+    Train the ML filter on all available backtest data and save to disk.
+
+    Returns the path to the saved model file.
+    """
+    from xgboost import XGBClassifier
+
+    X, y = build_training_data(epic=epic, data_dir=data_dir)
+
+    if len(y) < 30:
+        raise ValueError(f"Not enough trades to train ({len(y)}), need at least 30")
+
+    n_pos = int(y.sum())
+    n_neg = len(y) - n_pos
+    spw = n_neg / max(n_pos, 1)
+
+    model = XGBClassifier(
+        n_estimators=100,
+        max_depth=4,
+        learning_rate=0.1,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        scale_pos_weight=spw,
+        eval_metric="logloss",
+        random_state=42,
+        verbosity=0,
+    )
+    model.fit(X, y)
+
+    save_dir = Path(output_dir) if output_dir else (
+        Path(data_dir).parent / "models" / "orb_fvg"
+    )
+    save_dir.mkdir(parents=True, exist_ok=True)
+    model_path = save_dir / "filter_model.json"
+    model.save_model(str(model_path))
+
+    logger.info(
+        f"ORB+FVG ML filter saved to {model_path} "
+        f"(trained on {len(y)} trades: {n_pos} wins, {n_neg} losses)"
+    )
+    return model_path

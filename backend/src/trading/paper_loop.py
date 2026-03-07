@@ -820,8 +820,9 @@ class PaperTradingLoop:
             )
             return
 
-        # Asset momentum rotation: refresh active assets weekly
-        self._refresh_active_assets()
+        # Asset rotation disabled: ScalpScore + session filter handle selection
+        # self._refresh_active_assets()
+        self._active_assets = None
 
         epics_to_process = []
         for epic in self.epics:
@@ -857,6 +858,82 @@ class PaperTradingLoop:
 
         # Phase 14: persist risk state after iteration
         await self._persist_risk_state()
+
+    async def _fetch_m1_bars(self, epic: str):
+        """
+        Fetch today's M1 bars from broker for ORB+FVG strategy.
+
+        Returns a Polars DataFrame with columns: timestamp, open, high, low, close.
+        Returns None if broker is unavailable or no data.
+        """
+        if not self.broker:
+            return None
+
+        try:
+            import polars as pl
+            from src.broker.models import Resolution
+            from zoneinfo import ZoneInfo
+
+            _ET = ZoneInfo("America/New_York")
+            _BROKER_TZ = ZoneInfo("Europe/Berlin")
+
+            now_utc = datetime.now(timezone.utc)
+            now_et = now_utc.astimezone(_ET)
+
+            # Only fetch during NYSE session (09:25 - 16:05 ET)
+            if now_et.hour < 9 or (now_et.hour == 9 and now_et.minute < 25):
+                return None
+            if now_et.hour >= 17:
+                return None
+
+            # Fetch from 09:25 ET today to now
+            from_dt = now_et.replace(hour=9, minute=25, second=0, microsecond=0)
+            from_utc = from_dt.astimezone(timezone.utc).replace(tzinfo=None)
+            to_utc = now_utc.replace(tzinfo=None)
+
+            candles = await asyncio.wait_for(
+                self.broker.get_historical_prices(
+                    epic=epic,
+                    resolution=Resolution.MINUTE,
+                    from_date=from_utc,
+                    to_date=to_utc,
+                    max_candles=1000,
+                ),
+                timeout=15.0,
+            )
+
+            if not candles:
+                return None
+
+            # Convert to DataFrame, handling CET timestamps from broker
+            rows = []
+            for c in candles:
+                ts = c.timestamp
+                if ts.tzinfo is None:
+                    # Broker returns CET/CEST — convert to UTC
+                    aware = ts.replace(tzinfo=_BROKER_TZ)
+                    ts = aware.astimezone(timezone.utc).replace(tzinfo=None)
+                rows.append({
+                    "timestamp": ts,
+                    "open": c.open,
+                    "high": c.high,
+                    "low": c.low,
+                    "close": c.close,
+                })
+
+            if not rows:
+                return None
+
+            df = pl.DataFrame(rows).sort("timestamp")
+            logger.debug(f"[{epic}] Fetched {len(df)} M1 bars for ORB+FVG")
+            return df
+
+        except asyncio.TimeoutError:
+            logger.warning(f"[{epic}] M1 bar fetch timed out")
+            return None
+        except Exception as e:
+            logger.warning(f"[{epic}] M1 bar fetch failed: {e}")
+            return None
 
     async def _fetch_equity(self) -> float:
         """Get current equity. DEMO/LIVE: from broker. PAPER: from risk manager."""
@@ -920,6 +997,12 @@ class PaperTradingLoop:
         if market_data is None:
             logger.warning(f"[{epic}] No market data available")
             return
+
+        # Step 2b: Fetch M1 bars for ORB+FVG epics
+        if epic in self.strategy_manager.orb_fvg_epics:
+            m1_bars = await self._fetch_m1_bars(epic)
+            if m1_bars is not None:
+                market_data["m1_bars"] = m1_bars
 
         # Log market state with regime info (Step 7: regime detection)
         regime = market_data.get("regime", "unknown")

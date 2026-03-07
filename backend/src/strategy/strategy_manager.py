@@ -30,6 +30,7 @@ class StrategyManager:
         configs: dict[str, StrategyConfig] | None = None,
         excluded_epics: set[str] | None = None,
         scalp_mode: bool = False,
+        orb_fvg_epics: set[str] | None = None,
     ):
         """
         Initialize strategy manager.
@@ -38,14 +39,20 @@ class StrategyManager:
             configs: Per-asset strategy configs. Uses defaults if None.
             excluded_epics: Epics to skip (decision=EXCLUDE from scorecard).
             scalp_mode: If True, use ScalpScoreStrategy as primary signal source.
+            orb_fvg_epics: Epics to use ORB+FVG strategy (default: {"US500"}).
         """
         self._configs = configs or {}
         self.excluded_epics: set[str] = excluded_epics or set()
         self.scalp_mode = scalp_mode
         self._scalp_strategy = None
+        self._orb_fvg_strategy = None
+        self.orb_fvg_epics: set[str] = orb_fvg_epics if orb_fvg_epics is not None else {"US500"}
         if scalp_mode:
             from src.strategy.scalp_score_strategy import ScalpScoreStrategy
             self._scalp_strategy = ScalpScoreStrategy()
+        if self.orb_fvg_epics:
+            from src.strategy.orb_fvg_strategy import OrbFvgStrategy
+            self._orb_fvg_strategy = OrbFvgStrategy()
 
     @classmethod
     def from_optimal_thresholds(
@@ -124,6 +131,14 @@ class StrategyManager:
         if not (isinstance(atr, (int, float)) and atr > 0):
             raise ValueError(f"Invalid ATR: {atr}")
 
+        # Route to ORB+FVG for configured epics during NYSE hours
+        if (
+            self._orb_fvg_strategy is not None
+            and epic in self.orb_fvg_epics
+            and market_data.get("m1_bars") is not None
+        ):
+            return self._process_orb_fvg(epic, market_data)
+
         if self.scalp_mode and self._scalp_strategy is not None:
             return self._process_scalp(prediction, epic, market_data)
 
@@ -155,6 +170,38 @@ class StrategyManager:
             f"Strategy [{epic}]: {signal.direction.value} "
             f"conf={signal.confidence:.2f} regime={regime}"
         )
+
+        return signal
+
+    def _process_orb_fvg(
+        self,
+        epic: str,
+        market_data: dict,
+    ) -> TradingSignal:
+        """Route to ORB+FVG strategy using M1 bars from market_data."""
+        import polars as pl
+
+        m1_bars = market_data["m1_bars"]
+        current_price = float(market_data["current_price"])
+        atr = float(market_data["atr"])
+
+        config = StrategyConfig(
+            epic=epic,
+            stop_multiplier=1.0,
+            risk_reward_ratio=2.0,
+        )
+
+        current_bar = {"close": current_price, "atr_14": atr}
+
+        signal = self._orb_fvg_strategy.generate_signal(
+            epic, current_bar, m1_bars, config
+        )
+
+        if signal.direction.value != "HOLD":
+            logger.info(
+                f"ORB+FVG [{epic}]: {signal.direction.value} "
+                f"conf={signal.confidence:.2f}"
+            )
 
         return signal
 
@@ -234,25 +281,13 @@ class StrategyManager:
                 f"(score->signal, ML neutral -> half conf={signal.confidence:.2f})"
             )
         else:
-            # ML disagrees (opposite direction)
-            if prediction.confidence > 0.50:
-                # Strong disagreement -> SKIP
-                logger.info(
-                    f"Scalp [{epic}]: SKIP (technical={signal.direction.value}, "
-                    f"ML={ml_direction.value} conf={prediction.confidence:.2f})"
-                )
-                return TradingSignal(
-                    epic=epic,
-                    direction=SignalDirection.HOLD,
-                    confidence=0.0,
-                    signal_class=SignalClass.HOLD,
-                    entry_price=current_price,
-                    technical_confirmation=False,
-                    strategy_name="scalp_score",
-                )
-            else:
-                # ML weakly disagrees -> halve
-                signal = signal.model_copy(update={"confidence": signal.confidence * 0.5})
+            # ML disagrees — halve confidence but never veto
+            # GURU: technical confluence is the decision maker, ML only adjusts sizing
+            signal = signal.model_copy(update={"confidence": signal.confidence * 0.5})
+            logger.info(
+                f"Scalp [{epic}]: {signal.direction.value} "
+                f"(ML disagrees {ml_direction.value} conf={prediction.confidence:.2f} -> half conf={signal.confidence:.2f})"
+            )
 
         signal = signal.model_copy(update={"strategy_name": "scalp_score"})
         return signal

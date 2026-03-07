@@ -1,7 +1,9 @@
-"""Tests for ORB+FVG strategy core logic."""
+"""Tests for ORB+FVG strategy core logic and live integration."""
 
 from datetime import datetime, timezone
+from unittest.mock import patch, MagicMock
 
+import polars as pl
 import pytest
 
 from src.strategy.orb_fvg_strategy import (
@@ -9,10 +11,11 @@ from src.strategy.orb_fvg_strategy import (
     OrbFvgStrategy,
     RR_RATIO,
     _minutes_utc,
+    _SessionState,
     detect_fvg,
     process_session,
 )
-from src.strategy.schemas import SignalDirection
+from src.strategy.schemas import SignalDirection, StrategyConfig
 
 
 # ---------------------------------------------------------------------------
@@ -220,3 +223,246 @@ class TestOrbFvgStrategy:
 
         assert risk > 0
         assert abs(reward / risk - RR_RATIO) < 1e-9
+
+
+# ===================================================================
+# TestOrbFvgStrategyLive — generate_signal with M1 DataFrame
+# ===================================================================
+class TestOrbFvgStrategyLive:
+    """Tests for the live generate_signal() with session state machine."""
+
+    @staticmethod
+    def _make_m1_df(bars: list[dict]) -> pl.DataFrame:
+        """Convert bar dicts to a Polars DataFrame matching M1 schema."""
+        return pl.DataFrame(bars)
+
+    @staticmethod
+    def _make_session_bars(base: float = 5000.0) -> list[dict]:
+        """Build a full ORB + bullish FVG session for US500-like prices."""
+        bars = []
+        # ORB bars (14:30-14:34 UTC) — Jan 15, 2026 (winter, EST = UTC-5)
+        for i in range(5):
+            bars.append(_bar(14, 30 + i, base, base + 10, base - 10, base + 5))
+        # orb_high = base+10, orb_low = base-10
+
+        # Scan bars forming bullish FVG
+        bars.append(_bar(14, 35, base, base + 5, base - 5, base + 2))    # C1
+        bars.append(_bar(14, 36, base + 5, base + 30, base, base + 25))  # C2: close > orb_high
+        bars.append(_bar(14, 37, base + 25, base + 35, base + 11, base + 30))  # C3: low > C1.high
+        bars.append(_bar(14, 38, base + 30, base + 35, base + 28, base + 32))  # C4: entry
+        return bars
+
+    def test_generate_signal_with_valid_fvg(self):
+        """Strategy returns BUY when M1 bars contain a valid ORB+FVG."""
+        strategy = OrbFvgStrategy(ml_threshold=0.50)
+        bars = self._make_session_bars(5000.0)
+        df = self._make_m1_df(bars)
+        config = StrategyConfig(epic="US500")
+
+        signal = strategy.generate_signal(
+            "US500", {"close": 5030.0}, df, config
+        )
+
+        assert signal.direction == SignalDirection.BUY
+        assert signal.strategy_name == "orb_fvg"
+        assert signal.confidence > 0
+        assert signal.suggested_stop is not None
+        assert signal.suggested_tp is not None
+
+    def test_generate_signal_hold_when_no_fvg(self):
+        """Strategy returns HOLD when M1 bars have no FVG."""
+        strategy = OrbFvgStrategy()
+        # Only flat ORB bars, no FVG pattern
+        bars = []
+        for i in range(10):
+            bars.append(_bar(14, 30 + i, 5000, 5001, 4999, 5000))
+        df = self._make_m1_df(bars)
+        config = StrategyConfig(epic="US500")
+
+        signal = strategy.generate_signal("US500", {"close": 5000.0}, df, config)
+        assert signal.direction == SignalDirection.HOLD
+
+    def test_generate_signal_hold_when_empty_df(self):
+        """Strategy returns HOLD when recent_bars is empty."""
+        strategy = OrbFvgStrategy()
+        df = pl.DataFrame({"timestamp": [], "open": [], "high": [], "low": [], "close": []})
+        config = StrategyConfig(epic="US500")
+
+        signal = strategy.generate_signal("US500", {"close": 5000.0}, df, config)
+        assert signal.direction == SignalDirection.HOLD
+
+    def test_one_trade_per_session(self):
+        """Strategy returns HOLD on second call for same session day."""
+        strategy = OrbFvgStrategy(ml_threshold=0.50)
+        bars = self._make_session_bars(5000.0)
+        df = self._make_m1_df(bars)
+        config = StrategyConfig(epic="US500")
+
+        # First call: should signal
+        signal1 = strategy.generate_signal("US500", {"close": 5030.0}, df, config)
+        assert signal1.direction == SignalDirection.BUY
+
+        # Second call same day: should HOLD (already traded)
+        signal2 = strategy.generate_signal("US500", {"close": 5030.0}, df, config)
+        assert signal2.direction == SignalDirection.HOLD
+
+    def test_new_session_resets_state(self):
+        """Strategy resets when bars are from a different date."""
+        strategy = OrbFvgStrategy(ml_threshold=0.50)
+
+        # Day 1 — trades
+        bars1 = self._make_session_bars(5000.0)
+        df1 = self._make_m1_df(bars1)
+        config = StrategyConfig(epic="US500")
+        signal1 = strategy.generate_signal("US500", {"close": 5030.0}, df1, config)
+        assert signal1.direction == SignalDirection.BUY
+
+        # Day 2 — different date, should be able to trade again
+        bars2 = []
+        for i in range(5):
+            bars2.append({
+                "timestamp": datetime(2026, 1, 16, 14, 30 + i, tzinfo=timezone.utc),
+                "open": 5100.0, "high": 5110.0, "low": 5090.0, "close": 5105.0, "volume": 1000,
+            })
+        bars2.append({
+            "timestamp": datetime(2026, 1, 16, 14, 35, tzinfo=timezone.utc),
+            "open": 5100, "high": 5105, "low": 5095, "close": 5102, "volume": 1000,
+        })
+        bars2.append({
+            "timestamp": datetime(2026, 1, 16, 14, 36, tzinfo=timezone.utc),
+            "open": 5105, "high": 5130, "low": 5100, "close": 5125, "volume": 1000,
+        })
+        bars2.append({
+            "timestamp": datetime(2026, 1, 16, 14, 37, tzinfo=timezone.utc),
+            "open": 5125, "high": 5135, "low": 5111, "close": 5130, "volume": 1000,
+        })
+        bars2.append({
+            "timestamp": datetime(2026, 1, 16, 14, 38, tzinfo=timezone.utc),
+            "open": 5130, "high": 5135, "low": 5128, "close": 5132, "volume": 1000,
+        })
+        df2 = self._make_m1_df(bars2)
+        signal2 = strategy.generate_signal("US500", {"close": 5130.0}, df2, config)
+
+        # Session state should have been reset (different day)
+        sess = strategy._get_session("US500")
+        assert sess.session_date == datetime(2026, 1, 16).date()
+
+    def test_ml_filter_rejects_low_probability(self):
+        """Strategy returns HOLD when ML filter probability is below threshold."""
+        strategy = OrbFvgStrategy(ml_threshold=0.80)
+        bars = self._make_session_bars(5000.0)
+        df = self._make_m1_df(bars)
+        config = StrategyConfig(epic="US500")
+
+        # Mock ML model to return low probability
+        mock_model = MagicMock()
+        mock_model.predict_proba.return_value = [[0.60, 0.40]]  # prob=0.40 < 0.80
+        strategy._ml_model = mock_model
+        strategy._ml_load_attempted = True
+
+        signal = strategy.generate_signal("US500", {"close": 5030.0}, df, config)
+        assert signal.direction == SignalDirection.HOLD
+
+    def test_ml_filter_approves_high_probability(self):
+        """Strategy returns signal when ML filter probability is above threshold."""
+        strategy = OrbFvgStrategy(ml_threshold=0.50)
+        bars = self._make_session_bars(5000.0)
+        df = self._make_m1_df(bars)
+        config = StrategyConfig(epic="US500")
+
+        # Mock ML model to return high probability
+        mock_model = MagicMock()
+        mock_model.predict_proba.return_value = [[0.30, 0.70]]  # prob=0.70 > 0.50
+        strategy._ml_model = mock_model
+        strategy._ml_load_attempted = True
+
+        signal = strategy.generate_signal("US500", {"close": 5030.0}, df, config)
+        assert signal.direction == SignalDirection.BUY
+        # Confidence should be boosted by ML probability
+        assert signal.confidence > 0.60
+
+    def test_no_ml_model_still_signals(self):
+        """Strategy works without ML model (no filter applied)."""
+        strategy = OrbFvgStrategy()
+        strategy._ml_load_attempted = True  # Skip model loading
+        strategy._ml_model = None
+
+        bars = self._make_session_bars(5000.0)
+        df = self._make_m1_df(bars)
+        config = StrategyConfig(epic="US500")
+
+        signal = strategy.generate_signal("US500", {"close": 5030.0}, df, config)
+        assert signal.direction == SignalDirection.BUY
+        assert signal.confidence == 0.60  # Base confidence without ML
+
+
+# ===================================================================
+# TestStrategyManagerOrbFvg — routing integration
+# ===================================================================
+class TestStrategyManagerOrbFvg:
+    """Test that StrategyManager routes US500 to ORB+FVG."""
+
+    def test_orb_fvg_epics_default(self):
+        from src.strategy.strategy_manager import StrategyManager
+        sm = StrategyManager(scalp_mode=True)
+        assert "US500" in sm.orb_fvg_epics
+        assert sm._orb_fvg_strategy is not None
+
+    def test_orb_fvg_routes_with_m1_bars(self):
+        """US500 with m1_bars in market_data routes to ORB+FVG."""
+        from src.strategy.strategy_manager import StrategyManager
+        from src.models.schemas import PredictionResult, SignalClass
+
+        sm = StrategyManager(scalp_mode=True)
+        # Bypass ML filter for test
+        sm._orb_fvg_strategy._ml_load_attempted = True
+        sm._orb_fvg_strategy._ml_model = None
+
+        bars = TestOrbFvgStrategyLive._make_session_bars(5000.0)
+        m1_df = pl.DataFrame(bars)
+
+        prediction = PredictionResult(
+            signal_class=SignalClass.BUY,
+            signal_name="BUY",
+            confidence=0.60,
+            probabilities={"BUY": 0.60, "HOLD": 0.30, "SELL": 0.10},
+        )
+        market_data = {
+            "current_price": 5030.0,
+            "atr": 15.0,
+            "m1_bars": m1_df,
+        }
+
+        signal = sm.process_prediction(prediction, "US500", market_data)
+        assert signal.strategy_name == "orb_fvg"
+
+    def test_non_orb_epic_routes_to_scalp(self):
+        """XAUUSD (not in orb_fvg_epics) routes to ScalpScore."""
+        from src.strategy.strategy_manager import StrategyManager
+        from src.models.schemas import PredictionResult, SignalClass
+
+        sm = StrategyManager(scalp_mode=True)
+
+        prediction = PredictionResult(
+            signal_class=SignalClass.BUY,
+            signal_name="BUY",
+            confidence=0.60,
+            probabilities={"BUY": 0.60, "HOLD": 0.30, "SELL": 0.10},
+        )
+        market_data = {
+            "current_price": 2050.0,
+            "atr": 5.0,
+            "rsi": 50,
+            "adx": 25,
+            "ema_9": 2048, "ema_21": 2045,
+            "macd": 1.0, "macd_signal": 0.5, "macd_histogram": 0.5,
+            "volume": 1000, "volume_sma_20": 800,
+            "bb_upper": 2060, "bb_lower": 2040, "bb_middle": 2050,
+            "keltner_upper": 2058, "keltner_lower": 2042,
+            "vwap": 2048,
+            "htf_bias": None,
+        }
+
+        signal = sm.process_prediction(prediction, "XAUUSD", market_data)
+        # Should use scalp_score, not orb_fvg
+        assert signal.strategy_name != "orb_fvg"
