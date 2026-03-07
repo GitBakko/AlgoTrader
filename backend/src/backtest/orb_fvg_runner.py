@@ -19,9 +19,10 @@ import polars as pl
 from loguru import logger
 
 from src.strategy.orb_fvg_strategy import (
-    SESSION_END_UTC,
     FVGSignal,
     _minutes_utc,
+    _nyse_utc_minutes,
+    _NYSE_SESSION_END,
     process_session,
 )
 from src.strategy.schemas import SignalDirection
@@ -100,9 +101,15 @@ def _simulate_trade(
         take_profit=fvg.take_profit,
     )
 
+    # Compute session end for this date (DST-aware)
+    if bars_after_entry:
+        session_end_utc = _nyse_utc_minutes(bars_after_entry[0]["timestamp"], _NYSE_SESSION_END)
+    else:
+        session_end_utc = 20 * 60  # fallback: 20:00 UTC
+
     for idx, bar in enumerate(bars_after_entry):
         # Check EOD first — if we are at/past session end, close at bar close
-        if _minutes_utc(bar["timestamp"]) >= SESSION_END_UTC:
+        if _minutes_utc(bar["timestamp"]) >= session_end_utc:
             trade.exit_price = bar["close"]
             trade.exit_reason = "EOD"
             trade.bars_in_trade = idx + 1

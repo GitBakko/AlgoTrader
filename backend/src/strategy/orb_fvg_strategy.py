@@ -23,7 +23,8 @@ Constraints:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, time, timezone
+from zoneinfo import ZoneInfo
 
 import polars as pl
 from loguru import logger
@@ -32,12 +33,22 @@ from src.strategy.base_strategy import BaseStrategy
 from src.strategy.schemas import SignalDirection, StrategyConfig, TradingSignal
 
 # ---------------------------------------------------------------------------
-# UTC minute-of-day constants (EST + 5h during standard time)
+# NYSE session times in US/Eastern (handles EST/EDT automatically)
 # ---------------------------------------------------------------------------
-ORB_START_UTC = 14 * 60 + 30   # 09:30 EST
-ORB_END_UTC = 14 * 60 + 35     # 09:35 EST
-SESSION_END_UTC = 20 * 60       # 16:00 EST
-ENTRY_CUTOFF_UTC = 19 * 60 + 30  # 15:30 EST
+_ET = ZoneInfo("America/New_York")
+
+# NYSE local times
+_NYSE_ORB_START = time(9, 30)
+_NYSE_ORB_END = time(9, 35)
+_NYSE_ENTRY_CUTOFF = time(15, 30)
+_NYSE_SESSION_END = time(16, 0)
+
+
+def _nyse_utc_minutes(date: datetime, local_time: time) -> int:
+    """Convert a NYSE local time to UTC minutes-from-midnight for a given date."""
+    et_dt = datetime.combine(date.date(), local_time, tzinfo=_ET)
+    utc_dt = et_dt.astimezone(timezone.utc)
+    return utc_dt.hour * 60 + utc_dt.minute
 
 # Minimum ORB range as fraction of mid-price
 MIN_ORB_RANGE_PCT = 0.001  # 0.1%
@@ -132,19 +143,28 @@ def process_session(bars: list[dict]) -> FVGSignal | None:
     Walk through one day of M1 bars and return the first valid ORB+FVG signal.
 
     Each bar dict must have keys: timestamp (datetime), open, high, low, close.
-    Bars must be sorted chronologically.
+    Bars must be sorted chronologically. Timestamps must be naive UTC.
 
     Returns None when no valid signal is found for this session.
     """
+    if not bars:
+        return None
+
+    # Compute UTC session boundaries for this specific date (handles DST)
+    session_date = bars[0]["timestamp"]
+    orb_start = _nyse_utc_minutes(session_date, _NYSE_ORB_START)
+    orb_end = _nyse_utc_minutes(session_date, _NYSE_ORB_END)
+    entry_cutoff = _nyse_utc_minutes(session_date, _NYSE_ENTRY_CUTOFF)
+
     # --- Phase 1: collect ORB candles ---
     orb_bars: list[dict] = []
     scan_bars: list[dict] = []
 
     for bar in bars:
         m = _minutes_utc(bar["timestamp"])
-        if ORB_START_UTC <= m < ORB_END_UTC:
+        if orb_start <= m < orb_end:
             orb_bars.append(bar)
-        elif ORB_END_UTC <= m <= ENTRY_CUTOFF_UTC:
+        elif orb_end <= m <= entry_cutoff:
             scan_bars.append(bar)
 
     if len(orb_bars) < 2:
@@ -171,7 +191,7 @@ def process_session(bars: list[dict]) -> FVGSignal | None:
         c3 = scan_bars[i]
 
         # Respect entry cutoff
-        if _minutes_utc(c3["timestamp"]) > ENTRY_CUTOFF_UTC:
+        if _minutes_utc(c3["timestamp"]) > entry_cutoff:
             break
 
         signal = detect_fvg(c1, c2, c3, orb_high, orb_low)

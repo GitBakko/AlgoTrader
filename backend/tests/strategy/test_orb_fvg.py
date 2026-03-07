@@ -174,17 +174,17 @@ class TestProcessSession:
         assert result is None
 
     def test_cutoff_time_stops_scanning(self):
-        """FVG occurring after 19:30 UTC -> ignored."""
+        """FVG occurring after 20:30 UTC (15:30 EST on Jan 15) -> ignored."""
         bars = self._make_orb_bars(100.0)
 
         # Add scan bars before cutoff that are flat (no FVG)
         for i in range(10):
             bars.append(_bar(14, 35 + i, 100, 100.5, 99.5, 100.2))
 
-        # Add FVG bars right at / after 19:30 UTC cutoff
-        bars.append(_bar(19, 29, 100, 100.5, 99.5, 100.2))   # C1 at 19:29
-        bars.append(_bar(19, 30, 100.5, 103, 100, 102))       # C2 at 19:30
-        bars.append(_bar(19, 31, 102, 104, 101, 103))         # C3 at 19:31 > cutoff
+        # Add FVG bars right at / after 20:30 UTC cutoff (15:30 EST in winter)
+        bars.append(_bar(20, 29, 100, 100.5, 99.5, 100.2))   # C1 at 20:29
+        bars.append(_bar(20, 30, 100.5, 103, 100, 102))       # C2 at 20:30
+        bars.append(_bar(20, 31, 102, 104, 101, 103))         # C3 at 20:31 > cutoff
 
         result = process_session(bars)
         assert result is None

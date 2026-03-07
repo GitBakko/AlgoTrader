@@ -1,8 +1,13 @@
 """
 Download M1 (1-minute) historical candles from Capital.com for ORB+FVG strategy.
 
-Fetches 12 months of M1 data for selected assets, saving to monthly Parquet files.
-Supports resume: if a monthly file already exists, new data is merged and deduplicated.
+Capital.com API quirks for MINUTE resolution:
+- Returns max ~1000 bars per request when max_candles is specified
+- Without max_candles, returns only 10 bars
+- Timestamps are in CET/CEST (Europe/Berlin), NOT UTC
+- API accepts UTC datetimes as from/to parameters
+
+This script converts all timestamps to UTC before saving.
 
 Usage:
     cd backend
@@ -16,6 +21,7 @@ import asyncio
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 # Add backend src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -29,11 +35,12 @@ from src.broker.models import Resolution
 # Assets relevant for ORB+FVG intraday strategy
 DEFAULT_ASSETS = ["US500", "NAS100", "NVDA", "TSLA"]
 
-# Capital.com max candles per request for MINUTE resolution
-CHUNK_SIZE = 10_000  # ~6.9 trading days of M1 bars
+# Capital.com: max_candles=1000 with 6-hour window works reliably
+MAX_CANDLES = 1000
+CHUNK_HOURS = 6
 
-# Rate limiting: pause between API requests
-REQUEST_DELAY_S = 0.15  # 150ms
+# Rate limiting
+REQUEST_DELAY_S = 0.10
 
 # Retry config
 MAX_RETRIES = 3
@@ -42,7 +49,10 @@ RETRY_DELAY_S = 2.0
 # Output directory
 DATA_DIR = Path(__file__).parent.parent / "data" / "historical"
 
-# Parquet schema
+# Capital.com returns timestamps in this timezone
+BROKER_TZ = ZoneInfo("Europe/Berlin")
+
+# Parquet schema — timestamps stored as naive UTC
 PARQUET_SCHEMA = {
     "timestamp": pl.Datetime("us"),
     "open": pl.Float64,
@@ -53,14 +63,22 @@ PARQUET_SCHEMA = {
 }
 
 
+def cet_to_utc(dt: datetime) -> datetime:
+    """Convert a naive CET/CEST timestamp to naive UTC."""
+    # Interpret naive datetime as Europe/Berlin
+    aware = dt.replace(tzinfo=BROKER_TZ)
+    # Convert to UTC, then strip tzinfo for storage
+    return aware.astimezone(timezone.utc).replace(tzinfo=None)
+
+
 def candles_to_dataframe(candles: list) -> pl.DataFrame:
-    """Convert OHLCCandle list to a Polars DataFrame."""
+    """Convert OHLCCandle list to a Polars DataFrame with UTC timestamps."""
     if not candles:
         return pl.DataFrame(schema=PARQUET_SCHEMA)
 
     rows = [
         {
-            "timestamp": c.timestamp,
+            "timestamp": cet_to_utc(c.timestamp),
             "open": c.open,
             "high": c.high,
             "low": c.low,
@@ -115,10 +133,14 @@ async def fetch_chunk_with_retry(
                 resolution=Resolution.MINUTE,
                 from_date=from_dt,
                 to_date=to_dt,
-                max_candles=CHUNK_SIZE,
+                max_candles=MAX_CANDLES,
             )
             return candles
         except Exception as e:
+            err_str = str(e)
+            # Don't retry on non-transient errors
+            if "not-found" in err_str or "not.found" in err_str:
+                return []
             if attempt < MAX_RETRIES:
                 wait = RETRY_DELAY_S * attempt
                 logger.warning(
@@ -141,7 +163,7 @@ async def download_asset(client: CapitalComClient, epic: str, months_back: int) 
 
     Returns total number of new candles downloaded.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     start_date = now - timedelta(days=months_back * 30)
 
     logger.info(f"\n{'='*60}")
@@ -149,25 +171,24 @@ async def download_asset(client: CapitalComClient, epic: str, months_back: int) 
     logger.info(f"  Range: {start_date.date()} -> {now.date()} (~{months_back} months)")
     logger.info(f"{'='*60}")
 
-    # We iterate backwards from now to start_date in chunks
     cursor = now
     total_candles = 0
     chunk_count = 0
     empty_streak = 0
 
-    # Accumulate all candles, then distribute to monthly files at the end
     all_candles_df = pl.DataFrame(schema=PARQUET_SCHEMA)
 
     while cursor > start_date:
-        # Each chunk covers ~7 days backwards (10000 M1 bars)
         chunk_end = cursor
-        chunk_start = max(cursor - timedelta(minutes=CHUNK_SIZE), start_date)
+        chunk_start = max(cursor - timedelta(hours=CHUNK_HOURS), start_date)
 
         chunk_count += 1
-        logger.info(
-            f"  Chunk {chunk_count}: {chunk_start.strftime('%Y-%m-%d %H:%M')} "
-            f"-> {chunk_end.strftime('%Y-%m-%d %H:%M')}"
-        )
+        if chunk_count % 10 == 1:
+            logger.info(
+                f"  Chunk {chunk_count}: {chunk_start.strftime('%Y-%m-%d %H:%M')} "
+                f"-> {chunk_end.strftime('%Y-%m-%d %H:%M')} "
+                f"(total so far: {total_candles})"
+            )
 
         candles = await fetch_chunk_with_retry(client, epic, chunk_start, chunk_end)
 
@@ -176,34 +197,29 @@ async def download_asset(client: CapitalComClient, epic: str, months_back: int) 
             all_candles_df = pl.concat([all_candles_df, df]) if not all_candles_df.is_empty() else df
             total_candles += len(candles)
             empty_streak = 0
-            logger.info(f"    -> {len(candles)} candles (total: {total_candles})")
 
-            # Move cursor to just before the earliest candle we got
-            earliest = min(c.timestamp for c in candles)
-            # Ensure we don't get stuck if API returns candles at chunk_start
-            cursor = min(earliest - timedelta(minutes=1), chunk_start)
+            # Move cursor to just before the earliest candle (in UTC)
+            earliest_utc = df["timestamp"].min()
+            cursor = earliest_utc - timedelta(minutes=1)
         else:
             empty_streak += 1
-            logger.info(f"    -> 0 candles (empty streak: {empty_streak})")
-            # Move cursor back by chunk size even if empty
             cursor = chunk_start - timedelta(minutes=1)
 
-            # If 5 consecutive empty chunks, likely no more data available
-            if empty_streak >= 5:
+            if empty_streak >= 15:
                 logger.warning(
-                    f"  5 consecutive empty chunks for {epic}, "
+                    f"  15 consecutive empty chunks for {epic}, "
                     f"stopping at {cursor.date()}"
                 )
                 break
 
-        # Rate limiting
         await asyncio.sleep(REQUEST_DELAY_S)
 
-    # Deduplicate all collected candles
+    logger.info(f"  Downloaded {total_candles} raw candles in {chunk_count} chunks")
+
+    # Deduplicate and save to monthly parquet files
     if not all_candles_df.is_empty():
         all_candles_df = all_candles_df.unique(subset=["timestamp"]).sort("timestamp")
 
-        # Distribute to monthly parquet files
         all_candles_df = all_candles_df.with_columns([
             pl.col("timestamp").dt.year().alias("_year"),
             pl.col("timestamp").dt.month().alias("_month"),
@@ -213,7 +229,6 @@ async def download_asset(client: CapitalComClient, epic: str, months_back: int) 
         saved_count = 0
 
         for (year, month), group_df in monthly_groups:
-            # Drop helper columns
             month_df = group_df.drop(["_year", "_month"])
             path = get_parquet_path(epic, int(year), int(month))
 
@@ -245,8 +260,9 @@ async def main(args: argparse.Namespace) -> None:
     logger.info("=" * 60)
     logger.info(f"Assets: {assets}")
     logger.info(f"Months back: {months_back}")
-    logger.info(f"Chunk size: {CHUNK_SIZE} bars (~{CHUNK_SIZE / 1440:.1f} days)")
+    logger.info(f"Chunk: {CHUNK_HOURS}h, max_candles={MAX_CANDLES}")
     logger.info(f"Output dir: {DATA_DIR}")
+    logger.info(f"Timestamps: converted from CET/CEST to UTC")
 
     client = CapitalComClient()
 
