@@ -34,6 +34,7 @@ class TradingSignal(BaseModel):
     suggested_stop: float | None = None
     suggested_tp: float | None = None
     strategy_name: str | None = None
+    metadata: dict = Field(default_factory=dict)
 
 
 class StrategyConfig(BaseModel):
