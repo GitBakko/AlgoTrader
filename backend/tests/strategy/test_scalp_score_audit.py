@@ -1,6 +1,8 @@
 """Tests for ScalpScore decision audit trail metadata."""
+import polars as pl
 import pytest
-from src.strategy.schemas import TradingSignal, SignalDirection
+from src.strategy.scalp_score_strategy import ScalpScoreStrategy
+from src.strategy.schemas import TradingSignal, SignalDirection, StrategyConfig
 
 
 class TestTradingSignalMetadata:
@@ -46,7 +48,47 @@ class TestTradingSignalMetadata:
         assert "test" not in sig2.metadata
 
 
-from src.strategy.scalp_score_strategy import ScalpScoreStrategy
+def _make_bar(**overrides) -> dict:
+    """Create current_bar dict with all-bullish defaults for audit tests."""
+    bar = {
+        "close": 105.0,
+        "high": 105.5,
+        "low": 104.5,
+        "open": 104.8,
+        "volume": 1500,
+        "atr_14": 1.0,
+        "rsi_14": 38.0,         # oversold → BUY
+        "ema_9": 105.5,
+        "ema_21": 104.8,        # bullish spread
+        "macd_histogram": 0.5,
+        "macd": 0.6,
+        "macd_signal": 0.1,     # bullish
+        "adx_14": 28.0,         # trending
+        "volume_sma_20": 1000,  # vol ratio 1.5 > 1.2 → confirms
+        "bb_upper": 106.0,
+        "bb_lower": 104.0,
+        "bb_middle": 105.0,
+        "keltner_upper": 106.5,
+        "keltner_lower": 103.5,
+        "vwap": 104.0,          # price > VWAP → BUY allowed
+        "htf_bias": "bullish",
+        "utc_hour": 14,         # NY kill zone
+    }
+    bar.update(overrides)
+    return bar
+
+
+def _make_recent_bars() -> pl.DataFrame:
+    return pl.DataFrame({
+        "close": [100.0 + i * 0.1 for i in range(20)],
+        "high": [100.5 + i * 0.1 for i in range(20)],
+        "low": [99.5 + i * 0.1 for i in range(20)],
+        "volume": [1000 + i * 10 for i in range(20)],
+    })
+
+
+def _make_config() -> StrategyConfig:
+    return StrategyConfig(epic="XAUUSD", stop_multiplier=1.0, risk_reward_ratio=2.0)
 
 
 class TestVoteFunctionDetails:
@@ -116,3 +158,54 @@ class TestVoteFunctionDetails:
         assert details["kc_lower"] == 2035
         assert details["price"] == 2047.5
         assert details["bb_mid"] == 2045
+
+
+class TestGenerateSignalMetadata:
+    """generate_signal() should populate signal.metadata with full audit data."""
+
+    def test_executed_signal_has_votes_in_metadata(self):
+        strategy = ScalpScoreStrategy(min_confluence=3)
+        bar = _make_bar()
+        signal = strategy.generate_signal(
+            "XAUUSD", bar, _make_recent_bars(), _make_config(),
+        )
+        assert signal.direction == SignalDirection.BUY
+        assert "votes" in signal.metadata
+        votes = signal.metadata["votes"]
+        for name in ["ema", "rsi", "macd", "volume", "adx", "bb_keltner"]:
+            assert name in votes, f"Missing vote: {name}"
+            assert "value" in votes[name], f"Missing value in vote {name}"
+
+    def test_executed_signal_has_gates_in_metadata(self):
+        strategy = ScalpScoreStrategy(min_confluence=3)
+        bar = _make_bar()
+        signal = strategy.generate_signal(
+            "XAUUSD", bar, _make_recent_bars(), _make_config(),
+        )
+        assert signal.direction == SignalDirection.BUY
+        assert "gates" in signal.metadata
+        gates = signal.metadata["gates"]
+        for gate in ["session", "dead_market", "vwap", "htf", "confluence"]:
+            assert gate in gates, f"Missing gate: {gate}"
+
+    def test_executed_signal_has_market_snapshot(self):
+        strategy = ScalpScoreStrategy(min_confluence=3)
+        bar = _make_bar()
+        signal = strategy.generate_signal(
+            "XAUUSD", bar, _make_recent_bars(), _make_config(),
+        )
+        assert signal.direction == SignalDirection.BUY
+        assert "market_snapshot" in signal.metadata
+        snap = signal.metadata["market_snapshot"]
+        for key in ["atr", "rsi", "adx", "vwap", "htf_bias"]:
+            assert key in snap, f"Missing snapshot key: {key}"
+
+    def test_hold_signal_has_empty_metadata(self):
+        """HOLD signals keep metadata empty (not persisted anyway)."""
+        strategy = ScalpScoreStrategy(min_confluence=3)
+        bar = _make_bar(close=0)  # invalid price → HOLD
+        signal = strategy.generate_signal(
+            "XAUUSD", bar, _make_recent_bars(), _make_config(),
+        )
+        assert signal.direction == SignalDirection.HOLD
+        assert signal.metadata == {}

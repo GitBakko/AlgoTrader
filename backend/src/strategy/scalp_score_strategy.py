@@ -234,6 +234,16 @@ class ScalpScoreStrategy(BaseStrategy):
             float(current_bar.get("bb_middle", 0)),
         )
 
+        # Build votes data for audit trail
+        votes_data = {
+            "ema": {"value": ema_vote, **ema_details},
+            "rsi": {"value": rsi_vote, **rsi_details},
+            "macd": {"value": macd_vote, **macd_details},
+            "volume": {"value": vol_vote, **vol_details},
+            "adx": {"value": adx_vote, **adx_details},
+            "bb_keltner": {"value": bb_vote, **bb_details},
+        }
+
         # Volume and ADX are direction-agnostic confirmations.
         # They amplify the majority direction.
         directional_votes = [ema_vote, rsi_vote, macd_vote, bb_vote]
@@ -358,6 +368,51 @@ class ScalpScoreStrategy(BaseStrategy):
             f"({confluence}/6) [{votes_str}]{vwap_info}{htf_info}"
         )
 
+        # Assemble audit metadata
+        zone = "kill_zone" if session_mult >= 1.0 else "off_killzone"
+        if (_strat_settings.scalp_chop_zone_start
+                <= utc_hour < _strat_settings.scalp_chop_zone_end):
+            zone = "chop_zone"
+        audit_metadata = {
+            "votes": votes_data,
+            "gates": {
+                "session": {
+                    "passed": True,
+                    "session_mult": session_mult,
+                    "utc_hour": utc_hour,
+                    "zone": zone,
+                },
+                "dead_market": {"passed": True, "adx": adx_val},
+                "vwap": {
+                    "passed": True,
+                    "price": price,
+                    "vwap": vwap,
+                    "bias": "above" if price > vwap else "below",
+                },
+                "htf": {
+                    "passed": True,
+                    "htf_bias": htf_bias,
+                },
+                "confluence": {
+                    "passed": True,
+                    "buy_count": buy_count,
+                    "sell_count": sell_count,
+                    "effective_min": effective_min,
+                    "direction": direction.value,
+                },
+            },
+            "market_snapshot": {
+                "price": price,
+                "atr": round(atr, 5),
+                "rsi": round(float(current_bar.get("rsi_14", 0)), 1),
+                "adx": round(adx_val, 1),
+                "vwap": round(vwap, 4) if vwap else 0,
+                "htf_bias": htf_bias or "neutral",
+                "volume": float(current_bar.get("volume", 0)),
+                "bb_width": round(bb_upper - bb_lower, 4),
+            },
+        }
+
         return TradingSignal(
             epic=epic,
             direction=direction,
@@ -368,6 +423,7 @@ class ScalpScoreStrategy(BaseStrategy):
             suggested_tp=tp,
             technical_confirmation=True,
             strategy_name=self.name,
+            metadata=audit_metadata,
         )
 
     def generate_backtest_signals(
