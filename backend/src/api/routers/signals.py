@@ -246,3 +246,84 @@ async def predict_and_execute(
         request.app.state.signal_history = history[-MAX_SIGNAL_HISTORY:]
 
     return success_response(response_data)
+
+
+# ── Decision Audit Trail Endpoints ──
+
+
+@router.get("/audit/{signal_id}")
+async def get_signal_audit(
+    signal_id: int = Path(..., ge=1),
+    signal_repo=Depends(get_signal_repo),
+):
+    """Get full audit trail for a specific signal by ID."""
+    if signal_repo is None:
+        return error_response("Database not available", 503)
+
+    signal = await signal_repo.get_by_id(signal_id)
+    if signal is None:
+        return error_response(f"Signal {signal_id} not found", 404)
+
+    return success_response({
+        "id": signal.id,
+        "epic": signal.epic,
+        "direction": signal.direction,
+        "confidence": float(signal.confidence),
+        "status": signal.status,
+        "generated_at": signal.generated_at.isoformat() if signal.generated_at else None,
+        "entry_price": float(signal.predicted_price) if signal.predicted_price else None,
+        "stop_loss": float(signal.stop_loss_price) if signal.stop_loss_price else None,
+        "take_profit": float(signal.take_profit_price) if signal.take_profit_price else None,
+        "position_id": signal.position_id,
+        "features": signal.features or {},
+    })
+
+
+@router.get("/audit/position/{deal_id}")
+async def get_signal_by_position(
+    deal_id: str = Path(...),
+    signal_repo=Depends(get_signal_repo),
+):
+    """Get audit trail for the signal linked to a position by deal_id."""
+    if signal_repo is None:
+        return error_response("Database not available", 503)
+
+    signal = await signal_repo.get_by_position_deal_id(deal_id)
+    if signal is None:
+        return error_response(f"No signal found for position {deal_id}", 404)
+
+    return success_response({
+        "id": signal.id,
+        "epic": signal.epic,
+        "direction": signal.direction,
+        "confidence": float(signal.confidence),
+        "status": signal.status,
+        "generated_at": signal.generated_at.isoformat() if signal.generated_at else None,
+        "entry_price": float(signal.predicted_price) if signal.predicted_price else None,
+        "stop_loss": float(signal.stop_loss_price) if signal.stop_loss_price else None,
+        "take_profit": float(signal.take_profit_price) if signal.take_profit_price else None,
+        "position_id": signal.position_id,
+        "features": signal.features or {},
+    })
+
+
+@router.get("/audit/history/{epic}")
+async def get_signal_history(
+    epic: str = Path(...),
+    limit: int = Query(default=10, ge=1, le=50),
+    offset: int = Query(default=0, ge=0),
+    signal_repo=Depends(get_signal_repo),
+):
+    """Get lightweight signal history for an epic (no JSONB features)."""
+    if signal_repo is None:
+        return error_response("Database not available", 503)
+
+    history = await signal_repo.get_history_by_epic(epic, limit=limit, offset=offset)
+    total = await signal_repo.count_by_epic(epic)
+
+    return success_response({
+        "items": history,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    })
