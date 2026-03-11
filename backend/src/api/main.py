@@ -32,6 +32,7 @@ from src.api.routers import (
     notifications,
     positions,
     signals,
+    sil,
     strategy,
     system,
     trading,
@@ -187,10 +188,16 @@ async def lifespan(app: FastAPI):
     logger.info("🔄 Starting state recovery...")
 
     from src.execution.state_recovery import StateRecoveryService
-    from src.risk.trailing_stop_manager import TrailingStopManager
+    from src.risk.trailing_stop_manager import TrailingStopConfig, TrailingStopManager
 
-    # Create temporary trailing stop manager for recovery
-    temp_trailing_stop_manager = TrailingStopManager()
+    # Create trailing stop manager with config from settings
+    _ts_settings = get_settings()
+    temp_trailing_stop_manager = TrailingStopManager(
+        TrailingStopConfig(
+            tp1_risk_multiple=_ts_settings.scalp_tp1_risk_multiple,
+            tp2_risk_multiple=_ts_settings.scalp_tp2_risk_multiple,
+        )
+    )
 
     recovery_service = StateRecoveryService(
         execution_engine=app.state.execution_engine,
@@ -272,6 +279,7 @@ async def lifespan(app: FastAPI):
         broker=app.state.broker_client,
         db_session_factory=getattr(app.state, "db_session_factory", None),
         trailing_stop_manager=app.state.recovered_trailing_stop_manager,
+        signal_repo_factory=getattr(app.state, "db_session_factory", None),
     )
 
     # Phase 14: Inject recovered trade history for Kelly sizing + circuit breaker
@@ -662,6 +670,7 @@ app.include_router(export.router, prefix="/api/export", tags=["Export"])
 app.include_router(monitoring.router, prefix="/api", tags=["Monitoring"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
+app.include_router(sil.router, prefix="/api/sil", tags=["SIL"])
 
 # ===== WebSocket Endpoints =====
 app.websocket("/ws/prices")(prices_endpoint)

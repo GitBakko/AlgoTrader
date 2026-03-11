@@ -115,3 +115,85 @@ class TestSignalRepositoryAuditMethods:
 
         count = await repo.count_by_epic("XAUUSD")
         assert count == 15
+
+
+class TestPersistSignalAudit:
+    """Tests for PaperTradingLoop._persist_signal_audit helper."""
+
+    def _make_loop(self, signal_repo_factory=None):
+        from src.trading.paper_loop import PaperTradingLoop
+        return PaperTradingLoop(
+            prediction_service=MagicMock(),
+            strategy_manager=MagicMock(),
+            risk_manager=MagicMock(),
+            execution_engine=MagicMock(mode=MagicMock(value="PAPER")),
+            signal_repo_factory=signal_repo_factory,
+        )
+
+    @pytest.mark.asyncio
+    async def test_persist_returns_none_without_factory(self):
+        """Without signal_repo_factory, _persist_signal_audit returns None."""
+        loop = self._make_loop(signal_repo_factory=None)
+        result = await loop._persist_signal_audit(
+            epic="XAUUSD", direction="BUY", confidence=0.6,
+            entry_price=2050.0, stop_loss=2040.0, take_profit=2060.0,
+            status="EXECUTED", features={"version": 1},
+        )
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_persist_calls_create_from_audit(self):
+        """With factory, _persist_signal_audit creates repo and calls create_from_audit."""
+        mock_session = AsyncMock()
+        mock_repo_instance = AsyncMock()
+        mock_repo_instance.create_from_audit.return_value = 77
+
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def fake_factory():
+            yield mock_session
+
+        # Patch SignalRepository inside the method
+        import src.trading.paper_loop as plmod
+        original_import = __builtins__.__import__ if hasattr(__builtins__, '__import__') else None
+
+        loop = self._make_loop(signal_repo_factory=fake_factory)
+
+        # We need to patch the SignalRepository class that gets imported inside
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(
+                "src.database.repositories.signal_repository.SignalRepository.__init__",
+                lambda self, session: setattr(self, 'session', session) or None,
+            )
+            mp.setattr(
+                "src.database.repositories.signal_repository.SignalRepository.create_from_audit",
+                mock_repo_instance.create_from_audit,
+            )
+
+            result = await loop._persist_signal_audit(
+                epic="XAUUSD", direction="BUY", confidence=0.6,
+                entry_price=2050.0, stop_loss=2040.0, take_profit=2060.0,
+                status="EXECUTED", features={"version": 1},
+            )
+
+        assert result == 77
+        mock_repo_instance.create_from_audit.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_persist_swallows_exceptions(self):
+        """_persist_signal_audit should never raise — best-effort only."""
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def broken_factory():
+            raise RuntimeError("DB is down")
+            yield  # noqa: unreachable
+
+        loop = self._make_loop(signal_repo_factory=broken_factory)
+        result = await loop._persist_signal_audit(
+            epic="XAUUSD", direction="BUY", confidence=0.6,
+            entry_price=2050.0, stop_loss=2040.0, take_profit=2060.0,
+            status="EXECUTED", features={"version": 1},
+        )
+        assert result is None  # No crash, returns None

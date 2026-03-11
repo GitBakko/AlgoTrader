@@ -22,11 +22,13 @@ from src.data.data_access import DataAccessLayer
 from src.execution.execution_engine import ExecutionEngine
 from src.execution.schemas import ExecutionMode
 from src.models.prediction_service import PredictionService
+from src.risk.asset_performance_tracker import AssetPerformanceTracker
 from src.risk.risk_manager import RiskManager
 from src.risk.trailing_stop_manager import TrailingPhase, TrailingStopConfig, TrailingStopManager
 from src.monitoring.metrics import MetricsCollector
 from src.monitoring.trade_logger import get_trade_logger, SignalType, ExecutionStatus, RiskEventType
 from src.strategy.strategy_manager import StrategyManager
+from src.external.sil_schemas import SILData
 from src.utils.config import get_settings
 from src.utils.constants import TRADABLE_ASSETS
 
@@ -64,6 +66,7 @@ class PaperTradingLoop:
         trailing_stop_config: TrailingStopConfig | None = None,
         db_session_factory = None,
         trailing_stop_manager: TrailingStopManager | None = None,
+        signal_repo_factory = None,
     ):
         self.prediction_service = prediction_service
         self.strategy_manager = strategy_manager
@@ -89,6 +92,15 @@ class PaperTradingLoop:
         self._trade_history: deque[dict] = deque(maxlen=200)
         # Phase 14: database session factory for state persistence
         self._db_session_factory = db_session_factory
+        # Decision audit trail: signal persistence factory
+        self._signal_repo_factory = signal_repo_factory
+        # Rolling per-asset performance tracker (14-day Sharpe exclusion)
+        _init_settings = get_settings()
+        self._asset_tracker = AssetPerformanceTracker(
+            lookback_days=_init_settings.scalp_asset_exclusion_lookback_days,
+            min_trades=_init_settings.scalp_asset_exclusion_min_trades,
+            sharpe_threshold=_init_settings.scalp_asset_exclusion_sharpe_threshold,
+        )
 
         self._running = False
         self._task: asyncio.Task | None = None
@@ -128,6 +140,13 @@ class PaperTradingLoop:
         self._asset_rotation_ts: float = 0.0
         self._per_asset_losses: dict[str, int] = {}  # consecutive loss counter per asset
 
+        # Signal Intelligence Layer (SIL)
+        self._sil_data: SILData = SILData()
+        self._sil_clients_initialized = False
+        self._calendar_gate = None
+        if _settings.sil_enabled:
+            self._init_sil_clients()
+
     @property
     def is_running(self) -> bool:
         return self._running
@@ -152,6 +171,79 @@ class PaperTradingLoop:
     def last_signals(self) -> dict[str, dict]:
         """Last signal info per epic (read-only copy)."""
         return dict(self._last_signals)
+
+    def _init_sil_clients(self) -> None:
+        """Initialize SIL external clients and calendar gate."""
+        try:
+            from src.external.fear_greed_client import FearGreedClient
+            from src.external.fred_client import FREDClient
+            from src.external.alpha_vantage_client import AlphaVantageClient
+            from src.external.cot_client import COTClient
+            from src.external.social_sentiment_client import SocialSentimentClient
+            from src.risk.economic_calendar_gate import EconomicCalendarGate
+
+            self._fg_client = FearGreedClient()
+            self._fred_client = FREDClient()
+            self._av_client = AlphaVantageClient()
+            self._cot_client = COTClient()
+            self._social_client = SocialSentimentClient()
+            self._calendar_gate = EconomicCalendarGate()
+            self._sil_clients_initialized = True
+            logger.info("[SIL] Signal Intelligence Layer clients initialized")
+        except Exception as e:
+            logger.warning(f"[SIL] Failed to initialize clients: {e}")
+            self._sil_clients_initialized = False
+
+    async def _fetch_sil_data(self) -> SILData:
+        """Fetch all SIL data with per-client error handling."""
+        if not self._sil_clients_initialized:
+            return SILData()
+
+        errors: list[str] = []
+        fg_data = None
+        fred_data = None
+        av_data = None
+        cot_data = None
+        social_data = None
+
+        # Fetch all clients concurrently
+        async def _safe(name, coro):
+            try:
+                return await coro
+            except Exception as e:
+                errors.append(f"{name}: {e}")
+                logger.debug(f"[SIL] {name} fetch failed: {e}")
+                return None
+
+        results = await asyncio.gather(
+            _safe("FearGreed", self._fg_client.fetch()),
+            _safe("FRED", self._fred_client.fetch()),
+            _safe("AlphaVantage", self._av_client.fetch()),
+            _safe("COT", self._cot_client.fetch("XAUUSD")),
+            _safe("Social", self._social_client.fetch("XAUUSD")),
+            return_exceptions=False,
+        )
+
+        fg_data, fred_data, av_data, cot_data, social_data = results
+
+        from src.external.sil_schemas import (
+            FearGreedData, FREDData, AlphaVantageData, COTData, SocialSentimentData,
+        )
+        sil = SILData(
+            fear_greed=fg_data or FearGreedData(),
+            fred=fred_data or FREDData(),
+            alpha_vantage=av_data or AlphaVantageData(),
+            cot=cot_data or COTData(),
+            social=social_data or SocialSentimentData(),
+            fetch_errors=errors,
+        )
+
+        if errors:
+            logger.warning(f"[SIL] {len(errors)} fetch errors: {errors}")
+        else:
+            logger.info("[SIL] All data fetched successfully")
+
+        return sil
 
     async def get_positions_async(self) -> list[dict]:
         """Get positions for all modes (async, works with broker or in-memory).
@@ -293,6 +385,7 @@ class PaperTradingLoop:
             "STOP_LOSS_HIT": "SL",
             "TAKE_PROFIT_HIT": "TP",
             "TP1_HIT": "TP",
+            "TIME_STOP": "TIME",
             "API close request": "MANUAL",
             "Graceful shutdown": "MANUAL",
         }
@@ -846,6 +939,14 @@ class PaperTradingLoop:
             f"(check #{self._check_count}, epics: {epics_to_process})"
         )
 
+        # Fetch SIL data once per iteration (cached internally by each client)
+        if _settings.sil_enabled and self._sil_clients_initialized:
+            try:
+                self._sil_data = await self._fetch_sil_data()
+            except Exception as e:
+                logger.warning(f"[SIL] Data fetch failed, using defaults: {e}")
+                self._sil_data = SILData()
+
         for epic in epics_to_process:
             try:
                 # Refresh heartbeat per-epic so the 30s timeout measures
@@ -962,6 +1063,13 @@ class PaperTradingLoop:
             logger.debug(f"[{epic}] Per-asset CB: 5 consecutive losses, skipping")
             return
 
+        # Rolling asset exclusion (14-day Sharpe < threshold)
+        _pe_settings = get_settings()
+        if _pe_settings.scalp_asset_exclusion_enabled:
+            excluded, sharpe = self._asset_tracker.is_excluded(epic)
+            if excluded:
+                return
+
         # Step 0: Market hours check (DEMO/LIVE only)
         is_open, closed_reason = await self._is_market_open(epic)
         if not is_open:
@@ -978,6 +1086,27 @@ class PaperTradingLoop:
             self._signal_history.appendleft(signal_info)
             logger.info(f"[{epic}] {closed_reason}")
             return
+
+        # Step 0b: Economic Calendar gate (SIL)
+        if self._calendar_gate is not None:
+            try:
+                is_blackout, blackout_reason = await self._calendar_gate.is_blackout(epic)
+                if is_blackout:
+                    signal_info = {
+                        "epic": epic,
+                        "direction": "HOLD",
+                        "confidence": 0.0,
+                        "entry_price": 0.0,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "status": "calendar_blackout",
+                        "rejection_reason": blackout_reason,
+                    }
+                    self._last_signals[epic] = signal_info
+                    self._signal_history.appendleft(signal_info)
+                    logger.info(f"[{epic}] {blackout_reason}")
+                    return
+            except Exception as e:
+                logger.debug(f"[{epic}] Calendar gate error (non-blocking): {e}")
 
         # Step 1: ML Prediction
         prediction = self.prediction_service.predict(epic, timeframe=self._candle_resolution)
@@ -1020,6 +1149,18 @@ class PaperTradingLoop:
         # Step 3: Strategy -> TradingSignal
         signal = self.strategy_manager.process_prediction(prediction, epic, market_data)
         self._signal_count += 1
+        # Meta-label features: logged with each signal for future ML training
+        _ml_htf = market_data.get("htf_bias")
+        _ml_features = {
+            "ml_confluence": round(signal.confidence * 6, 1),
+            "ml_utc_hour": datetime.now(timezone.utc).hour,
+            "ml_adx": round(float(market_data.get("adx", 0)), 1),
+            "ml_rsi": round(float(market_data.get("rsi", 50)), 1),
+            "ml_atr": round(float(market_data.get("atr", 0)), 5),
+            "ml_htf_bias": 1 if _ml_htf == "bullish" else (-1 if _ml_htf == "bearish" else 0),
+            "ml_regime": market_data.get("regime", "unknown"),
+        }
+
         signal_info = {
             "epic": epic,
             "direction": signal.direction.value,
@@ -1028,9 +1169,26 @@ class PaperTradingLoop:
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "status": "predicted",
             "strategy_name": signal.strategy_name,
+            **_ml_features,
         }
         self._last_signals[epic] = signal_info
         self._signal_history.appendleft(signal_info)
+
+        # --- Audit trail: build features dict from signal metadata ---
+        audit_features = None
+        if self._signal_repo_factory and signal.metadata:
+            try:
+                audit_features = {
+                    "version": 1,
+                    "rejection_reason": None,
+                    "votes": signal.metadata.get("votes"),
+                    "gates": signal.metadata.get("gates"),
+                    "ml": signal.metadata.get("ml"),
+                    "risk": None,
+                    "market_snapshot": signal.metadata.get("market_snapshot"),
+                }
+            except Exception:
+                logger.warning(f"[{epic}] Failed to build audit features")
 
         # Map direction to SignalType for structured logging
         _dir_map = {"BUY": SignalType.LONG, "SELL": SignalType.SHORT, "HOLD": SignalType.HOLD}
@@ -1127,6 +1285,22 @@ class PaperTradingLoop:
                 )
             except Exception:
                 pass
+
+            # Persist REJECTED signal audit trail
+            if audit_features is not None:
+                audit_features["risk"] = risk_result.audit
+                audit_features["rejection_reason"] = risk_result.rejection_reason
+                await self._persist_signal_audit(
+                    epic=epic,
+                    direction=signal.direction.value,
+                    confidence=signal.confidence,
+                    entry_price=signal.entry_price,
+                    stop_loss=signal.suggested_stop,
+                    take_profit=signal.suggested_tp,
+                    status="REJECTED",
+                    features=audit_features,
+                )
+
             return
 
         logger.info(
@@ -1172,7 +1346,27 @@ class PaperTradingLoop:
                     )
                 except Exception:
                     pass
+
+                # Persist REJECTED signal (min deal size)
+                if audit_features is not None:
+                    audit_features["risk"] = risk_result.audit
+                    audit_features["rejection_reason"] = reason
+                    await self._persist_signal_audit(
+                        epic=epic,
+                        direction=signal.direction.value,
+                        confidence=signal.confidence,
+                        entry_price=signal.entry_price,
+                        stop_loss=risk_result.stop_loss,
+                        take_profit=risk_result.take_profit,
+                        status="REJECTED",
+                        features=audit_features,
+                    )
+
                 return
+
+        # Add approved risk audit data to features
+        if audit_features is not None:
+            audit_features["risk"] = risk_result.audit
 
         # HIGH-8 FIX: Refresh equity immediately before execution
         # to catch any changes since risk check (manual trades, other systems, etc.)
@@ -1246,6 +1440,34 @@ class PaperTradingLoop:
                 )
             except Exception:
                 pass
+
+            # Persist EXECUTED signal audit trail + link to position
+            if audit_features is not None:
+                signal_id = await self._persist_signal_audit(
+                    epic=epic,
+                    direction=signal.direction.value,
+                    confidence=signal.confidence,
+                    entry_price=exec_result.fill_price or signal.entry_price,
+                    stop_loss=risk_result.stop_loss,
+                    take_profit=risk_result.take_profit,
+                    status="EXECUTED",
+                    features=audit_features,
+                )
+                # Link signal to position via deal_id
+                if signal_id and exec_result.deal_id and self._signal_repo_factory:
+                    try:
+                        async with self._signal_repo_factory() as session:
+                            from src.database.repositories.position_repository import PositionRepository
+                            from src.database.repositories.signal_repository import SignalRepository
+                            pos_repo = PositionRepository(session)
+                            position = await pos_repo.get_by_deal_id(exec_result.deal_id)
+                            if position:
+                                sig_repo = SignalRepository(session)
+                                await sig_repo.mark_as_executed(signal_id, position.id)
+                                await session.commit()
+                    except Exception as e:
+                        logger.warning(f"[{epic}] Signal-position link failed: {e}")
+
         else:
             signal_info["status"] = "exec_failed"
             signal_info["rejection_reason"] = exec_result.error
@@ -1276,6 +1498,54 @@ class PaperTradingLoop:
                 )
             except Exception:
                 pass
+
+            # Persist EXEC_FAILED signal audit trail
+            if audit_features is not None:
+                audit_features["rejection_reason"] = exec_result.error
+                await self._persist_signal_audit(
+                    epic=epic,
+                    direction=signal.direction.value,
+                    confidence=signal.confidence,
+                    entry_price=signal.entry_price,
+                    stop_loss=risk_result.stop_loss,
+                    take_profit=risk_result.take_profit,
+                    status="REJECTED",
+                    features=audit_features,
+                )
+
+    async def _persist_signal_audit(
+        self,
+        epic: str,
+        direction: str,
+        confidence: float,
+        entry_price: float | None,
+        stop_loss: float | None,
+        take_profit: float | None,
+        status: str,
+        features: dict,
+    ) -> int | None:
+        """Best-effort persist signal audit to DB. Returns signal ID or None."""
+        if not self._signal_repo_factory:
+            return None
+        try:
+            async with self._signal_repo_factory() as session:
+                from src.database.repositories.signal_repository import SignalRepository
+                repo = SignalRepository(session)
+                signal_id = await repo.create_from_audit(
+                    epic=epic,
+                    direction=direction,
+                    confidence=confidence,
+                    entry_price=entry_price,
+                    stop_loss=stop_loss,
+                    take_profit=take_profit,
+                    status=status,
+                    features=features,
+                )
+                await session.commit()
+                return signal_id
+        except Exception as e:
+            logger.warning(f"[{epic}] Signal audit persist failed: {e}")
+            return None
 
     async def _update_trailing_stops(self, current_positions: list[dict]) -> None:
         """
@@ -1360,8 +1630,10 @@ class PaperTradingLoop:
 
     async def _check_stop_losses(self, current_positions: list[dict]) -> None:
         """
-        CRITICAL: Check if any open position has violated its stop loss OR take profit.
+        CRITICAL: Check if any open position has violated its stop loss OR take profit
+        OR exceeded the maximum hold time (time-based stop).
         Auto-close positions where:
+          - Time stop: position held longer than max_hold_hours
           - SL violated: price <= SL (longs) or price >= SL (shorts)
           - TP hit: price >= TP (longs) or price <= TP (shorts)
 
@@ -1370,12 +1642,65 @@ class PaperTradingLoop:
         if not current_positions:
             return
 
+        _loop_settings = get_settings()
+        max_hold_hours = _loop_settings.scalp_max_hold_hours
+        now_utc = datetime.now(timezone.utc)
+
         for position in current_positions:
             deal_id = position.get("deal_id")
             epic = position.get("epic", "")
             direction = position.get("direction", "")
             stop_level = position.get("stop_level")
             profit_level = position.get("profit_level")
+
+            # --- Time-based stop: close stale positions ---
+            opened_at_str = position.get("opened_at")
+            if opened_at_str and max_hold_hours < 9000:
+                try:
+                    opened_at = datetime.fromisoformat(str(opened_at_str))
+                    if opened_at.tzinfo is None:
+                        opened_at = opened_at.replace(tzinfo=timezone.utc)
+                    age_hours = (now_utc - opened_at).total_seconds() / 3600
+                    if age_hours >= max_hold_hours:
+                        logger.warning(
+                            f"⏰ [{epic}] TIME STOP: position {deal_id} held "
+                            f"{age_hours:.1f}h >= {max_hold_hours}h limit"
+                        )
+                        try:
+                            result = await self.execution_engine.close_position(
+                                deal_id=deal_id,
+                                reason="TIME_STOP",
+                            )
+                            if result.success:
+                                entry_price = position.get("level") or position.get("entry_price", 0)
+                                size = position.get("size", 0)
+                                latest = self.data_access.get_latest_price(epic, timeframe="1h")
+                                current_price = latest.get("close", 0) if latest else 0
+                                if direction == "BUY":
+                                    pnl = (current_price - entry_price) * size
+                                else:
+                                    pnl = (entry_price - current_price) * size
+                                logger.info(
+                                    f"✅ [{epic}] Time stop closed: "
+                                    f"P&L = ${pnl:.2f} (held {age_hours:.1f}h)"
+                                )
+                                self._on_position_closed(deal_id, pnl, epic=epic)
+                                await self._persist_position_close(
+                                    deal_id=deal_id,
+                                    epic=epic,
+                                    direction=direction,
+                                    size=size,
+                                    entry_price=entry_price,
+                                    exit_price=current_price,
+                                    pnl=pnl,
+                                    close_reason="TIME_STOP",
+                                    opened_at=position.get("opened_at"),
+                                )
+                            continue  # Skip SL/TP checks for this position
+                        except Exception as e:
+                            logger.warning(f"[{epic}] Time stop close failed: {e}")
+                except (ValueError, TypeError) as e:
+                    logger.debug(f"[{epic}] Could not parse opened_at '{opened_at_str}': {e}")
 
             # Skip if no stop loss AND no take profit set
             if (stop_level is None or stop_level <= 0) and (profit_level is None or profit_level <= 0):
@@ -1529,6 +1854,8 @@ class PaperTradingLoop:
         # Per-asset circuit breaker: track consecutive losses
         if epic:
             self._record_per_asset_result(epic, is_win=(pnl > 0))
+            # Rolling asset performance tracker (Sharpe-based exclusion)
+            self._asset_tracker.record_trade(epic, pnl)
 
         # Trailing stop: unregister
         self.trailing_stop_manager.unregister_position(deal_id)
@@ -1616,6 +1943,14 @@ class PaperTradingLoop:
             "min_deal_sizes_cached": len(self._min_deal_size_cache),
             "active_assets": len(self._active_assets) if self._active_assets else len(self.epics),
             "per_asset_losses": {k: v for k, v in self._per_asset_losses.items() if v > 0},
+            "sil": {
+                "enabled": _settings.sil_enabled,
+                "clients_initialized": self._sil_clients_initialized,
+                "calendar_gate_enabled": _settings.sil_calendar_gate_enabled if _settings.sil_enabled else False,
+                "fetch_errors": self._sil_data.fetch_errors if self._sil_data else [],
+                "fear_greed_value": self._sil_data.fear_greed.value if self._sil_data else None,
+                "composite_score": None,  # Populated from features
+            },
         }
 
     def _get_kelly_stats(self) -> dict | None:
