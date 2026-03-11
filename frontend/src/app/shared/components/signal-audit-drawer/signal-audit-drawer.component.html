@@ -1,0 +1,245 @@
+<!-- Backdrop -->
+@if (auditService.isOpen()) {
+  <div class="audit-backdrop" (click)="onBackdropClick()"></div>
+}
+
+<!-- Drawer panel -->
+<div class="audit-drawer" [class.audit-drawer--open]="auditService.isOpen()">
+
+  <!-- Header -->
+  <div class="audit-header">
+    <div class="d-flex align-items-center gap-2">
+      @if (auditService.currentAudit(); as audit) {
+        <app-epic-logo [epic]="audit.epic" [size]="24"></app-epic-logo>
+        <span class="fw-semibold">{{ audit.epic }}</span>
+        <c-badge [color]="audit.direction === 'BUY' ? 'success' : 'danger'">
+          {{ audit.direction === 'BUY' ? '▲ BUY' : '▼ SELL' }}
+        </c-badge>
+        <c-badge [color]="audit.status === 'EXECUTED' ? 'primary' : 'warning'">
+          {{ audit.status }}
+        </c-badge>
+      }
+    </div>
+    <button class="btn btn-sm btn-ghost-secondary" (click)="auditService.close()" aria-label="Chiudi">
+      ✕
+    </button>
+  </div>
+
+  <!-- Loading -->
+  @if (auditService.loading()) {
+    <div class="d-flex justify-content-center align-items-center p-5">
+      <c-spinner color="primary"></c-spinner>
+    </div>
+  }
+
+  <!-- Content -->
+  @if (auditService.currentAudit(); as audit) {
+    <div class="audit-body">
+
+      <!-- Meta info -->
+      <div class="audit-meta small text-body-secondary mb-3">
+        <span>ID: {{ audit.id }}</span>
+        <span class="mx-2">|</span>
+        <span>{{ audit.generated_at | date:'dd/MM/yyyy HH:mm:ss' }}</span>
+        <span class="mx-2">|</span>
+        <span class="mantis-mono">Conf: {{ (audit.confidence * 100).toFixed(1) }}%</span>
+      </div>
+
+      <!-- Rejection reason -->
+      @if (audit.features?.rejection_reason) {
+        <div class="alert alert-warning py-2 px-3 small mb-3">
+          <strong>Motivo rifiuto:</strong> {{ audit.features.rejection_reason }}
+        </div>
+      }
+
+      <!-- SECTION: ScalpScore Votes -->
+      @if (voteEntries().length > 0) {
+        <div class="audit-section">
+          <div class="audit-section__title">
+            <span class="audit-section__icon">◆</span> ScalpScore Voti
+          </div>
+          <div class="votes-grid">
+            @for (entry of voteEntries(); track entry[0]) {
+              <div class="vote-card">
+                <div class="vote-card__label">{{ voteLabel(entry[0]) }}</div>
+                <div class="vote-card__value mantis-mono"
+                     [class.text-success]="entry[1].value > 0"
+                     [class.text-danger]="entry[1].value < 0"
+                     [class.text-body-secondary]="entry[1].value === 0">
+                  {{ entry[1].value > 0 ? '+1' : entry[1].value < 0 ? '-1' : '0' }}
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- SECTION: Gates -->
+      @if (gateEntries().length > 0) {
+        <div class="audit-section">
+          <div class="audit-section__title">
+            <span class="audit-section__icon">◆</span> Gates ({{ gatesPassed() }}/{{ gatesTotal() }})
+          </div>
+          <div class="gates-list">
+            @for (entry of gateEntries(); track entry[0]) {
+              @if (entry[1] !== null) {
+                <div class="gate-row">
+                  <span class="gate-dot"
+                        [class.gate-dot--pass]="entry[1].passed"
+                        [class.gate-dot--fail]="!entry[1].passed"></span>
+                  <span class="gate-label">{{ gateLabel(entry[0]) }}</span>
+                  <span class="gate-status mantis-mono small"
+                        [class.text-success]="entry[1].passed"
+                        [class.text-danger]="!entry[1].passed">
+                    {{ entry[1].passed ? 'PASS' : 'FAIL' }}
+                  </span>
+                </div>
+              }
+            }
+          </div>
+        </div>
+      }
+
+      <!-- SECTION: ML Prediction -->
+      @if (audit.features?.ml; as ml) {
+        <div class="audit-section">
+          <div class="audit-section__title">
+            <span class="audit-section__icon">◆</span> ML Prediction
+          </div>
+          <div class="ml-grid">
+            <div class="ml-item">
+              <span class="small text-body-secondary">Accordo</span>
+              <c-badge [color]="mlAgreementColor()">{{ mlAgreementLabel() }}</c-badge>
+            </div>
+            <div class="ml-item">
+              <span class="small text-body-secondary">Classe</span>
+              <span class="mantis-mono">{{ ml.signal_name }}</span>
+            </div>
+            <div class="ml-item">
+              <span class="small text-body-secondary">Conf. ML</span>
+              <span class="mantis-mono">{{ (ml.confidence * 100).toFixed(1) }}%</span>
+            </div>
+            <div class="ml-item">
+              <span class="small text-body-secondary">Prima → Dopo</span>
+              <span class="mantis-mono">
+                {{ (ml.confidence_before * 100).toFixed(1) }}%
+                →
+                {{ (ml.confidence_after * 100).toFixed(1) }}%
+              </span>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- SECTION: Risk Check -->
+      @if (audit.features?.risk; as risk) {
+        <div class="audit-section">
+          <div class="audit-section__title">
+            <span class="audit-section__icon">◆</span> Risk Check
+          </div>
+          <div class="risk-grid">
+            @if (risk.circuit_breakers) {
+              <div class="risk-item">
+                <span class="small text-body-secondary">Circuit Breakers</span>
+                <span class="mantis-mono" [class.text-success]="risk.circuit_breakers.passed"
+                      [class.text-danger]="!risk.circuit_breakers.passed">
+                  {{ risk.circuit_breakers.passed ? 'OK' : 'TRIPPED' }}
+                </span>
+              </div>
+            }
+            @if (risk.drawdown) {
+              <div class="risk-item">
+                <span class="small text-body-secondary">Drawdown</span>
+                <span class="mantis-mono" [class.text-success]="risk.drawdown.passed"
+                      [class.text-danger]="!risk.drawdown.passed">
+                  {{ risk.drawdown.passed ? 'OK' : 'EXCEEDED' }}
+                </span>
+              </div>
+            }
+            @if (risk.sizing) {
+              <div class="risk-item">
+                <span class="small text-body-secondary">Metodo Sizing</span>
+                <span class="mantis-mono">{{ risk.sizing['method'] || '-' }}</span>
+              </div>
+            }
+            @if (risk.confidence_tier) {
+              <div class="risk-item">
+                <span class="small text-body-secondary">Tier Confidenza</span>
+                <span class="mantis-mono">{{ risk.confidence_tier['multiplier'] ?? '-' }}x</span>
+              </div>
+            }
+            @if (risk.stop_loss) {
+              <div class="risk-item">
+                <span class="small text-body-secondary">Stop Loss</span>
+                <span class="mantis-mono">{{ risk.stop_loss['stop_loss'] ?? '-' }}</span>
+              </div>
+              <div class="risk-item">
+                <span class="small text-body-secondary">Take Profit</span>
+                <span class="mantis-mono">{{ risk.stop_loss['take_profit'] ?? '-' }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- SECTION: Market Snapshot -->
+      @if (snapshotEntries().length > 0) {
+        <div class="audit-section">
+          <div class="audit-section__title">
+            <span class="audit-section__icon">◆</span> Market Snapshot
+          </div>
+          <div class="snapshot-grid">
+            @for (entry of snapshotEntries(); track entry[0]) {
+              <div class="snapshot-item">
+                <span class="small text-body-secondary">{{ snapshotLabel(entry[0]) }}</span>
+                <span class="mantis-mono">{{ formatValue(entry[1]) }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- SECTION: Related Signals -->
+      @if (auditService.relatedSignals().length > 0) {
+        <div class="audit-section">
+          <div class="audit-section__title">
+            <span class="audit-section__icon">◆</span> Ultimi Segnali
+          </div>
+          <div class="related-list">
+            @for (sig of auditService.relatedSignals(); track sig.id) {
+              <div class="related-row"
+                   [class.related-row--active]="sig.id === audit.id"
+                   (click)="auditService.navigateToSignal(sig.id)"
+                   style="cursor:pointer;">
+                <span class="small"
+                      [class.text-success]="sig.direction === 'BUY'"
+                      [class.text-danger]="sig.direction === 'SELL'">
+                  {{ sig.direction === 'BUY' ? '▲' : '▼' }}
+                </span>
+                <span class="mantis-mono small">{{ (sig.confidence * 100).toFixed(0) }}%</span>
+                <c-badge size="sm"
+                         [color]="sig.status === 'EXECUTED' ? 'primary' : 'warning'">
+                  {{ sig.status }}
+                </c-badge>
+                @if (sig.position_pnl !== null) {
+                  <span class="mantis-mono small ms-auto"
+                        [class.text-success]="sig.position_pnl >= 0"
+                        [class.text-danger]="sig.position_pnl < 0">
+                    {{ sig.position_pnl >= 0 ? '+' : '' }}{{ sig.position_pnl.toFixed(2) }}
+                  </span>
+                }
+                @if (sig.rejection_reason) {
+                  <span class="small text-body-secondary ms-auto text-truncate"
+                        style="max-width: 120px;" [title]="sig.rejection_reason">
+                    {{ sig.rejection_reason }}
+                  </span>
+                }
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+    </div>
+  }
+</div>

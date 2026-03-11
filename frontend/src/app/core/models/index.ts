@@ -21,6 +21,11 @@ export interface EquityCurvePoint {
   date: string;
   equity: number;
   drawdown_pct: number;
+  daily_pnl: number;
+  trade_count: number;
+  win_count: number;
+  cumulative_trades: number;
+  cumulative_win_rate: number;
 }
 
 // Positions
@@ -356,6 +361,63 @@ export interface TradingPerformance {
   sortino_ratio?: number;
   calmar_ratio?: number;
   max_drawdown?: number;
+}
+
+// --- Signal Audit Trail ---
+
+export interface SignalAudit {
+  id: number;
+  epic: string;
+  direction: 'BUY' | 'SELL';
+  confidence: number;
+  status: 'EXECUTED' | 'REJECTED';
+  generated_at: string;
+  entry_price: number | null;
+  stop_loss: number | null;
+  take_profit: number | null;
+  position_id: number | null;
+  features: SignalFeatures;
+}
+
+export interface SignalFeatures {
+  version: number;
+  rejection_reason: string | null;
+  votes: Record<string, { value: number; [key: string]: any }>;
+  gates: Record<string, { passed: boolean; [key: string]: any } | null>;
+  ml: SignalMl | null;
+  risk: SignalRisk | null;
+  market_snapshot: Record<string, number | string>;
+}
+
+export interface SignalMl {
+  signal_class: number;
+  signal_name: string;
+  confidence: number;
+  probabilities: Record<string, number>;
+  agreement: string;
+  confidence_before: number;
+  confidence_after: number;
+}
+
+export interface SignalRisk {
+  circuit_breakers: { passed: boolean; [key: string]: any };
+  drawdown: { passed: boolean; [key: string]: any };
+  stop_loss: { [key: string]: any };
+  correlation: { [key: string]: any };
+  sizing: { [key: string]: any };
+  confidence_tier: { [key: string]: any };
+}
+
+export interface SignalHistoryItem {
+  id: number;
+  epic: string;
+  direction: 'BUY' | 'SELL';
+  confidence: number;
+  status: 'EXECUTED' | 'REJECTED';
+  generated_at: string;
+  rejection_reason: string | null;
+  position_pnl: number | null;
+  position_status: string | null;
 }
 
 // Notifications

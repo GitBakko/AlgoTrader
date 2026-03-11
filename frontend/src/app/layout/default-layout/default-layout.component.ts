@@ -16,7 +16,9 @@ import {
 
 import { DefaultFooterComponent, DefaultHeaderComponent } from './';
 import { ToastContainerComponent } from '../../shared/components/toast-container/toast-container.component';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { BottomNavComponent } from '../../shared/components/bottom-nav/bottom-nav.component';
+import { SignalAuditDrawerComponent } from '../../shared/components/signal-audit-drawer/signal-audit-drawer.component';
 import { navItems } from './_nav';
 import { WebSocketService } from '../../core/services/websocket.service';
 
@@ -40,7 +42,9 @@ import { WebSocketService } from '../../core/services/websocket.service';
     RouterLink,
     ShadowOnScrollDirective,
     ToastContainerComponent,
-    BottomNavComponent
+    ConfirmDialogComponent,
+    BottomNavComponent,
+    SignalAuditDrawerComponent,
   ]
 })
 export class DefaultLayoutComponent {
