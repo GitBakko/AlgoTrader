@@ -22,6 +22,7 @@ class RiskCheckResult(BaseModel):
     adjustments: list[str] = Field(default_factory=list)
     sizing_method: str = "fixed_fractional"
     circuit_breaker_details: dict | None = None
+    audit: dict = Field(default_factory=dict)
 
 
 class RiskLimits(BaseModel):

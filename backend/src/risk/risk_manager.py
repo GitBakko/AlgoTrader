@@ -73,6 +73,7 @@ class RiskManager:
         """
         open_positions = open_positions or []
         adjustments: list[str] = []
+        audit: dict = {}
 
         # 0. Validate inputs
         if atr <= 0:
@@ -80,6 +81,7 @@ class RiskManager:
             return RiskCheckResult(
                 approved=False,
                 rejection_reason=f"Invalid ATR value: {atr}",
+                audit=audit,
             )
 
         # 1. Check advanced circuit breakers
@@ -94,6 +96,12 @@ class RiskManager:
             current_atr=atr,
             baseline_atr=self.circuit_breakers.get_baseline_atr(signal.epic),
         )
+        audit["circuit_breakers"] = {
+            "passed": cb_ok,
+            "daily_pnl_pct": round(daily_pnl_pct, 4),
+            "open_positions": len(open_positions),
+            "reasons": cb_reasons if not cb_ok else [],
+        }
         if not cb_ok:
             reason = "; ".join(cb_reasons)
             logger.warning(f"Trade rejected (circuit breaker): {reason}")
@@ -103,6 +111,7 @@ class RiskManager:
                 circuit_breaker_details={
                     "tripped": self.circuit_breakers.tripped_breakers,
                 },
+                audit=audit,
             )
 
         # 1b. Check max total open positions
@@ -147,19 +156,28 @@ class RiskManager:
         # 2. Update and check drawdown limits
         self.drawdown_monitor.update(equity)
         dd_ok, dd_reason = self.drawdown_monitor.check_limits(self.limits)
+        dd_pct = self.drawdown_monitor.state.current_drawdown_pct
+        audit["drawdown"] = {
+            "passed": dd_ok,
+            "current_dd_pct": round(dd_pct, 4) if isinstance(dd_pct, (int, float)) else 0.0,
+            "equity": equity,
+            "reason": dd_reason if not dd_ok else None,
+        }
         if not dd_ok:
             self.drawdown_monitor.activate_circuit_breaker(dd_reason)
             logger.warning(f"Trade rejected (drawdown): {dd_reason}")
             return RiskCheckResult(
                 approved=False,
                 rejection_reason=dd_reason,
+                audit=audit,
             )
 
         # 3. Calculate stop-loss with dynamic multiplier (volatility-scaled)
         _risk_settings = get_settings()
         if _risk_settings.scalp_mode_enabled:
-            base_sl = _risk_settings.scalp_sl_multiplier     # 1.0
-            sl_min, sl_max = 0.7, 2.0
+            base_sl = _risk_settings.scalp_sl_multiplier
+            sl_min = _risk_settings.scalp_dynamic_sl_min
+            sl_max = _risk_settings.scalp_dynamic_sl_max
         else:
             base_sl = 2.0
             sl_min, sl_max = 1.5, 4.0
@@ -207,6 +225,14 @@ class RiskManager:
             take_profit = signal.suggested_tp
             adjustments.append("Using signal suggested take-profit")
 
+        audit["stop_loss"] = {
+            "dynamic_multiplier": round(stop_mult, 4),
+            "base_multiplier": base_sl,
+            "baseline_atr": round(baseline_atr, 5) if isinstance(baseline_atr, (int, float)) else None,
+            "stop_loss": round(stop_loss, 5),
+            "take_profit": round(take_profit, 5),
+        }
+
         # 5. Check correlation exposure
         corr_multiplier, corr_warnings = CorrelationGuard.check_exposure(
             epic=signal.epic,
@@ -214,6 +240,11 @@ class RiskManager:
             open_positions=open_positions,
         )
         adjustments.extend(corr_warnings)
+
+        audit["correlation"] = {
+            "multiplier": round(corr_multiplier, 4),
+            "warnings": corr_warnings,
+        }
 
         # 6. Calculate position size (Kelly or fixed-fractional)
         sizing_method = "fixed_fractional"
@@ -249,6 +280,10 @@ class RiskManager:
 
         # 6b. Confidence tiering
         conf_mult = self.confidence_size_multiplier(signal.confidence)
+        audit["confidence_tier"] = {
+            "confidence": round(signal.confidence, 4),
+            "multiplier": conf_mult,
+        }
         if conf_mult < 1.0:
             adjustments.append(
                 f"Confidence tier: {conf_mult:.0%} (conf={signal.confidence:.2f})"
@@ -263,10 +298,17 @@ class RiskManager:
                 f"Equity curve filter: size reduced {eq_multiplier:.0%}"
             )
 
+        audit["sizing"] = {
+            "method": sizing_method,
+            "raw_size": round(position_size, 6),
+            "corr_multiplier": round(corr_multiplier, 4),
+        }
+
         if position_size <= 0:
             return RiskCheckResult(
                 approved=False,
                 rejection_reason="Calculated position size is zero",
+                audit=audit,
             )
 
         # 8. Calculate multi-target TP1/TP2
@@ -293,6 +335,7 @@ class RiskManager:
             take_profit_2=tp2,
             adjustments=adjustments,
             sizing_method=sizing_method,
+            audit=audit,
         )
 
     def update_equity(self, equity: float) -> DrawdownState:
@@ -315,14 +358,17 @@ class RiskManager:
     def confidence_size_multiplier(confidence: float) -> float:
         """Scale position size by confidence tier.
 
-        < 0.50: 0.0 (rejected by min_confidence)
-        0.50-0.58: 0.50x
-        0.58-0.65: 0.75x
+        < 0.25: 0.0 (rejected — too low even for reduced sizing)
+        0.25-0.40: 0.25x (ML-disagree signals with confluence)
+        0.40-0.55: 0.50x
+        0.55-0.65: 0.75x
         >= 0.65: 1.0x
         """
-        if confidence < 0.50:
+        if confidence < 0.25:
             return 0.0
-        elif confidence < 0.58:
+        elif confidence < 0.40:
+            return 0.25
+        elif confidence < 0.55:
             return 0.50
         elif confidence < 0.65:
             return 0.75
