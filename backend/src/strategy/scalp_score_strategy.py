@@ -1,19 +1,27 @@
 """
-ScalpScoreStrategy — Multi-indicator scoring for 15-min scalping.
+ScalpScoreStrategy — Confluence voting model for 15-min scalping.
 
-SCALPING-GURU architecture: raw score + binary gate filters.
+SCALPING-GURU architecture (Section 3.1):
+  "Confluence Check (minimo N segnali concordanti)"
 
-Computes a composite score (0-100) from 6 technical indicators:
-  EMA Trend (20), RSI (18), MACD (18), Volume (12), ADX (18), BB Squeeze (14)
+Instead of additive scoring with a threshold, each indicator group
+votes BUY/SELL/NEUTRAL independently. A trade fires when enough
+indicator groups agree on the same direction.
 
-Score >= threshold AND gate_filters_pass -> entry signal.
+6 indicator groups (each votes independently):
+  1. EMA Trend  — EMA(9) vs EMA(21) cross direction
+  2. RSI        — Oversold (<45) = BUY, Overbought (>55) = SELL
+  3. MACD       — Histogram + crossover direction
+  4. Volume     — Confirmation boost (volume > 1.2x SMA)
+  5. ADX        — Trend strength confirmation (ADX > 20)
+  6. BB/Keltner — Squeeze breakout direction
 
-Gate filters (binary pass/fail, NOT multiplicative):
+Gate filters (binary pass/fail):
   - Session: kill zone or active session (off-session = hard block)
   - VWAP: directional gate (buy only above VWAP, sell only below)
-  - HTF: additive bonus/malus (+5 aligned, -10 opposing)
+  - HTF: adds/removes 1 vote for alignment/opposition
 
-ML model acts as a boost layer externally (not inside this strategy).
+Entry rule: confluence_count >= MIN_CONFLUENCE (default 3/6)
 """
 
 import polars as pl
@@ -23,30 +31,24 @@ from src.models.schemas import SignalClass
 from src.strategy.base_strategy import BaseStrategy
 from src.strategy.schemas import SignalDirection, StrategyConfig, TradingSignal
 from src.strategy.session_filter import SessionFilter
+from src.utils.config import get_settings
 
-# Indicator weights (must sum to 100)
-W_EMA = 20
-W_RSI = 18
-W_MACD = 18
-W_VOLUME = 12
-W_ADX = 18
-W_BB = 14
-
-# Score thresholds
-DEFAULT_ENTRY_THRESHOLD = 55
-DEFAULT_FULL_SIZE_THRESHOLD = 70
+# Minimum concordant indicator votes to trigger a signal
+DEFAULT_MIN_CONFLUENCE = 3
+# During kill zones (high-probability windows), lower the bar
+KILLZONE_MIN_CONFLUENCE = 3
+# Outside kill zones, require stronger agreement
+OFF_KILLZONE_MIN_CONFLUENCE = 4
 
 
 class ScalpScoreStrategy(BaseStrategy):
-    """Multi-indicator scoring strategy for scalp/intraday trading."""
+    """Confluence voting strategy for scalp/intraday trading."""
 
     def __init__(
         self,
-        entry_threshold: int = DEFAULT_ENTRY_THRESHOLD,
-        full_size_threshold: int = DEFAULT_FULL_SIZE_THRESHOLD,
+        min_confluence: int = DEFAULT_MIN_CONFLUENCE,
     ):
-        self.entry_threshold = entry_threshold
-        self.full_size_threshold = full_size_threshold
+        self.min_confluence = min_confluence
 
     @property
     def name(self) -> str:
@@ -57,175 +59,98 @@ class ScalpScoreStrategy(BaseStrategy):
         return ["trending_up", "trending_down", "ranging"]
 
     # ------------------------------------------------------------------
-    # Scoring helpers
+    # Indicator vote functions — each returns +1 (BUY), -1 (SELL), 0
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _score_ema(ema_9: float, ema_21: float, price: float) -> tuple[float, float]:
-        """
-        EMA cross + slope scoring.
-        Returns (buy_score, sell_score) each in [0, W_EMA].
-        """
+    def _vote_ema(ema_9: float, ema_21: float) -> tuple[int, dict]:
+        """EMA cross: bullish cross = BUY, bearish cross = SELL."""
+        details = {"ema_9": ema_9, "ema_21": ema_21}
         if ema_9 <= 0 or ema_21 <= 0:
-            return 0.0, 0.0
-
-        spread = (ema_9 - ema_21) / ema_21  # positive = bullish
-        # Slope: how far price is from EMA9
-        slope = (price - ema_9) / ema_9 if ema_9 > 0 else 0
-
-        buy_score = 0.0
-        sell_score = 0.0
-
-        if spread > 0:
-            # Bullish: EMA9 above EMA21
-            buy_score = min(W_EMA, W_EMA * min(spread * 200, 1.0))  # 0.5% spread = full points
-            if slope > 0:
-                buy_score = min(W_EMA, buy_score * 1.2)  # Bonus for price above EMA9
-        elif spread < 0:
-            # Bearish: EMA9 below EMA21
-            sell_score = min(W_EMA, W_EMA * min(abs(spread) * 200, 1.0))
-            if slope < 0:
-                sell_score = min(W_EMA, sell_score * 1.2)
-
-        return buy_score, sell_score
+            return 0, details
+        spread = (ema_9 - ema_21) / ema_21
+        if spread > 0.001:   # >0.1% spread = bullish
+            return 1, details
+        elif spread < -0.001:
+            return -1, details
+        return 0, details
 
     @staticmethod
-    def _score_rsi(rsi: float) -> tuple[float, float]:
-        """
-        RSI scoring for buy/sell.
-        BUY zone: RSI 25-45 (oversold bounce).
-        SELL zone: RSI 55-75 (overbought rejection).
-        """
-        buy_score = 0.0
-        sell_score = 0.0
-
-        if 25 <= rsi <= 45:
-            # Peak score at RSI ~35
-            buy_score = W_RSI * max(0, 1.0 - abs(rsi - 35) / 15)
-        elif 55 <= rsi <= 75:
-            # Peak score at RSI ~65
-            sell_score = W_RSI * max(0, 1.0 - abs(rsi - 65) / 15)
-
-        return buy_score, sell_score
+    def _vote_rsi(rsi: float) -> tuple[int, dict]:
+        """RSI: oversold zone = BUY potential, overbought = SELL."""
+        details = {"rsi_14": rsi}
+        if rsi < 45:
+            return 1, details
+        elif rsi > 55:
+            return -1, details
+        return 0, details
 
     @staticmethod
-    def _score_macd(histogram: float, macd: float, signal: float) -> tuple[float, float]:
-        """MACD histogram + crossover scoring."""
-        buy_score = 0.0
-        sell_score = 0.0
-
+    def _vote_macd(histogram: float, macd: float, signal: float) -> tuple[int, dict]:
+        """MACD: histogram direction + crossover."""
+        details = {"histogram": histogram, "macd": macd, "signal": signal}
+        if histogram > 0 and macd > signal:
+            return 1, details
+        elif histogram < 0 and macd < signal:
+            return -1, details
+        # Histogram positive but no cross (or vice versa) = neutral
         if histogram > 0:
-            buy_score += W_MACD * 0.6  # Histogram positive
-            if macd > signal:
-                buy_score += W_MACD * 0.4  # Crossover confirmed
+            return 1, details
         elif histogram < 0:
-            sell_score += W_MACD * 0.6
-            if macd < signal:
-                sell_score += W_MACD * 0.4
-
-        return min(W_MACD, buy_score), min(W_MACD, sell_score)
+            return -1, details
+        return 0, details
 
     @staticmethod
-    def _score_volume(volume: float, volume_sma: float) -> float:
-        """
-        Volume confirmation (direction-agnostic).
-        Returns score in [0, W_VOLUME].
-        """
+    def _vote_volume(volume: float, volume_sma: float) -> tuple[int, dict]:
+        """Volume confirmation: strong volume = confirms current move."""
+        details = {"volume": volume, "volume_sma_20": volume_sma}
         if volume_sma <= 0:
-            return 0.0
-        ratio = volume / volume_sma
-        if ratio >= 1.2:
-            return min(W_VOLUME, W_VOLUME * min((ratio - 1.0) / 0.5, 1.0))
-        return 0.0
+            return 0, details
+        if volume / volume_sma >= 1.2:
+            return 1, details
+        return 0, details
 
     @staticmethod
-    def _score_adx(adx: float) -> float:
-        """
-        ADX trend strength (direction-agnostic).
-        Returns score in [0, W_ADX].
-        """
-        if adx >= 30:
-            return W_ADX  # Strong trend
-        elif adx >= 20:
-            return W_ADX * (adx - 15) / 15  # Linear ramp from 15 to 30
-        return 0.0
+    def _vote_adx(adx: float) -> tuple[int, dict]:
+        """ADX trend strength: >20 = trend exists, confirming vote."""
+        details = {"adx_14": adx}
+        if adx >= 20:
+            return 1, details
+        return 0, details
 
     @staticmethod
-    def _score_bb_squeeze(
+    def _vote_bb_squeeze(
         bb_upper: float, bb_lower: float,
         keltner_upper: float, keltner_lower: float,
         price: float, bb_middle: float,
-    ) -> tuple[float, float]:
-        """
-        Bollinger Band squeeze + breakout direction.
-        Squeeze: BB inside Keltner (compression).
-        Breakout up -> buy points; breakout down -> sell points.
-        """
-        buy_score = 0.0
-        sell_score = 0.0
-
+    ) -> tuple[int, dict]:
+        """BB squeeze: breakout direction from compression."""
+        details = {
+            "bb_upper": bb_upper, "bb_lower": bb_lower,
+            "kc_upper": keltner_upper, "kc_lower": keltner_lower,
+            "price": price, "bb_mid": bb_middle,
+        }
         if bb_upper <= 0 or keltner_upper <= 0:
-            return 0.0, 0.0
+            return 0, details
 
         bb_width = bb_upper - bb_lower
         kc_width = keltner_upper - keltner_lower
-
         if kc_width <= 0:
-            return 0.0, 0.0
+            return 0, details
 
-        # Squeeze detection: BB narrower than Keltner
-        is_squeeze = bb_width < kc_width
-        squeeze_ratio = 1.0 - (bb_width / kc_width) if is_squeeze else 0.0
-
-        if squeeze_ratio > 0:
-            # Breakout direction from squeeze
+        # Squeeze: BB inside Keltner
+        if bb_width < kc_width:
             if price > bb_middle:
-                buy_score = W_BB * min(squeeze_ratio * 2, 1.0)
+                return 1, details
             elif price < bb_middle:
-                sell_score = W_BB * min(squeeze_ratio * 2, 1.0)
+                return -1, details
+        # Not in squeeze: check band touches
         elif price > bb_upper:
-            # Breaking above upper BB (strong momentum)
-            buy_score = W_BB * 0.5
+            return 1, details
         elif price < bb_lower:
-            # Breaking below lower BB
-            sell_score = W_BB * 0.5
+            return -1, details
 
-        return buy_score, sell_score
-
-    # ------------------------------------------------------------------
-    # Micro-regime detection
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _detect_micro_regime(current_bar: dict, recent_bars: pl.DataFrame) -> str:
-        """
-        Detect micro-regime from current indicators.
-
-        Returns:
-            "SQUEEZE" — BB inside Keltner (breakout building)
-            "HIGH_VOL" — ATR > 2x rolling mean (volatile)
-            "NORMAL" — default
-        """
-        bb_upper = float(current_bar.get("bb_upper", 0))
-        bb_lower = float(current_bar.get("bb_lower", 0))
-        kc_upper = float(current_bar.get("keltner_upper", 0))
-        kc_lower = float(current_bar.get("keltner_lower", 0))
-
-        # Squeeze: BB bands inside Keltner channels
-        if bb_upper > 0 and kc_upper > 0:
-            bb_width = bb_upper - bb_lower
-            kc_width = kc_upper - kc_lower
-            if kc_width > 0 and bb_width < kc_width:
-                return "SQUEEZE"
-
-        # High volatility: ATR spike above 2x rolling mean
-        atr = float(current_bar.get("atr_14", 0))
-        if atr > 0 and "atr_14" in recent_bars.columns and len(recent_bars) > 10:
-            atr_mean = recent_bars.get_column("atr_14").mean()
-            if atr_mean is not None and atr_mean > 0 and atr > 2.0 * atr_mean:
-                return "HIGH_VOL"
-
-        return "NORMAL"
+        return 0, details
 
     # ------------------------------------------------------------------
     # Main signal generation
@@ -244,7 +169,7 @@ class ScalpScoreStrategy(BaseStrategy):
         if price <= 0 or atr <= 0:
             return self._hold(epic, price)
 
-        # Session awareness: block or penalise off-session trades
+        # Session awareness: block off-session trades
         utc_hour = int(current_bar.get("utc_hour", -1))
         session_mult = 1.0
         if utc_hour >= 0:
@@ -253,95 +178,171 @@ class ScalpScoreStrategy(BaseStrategy):
                 logger.debug(f"[{epic}] Session blocked (UTC hour={utc_hour})")
                 return self._hold(epic, price)
 
-        # Extract indicators
-        ema_9 = float(current_bar.get("ema_9", 0))
-        ema_21 = float(current_bar.get("ema_21", 0))
-        rsi = float(current_bar.get("rsi_14", 50))
-        macd_hist = float(current_bar.get("macd_histogram", 0))
-        macd_val = float(current_bar.get("macd", 0))
-        macd_sig = float(current_bar.get("macd_signal", 0))
-        adx = float(current_bar.get("adx_14", 0))
-        volume = float(current_bar.get("volume", 0))
-        volume_sma = float(current_bar.get("volume_sma_20", 0))
+        # Dead market gate: skip when BOTH ADX low AND BB width compressed
+        _dm_settings = get_settings()
+        adx_val = float(current_bar.get("adx_14", 0))
         bb_upper = float(current_bar.get("bb_upper", 0))
         bb_lower = float(current_bar.get("bb_lower", 0))
-        bb_middle = float(current_bar.get("bb_middle", 0))
-        kc_upper = float(current_bar.get("keltner_upper", 0))
-        kc_lower = float(current_bar.get("keltner_lower", 0))
+        bb_mid = float(current_bar.get("bb_middle", 0))
+        if (adx_val > 0 and bb_mid > 0
+                and adx_val < _dm_settings.scalp_dead_market_adx):
+            # Compute BB width percentile from recent_bars
+            bb_width_now = (bb_upper - bb_lower) / bb_mid if bb_mid > 0 else 0
+            bb_pctile = 50.0  # default: assume mid-range
+            if ("bb_upper" in recent_bars.columns
+                    and "bb_lower" in recent_bars.columns
+                    and "bb_middle" in recent_bars.columns
+                    and len(recent_bars) > 10):
+                widths = (
+                    (recent_bars["bb_upper"] - recent_bars["bb_lower"])
+                    / recent_bars["bb_middle"]
+                ).drop_nulls().to_list()
+                if widths:
+                    count_below = sum(1 for w in widths if w <= bb_width_now)
+                    bb_pctile = count_below / len(widths) * 100
+            if bb_pctile < _dm_settings.scalp_dead_market_bb_pctile:
+                logger.debug(
+                    f"[{epic}] Dead market gate: ADX={adx_val:.1f} "
+                    f"BB_pctile={bb_pctile:.0f}%"
+                )
+                return self._hold(epic, price)
 
-        # Compute component scores
-        ema_buy, ema_sell = self._score_ema(ema_9, ema_21, price)
-        rsi_buy, rsi_sell = self._score_rsi(rsi)
-        macd_buy, macd_sell = self._score_macd(macd_hist, macd_val, macd_sig)
-        vol_score = self._score_volume(volume, volume_sma)
-        adx_score = self._score_adx(adx)
-        bb_buy, bb_sell = self._score_bb_squeeze(
-            bb_upper, bb_lower, kc_upper, kc_lower, price, bb_middle
+        # --- Collect votes from each indicator group ---
+        ema_vote, ema_details = self._vote_ema(
+            float(current_bar.get("ema_9", 0)),
+            float(current_bar.get("ema_21", 0)),
+        )
+        rsi_vote, rsi_details = self._vote_rsi(float(current_bar.get("rsi_14", 50)))
+        macd_vote, macd_details = self._vote_macd(
+            float(current_bar.get("macd_histogram", 0)),
+            float(current_bar.get("macd", 0)),
+            float(current_bar.get("macd_signal", 0)),
         )
 
-        buy_total = ema_buy + rsi_buy + macd_buy + vol_score + adx_score + bb_buy
-        sell_total = ema_sell + rsi_sell + macd_sell + vol_score + adx_score + bb_sell
+        volume = float(current_bar.get("volume", 0))
+        volume_sma = float(current_bar.get("volume_sma_20", 0))
+        vol_vote, vol_details = self._vote_volume(volume, volume_sma)
 
-        # --- GURU GATE FILTERS (binary, not multiplicative) ---
+        adx_vote, adx_details = self._vote_adx(float(current_bar.get("adx_14", 0)))
 
-        # VWAP directional gate: zero the opposing direction
+        bb_vote, bb_details = self._vote_bb_squeeze(
+            float(current_bar.get("bb_upper", 0)),
+            float(current_bar.get("bb_lower", 0)),
+            float(current_bar.get("keltner_upper", 0)),
+            float(current_bar.get("keltner_lower", 0)),
+            price,
+            float(current_bar.get("bb_middle", 0)),
+        )
+
+        # Volume and ADX are direction-agnostic confirmations.
+        # They amplify the majority direction.
+        directional_votes = [ema_vote, rsi_vote, macd_vote, bb_vote]
+        buy_dir = sum(1 for v in directional_votes if v > 0)
+        sell_dir = sum(1 for v in directional_votes if v < 0)
+
+        # Determine majority direction
+        if buy_dir > sell_dir:
+            majority = 1  # BUY majority
+            buy_count = buy_dir
+            sell_count = sell_dir
+            # Confirmation votes add to majority
+            if vol_vote > 0:
+                buy_count += 1
+            if adx_vote > 0:
+                buy_count += 1
+        elif sell_dir > buy_dir:
+            majority = -1  # SELL majority
+            buy_count = buy_dir
+            sell_count = sell_dir
+            if vol_vote > 0:
+                sell_count += 1
+            if adx_vote > 0:
+                sell_count += 1
+        else:
+            # Tied or all neutral — no trade
+            majority = 0
+            buy_count = buy_dir
+            sell_count = sell_dir
+
+        # --- GURU GATE FILTERS ---
+
+        # VWAP directional gate
         vwap = float(current_bar.get("vwap", 0))
         if vwap > 0:
             if price < vwap:
-                buy_total = 0  # Cannot buy below VWAP
+                buy_count = 0   # Cannot buy below VWAP
             elif price > vwap:
-                sell_total = 0  # Cannot sell above VWAP
+                sell_count = 0  # Cannot sell above VWAP
 
-        # Session: no score penalty — only threshold adjustment
-        # (off-session hard block already handled above)
-        effective_threshold = self.entry_threshold
-        if session_mult < 1.0:
-            effective_threshold += 5  # Slightly higher bar outside kill zones
-
-        # Micro-regime: additive adjustments
-        micro_regime = self._detect_micro_regime(current_bar, recent_bars)
-        if micro_regime == "SQUEEZE":
-            buy_total += 5   # Breakout energy building
-            sell_total += 5
-        elif micro_regime == "HIGH_VOL":
-            effective_threshold = max(effective_threshold, 65)
-
-        # HTF confluence: additive bonus/malus (not multiplicative)
+        # HTF confluence: adds/removes 1 vote
         htf_bias = current_bar.get("htf_bias")
-        if htf_bias == "bearish":
-            buy_total -= 10  # Fighting the trend
-            sell_total += 5  # Aligned with trend
-        elif htf_bias == "bullish":
-            sell_total -= 10  # Fighting the trend
-            buy_total += 5   # Aligned with trend
+        if htf_bias == "bullish":
+            buy_count += 1
+            sell_count = max(0, sell_count - 1)
+        elif htf_bias == "bearish":
+            sell_count += 1
+            buy_count = max(0, buy_count - 1)
 
-        # Determine direction: highest score wins
-        if buy_total >= sell_total and buy_total >= effective_threshold:
+        # Effective confluence requirement (3-tier: kill zone / chop zone / default)
+        _strat_settings = get_settings()
+        if session_mult >= 1.0:
+            # Inside kill zone — lowest bar
+            effective_min = KILLZONE_MIN_CONFLUENCE
+        elif (_strat_settings.scalp_chop_zone_start
+              <= utc_hour < _strat_settings.scalp_chop_zone_end):
+            # Chop zone (e.g. 16-20 UTC) — highest bar
+            effective_min = _strat_settings.scalp_chop_zone_min_confluence
+        else:
+            # Outside kill zone — moderate bar
+            effective_min = OFF_KILLZONE_MIN_CONFLUENCE
+
+        # Vote summary for logging
+        votes_str = (
+            f"EMA={ema_vote:+d} RSI={rsi_vote:+d} MACD={macd_vote:+d} "
+            f"BB={bb_vote:+d} VOL={vol_vote:+d} ADX={adx_vote:+d}"
+        )
+
+        # Determine signal
+        if buy_count >= effective_min and buy_count > sell_count:
             direction = SignalDirection.BUY
-            score = buy_total
+            confluence = buy_count
             signal_class = SignalClass.BUY
-        elif sell_total > buy_total and sell_total >= effective_threshold:
+        elif sell_count >= effective_min and sell_count > buy_count:
             direction = SignalDirection.SELL
-            score = sell_total
+            confluence = sell_count
             signal_class = SignalClass.SELL
         else:
-            # Show feature details for HOLD signals during testing
             vwap_tag = f" VWAP={vwap:.2f}" if vwap > 0 else ""
-            regime_tag = f" regime={micro_regime}" if micro_regime != "NORMAL" else ""
             htf_tag = f" HTF={htf_bias}" if htf_bias else ""
-            sess_tag = f" sess={session_mult:.1f}" if session_mult < 1.0 else ""
+            sess_tag = f" kz" if session_mult >= 1.0 else f" s={session_mult:.1f}"
             logger.info(
-                f"[{epic}] ScalpScore: BUY={buy_total:.0f} SELL={sell_total:.0f} "
-                f"< thr={effective_threshold}{vwap_tag}{regime_tag}{htf_tag}{sess_tag}"
+                f"[{epic}] Confluence: BUY={buy_count} SELL={sell_count} "
+                f"< min={effective_min} [{votes_str}]{vwap_tag}{htf_tag}{sess_tag}"
             )
             return self._hold(epic, price)
 
-        # Confidence: map score to [0.0, 1.0]
-        confidence = min(1.0, score / 100.0)
+        # HTF gate: block counter-trend entries entirely
+        if _strat_settings.scalp_htf_gate_enabled and htf_bias is not None:
+            if direction == SignalDirection.BUY and htf_bias == "bearish":
+                logger.info(
+                    f"[{epic}] HTF gate: BUY blocked by bearish 1H trend "
+                    f"(confluence={confluence}/6)"
+                )
+                return self._hold(epic, price)
+            if direction == SignalDirection.SELL and htf_bias == "bullish":
+                logger.info(
+                    f"[{epic}] HTF gate: SELL blocked by bullish 1H trend "
+                    f"(confluence={confluence}/6)"
+                )
+                return self._hold(epic, price)
+
+        # Confidence: map confluence count to [0.3, 1.0]
+        # 3/6 = 0.50, 4/6 = 0.67, 5/6 = 0.83, 6/6 = 1.0
+        confidence = min(1.0, confluence / 6.0)
 
         # SL / TP from config
-        sl_mult = config.stop_multiplier  # 1.0 ATR for scalp
-        rr = config.risk_reward_ratio     # 2.0 for scalp
+        sl_mult = config.stop_multiplier
+        rr = config.risk_reward_ratio
 
         if direction == SignalDirection.BUY:
             stop = price - atr * sl_mult
@@ -351,12 +352,10 @@ class ScalpScoreStrategy(BaseStrategy):
             tp = price - atr * sl_mult * rr
 
         vwap_info = f" VWAP={vwap:.2f}" if vwap > 0 else ""
-        regime_info = f" regime={micro_regime}" if micro_regime != "NORMAL" else ""
         htf_info = f" HTF={htf_bias}" if htf_bias else ""
         logger.info(
-            f"[{epic}] ScalpScore: BUY={buy_total:.0f} SELL={sell_total:.0f} "
-            f"-> {direction.value} (score={score:.0f}, conf={confidence:.2f})"
-            f"{vwap_info}{regime_info}{htf_info}"
+            f"[{epic}] Confluence: {direction.value} "
+            f"({confluence}/6) [{votes_str}]{vwap_info}{htf_info}"
         )
 
         return TradingSignal(

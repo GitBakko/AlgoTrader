@@ -1,10 +1,14 @@
-"""Tests for ScalpScoreStrategy multi-indicator scoring."""
+"""Tests for ScalpScoreStrategy confluence voting model."""
 import polars as pl
 import pytest
 
-from src.strategy.scalp_score_strategy import ScalpScoreStrategy
+from src.strategy.scalp_score_strategy import (
+    ScalpScoreStrategy,
+    DEFAULT_MIN_CONFLUENCE,
+    KILLZONE_MIN_CONFLUENCE,
+    OFF_KILLZONE_MIN_CONFLUENCE,
+)
 from src.strategy.schemas import SignalDirection, StrategyConfig
-from src.models.schemas import SignalClass
 
 
 @pytest.fixture
@@ -23,7 +27,6 @@ def config() -> StrategyConfig:
 
 @pytest.fixture
 def recent_bars() -> pl.DataFrame:
-    """Minimal recent bars for lookback (20 rows)."""
     return pl.DataFrame({
         "close": [100.0 + i * 0.1 for i in range(20)],
         "high": [100.5 + i * 0.1 for i in range(20)],
@@ -59,7 +62,7 @@ def _make_bar(**overrides) -> dict:
     return bar
 
 
-class TestScalpScoreStrategyProperties:
+class TestScalpScoreProperties:
     def test_name(self, strategy):
         assert strategy.name == "scalp_score"
 
@@ -69,8 +72,82 @@ class TestScalpScoreStrategyProperties:
         assert "trending_down" in regimes
         assert "ranging" in regimes
 
+    def test_default_confluence_is_3(self):
+        assert DEFAULT_MIN_CONFLUENCE == 3
 
-class TestScalpScoreHold:
+    def test_killzone_confluence_is_3(self):
+        assert KILLZONE_MIN_CONFLUENCE == 3
+
+    def test_off_killzone_confluence_is_4(self):
+        assert OFF_KILLZONE_MIN_CONFLUENCE == 4
+
+
+class TestIndividualVotes:
+    """Test each indicator vote function independently."""
+
+    def test_ema_vote_bullish(self):
+        value, _ = ScalpScoreStrategy._vote_ema(105.5, 104.8)
+        assert value == 1
+
+    def test_ema_vote_bearish(self):
+        value, _ = ScalpScoreStrategy._vote_ema(104.5, 105.2)
+        assert value == -1
+
+    def test_ema_vote_neutral_when_close(self):
+        value, _ = ScalpScoreStrategy._vote_ema(105.0, 105.0)
+        assert value == 0
+
+    def test_rsi_vote_buy_oversold(self):
+        value, _ = ScalpScoreStrategy._vote_rsi(35.0)
+        assert value == 1
+
+    def test_rsi_vote_sell_overbought(self):
+        value, _ = ScalpScoreStrategy._vote_rsi(65.0)
+        assert value == -1
+
+    def test_rsi_vote_neutral(self):
+        value, _ = ScalpScoreStrategy._vote_rsi(50.0)
+        assert value == 0
+
+    def test_macd_vote_bullish(self):
+        value, _ = ScalpScoreStrategy._vote_macd(0.5, 0.6, 0.1)
+        assert value == 1
+
+    def test_macd_vote_bearish(self):
+        value, _ = ScalpScoreStrategy._vote_macd(-0.5, -0.6, -0.1)
+        assert value == -1
+
+    def test_volume_vote_strong(self):
+        value, _ = ScalpScoreStrategy._vote_volume(1500, 1000)
+        assert value == 1
+
+    def test_volume_vote_weak(self):
+        value, _ = ScalpScoreStrategy._vote_volume(900, 1000)
+        assert value == 0
+
+    def test_adx_vote_trending(self):
+        value, _ = ScalpScoreStrategy._vote_adx(25.0)
+        assert value == 1
+
+    def test_adx_vote_no_trend(self):
+        value, _ = ScalpScoreStrategy._vote_adx(15.0)
+        assert value == 0
+
+    def test_bb_vote_squeeze_up(self):
+        # BB inside Keltner (squeeze), price above middle
+        value, _ = ScalpScoreStrategy._vote_bb_squeeze(
+            106.0, 104.0, 107.0, 103.0, 105.5, 105.0
+        )
+        assert value == 1
+
+    def test_bb_vote_squeeze_down(self):
+        value, _ = ScalpScoreStrategy._vote_bb_squeeze(
+            106.0, 104.0, 107.0, 103.0, 104.5, 105.0
+        )
+        assert value == -1
+
+
+class TestConfluenceHold:
     def test_hold_on_invalid_price(self, strategy, recent_bars, config):
         bar = _make_bar(close=0)
         signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
@@ -81,75 +158,187 @@ class TestScalpScoreHold:
         signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
         assert signal.direction == SignalDirection.HOLD
 
-    def test_hold_on_low_score(self, strategy, recent_bars, config):
-        """Conflicting signals should produce low score -> HOLD."""
+    def test_hold_on_conflicting_signals(self, strategy, recent_bars, config):
+        """Mixed indicators should not reach confluence."""
         bar = _make_bar(
-            ema_9=104.5, ema_21=105.2,  # bearish EMA
-            rsi_14=50.0,                  # neutral RSI
-            macd_histogram=-0.1,          # weak bearish MACD
+            ema_9=105.1, ema_21=104.9,  # weak bullish
+            rsi_14=50.0,                  # neutral
+            macd_histogram=-0.1,          # bearish
             adx_14=12.0,                  # no trend
+            volume=900, volume_sma_20=1000,  # weak volume
         )
         signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
         assert signal.direction == SignalDirection.HOLD
 
 
-class TestScalpScoreBuy:
-    def test_strong_buy_signal(self, strategy, recent_bars, config):
-        """All indicators aligned bullish -> strong BUY."""
+class TestConfluenceBuy:
+    def test_strong_buy_confluence(self, strategy, recent_bars, config):
+        """All indicators aligned bullish -> BUY."""
         bar = _make_bar(
-            ema_9=105.5, ema_21=104.8,     # bullish cross
-            rsi_14=38.0,                     # oversold bounce
-            macd_histogram=0.5,              # strong bullish
-            macd=0.6, macd_signal=0.1,       # recent crossover
-            adx_14=28.0,                     # strong trend
-            volume=1500, volume_sma_20=1000, # high volume
-            bb_upper=106.0, bb_lower=104.0,  # normal BB
-            keltner_upper=106.5, keltner_lower=103.5,
+            ema_9=105.5, ema_21=104.8,     # BUY vote
+            rsi_14=38.0,                     # BUY vote
+            macd_histogram=0.5,              # BUY vote
+            macd=0.6, macd_signal=0.1,
+            adx_14=28.0,                     # confirms trend
+            volume=1500, volume_sma_20=1000, # confirms volume
         )
         signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
         assert signal.direction == SignalDirection.BUY
-        assert signal.confidence > 0.6
-        assert signal.suggested_stop is not None
-        assert signal.suggested_tp is not None
+        assert signal.confidence >= 0.5
         assert signal.suggested_stop < signal.entry_price < signal.suggested_tp
 
-    def test_buy_stop_loss_distance(self, strategy, recent_bars, config):
-        """SL should be ~1.0 ATR below entry for BUY."""
+    def test_minimal_buy_confluence(self, strategy, recent_bars, config):
+        """Just enough votes (3) should still produce BUY."""
         bar = _make_bar(
-            ema_9=105.5, ema_21=104.8,
-            rsi_14=38.0,
-            macd_histogram=0.5, macd=0.6, macd_signal=0.1,
-            adx_14=28.0,
-            volume=1500, volume_sma_20=1000,
-            atr_14=2.0,
+            ema_9=105.5, ema_21=104.8,     # BUY vote (1)
+            rsi_14=38.0,                     # BUY vote (2)
+            macd_histogram=0.5,              # BUY vote (3)
+            macd=0.6, macd_signal=0.1,
+            adx_14=15.0,                     # no confirmation
+            volume=900, volume_sma_20=1000,  # no volume
+            utc_hour=14,                     # NY kill zone
         )
         signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
-        if signal.direction == SignalDirection.BUY:
-            sl_distance = signal.entry_price - signal.suggested_stop
-            assert 1.5 <= sl_distance <= 2.5  # ~1.0 * ATR(2.0)
+        assert signal.direction == SignalDirection.BUY
 
 
-class TestScalpScoreSell:
-    def test_strong_sell_signal(self, strategy, recent_bars, config):
-        """All indicators aligned bearish -> strong SELL."""
+class TestConfluenceSell:
+    def test_strong_sell_confluence(self, strategy, recent_bars, config):
+        """All indicators aligned bearish -> SELL."""
         bar = _make_bar(
             close=105.0,
-            ema_9=104.5, ema_21=105.2,     # bearish cross
-            rsi_14=65.0,                     # overbought area
-            macd_histogram=-0.5,             # strong bearish
-            macd=-0.6, macd_signal=-0.1,     # recent bearish crossover
-            adx_14=28.0,                     # strong trend
-            volume=1500, volume_sma_20=1000, # high volume
+            ema_9=104.5, ema_21=105.2,     # SELL vote
+            rsi_14=65.0,                     # SELL vote
+            macd_histogram=-0.5,             # SELL vote
+            macd=-0.6, macd_signal=-0.1,
+            adx_14=28.0,                     # confirms trend
+            volume=1500, volume_sma_20=1000, # confirms volume
         )
         signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
         assert signal.direction == SignalDirection.SELL
-        assert signal.confidence > 0.6
-        assert signal.suggested_stop is not None
-        assert signal.suggested_tp is not None
+        assert signal.confidence >= 0.5
         assert signal.suggested_tp < signal.entry_price < signal.suggested_stop
 
 
-class TestScalpScoreBacktest:
+class TestVWAPGateFilter:
+    def test_vwap_blocks_buy_below(self, strategy, recent_bars, config):
+        """GURU: Cannot buy below VWAP."""
+        bar = _make_bar(
+            ema_9=105.5, ema_21=104.8,
+            rsi_14=35.0,
+            macd_histogram=0.5, macd=0.6, macd_signal=0.1,
+            adx_14=32.0,
+            volume=1500, volume_sma_20=1000,
+            vwap=106.0,  # price 105 < VWAP 106
+        )
+        signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
+        assert signal.direction != SignalDirection.BUY
+
+    def test_vwap_blocks_sell_above(self, strategy, recent_bars, config):
+        """GURU: Cannot sell above VWAP."""
+        bar = _make_bar(
+            close=105.0,
+            ema_9=104.5, ema_21=105.2,
+            rsi_14=65.0,
+            macd_histogram=-0.5, macd=-0.6, macd_signal=-0.1,
+            adx_14=28.0,
+            volume=1500, volume_sma_20=1000,
+            vwap=104.0,  # price 105 > VWAP 104
+        )
+        signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
+        assert signal.direction != SignalDirection.SELL
+
+    def test_vwap_allows_buy_above(self, strategy, recent_bars, config):
+        """Buy above VWAP should pass."""
+        bar = _make_bar(
+            ema_9=105.5, ema_21=104.8,
+            rsi_14=35.0,
+            macd_histogram=0.5, macd=0.6, macd_signal=0.1,
+            adx_14=28.0,
+            volume=1500, volume_sma_20=1000,
+            vwap=104.0,
+        )
+        signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
+        assert signal.direction == SignalDirection.BUY
+
+    def test_no_vwap_allows_both(self, strategy, recent_bars, config):
+        """No VWAP data = no gating."""
+        bar = _make_bar(
+            ema_9=105.5, ema_21=104.8,
+            rsi_14=35.0,
+            macd_histogram=0.5, macd=0.6, macd_signal=0.1,
+            adx_14=28.0,
+            volume=1500, volume_sma_20=1000,
+        )
+        signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
+        assert signal.direction == SignalDirection.BUY
+
+
+class TestHTFConfluence:
+    def test_htf_bullish_boosts_buy(self, strategy, recent_bars, config):
+        """HTF bullish adds 1 vote to buy, making a borderline signal pass."""
+        bar = _make_bar(
+            ema_9=105.5, ema_21=104.8,     # BUY (1)
+            rsi_14=38.0,                     # BUY (2)
+            macd_histogram=0.05,             # weak BUY (3)
+            macd=0.1, macd_signal=0.05,
+            adx_14=15.0,                     # no confirmation
+            volume=900, volume_sma_20=1000,  # no volume
+            htf_bias="bullish",              # +1 to buy
+            utc_hour=14,                     # kill zone
+        )
+        signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
+        assert signal.direction == SignalDirection.BUY
+
+    def test_htf_opposing_can_block(self, strategy, recent_bars, config):
+        """HTF opposing removes 1 buy vote, potentially blocking borderline signal."""
+        bar = _make_bar(
+            ema_9=105.3, ema_21=104.9,     # weak BUY (1)
+            rsi_14=42.0,                     # BUY (2)
+            macd_histogram=0.2,              # BUY (3)
+            macd=0.3, macd_signal=0.1,
+            adx_14=15.0,                     # no confirmation
+            volume=900, volume_sma_20=1000,  # no volume
+            htf_bias="bearish",              # -1 from buy
+            utc_hour=14,                     # kill zone
+        )
+        signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
+        # With HTF bearish: buy_count goes from 3 to 2, below min 3
+        assert signal.direction == SignalDirection.HOLD
+
+
+class TestSessionFilter:
+    def test_off_killzone_needs_more_confluence(self, strategy, recent_bars, config):
+        """Outside kill zones, need 4 votes instead of 3."""
+        bar = _make_bar(
+            ema_9=105.5, ema_21=104.8,     # BUY (1)
+            rsi_14=38.0,                     # BUY (2)
+            macd_histogram=0.5,              # BUY (3)
+            macd=0.6, macd_signal=0.1,
+            adx_14=15.0,                     # no confirmation
+            volume=900, volume_sma_20=1000,  # no volume
+            utc_hour=18,                     # outside kill zone (session_mult < 1.0)
+        )
+        signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
+        # 3 directional BUY votes, but off-killzone needs 4 -> HOLD
+        assert signal.direction == SignalDirection.HOLD
+
+    def test_killzone_accepts_3_votes(self, strategy, recent_bars, config):
+        """During kill zone, 3 votes are enough."""
+        bar = _make_bar(
+            ema_9=105.5, ema_21=104.8,     # BUY (1)
+            rsi_14=38.0,                     # BUY (2)
+            macd_histogram=0.5,              # BUY (3)
+            macd=0.6, macd_signal=0.1,
+            adx_14=15.0,
+            volume=900, volume_sma_20=1000,
+            utc_hour=14,                     # NY kill zone
+        )
+        signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
+        assert signal.direction == SignalDirection.BUY
+
+
+class TestBacktest:
     def test_backtest_adds_columns(self, strategy):
         df = pl.DataFrame({
             "close": [100.0, 101.0, 102.0, 103.0, 104.0] * 10,
@@ -176,115 +365,3 @@ class TestScalpScoreBacktest:
         assert "signal_direction" in result.columns
         assert "signal_confidence" in result.columns
         assert len(result) == len(df)
-
-
-class TestScalpScoreGuruGateFilters:
-    """Tests for SCALPING-GURU gate filter architecture (2026-03-04)."""
-
-    def test_default_entry_threshold_is_55(self):
-        from src.strategy.scalp_score_strategy import DEFAULT_ENTRY_THRESHOLD
-        assert DEFAULT_ENTRY_THRESHOLD == 55
-
-    def test_default_full_size_threshold_is_70(self):
-        from src.strategy.scalp_score_strategy import DEFAULT_FULL_SIZE_THRESHOLD
-        assert DEFAULT_FULL_SIZE_THRESHOLD == 70
-
-    def test_vwap_gate_blocks_buy_below_vwap(self, strategy, recent_bars, config):
-        """GURU: VWAP is a binary gate. Buy below VWAP is blocked, sell allowed."""
-        bar = _make_bar(
-            ema_9=105.5, ema_21=104.8,
-            rsi_14=35.0,
-            macd_histogram=0.5, macd=0.6, macd_signal=0.1,
-            adx_14=32.0,
-            volume=1500, volume_sma_20=1000,
-            vwap=106.0,  # price BELOW vwap -> buy blocked
-        )
-        signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
-        # Buy is gated (zeroed), so either SELL or HOLD — never BUY
-        assert signal.direction != SignalDirection.BUY
-
-    def test_vwap_gate_blocks_sell_above_vwap(self, strategy, recent_bars, config):
-        """GURU: Sell above VWAP is blocked."""
-        bar = _make_bar(
-            close=105.0,
-            ema_9=104.5, ema_21=105.2,     # bearish EMA
-            rsi_14=65.0,                     # overbought
-            macd_histogram=-0.5, macd=-0.6, macd_signal=-0.1,
-            adx_14=28.0,
-            volume=1500, volume_sma_20=1000,
-            vwap=104.0,  # price ABOVE vwap -> sell blocked
-        )
-        signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
-        assert signal.direction != SignalDirection.SELL
-
-    def test_vwap_aligned_buy_passes(self, strategy, recent_bars, config):
-        """GURU: Buy above VWAP passes through untouched."""
-        bar = _make_bar(
-            ema_9=105.5, ema_21=104.8,
-            rsi_14=35.0,
-            macd_histogram=0.5, macd=0.6, macd_signal=0.1,
-            adx_14=32.0,
-            volume=1500, volume_sma_20=1000,
-            vwap=104.0,  # price ABOVE vwap -> buy allowed
-        )
-        signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
-        assert signal.direction == SignalDirection.BUY
-
-    def test_no_vwap_data_allows_both_directions(self, strategy, recent_bars, config):
-        """Without VWAP data, both directions should work normally."""
-        bar = _make_bar(
-            ema_9=105.5, ema_21=104.8,
-            rsi_14=35.0,
-            macd_histogram=0.5, macd=0.6, macd_signal=0.1,
-            adx_14=32.0,
-            volume=1500, volume_sma_20=1000,
-            # no vwap key
-        )
-        signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
-        assert signal.direction == SignalDirection.BUY
-
-    def test_htf_opposing_reduces_score_additively(self, strategy, recent_bars, config):
-        """GURU: HTF opposing = additive -10, not multiplicative ×0.5."""
-        bar = _make_bar(
-            close=105.5,
-            ema_9=105.5, ema_21=104.8,
-            rsi_14=35.0,
-            macd_histogram=0.8, macd=0.9, macd_signal=0.1,
-            adx_14=40.0,
-            volume=2000, volume_sma_20=1000,
-            bb_upper=106.0, bb_lower=104.0, bb_middle=105.0,
-            keltner_upper=107.0, keltner_lower=103.0,
-            htf_bias="bearish",
-        )
-        signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
-        # With additive -10 a strong signal (~80+) should still pass threshold 55
-        assert signal.direction == SignalDirection.BUY
-
-    def test_htf_aligned_gives_bonus(self, strategy, recent_bars, config):
-        """GURU: HTF aligned = additive +5 bonus."""
-        bar = _make_bar(
-            ema_9=105.5, ema_21=104.8,
-            rsi_14=35.0,
-            macd_histogram=0.5, macd=0.6, macd_signal=0.1,
-            adx_14=28.0,
-            volume=1500, volume_sma_20=1000,
-            htf_bias="bullish",
-        )
-        signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
-        assert signal.direction == SignalDirection.BUY
-
-    def test_session_outside_killzone_raises_threshold(self, strategy, recent_bars, config):
-        """GURU: Outside kill zone, threshold +5 (additive), not score ×0.7."""
-        # Moderate signal that passes threshold 55 but not 60
-        bar = _make_bar(
-            ema_9=105.3, ema_21=104.9,     # moderate bullish
-            rsi_14=38.0,                     # RSI buy zone
-            macd_histogram=0.3, macd=0.4, macd_signal=0.1,
-            adx_14=25.0,                     # moderate trend
-            volume=1400, volume_sma_20=1000, # moderate volume
-            utc_hour=18,                     # 18 UTC = active session, not kill zone
-        )
-        signal = strategy.generate_signal("XAUUSD", bar, recent_bars, config)
-        # With threshold raised to 60, a moderate signal might HOLD
-        # (This is the correct behavior — slightly stricter outside kill zones)
-        assert signal.direction in (SignalDirection.BUY, SignalDirection.HOLD)
