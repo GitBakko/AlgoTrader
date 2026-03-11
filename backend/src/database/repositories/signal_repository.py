@@ -148,13 +148,111 @@ class SignalRepository(BaseRepository[Signal]):
         await self.session.refresh(signal)
         return signal
 
-    async def expire_old_signals(self) -> int:
-        """
-        Expire pending signals past their expiration date.
+    async def create_from_audit(
+        self,
+        epic: str,
+        direction: str,
+        confidence: float,
+        entry_price: float | None,
+        stop_loss: float | None,
+        take_profit: float | None,
+        status: str,
+        features: dict,
+    ) -> int | None:
+        """Create a signal record with full audit trail JSONB."""
+        from decimal import Decimal
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
 
-        Returns:
-            Number of signals expired
-        """
+        signal = Signal(
+            epic=epic,
+            timeframe="15min",
+            direction=direction,
+            confidence=Decimal(str(round(confidence, 4))),
+            predicted_price=Decimal(str(round(entry_price, 4))) if entry_price else None,
+            stop_loss_price=Decimal(str(round(stop_loss, 4))) if stop_loss else None,
+            take_profit_price=Decimal(str(round(take_profit, 4))) if take_profit else None,
+            model_version="scalp_score_v1",
+            features=features,
+            status=status,
+            generated_at=now,
+        )
+        self.session.add(signal)
+        await self.session.flush()
+        await self.session.refresh(signal)
+        return signal.id
+
+    async def get_by_position_deal_id(self, deal_id: str) -> Signal | None:
+        """Find the signal linked to a position by deal_id."""
+        from src.database.models import Position
+
+        result = await self.session.execute(
+            select(Signal)
+            .join(Position, Signal.position_id == Position.id)
+            .where(Position.deal_id == deal_id)
+            .order_by(Signal.generated_at.desc())
+            .limit(1)
+        )
+        return result.scalars().first()
+
+    async def get_history_by_epic(
+        self, epic: str, limit: int = 10, offset: int = 0
+    ) -> list[dict]:
+        """Get lightweight signal history for an epic (no JSONB features)."""
+        from src.database.models import Position
+        from sqlalchemy import case
+
+        query = (
+            select(
+                Signal.id,
+                Signal.direction,
+                Signal.confidence,
+                Signal.status,
+                Signal.generated_at,
+                Signal.features["rejection_reason"].as_string().label("rejection_reason"),
+                Position.profit_loss.label("position_pnl"),
+                case(
+                    (Position.status == "OPEN", "OPEN"),
+                    (Position.status == "CLOSED", "CLOSED"),
+                    else_=None,
+                ).label("position_status"),
+            )
+            .outerjoin(Position, Signal.position_id == Position.id)
+            .where(Signal.epic == epic)
+            .where(Signal.status.in_(["EXECUTED", "REJECTED"]))
+            .order_by(Signal.generated_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        result = await self.session.execute(query)
+        rows = result.all()
+
+        return [
+            {
+                "id": row.id,
+                "epic": epic,
+                "direction": row.direction,
+                "confidence": float(row.confidence),
+                "status": row.status,
+                "generated_at": row.generated_at.isoformat() if row.generated_at else None,
+                "rejection_reason": row.rejection_reason,
+                "position_pnl": float(row.position_pnl) if row.position_pnl else None,
+                "position_status": row.position_status,
+            }
+            for row in rows
+        ]
+
+    async def count_by_epic(self, epic: str) -> int:
+        """Count total signals for an epic."""
+        from sqlalchemy import func
+        result = await self.session.execute(
+            select(func.count(Signal.id))
+            .where(Signal.epic == epic)
+            .where(Signal.status.in_(["EXECUTED", "REJECTED"]))
+        )
+        return result.scalar() or 0
+
+    async def expire_old_signals(self) -> int:
+        """Expire pending signals past their expiration date."""
         now = datetime.now(timezone.utc)
         result = await self.session.execute(
             select(Signal)
