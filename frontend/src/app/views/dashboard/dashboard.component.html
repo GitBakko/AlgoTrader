@@ -190,6 +190,8 @@
       <app-tv-chart
         mode="area"
         [lineData]="equityLineData()"
+        [drawdownData]="drawdownLineData()"
+        [equityTooltipData]="equityTooltipPoints()"
         [height]="340"
         lineColor="#00d97e"
         areaTopColor="rgba(0, 217, 126, 0.25)"
@@ -451,7 +453,7 @@
               </thead>
               <tbody>
                 @for (pos of livePositions(); track pos.deal_id) {
-                  <tr>
+                  <tr (click)="auditService.openByDealId(pos.deal_id)" style="cursor:pointer;">
                     <td class="fw-semibold">
                       <div class="d-flex align-items-center gap-1">
                         <app-epic-logo [epic]="pos.epic" [size]="20" [rounded]="true" />

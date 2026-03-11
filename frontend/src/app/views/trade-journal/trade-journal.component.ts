@@ -14,6 +14,7 @@ import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
 import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.component';
 import { NewsWidgetComponent } from '../../shared/components/news-widget/news-widget.component';
 import { PaperSignal } from '../../core/models';
+import { SignalAuditService } from '../../core/services/signal-audit.service';
 
 type SortField = 'timestamp' | 'epic' | 'confidence' | 'entry_price';
 type SortDir = 'asc' | 'desc';
@@ -297,6 +298,7 @@ type SortDir = 'asc' | 'desc';
 export class TradeJournalComponent implements OnInit {
   private readonly trading = inject(TradingService);
   readonly newsService = inject(NewsService);
+  readonly auditService = inject(SignalAuditService);
 
   readonly selectedEpic = signal<string | null>(null);
   readonly showNewsModal = signal(false);

@@ -12,6 +12,8 @@ import { WebSocketService } from '../../core/services/websocket.service';
 import { MarketStatusService, MarketStatusResponse } from '../../core/services/market-status.service';
 import { NewsService } from '../../core/services/news.service';
 import { ToastService } from '../../shared/services/toast.service';
+import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
+import { SignalAuditService } from '../../core/services/signal-audit.service';
 import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
 import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.component';
 import { LoadingButtonComponent } from '../../shared/components/loading-button/loading-button.component';
@@ -371,7 +373,8 @@ interface GroupedPosition {
                         @for (pos of group.positions; track pos.deal_id) {
                           <tr class="detail-row"
                               [class.pnl-row-positive]="pos.live_pnl > 0"
-                              [class.pnl-row-negative]="pos.live_pnl < 0">
+                              [class.pnl-row-negative]="pos.live_pnl < 0"
+                              (click)="openAuditByDeal(pos.deal_id, $event)" style="cursor:pointer;">
                             <td></td>
                             <td class="ps-4">
                               <div class="d-flex align-items-center gap-1">
@@ -700,7 +703,9 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   readonly ws = inject(WebSocketService);
   readonly marketStatus = inject(MarketStatusService);
   readonly toast = inject(ToastService);
+  readonly confirmDialog = inject(ConfirmDialogService);
   readonly newsService = inject(NewsService);
+  readonly auditService = inject(SignalAuditService);
 
   /** Circuit breaker type → Italian label + icon */
   readonly cbTypeMap: Record<string, { label: string; icon: string }> = {
@@ -914,10 +919,14 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     });
   }
 
-  emergencyStop(): void {
-    const confirmed = window.confirm(
-      'ATTENZIONE: Questo fermerà il trading e chiuderà TUTTE le posizioni aperte. Procedere?'
-    );
+  async emergencyStop(): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Emergency Stop',
+      message: 'ATTENZIONE: Questo fermerà il trading e chiuderà TUTTE le posizioni aperte. Procedere?',
+      confirmText: 'Ferma tutto',
+      cancelText: 'Annulla',
+      color: 'danger',
+    });
     if (!confirmed) return;
 
     this.emergencyStopInProgress.set(true);
@@ -934,10 +943,14 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     });
   }
 
-  resetCircuitBreakers(): void {
-    const confirmed = window.confirm(
-      'Resettare tutti i circuit breakers e i contatori perdite per-asset?'
-    );
+  async resetCircuitBreakers(): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Reset Circuit Breakers',
+      message: 'Resettare tutti i circuit breakers e i contatori perdite per-asset?',
+      confirmText: 'Reset',
+      cancelText: 'Annulla',
+      color: 'warning',
+    });
     if (!confirmed) return;
 
     this.resetCbInProgress.set(true);
@@ -1066,6 +1079,11 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   closeNewsModal(): void {
     this.showNewsModal.set(false);
     this.selectedEpic.set(null);
+  }
+
+  openAuditByDeal(dealId: string, event: MouseEvent): void {
+    event.stopPropagation();
+    this.auditService.openByDealId(dealId);
   }
 
   getGroupRiskType(group: GroupedPosition): 'broker' | 'local' | 'none' {

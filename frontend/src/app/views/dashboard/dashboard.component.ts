@@ -8,13 +8,14 @@ import {
   PlaceholderDirective, PlaceholderAnimationDirective,
 } from '@coreui/angular';
 import { IconDirective } from '@coreui/icons-angular';
-import { TvChartComponent, LineDataPoint } from '../../shared/components/tv-chart/tv-chart.component';
+import { TvChartComponent, LineDataPoint, EquityTooltipPoint } from '../../shared/components/tv-chart/tv-chart.component';
 import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
 import { TradingService } from '../../core/services/trading.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { MarketStatusService, MarketStatusResponse } from '../../core/services/market-status.service';
 import { NewsService } from '../../core/services/news.service';
 import { NotificationCenterService } from '../../core/services/notification-center.service';
+import { SignalAuditService } from '../../core/services/signal-audit.service';
 import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.component';
 import { NewsWidgetComponent } from '../../shared/components/news-widget/news-widget.component';
 import { SkeletonCardComponent } from '../../shared/components/skeleton-card/skeleton-card.component';
@@ -41,6 +42,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly marketStatus = inject(MarketStatusService);
   readonly newsService = inject(NewsService);
   private readonly notifCenter = inject(NotificationCenterService);
+  readonly auditService = inject(SignalAuditService);
 
   /** Recent unread alerts for dashboard widget (max 5) */
   readonly recentAlerts = computed(() =>
@@ -99,6 +101,43 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return Array.from(byDay.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([time, value]) => ({ time, value }));
+  });
+
+  // Drawdown overlay data (Bloomberg-style red fill)
+  readonly drawdownLineData = computed<LineDataPoint[]>(() => {
+    const curve = this.trading.equityCurve();
+    if (curve.length === 0) return [];
+    const byDay = new Map<string, number>();
+    for (const p of curve) {
+      const day = p.date?.substring(0, 10) || '';
+      if (day) byDay.set(day, p.drawdown_pct);
+    }
+    return Array.from(byDay.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([time, value]) => ({ time, value }));
+  });
+
+  // Enriched tooltip data for equity curve crosshair
+  readonly equityTooltipPoints = computed<EquityTooltipPoint[]>(() => {
+    const curve = this.trading.equityCurve();
+    if (curve.length === 0) return [];
+    const byDay = new Map<string, typeof curve[0]>();
+    for (const p of curve) {
+      const day = p.date?.substring(0, 10) || '';
+      if (day) byDay.set(day, p);
+    }
+    return Array.from(byDay.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([day, p]) => ({
+        date: day,
+        equity: p.equity,
+        daily_pnl: p.daily_pnl ?? 0,
+        drawdown_pct: p.drawdown_pct ?? 0,
+        trade_count: p.trade_count ?? 0,
+        win_count: p.win_count ?? 0,
+        cumulative_trades: p.cumulative_trades ?? 0,
+        cumulative_win_rate: p.cumulative_win_rate ?? 0,
+      }));
   });
 
   // All live positions with real-time P&L from WebSocket
