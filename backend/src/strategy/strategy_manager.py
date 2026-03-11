@@ -267,14 +267,18 @@ class StrategyManager:
             SignalClass.HOLD: SignalDirection.HOLD,
         }.get(prediction.signal_class, SignalDirection.HOLD)
 
+        pre_ml_confidence = signal.confidence
+
         if ml_direction == signal.direction and prediction.confidence > 0.40:
             # ML agrees -> full confidence (no change)
+            agreement = "agree"
             logger.info(
                 f"Scalp [{epic}]: {signal.direction.value} "
                 f"(score->signal, ML agrees conf={prediction.confidence:.2f})"
             )
         elif ml_direction == SignalDirection.HOLD or prediction.confidence <= 0.40:
             # ML neutral -> halve confidence
+            agreement = "neutral"
             signal = signal.model_copy(update={"confidence": signal.confidence * 0.5})
             logger.info(
                 f"Scalp [{epic}]: {signal.direction.value} "
@@ -283,13 +287,25 @@ class StrategyManager:
         else:
             # ML disagrees — halve confidence but never veto
             # GURU: technical confluence is the decision maker, ML only adjusts sizing
+            agreement = "disagree"
             signal = signal.model_copy(update={"confidence": signal.confidence * 0.5})
             logger.info(
                 f"Scalp [{epic}]: {signal.direction.value} "
                 f"(ML disagrees {ml_direction.value} conf={prediction.confidence:.2f} -> half conf={signal.confidence:.2f})"
             )
 
-        signal = signal.model_copy(update={"strategy_name": "scalp_score"})
+        # Add ML audit data to signal metadata
+        ml_audit = {
+            "signal_class": prediction.signal_class,
+            "signal_name": prediction.signal_name,
+            "confidence": round(prediction.confidence, 4),
+            "probabilities": prediction.probabilities,
+            "agreement": agreement,
+            "confidence_before": round(pre_ml_confidence, 4),
+            "confidence_after": round(signal.confidence, 4),
+        }
+        updated_metadata = {**signal.metadata, "ml": ml_audit}
+        signal = signal.model_copy(update={"strategy_name": "scalp_score", "metadata": updated_metadata})
         return signal
 
     def get_allocation(self, regime: str | None = None) -> dict[str, float]:

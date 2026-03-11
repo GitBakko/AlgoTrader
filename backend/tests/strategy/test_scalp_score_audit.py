@@ -1,7 +1,11 @@
 """Tests for ScalpScore decision audit trail metadata."""
 import polars as pl
 import pytest
+from unittest.mock import MagicMock
+
+from src.models.schemas import PredictionResult, SignalClass
 from src.strategy.scalp_score_strategy import ScalpScoreStrategy
+from src.strategy.strategy_manager import StrategyManager
 from src.strategy.schemas import TradingSignal, SignalDirection, StrategyConfig
 
 
@@ -209,3 +213,82 @@ class TestGenerateSignalMetadata:
         )
         assert signal.direction == SignalDirection.HOLD
         assert signal.metadata == {}
+
+
+class TestProcessScalpMlMetadata:
+    """_process_scalp() should add ml section to signal.metadata."""
+
+    def _make_strategy_manager(self):
+        sm = StrategyManager.__new__(StrategyManager)
+        sm._scalp_strategy = MagicMock()
+        sm.scalp_mode = True
+        sm._configs = {}
+        sm._orb_fvg_strategy = None
+        sm.orb_fvg_epics = set()
+        sm.excluded_epics = set()
+        return sm
+
+    def _make_signal(self, direction=SignalDirection.BUY, confidence=0.67):
+        return TradingSignal(
+            epic="XAUUSD", direction=direction, confidence=confidence,
+            signal_class=2, entry_price=2047.5, strategy_name="scalp_score",
+            metadata={"votes": {"ema": {"value": 1}}, "gates": {}, "market_snapshot": {}},
+        )
+
+    def _make_prediction(self, signal_class=SignalClass.BUY, confidence=0.72):
+        return PredictionResult(
+            signal_class=signal_class,
+            signal_name="BUY",
+            confidence=confidence,
+            probabilities={"SELL": 0.15, "HOLD": 0.13, "BUY": 0.72},
+        )
+
+    def test_ml_agree_metadata(self):
+        sm = self._make_strategy_manager()
+        signal = self._make_signal()
+        prediction = self._make_prediction(signal_class=SignalClass.BUY, confidence=0.72)
+        sm._scalp_strategy.generate_signal.return_value = signal
+        market_data = {"current_price": 2047.5, "atr": 16.8}
+
+        result = sm._process_scalp(prediction, "XAUUSD", market_data)
+
+        assert "ml" in result.metadata
+        ml = result.metadata["ml"]
+        assert ml["agreement"] == "agree"
+        assert ml["confidence_before"] == pytest.approx(0.67, abs=0.01)
+        assert ml["confidence_after"] == pytest.approx(0.67, abs=0.01)
+
+    def test_ml_disagree_halves_confidence(self):
+        sm = self._make_strategy_manager()
+        signal = self._make_signal(direction=SignalDirection.BUY, confidence=0.67)
+        prediction = self._make_prediction(signal_class=SignalClass.SELL, confidence=0.72)
+        prediction = PredictionResult(
+            signal_class=SignalClass.SELL,
+            signal_name="SELL",
+            confidence=0.72,
+            probabilities={"SELL": 0.72, "HOLD": 0.13, "BUY": 0.15},
+        )
+        sm._scalp_strategy.generate_signal.return_value = signal
+        market_data = {"current_price": 2047.5, "atr": 16.8}
+
+        result = sm._process_scalp(prediction, "XAUUSD", market_data)
+
+        assert result.metadata["ml"]["agreement"] == "disagree"
+        assert result.metadata["ml"]["confidence_after"] == pytest.approx(0.335, abs=0.01)
+
+    def test_ml_neutral_halves_confidence(self):
+        sm = self._make_strategy_manager()
+        signal = self._make_signal(direction=SignalDirection.BUY, confidence=0.67)
+        prediction = PredictionResult(
+            signal_class=SignalClass.HOLD,
+            signal_name="HOLD",
+            confidence=0.50,
+            probabilities={"SELL": 0.20, "HOLD": 0.50, "BUY": 0.30},
+        )
+        sm._scalp_strategy.generate_signal.return_value = signal
+        market_data = {"current_price": 2047.5, "atr": 16.8}
+
+        result = sm._process_scalp(prediction, "XAUUSD", market_data)
+
+        assert result.metadata["ml"]["agreement"] == "neutral"
+        assert result.metadata["ml"]["confidence_after"] == pytest.approx(0.335, abs=0.01)
