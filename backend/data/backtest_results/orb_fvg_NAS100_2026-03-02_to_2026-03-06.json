@@ -1,0 +1,22 @@
+{
+  "epic": "NAS100",
+  "period": "2026-03-02 to 2026-03-06",
+  "total_sessions": 5,
+  "trades_taken": 0,
+  "sessions_skipped": 5,
+  "win_rate": 0.0,
+  "avg_rr_achieved": 0.0,
+  "total_pnl": 0.0,
+  "max_consecutive_losses": 0,
+  "max_drawdown_pct": 0.0,
+  "sharpe_ratio": 0.0,
+  "profit_factor": 0.0,
+  "trades": [],
+  "daily_equity": [
+    10000.0,
+    10000.0,
+    10000.0,
+    10000.0,
+    10000.0
+  ]
+}

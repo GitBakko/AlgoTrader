@@ -1,0 +1,289 @@
+<h2>Decision Audit Drawer — Design</h2>
+<p class="subtitle">Slide-out panel from right edge, accessible from all position/signal views</p>
+
+<div class="mockup" style="max-width:1200px; margin:0 auto;">
+  <div class="mockup-header">Desktop View — Drawer open over content</div>
+  <div class="mockup-body" style="padding:0; position:relative; height:700px; overflow:hidden; background:#0d1117;">
+
+    <!-- Backdrop -->
+    <div style="position:absolute;inset:0;background:rgba(0,0,0,0.5);z-index:1;"></div>
+
+    <!-- Main content behind (blurred) -->
+    <div style="position:absolute;left:0;top:0;width:60%;height:100%;padding:20px;opacity:0.3;filter:blur(1px);">
+      <div style="background:#161b22;border-radius:8px;padding:16px;margin-bottom:12px;">
+        <div style="color:#8B949E;font-size:12px;margin-bottom:8px;">Posizioni Aperte</div>
+        <div style="display:flex;gap:8px;">
+          <div style="background:#1c2128;padding:8px 12px;border-radius:4px;flex:1;color:#c9d1d9;font-size:11px;">XAUUSD</div>
+          <div style="background:#1c2128;padding:8px 12px;border-radius:4px;flex:1;color:#c9d1d9;font-size:11px;">BTCUSD</div>
+          <div style="background:#1c2128;padding:8px 12px;border-radius:4px;flex:1;color:#c9d1d9;font-size:11px;">EURUSD</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DRAWER -->
+    <div style="position:absolute;right:0;top:0;width:480px;height:100%;background:#161b22;border-left:1px solid rgba(255,255,255,0.10);z-index:2;display:flex;flex-direction:column;overflow-y:auto;font-family:'Plus Jakarta Sans',sans-serif;">
+
+      <!-- Drawer Header -->
+      <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.10);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:#161b22;position:sticky;top:0;z-index:3;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:28px;height:28px;border-radius:50%;background:#21262d;display:flex;align-items:center;justify-content:center;font-size:11px;color:#c9d1d9;">Au</div>
+          <div>
+            <div style="color:#e6edf3;font-weight:600;font-size:14px;">XAUUSD <span style="background:rgba(57,255,20,0.15);color:#39FF14;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;margin-left:6px;">BUY</span></div>
+            <div style="color:#8B949E;font-size:11px;font-family:'IBM Plex Mono',monospace;">11 Mar 2026 · 14:23 UTC</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="background:rgba(57,255,20,0.12);color:#39FF14;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;">EXECUTED</span>
+          <div style="width:28px;height:28px;border-radius:4px;background:#21262d;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#8B949E;font-size:14px;">✕</div>
+        </div>
+      </div>
+
+      <!-- Position Summary Card (green border for profit) -->
+      <div style="margin:12px 16px 0;padding:14px;background:#1c2128;border-radius:8px;border-left:3px solid #39FF14;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <span style="color:#8B949E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Posizione Aperta</span>
+          <span style="display:flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;border-radius:50%;background:#39FF14;display:inline-block;animation:pulse 2s infinite;"></span><span style="color:#39FF14;font-size:10px;">LIVE</span></span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <div>
+            <div style="color:#8B949E;font-size:10px;">Entry</div>
+            <div style="color:#e6edf3;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;">2,047.50</div>
+          </div>
+          <div>
+            <div style="color:#8B949E;font-size:10px;">Live Price</div>
+            <div style="color:#39FF14;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;">2,052.30</div>
+          </div>
+          <div>
+            <div style="color:#8B949E;font-size:10px;">P&L</div>
+            <div style="color:#39FF14;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;">+$14.40 <span style="font-size:10px;font-weight:400;">+0.23%</span></div>
+          </div>
+          <div>
+            <div style="color:#8B949E;font-size:10px;">Size</div>
+            <div style="color:#e6edf3;font-family:'IBM Plex Mono',monospace;font-size:12px;">0.03</div>
+          </div>
+          <div>
+            <div style="color:#8B949E;font-size:10px;">SL</div>
+            <div style="color:#FF3D57;font-family:'IBM Plex Mono',monospace;font-size:12px;">2,035.00</div>
+          </div>
+          <div>
+            <div style="color:#8B949E;font-size:10px;">TP</div>
+            <div style="color:#39FF14;font-family:'IBM Plex Mono',monospace;font-size:12px;">2,060.00</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ScalpScore Votes Section -->
+      <div style="margin:12px 16px 0;">
+        <div style="color:#8B949E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+          <span style="color:#00E5FF;">◆</span> ScalpScore Votes
+          <span style="margin-left:auto;background:rgba(57,255,20,0.12);color:#39FF14;padding:2px 8px;border-radius:10px;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;">4/6 BUY</span>
+        </div>
+        <div style="background:#1c2128;border-radius:8px;padding:10px 12px;">
+          <div style="display:grid;grid-template-columns:80px 36px 1fr;gap:4px 8px;align-items:center;font-size:12px;">
+            <span style="color:#c9d1d9;">EMA</span>
+            <span style="color:#39FF14;font-family:'IBM Plex Mono',monospace;font-weight:600;text-align:center;">+1</span>
+            <span style="color:#8B949E;font-family:'IBM Plex Mono',monospace;font-size:10px;">EMA9 2045.12 &gt; EMA21 2043.80</span>
+
+            <span style="color:#c9d1d9;">RSI</span>
+            <span style="color:#FF3D57;font-family:'IBM Plex Mono',monospace;font-weight:600;text-align:center;">−1</span>
+            <span style="color:#8B949E;font-family:'IBM Plex Mono',monospace;font-size:10px;">RSI(14) = 58.3 &gt; 55</span>
+
+            <span style="color:#c9d1d9;">MACD</span>
+            <span style="color:#39FF14;font-family:'IBM Plex Mono',monospace;font-weight:600;text-align:center;">+1</span>
+            <span style="color:#8B949E;font-family:'IBM Plex Mono',monospace;font-size:10px;">Hist 0.45 · MACD 1.23 &gt; Sig 0.78</span>
+
+            <span style="color:#c9d1d9;">Volume</span>
+            <span style="color:#39FF14;font-family:'IBM Plex Mono',monospace;font-weight:600;text-align:center;">+1</span>
+            <span style="color:#8B949E;font-family:'IBM Plex Mono',monospace;font-size:10px;">15,200 &gt; 1.2× SMA 12,100</span>
+
+            <span style="color:#c9d1d9;">ADX</span>
+            <span style="color:#39FF14;font-family:'IBM Plex Mono',monospace;font-weight:600;text-align:center;">+1</span>
+            <span style="color:#8B949E;font-family:'IBM Plex Mono',monospace;font-size:10px;">ADX(14) = 28.7 ≥ 20</span>
+
+            <span style="color:#c9d1d9;">BB/Keltner</span>
+            <span style="color:#FF3D57;font-family:'IBM Plex Mono',monospace;font-weight:600;text-align:center;">−1</span>
+            <span style="color:#8B949E;font-family:'IBM Plex Mono',monospace;font-size:10px;">Price 2047.5 near BB upper 2052</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gates Section -->
+      <div style="margin:12px 16px 0;">
+        <div style="color:#8B949E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+          <span style="color:#00E5FF;">◆</span> Gate Filters
+          <span style="margin-left:auto;color:#39FF14;font-size:11px;">5/5 passed</span>
+        </div>
+        <div style="background:#1c2128;border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;">
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+            <span style="color:#39FF14;font-size:10px;">●</span>
+            <span style="color:#c9d1d9;width:90px;">Session</span>
+            <span style="color:#8B949E;font-family:'IBM Plex Mono',monospace;font-size:10px;">Kill Zone · mult 1.0 · 14:00 UTC</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+            <span style="color:#39FF14;font-size:10px;">●</span>
+            <span style="color:#c9d1d9;width:90px;">Dead Market</span>
+            <span style="color:#8B949E;font-family:'IBM Plex Mono',monospace;font-size:10px;">ADX 28.7 ≥ 20 · BB pctile 45%</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+            <span style="color:#39FF14;font-size:10px;">●</span>
+            <span style="color:#c9d1d9;width:90px;">VWAP</span>
+            <span style="color:#8B949E;font-family:'IBM Plex Mono',monospace;font-size:10px;">Price 2047.5 &gt; VWAP 2044.0 ✓ BUY OK</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+            <span style="color:#39FF14;font-size:10px;">●</span>
+            <span style="color:#c9d1d9;width:90px;">HTF Trend</span>
+            <span style="color:#8B949E;font-family:'IBM Plex Mono',monospace;font-size:10px;">1H EMA bullish · aligns with BUY</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+            <span style="color:#39FF14;font-size:10px;">●</span>
+            <span style="color:#c9d1d9;width:90px;">Confluence</span>
+            <span style="color:#8B949E;font-family:'IBM Plex Mono',monospace;font-size:10px;">4 BUY ≥ 3 required (kill zone)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ML Prediction Section -->
+      <div style="margin:12px 16px 0;">
+        <div style="color:#8B949E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+          <span style="color:#00E5FF;">◆</span> ML Prediction
+          <span style="margin-left:auto;background:rgba(57,255,20,0.12);color:#39FF14;padding:2px 8px;border-radius:10px;font-size:11px;">AGREE</span>
+        </div>
+        <div style="background:#1c2128;border-radius:8px;padding:10px 12px;">
+          <div style="display:flex;gap:6px;margin-bottom:8px;">
+            <div style="flex:1;background:#21262d;border-radius:4px;padding:6px 8px;text-align:center;">
+              <div style="color:#8B949E;font-size:9px;">SELL</div>
+              <div style="color:#FF3D57;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;">15%</div>
+            </div>
+            <div style="flex:1;background:#21262d;border-radius:4px;padding:6px 8px;text-align:center;">
+              <div style="color:#8B949E;font-size:9px;">HOLD</div>
+              <div style="color:#FFB020;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;">13%</div>
+            </div>
+            <div style="flex:1;background:rgba(57,255,20,0.08);border:1px solid rgba(57,255,20,0.20);border-radius:4px;padding:6px 8px;text-align:center;">
+              <div style="color:#8B949E;font-size:9px;">BUY</div>
+              <div style="color:#39FF14;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;">72%</div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;">
+            <span style="color:#8B949E;">Confidence: <span style="color:#e6edf3;font-family:'IBM Plex Mono',monospace;">0.67</span> → <span style="color:#39FF14;font-family:'IBM Plex Mono',monospace;">0.67</span> (unchanged)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Risk Management Section -->
+      <div style="margin:12px 16px 0;">
+        <div style="color:#8B949E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+          <span style="color:#00E5FF;">◆</span> Risk Management
+          <span style="margin-left:auto;background:rgba(57,255,20,0.12);color:#39FF14;padding:2px 8px;border-radius:10px;font-size:11px;">APPROVED</span>
+        </div>
+        <div style="background:#1c2128;border-radius:8px;padding:10px 12px;font-size:12px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;">
+            <div style="display:flex;justify-content:space-between;">
+              <span style="color:#8B949E;">Sizing</span>
+              <span style="color:#e6edf3;font-family:'IBM Plex Mono',monospace;">kelly</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="color:#8B949E;">Kelly %</span>
+              <span style="color:#e6edf3;font-family:'IBM Plex Mono',monospace;">8.2%</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="color:#8B949E;">Conf Tier</span>
+              <span style="color:#e6edf3;font-family:'IBM Plex Mono',monospace;">≥0.65 → 100%</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="color:#8B949E;">Eq Curve</span>
+              <span style="color:#e6edf3;font-family:'IBM Plex Mono',monospace;">1.00×</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="color:#8B949E;">Correlation</span>
+              <span style="color:#FFB020;font-family:'IBM Plex Mono',monospace;">0.85×</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="color:#8B949E;">Dyn SL mult</span>
+              <span style="color:#e6edf3;font-family:'IBM Plex Mono',monospace;">1.35×</span>
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);color:#FFB020;font-size:10px;">
+            ⚠ XAUUSD correlated with XAGUSD (0.85× size reduction)
+          </div>
+        </div>
+      </div>
+
+      <!-- Related Signals -->
+      <div style="margin:12px 16px 16px;">
+        <div style="color:#8B949E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+          <span style="color:#00E5FF;">◆</span> Ultimi Segnali XAUUSD
+        </div>
+        <div style="background:#1c2128;border-radius:8px;overflow:hidden;">
+          <!-- Current signal highlighted -->
+          <div style="display:flex;align-items:center;padding:8px 12px;gap:8px;font-size:11px;background:rgba(57,255,20,0.05);border-left:2px solid #39FF14;">
+            <span style="color:#e6edf3;font-family:'IBM Plex Mono',monospace;width:44px;">14:23</span>
+            <span style="color:#39FF14;font-weight:600;width:32px;">BUY</span>
+            <span style="color:#e6edf3;font-family:'IBM Plex Mono',monospace;width:36px;">67%</span>
+            <span style="background:rgba(57,255,20,0.12);color:#39FF14;padding:1px 6px;border-radius:8px;font-size:9px;">EXEC</span>
+            <span style="color:#39FF14;font-family:'IBM Plex Mono',monospace;margin-left:auto;">+$14.40</span>
+          </div>
+          <!-- Older signals -->
+          <div style="display:flex;align-items:center;padding:8px 12px;gap:8px;font-size:11px;border-top:1px solid rgba(255,255,255,0.04);cursor:pointer;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+            <span style="color:#8B949E;font-family:'IBM Plex Mono',monospace;width:44px;">13:15</span>
+            <span style="color:#FF3D57;font-weight:600;width:32px;">SELL</span>
+            <span style="color:#8B949E;font-family:'IBM Plex Mono',monospace;width:36px;">33%</span>
+            <span style="background:rgba(255,61,87,0.12);color:#FF3D57;padding:1px 6px;border-radius:8px;font-size:9px;">REJ</span>
+            <span style="color:#8B949E;font-family:'IBM Plex Mono',monospace;margin-left:auto;font-size:10px;">conf_low</span>
+          </div>
+          <div style="display:flex;align-items:center;padding:8px 12px;gap:8px;font-size:11px;border-top:1px solid rgba(255,255,255,0.04);cursor:pointer;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+            <span style="color:#8B949E;font-family:'IBM Plex Mono',monospace;width:44px;">12:00</span>
+            <span style="color:#39FF14;font-weight:600;width:32px;">BUY</span>
+            <span style="color:#8B949E;font-family:'IBM Plex Mono',monospace;width:36px;">50%</span>
+            <span style="background:rgba(57,255,20,0.12);color:#39FF14;padding:1px 6px;border-radius:8px;font-size:9px;">EXEC</span>
+            <span style="color:#FF3D57;font-family:'IBM Plex Mono',monospace;margin-left:auto;">−$8.20</span>
+          </div>
+          <div style="display:flex;align-items:center;padding:8px 12px;gap:8px;font-size:11px;border-top:1px solid rgba(255,255,255,0.04);cursor:pointer;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+            <span style="color:#8B949E;font-family:'IBM Plex Mono',monospace;width:44px;">10:45</span>
+            <span style="color:#FF3D57;font-weight:600;width:32px;">SELL</span>
+            <span style="color:#8B949E;font-family:'IBM Plex Mono',monospace;width:36px;">83%</span>
+            <span style="background:rgba(57,255,20,0.12);color:#39FF14;padding:1px 6px;border-radius:8px;font-size:9px;">EXEC</span>
+            <span style="color:#39FF14;font-family:'IBM Plex Mono',monospace;margin-left:auto;">+$22.10</span>
+          </div>
+          <div style="display:flex;align-items:center;padding:8px 12px;gap:8px;font-size:11px;border-top:1px solid rgba(255,255,255,0.04);cursor:pointer;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+            <span style="color:#8B949E;font-family:'IBM Plex Mono',monospace;width:44px;">09:30</span>
+            <span style="color:#39FF14;font-weight:600;width:32px;">BUY</span>
+            <span style="color:#8B949E;font-family:'IBM Plex Mono',monospace;width:36px;">50%</span>
+            <span style="background:rgba(255,176,32,0.12);color:#FFB020;padding:1px 6px;border-radius:8px;font-size:9px;">REJ</span>
+            <span style="color:#8B949E;font-family:'IBM Plex Mono',monospace;margin-left:auto;font-size:10px;">htf_gate</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:24px;">
+  <h3>Drawer Specs</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:800px;">
+    <div style="background:#1a1a2e;padding:12px;border-radius:6px;">
+      <div style="color:#888;font-size:11px;margin-bottom:4px;">Width</div>
+      <div style="color:#e0e0e0;">480px desktop, 100% mobile</div>
+    </div>
+    <div style="background:#1a1a2e;padding:12px;border-radius:6px;">
+      <div style="color:#888;font-size:11px;margin-bottom:4px;">Animation</div>
+      <div style="color:#e0e0e0;">slideIn 250ms ease-out</div>
+    </div>
+    <div style="background:#1a1a2e;padding:12px;border-radius:6px;">
+      <div style="color:#888;font-size:11px;margin-bottom:4px;">Close</div>
+      <div style="color:#e0e0e0;">✕ button, ESC key, backdrop click</div>
+    </div>
+    <div style="background:#1a1a2e;padding:12px;border-radius:6px;">
+      <div style="color:#888;font-size:11px;margin-bottom:4px;">Scroll</div>
+      <div style="color:#e0e0e0;">Body scrolls, header sticky</div>
+    </div>
+    <div style="background:#1a1a2e;padding:12px;border-radius:6px;">
+      <div style="color:#888;font-size:11px;margin-bottom:4px;">Rejected signal</div>
+      <div style="color:#e0e0e0;">Same layout, red border on card, failed gates marked ●</div>
+    </div>
+    <div style="background:#1a1a2e;padding:12px;border-radius:6px;">
+      <div style="color:#888;font-size:11px;margin-bottom:4px;">Related signals</div>
+      <div style="color:#e0e0e0;">Click row → replaces drawer content (no stack)</div>
+    </div>
+  </div>
+</div>
