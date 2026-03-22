@@ -269,6 +269,18 @@ class Settings(BaseSettings):
     agents_debate_enabled: bool = Field(default=True, alias="AGENTS_DEBATE_ENABLED")
     anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
 
+    # ===== Reinforcement Learning (Sprint 2) =====
+    rl_enabled: bool = Field(default=False, alias="RL_ENABLED")
+    rl_algorithm: str = Field(default="PPO", alias="RL_ALGORITHM")
+    rl_reward_function: str = Field(default="composite", alias="RL_REWARD_FUNCTION")
+    rl_sliding_window_size: int = Field(default=500, alias="RL_SLIDING_WINDOW_SIZE")
+    rl_retrain_interval_minutes: int = Field(default=60, alias="RL_RETRAIN_INTERVAL")
+    rl_max_trades_per_session: int = Field(default=20, alias="RL_MAX_TRADES_PER_SESSION")
+    rl_target_hold_candles: int = Field(default=10, alias="RL_TARGET_HOLD_CANDLES")
+    rl_max_drawdown_pct: float = Field(default=0.01, alias="RL_MAX_DRAWDOWN_PCT")
+    rl_learning_rate: float = Field(default=3e-4, alias="RL_LEARNING_RATE")
+    rl_total_timesteps: int = Field(default=50000, alias="RL_TOTAL_TIMESTEPS")
+
     # ===== Security =====
     secret_key: str = Field(default="dev_secret_key_change_in_production", alias="SECRET_KEY")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
