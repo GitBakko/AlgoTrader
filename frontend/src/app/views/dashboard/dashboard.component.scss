@@ -102,6 +102,48 @@
     }
   }
 
+  // Circuit breaker alert banner
+  .cb-alert-banner {
+    background: rgba(255, 61, 87, 0.12);
+    border: 1px solid rgba(255, 61, 87, 0.35);
+    border-left: 4px solid var(--mantis-loss, #FF3D57);
+    border-radius: var(--mantis-radius-md, 8px);
+    color: var(--mantis-text-primary, #e6edf3);
+    animation: cb-banner-pulse 3s ease-in-out infinite;
+
+    svg {
+      color: var(--mantis-loss, #FF3D57);
+    }
+
+    strong {
+      color: var(--mantis-loss, #FF3D57);
+      letter-spacing: 0.04em;
+    }
+  }
+
+  .cb-alert-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 100px;
+    font-size: 0.75rem;
+    background: rgba(255, 61, 87, 0.15);
+    border: 1px solid rgba(255, 61, 87, 0.25);
+    color: rgba(255, 255, 255, 0.85);
+
+    svg {
+      width: 12px;
+      height: 12px;
+      color: var(--mantis-warning, #FFB020);
+    }
+  }
+
+  @keyframes cb-banner-pulse {
+    0%, 100% { border-left-color: var(--mantis-loss, #FF3D57); }
+    50% { border-left-color: rgba(255, 61, 87, 0.4); }
+  }
+
   @keyframes chip-pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }

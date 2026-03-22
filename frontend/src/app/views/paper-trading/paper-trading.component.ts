@@ -326,7 +326,7 @@ interface GroupedPosition {
                       <tr class="group-header" [class.group-expanded]="group.expanded"
                           [class.pnl-row-positive]="group.totalPnl > 0"
                           [class.pnl-row-negative]="group.totalPnl < 0"
-                          (click)="toggleGroup(group.epic)">
+                          (click)="onGroupClick(group)" style="cursor:pointer;">
                         <td class="text-center">
                           <svg width="16" height="16" fill="currentColor" class="chevron-icon"
                                [class.rotated]="group.expanded">
@@ -374,7 +374,7 @@ interface GroupedPosition {
                           <tr class="detail-row"
                               [class.pnl-row-positive]="pos.live_pnl > 0"
                               [class.pnl-row-negative]="pos.live_pnl < 0"
-                              (click)="openAuditByDeal(pos.deal_id, $event)" style="cursor:pointer;">
+                              (click)="openAuditByDeal(pos.deal_id, $event, pos.epic)" style="cursor:pointer;">
                             <td></td>
                             <td class="ps-4">
                               <div class="d-flex align-items-center gap-1">
@@ -978,6 +978,14 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     this.expandedGroups.set(newSet);
   }
 
+  onGroupClick(group: GroupedPosition): void {
+    if (group.positions.length === 1) {
+      this.auditService.openByDealId(group.positions[0].deal_id, group.epic);
+    } else {
+      this.toggleGroup(group.epic);
+    }
+  }
+
   directionColor(direction: string): string {
     return direction === 'BUY' ? 'success' : direction === 'SELL' ? 'danger' : 'secondary';
   }
@@ -1081,9 +1089,9 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     this.selectedEpic.set(null);
   }
 
-  openAuditByDeal(dealId: string, event: MouseEvent): void {
+  openAuditByDeal(dealId: string, event: MouseEvent, epic?: string): void {
     event.stopPropagation();
-    this.auditService.openByDealId(dealId);
+    this.auditService.openByDealId(dealId, epic);
   }
 
   getGroupRiskType(group: GroupedPosition): 'broker' | 'local' | 'none' {

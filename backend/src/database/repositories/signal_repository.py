@@ -182,13 +182,47 @@ class SignalRepository(BaseRepository[Signal]):
         return signal.id
 
     async def get_by_position_deal_id(self, deal_id: str) -> Signal | None:
-        """Find the signal linked to a position by deal_id."""
+        """Find the signal linked to a position by deal_id.
+
+        First tries exact match via Signal→Position FK join.
+        If not found, looks up the position's epic and returns the most recent
+        EXECUTED signal for that epic (handles broker deal_id rotation).
+        """
         from src.database.models import Position
 
+        # Try exact FK match first
         result = await self.session.execute(
             select(Signal)
             .join(Position, Signal.position_id == Position.id)
             .where(Position.deal_id == deal_id)
+            .order_by(Signal.generated_at.desc())
+            .limit(1)
+        )
+        signal = result.scalars().first()
+        if signal:
+            return signal
+
+        # Fallback: find position epic, then most recent EXECUTED signal for it
+        pos_result = await self.session.execute(
+            select(Position.epic).where(Position.deal_id == deal_id).limit(1)
+        )
+        epic = pos_result.scalar_one_or_none()
+        if not epic:
+            return None
+
+        result = await self.session.execute(
+            select(Signal)
+            .where(Signal.epic == epic, Signal.status == "EXECUTED")
+            .order_by(Signal.generated_at.desc())
+            .limit(1)
+        )
+        return result.scalars().first()
+
+    async def get_latest_by_epic(self, epic: str) -> Signal | None:
+        """Get the most recent EXECUTED signal for an epic (with full features)."""
+        result = await self.session.execute(
+            select(Signal)
+            .where(Signal.epic == epic, Signal.status == "EXECUTED")
             .order_by(Signal.generated_at.desc())
             .limit(1)
         )

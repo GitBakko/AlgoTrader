@@ -1,11 +1,11 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { ApiService } from './api.service';
 import { SignalAudit, SignalHistoryItem } from '../models';
 import { ToastService } from '../../shared/services/toast.service';
 
 @Injectable({ providedIn: 'root' })
 export class SignalAuditService {
-  private readonly http = inject(HttpClient);
+  private readonly api = inject(ApiService);
   private readonly toast = inject(ToastService);
 
   readonly isOpen = signal(false);
@@ -17,12 +17,12 @@ export class SignalAuditService {
     this.loading.set(true);
     this.isOpen.set(true);
 
-    this.http.get<{ success: boolean; data: SignalAudit }>(`/api/signals/audit/${signalId}`)
+    this.api.get<SignalAudit>(`/api/signals/audit/${signalId}`)
       .subscribe({
-        next: (resp) => {
-          if (resp.success && resp.data) {
-            this.currentAudit.set(resp.data);
-            this._loadHistory(resp.data.epic);
+        next: (data) => {
+          if (data) {
+            this.currentAudit.set(data);
+            this._loadHistory(data.epic);
           } else {
             this.toast.warning('Nessun dato audit disponibile');
             this.close();
@@ -31,22 +31,24 @@ export class SignalAuditService {
         },
         error: () => {
           this.loading.set(false);
-          this.toast.error('Impossibile caricare i dati del segnale');
+          this.toast.warning('Audit non disponibile per questo segnale');
           this.close();
         },
       });
   }
 
-  openByDealId(dealId: string): void {
+  openByDealId(dealId: string, epic?: string): void {
     this.loading.set(true);
     this.isOpen.set(true);
 
-    this.http.get<{ success: boolean; data: SignalAudit | null }>(`/api/signals/audit/position/${dealId}`)
+    const params: Record<string, string> = {};
+    if (epic) params['epic'] = epic;
+    this.api.get<SignalAudit | null>(`/api/signals/audit/position/${dealId}`, params)
       .subscribe({
-        next: (resp) => {
-          if (resp.success && resp.data) {
-            this.currentAudit.set(resp.data);
-            this._loadHistory(resp.data.epic);
+        next: (data) => {
+          if (data) {
+            this.currentAudit.set(data);
+            this._loadHistory(data.epic);
           } else {
             this.toast.warning('Audit non disponibile per questa posizione');
             this.close();
@@ -55,7 +57,7 @@ export class SignalAuditService {
         },
         error: () => {
           this.loading.set(false);
-          this.toast.error('Impossibile caricare i dati del segnale');
+          this.toast.warning('Audit non disponibile per questa posizione');
           this.close();
         },
       });
@@ -72,10 +74,10 @@ export class SignalAuditService {
   }
 
   private _loadHistory(epic: string): void {
-    this.http.get<{ success: boolean; data: { items: SignalHistoryItem[] } }>(
-      `/api/signals/audit/history/${epic}?limit=10`
+    this.api.get<{ items: SignalHistoryItem[] }>(
+      `/api/signals/audit/history/${epic}`, { limit: 10 }
     ).subscribe({
-      next: (resp) => this.relatedSignals.set(resp.data?.items ?? []),
+      next: (data) => this.relatedSignals.set(data?.items ?? []),
       error: () => {},
     });
   }

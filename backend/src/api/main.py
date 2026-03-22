@@ -90,6 +90,8 @@ async def lifespan(app: FastAPI):
 
     # Initialize database connections
     DatabaseManager.initialize()
+    app.state.db_session_factory = DatabaseManager.session
+    logger.info("Database session factory registered on app.state")
 
     # Initialize trading services (paper mode by default)
     from src.api.dependencies import init_services

@@ -75,7 +75,7 @@ type Tab = 'open' | 'history';
             <!-- Mobile cards -->
             <div class="d-block d-md-none p-3">
               @for (pos of livePositions(); track pos.deal_id) {
-                <div class="pos-mobile-card mb-2" (click)="openAudit(pos.deal_id)" style="cursor:pointer;">
+                <div class="pos-mobile-card mb-2" (click)="openAudit(pos.deal_id, pos.epic)" style="cursor:pointer;">
                   <div class="d-flex justify-content-between align-items-start mb-2">
                     <div class="d-flex align-items-center gap-2">
                       <app-epic-logo [epic]="pos.epic" [size]="28" [rounded]="true" />
@@ -145,7 +145,7 @@ type Tab = 'open' | 'history';
                 </thead>
                 <tbody>
                   @for (pos of livePositions(); track pos.deal_id) {
-                    <tr (click)="openAudit(pos.deal_id)" style="cursor:pointer;">
+                    <tr (click)="openAudit(pos.deal_id, pos.epic)" style="cursor:pointer;">
                       <td class="fw-semibold">
                         <div class="d-flex align-items-center gap-2">
                           <app-epic-logo [epic]="pos.epic" [size]="24" [rounded]="true" />
@@ -330,7 +330,7 @@ type Tab = 'open' | 'history';
             <!-- Mobile cards -->
             <div class="d-block d-md-none p-3">
               @for (pos of trading.closedPositions(); track pos.deal_id) {
-                <div class="pos-mobile-card mb-2" (click)="openAudit(pos.deal_id)" style="cursor:pointer;">
+                <div class="pos-mobile-card mb-2" (click)="openAudit(pos.deal_id, pos.epic)" style="cursor:pointer;">
                   <div class="d-flex justify-content-between align-items-start mb-1">
                     <div class="d-flex align-items-center gap-2">
                       <app-epic-logo [epic]="pos.epic" [size]="24" [rounded]="true" />
@@ -386,7 +386,7 @@ type Tab = 'open' | 'history';
                   @for (pos of trading.closedPositions(); track pos.deal_id) {
                     <tr [class.pnl-row-positive]="(pos.profit_loss ?? 0) > 0"
                         [class.pnl-row-negative]="(pos.profit_loss ?? 0) < 0"
-                        (click)="openAudit(pos.deal_id)" style="cursor:pointer;">
+                        (click)="openAudit(pos.deal_id, pos.epic)" style="cursor:pointer;">
                       <td class="fw-semibold">
                         <div class="d-flex align-items-center gap-2">
                           <app-epic-logo [epic]="pos.epic" [size]="24" [rounded]="true" />
@@ -534,8 +534,8 @@ export class PositionsComponent implements OnInit, OnDestroy {
     this.loadHistory();
   }
 
-  openAudit(dealId: string): void {
-    this.auditService.openByDealId(dealId);
+  openAudit(dealId: string, epic?: string): void {
+    this.auditService.openByDealId(dealId, epic);
   }
 
   closePosition(dealId: string): void {

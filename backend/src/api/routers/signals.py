@@ -282,13 +282,20 @@ async def get_signal_audit(
 @router.get("/audit/position/{deal_id}")
 async def get_signal_by_position(
     deal_id: str = Path(...),
+    epic: str = Query(default=None),
     signal_repo=Depends(get_signal_repo),
 ):
-    """Get audit trail for the signal linked to a position by deal_id."""
+    """Get audit trail for the signal linked to a position by deal_id.
+
+    Falls back to most recent EXECUTED signal for the epic if the exact
+    deal_id is not found (handles broker deal_id rotation).
+    """
     if signal_repo is None:
         return error_response("Database not available", 503)
 
     signal = await signal_repo.get_by_position_deal_id(deal_id)
+    if signal is None and epic:
+        signal = await signal_repo.get_latest_by_epic(epic)
     if signal is None:
         return error_response(f"No signal found for position {deal_id}", 404)
 

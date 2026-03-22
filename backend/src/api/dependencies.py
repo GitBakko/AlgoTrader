@@ -202,10 +202,7 @@ def init_services(app) -> None:
     if settings.scalp_mode_enabled:
         from src.strategy.scalp_score_strategy import ScalpScoreStrategy
         app.state.strategy_manager.scalp_mode = True
-        app.state.strategy_manager._scalp_strategy = ScalpScoreStrategy(
-            entry_threshold=settings.scalp_score_threshold,
-            full_size_threshold=settings.scalp_score_full_threshold,
-        )
+        app.state.strategy_manager._scalp_strategy = ScalpScoreStrategy()
         # Stricter circuit breaker for scalp (4 consecutive losses)
         app.state.risk_manager.circuit_breakers.config.max_consecutive_losses = 4
         logger.info(

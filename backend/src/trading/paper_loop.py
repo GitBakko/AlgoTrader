@@ -1210,6 +1210,15 @@ class PaperTradingLoop:
 
         if signal.direction.value == "HOLD":
             signal_info["status"] = "hold"
+            # Persist HOLD as REJECTED audit
+            if audit_features is not None:
+                audit_features["rejection_reason"] = "Insufficient confluence (HOLD)"
+                await self._persist_signal_audit(
+                    epic=epic, direction="HOLD", confidence=signal.confidence,
+                    entry_price=signal.entry_price,
+                    stop_loss=signal.suggested_stop, take_profit=signal.suggested_tp,
+                    status="REJECTED", features=audit_features,
+                )
             # Log HOLD signal
             try:
                 await get_trade_logger().log_signal(
@@ -1526,8 +1535,10 @@ class PaperTradingLoop:
     ) -> int | None:
         """Best-effort persist signal audit to DB. Returns signal ID or None."""
         if not self._signal_repo_factory:
+            logger.debug(f"[{epic}] Signal audit skipped: no repo factory")
             return None
         try:
+            logger.debug(f"[{epic}] Persisting {status} signal audit...")
             async with self._signal_repo_factory() as session:
                 from src.database.repositories.signal_repository import SignalRepository
                 repo = SignalRepository(session)
@@ -1542,9 +1553,10 @@ class PaperTradingLoop:
                     features=features,
                 )
                 await session.commit()
+                logger.info(f"[{epic}] Signal audit persisted (id={signal_id}, status={status})")
                 return signal_id
         except Exception as e:
-            logger.warning(f"[{epic}] Signal audit persist failed: {e}")
+            logger.warning(f"[{epic}] Signal audit persist failed: {e!r}")
             return None
 
     async def _update_trailing_stops(self, current_positions: list[dict]) -> None:

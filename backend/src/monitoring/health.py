@@ -314,7 +314,7 @@ class HealthChecker:
             # Try to ping Capital.com API
             async with httpx.AsyncClient(timeout=10.0) as client:
                 # Use a simple endpoint that doesn't require authentication
-                response = await client.get(f"{api_url}/api/v1/ping")
+                response = await client.get(f"{api_url}/api/v1/time")
 
                 response_time_ms = (datetime.now() - start_time).total_seconds() * 1000
 
@@ -415,18 +415,21 @@ class HealthChecker:
     async def check_ml_models(self) -> ComponentHealth:
         """Check if ML models are loaded and accessible."""
         try:
-            model_dir = Path("data/models")
+            # Use absolute path based on this file's location to avoid CWD issues
+            backend_root = Path(__file__).resolve().parent.parent.parent
+            model_dir = backend_root / self.settings.model_dir
             if not model_dir.exists():
                 return ComponentHealth(
                     name="ML Models",
                     status=HealthStatus.DEGRADED,
-                    message="Model directory not found (normal for fresh installs)",
+                    message=f"Model directory not found: {model_dir}",
                 )
 
-            # Check for XGBoost models (.pkl) and PyTorch models (.pt)
-            xgb_models = list(model_dir.glob("*.pkl"))
-            pt_models = list(model_dir.glob("*.pt"))
+            # Check for XGBoost models (model.json in subdirs) and PyTorch models (.pt)
+            xgb_models = list(model_dir.glob("**/model.json"))
+            pt_models = list(model_dir.glob("**/*.pt"))
             total_models = len(xgb_models) + len(pt_models)
+            logger.debug(f"ML model check: found {len(xgb_models)} xgb, {len(pt_models)} pt")
 
             status = HealthStatus.HEALTHY if total_models > 0 else HealthStatus.DEGRADED
 

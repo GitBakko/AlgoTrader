@@ -20,6 +20,9 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
 import { NewsWidgetComponent } from '../../shared/components/news-widget/news-widget.component';
 import { SkeletonCardComponent } from '../../shared/components/skeleton-card/skeleton-card.component';
 import { SkeletonTableComponent } from '../../shared/components/skeleton-table/skeleton-table.component';
+import { LoadingButtonComponent } from '../../shared/components/loading-button/loading-button.component';
+import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
+import { ToastService } from '../../shared/services/toast.service';
 
 @Component({
   templateUrl: 'dashboard.component.html',
@@ -34,6 +37,7 @@ import { SkeletonTableComponent } from '../../shared/components/skeleton-table/s
     TvChartComponent, IconDirective,
     PriceFormatPipe, EpicLogoComponent, NewsWidgetComponent,
     SkeletonCardComponent, SkeletonTableComponent,
+    LoadingButtonComponent,
   ]
 })
 export class DashboardComponent implements OnInit, OnDestroy {
@@ -43,6 +47,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly newsService = inject(NewsService);
   private readonly notifCenter = inject(NotificationCenterService);
   readonly auditService = inject(SignalAuditService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly toast = inject(ToastService);
 
   /** Recent unread alerts for dashboard widget (max 5) */
   readonly recentAlerts = computed(() =>
@@ -78,6 +84,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
       reason: String(reason),
     }));
   });
+
+  readonly resetCbInProgress = signal(false);
 
   /** True until the first overview data arrives. */
   readonly loading = computed(() => this.overview() === null);
@@ -303,6 +311,30 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.trading.loadPaperPositions();
     this.trading.loadPaperSignals();
     this.trading.loadPerformance(30);
+  }
+
+  async resetCircuitBreakers(): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Reset Circuit Breakers',
+      message: 'Resettare tutti i circuit breakers e i contatori perdite per-asset?',
+      confirmText: 'Reset',
+      cancelText: 'Annulla',
+      color: 'warning',
+    });
+    if (!confirmed) return;
+
+    this.resetCbInProgress.set(true);
+    this.trading.resetCircuitBreakers().subscribe({
+      next: (data) => {
+        this.toast.success(data.message);
+        this.resetCbInProgress.set(false);
+        this.loadAll();
+      },
+      error: (err) => {
+        this.toast.error(err?.error?.error || 'Reset circuit breakers fallito');
+        this.resetCbInProgress.set(false);
+      }
+    });
   }
 
   directionColor(dir: string): string {

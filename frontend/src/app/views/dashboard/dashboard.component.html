@@ -51,6 +51,28 @@
   </div>
 </div>
 
+<!-- ═══════ CIRCUIT BREAKER ALERT ═══════ -->
+@if (circuitBreakersTripped().length > 0) {
+  <c-alert color="danger" class="mb-3 cb-alert-banner d-flex align-items-center justify-content-between">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <svg cIcon name="cilShieldAlt" size="lg"></svg>
+      <strong>TRADING BLOCCATO</strong>
+      <span class="opacity-75">&mdash;</span>
+      @for (cb of circuitBreakersTripped(); track cb.key) {
+        <span class="cb-alert-badge">
+          <svg cIcon [name]="cb.icon" size="xs"></svg>
+          {{ cb.label }}: {{ cb.reason }}
+        </span>
+      }
+    </div>
+    <app-loading-button color="warning" size="sm"
+                        [loading]="resetCbInProgress()"
+                        (clicked)="resetCircuitBreakers()">
+      Reset Circuit Breakers
+    </app-loading-button>
+  </c-alert>
+}
+
 <!-- Market Closed Alert -->
 @if (currentMarketStatus(); as status) {
   @if (!status.is_open) {
@@ -453,7 +475,7 @@
               </thead>
               <tbody>
                 @for (pos of livePositions(); track pos.deal_id) {
-                  <tr (click)="auditService.openByDealId(pos.deal_id)" style="cursor:pointer;">
+                  <tr (click)="auditService.openByDealId(pos.deal_id, pos.epic)" style="cursor:pointer;">
                     <td class="fw-semibold">
                       <div class="d-flex align-items-center gap-1">
                         <app-epic-logo [epic]="pos.epic" [size]="20" [rounded]="true" />
