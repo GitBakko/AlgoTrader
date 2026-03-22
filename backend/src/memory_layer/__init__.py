@@ -9,6 +9,7 @@ This package provides schema contracts, storage backends, and the unified
 MemoryManager that orchestrates all three layers.
 """
 
+from src.memory_layer.long_term import MantisLongTermMemory
 from src.memory_layer.short_term import MantisShortTermMemory
 
-__all__ = ["MantisShortTermMemory"]
+__all__ = ["MantisShortTermMemory", "MantisLongTermMemory"]
