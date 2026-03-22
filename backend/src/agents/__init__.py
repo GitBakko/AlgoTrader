@@ -1,4 +1,4 @@
-# MANTIS-EVOLUTION: Agent schema contracts
+# MANTIS-EVOLUTION: Agent schema contracts + base agent
 from src.agents.schemas import (
     AgentRole,
     MarketContext,
@@ -10,6 +10,7 @@ from src.agents.schemas import (
     DebateSummary,
     FinalDecision,
 )
+from src.agents.base_agent import MantisBaseAgent
 
 __all__ = [
     "AgentRole",
@@ -21,4 +22,5 @@ __all__ = [
     "DebateArgument",
     "DebateSummary",
     "FinalDecision",
+    "MantisBaseAgent",
 ]
