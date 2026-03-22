@@ -14,6 +14,7 @@ from src.agents.base_agent import MantisBaseAgent
 from src.agents.technical_analyst import TechnicalAnalystAgent
 from src.agents.sentiment_analyst import SentimentAnalystAgent
 from src.agents.risk_manager_agent import RiskManagerAgent
+from src.agents.trader_agent import TraderAgent
 
 __all__ = [
     "AgentRole",
@@ -29,4 +30,5 @@ __all__ = [
     "TechnicalAnalystAgent",
     "SentimentAnalystAgent",
     "RiskManagerAgent",
+    "TraderAgent",
 ]
