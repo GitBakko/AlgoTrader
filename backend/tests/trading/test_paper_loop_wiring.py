@@ -168,7 +168,7 @@ class TestTrailingStopManagerInit:
             risk_manager=MagicMock(),
             execution_engine=MagicMock(),
         )
-        assert pl.trailing_stop_manager.config.tp1_risk_multiple == 1.0
+        assert pl.trailing_stop_manager.config.tp1_risk_multiple == 0.5
 
 
 @pytest.mark.trading
@@ -272,7 +272,7 @@ class TestTP1PartialClose:
             atr=20.0,
         )
 
-        # Price has reached TP1 (entry + risk_distance * tp1_multiple = 2000 + 20*1.0 = 2020)
+        # Price has reached TP1 (entry + risk_distance * tp1_multiple = 2000 + 20*0.5 = 2010)
         positions = [{"deal_id": "DEAL-TP1", "epic": "XAUUSD", "level": 2025.0}]
 
         await loop._update_trailing_stops(positions)
@@ -294,8 +294,8 @@ class TestTP1PartialClose:
             atr=20.0,
         )
 
-        # Price below TP1 (2020)
-        positions = [{"deal_id": "DEAL-STAY", "epic": "XAUUSD", "level": 2010.0}]
+        # Price below TP1 (2000 + 20*0.5 = 2010), use 2005 to stay in INITIAL
+        positions = [{"deal_id": "DEAL-STAY", "epic": "XAUUSD", "level": 2005.0}]
 
         await loop._update_trailing_stops(positions)
 

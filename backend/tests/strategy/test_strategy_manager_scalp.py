@@ -86,11 +86,12 @@ class TestScalpModeSignalGeneration:
         if signal.direction == SignalDirection.BUY:
             assert signal.confidence <= 0.5  # halved
 
-    def test_ml_disagree_blocks_signal(self, scalp_manager, prediction_sell, bullish_market_data):
-        """When ML strongly disagrees (SELL vs technical BUY), signal blocked."""
+    def test_ml_disagree_halves_confidence(self, scalp_manager, prediction_sell, bullish_market_data):
+        """When ML disagrees (SELL vs technical BUY), confidence halved but not blocked."""
         signal = scalp_manager.process_prediction(prediction_sell, "XAUUSD", bullish_market_data)
-        # Technical says BUY, ML says SELL with high confidence -> HOLD
-        assert signal.direction == SignalDirection.HOLD
+        # GURU: technical confluence decides, ML only adjusts confidence
+        assert signal.direction == SignalDirection.BUY
+        assert signal.confidence <= 0.5
 
     def test_non_scalp_mode_unchanged(self, prediction_buy):
         """Default mode (scalp_mode=False) uses ML strategy as before."""

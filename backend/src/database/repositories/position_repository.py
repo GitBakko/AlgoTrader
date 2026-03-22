@@ -294,16 +294,47 @@ class PositionRepository(BaseRepository[Position]):
             if p.closed_at:
                 last_trade_by_epic[p.epic] = p.closed_at.isoformat()
 
-        # Equity curve (cumulative P&L over time)
+        # Equity curve (cumulative P&L over time) — enriched per-day
+        # First pass: group trades by day
+        from collections import defaultdict
+        daily_buckets: dict[str, list[float]] = defaultdict(list)
+        for p in positions:
+            if p.closed_at:
+                day = p.closed_at.strftime("%Y-%m-%d")
+                daily_buckets[day].append(float(p.profit_loss))
+
+        # Second pass: build enriched equity points
+        initial_equity = 10_000.0
         equity_points: list[dict] = []
         cumulative = 0.0
-        for p in positions:
-            cumulative += float(p.profit_loss)
-            if p.closed_at:
-                equity_points.append({
-                    "date": p.closed_at.strftime("%Y-%m-%d"),
-                    "value": round(cumulative, 2),
-                })
+        cumulative_trades = 0
+        cumulative_wins = 0
+        peak_equity = initial_equity
+        for day in sorted(daily_buckets.keys()):
+            day_pnls = daily_buckets[day]
+            daily_pnl = sum(day_pnls)
+            day_wins = sum(1 for v in day_pnls if v > 0)
+            cumulative += daily_pnl
+            cumulative_trades += len(day_pnls)
+            cumulative_wins += day_wins
+            equity_now = initial_equity + cumulative
+            peak_equity = max(peak_equity, equity_now)
+            dd_pct = (
+                (equity_now - peak_equity) / peak_equity * 100
+                if peak_equity > 0 else 0.0
+            )
+            equity_points.append({
+                "date": day,
+                "value": round(cumulative, 2),
+                "daily_pnl": round(daily_pnl, 2),
+                "drawdown_pct": round(dd_pct, 2),
+                "trade_count": len(day_pnls),
+                "win_count": day_wins,
+                "cumulative_trades": cumulative_trades,
+                "cumulative_win_rate": round(
+                    cumulative_wins / cumulative_trades, 3
+                ) if cumulative_trades > 0 else 0.0,
+            })
 
         # Risk-adjusted ratios from equity curve
         if equity_points and len(equity_points) > 1:

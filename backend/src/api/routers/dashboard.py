@@ -134,7 +134,12 @@ async def get_equity_curve(
                     EquityCurvePoint(
                         date=pt["date"],
                         equity=10000.0 + pt["value"],
-                        drawdown_pct=0.0,
+                        drawdown_pct=pt.get("drawdown_pct", 0.0),
+                        daily_pnl=pt.get("daily_pnl", 0.0),
+                        trade_count=pt.get("trade_count", 0),
+                        win_count=pt.get("win_count", 0),
+                        cumulative_trades=pt.get("cumulative_trades", 0),
+                        cumulative_win_rate=pt.get("cumulative_win_rate", 0.0),
                     ).model_dump()
                     for pt in curve
                 ]

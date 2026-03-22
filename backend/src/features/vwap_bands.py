@@ -18,14 +18,20 @@ class VWAPBands:
     @staticmethod
     def add_vwap_bands(
         df: pl.DataFrame,
+        vwap_period: int = 50,
         sd_period: int = 20,
         num_sd: list[float] | None = None,
     ) -> pl.DataFrame:
         """
         Add rolling VWAP with SD bands.
 
+        Uses a rolling window (default 50 bars) instead of cumulative VWAP
+        to keep the indicator responsive to recent price/volume action.
+        For 15-min bars, 50 bars ≈ 12.5 hours of trading.
+
         Args:
             df: DataFrame with close, high, low, volume columns
+            vwap_period: Rolling window for VWAP calculation (bars)
             sd_period: Rolling window for SD calculation
             num_sd: SD multiples for bands (default: [1, 2, 3])
 
@@ -46,14 +52,24 @@ class VWAPBands:
         # Typical price
         tp = (pl.col("high") + pl.col("low") + pl.col("close")) / 3.0
 
-        # Cumulative VWAP
+        # Rolling VWAP: sum(TP * volume) / sum(volume) over window
         df = df.with_columns([
-            (tp * pl.col("volume")).cum_sum().alias("_tp_vol_cum"),
-            pl.col("volume").cum_sum().alias("_vol_cum"),
+            (tp * pl.col("volume")).alias("_tp_vol"),
+        ])
+
+        df = df.with_columns([
+            pl.col("_tp_vol")
+            .rolling_sum(window_size=vwap_period)
+            .alias("_tp_vol_roll"),
+            pl.col("volume")
+            .rolling_sum(window_size=vwap_period)
+            .alias("_vol_roll"),
         ])
 
         df = df.with_columns(
-            (pl.col("_tp_vol_cum") / pl.col("_vol_cum"))
+            pl.when(pl.col("_vol_roll") > 0)
+            .then(pl.col("_tp_vol_roll") / pl.col("_vol_roll"))
+            .otherwise(pl.col("close"))
             .fill_nan(pl.col("close"))
             .alias("vwap_rolling")
         )
@@ -92,6 +108,6 @@ class VWAPBands:
             ])
 
         # Cleanup
-        df = df.drop(["_tp_vol_cum", "_vol_cum", "_vwap_dev"])
+        df = df.drop(["_tp_vol", "_tp_vol_roll", "_vol_roll", "_vwap_dev"])
 
         return df

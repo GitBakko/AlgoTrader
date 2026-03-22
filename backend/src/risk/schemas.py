@@ -31,7 +31,7 @@ class RiskLimits(BaseModel):
     max_risk_per_trade: float = Field(default=0.02, ge=0.001, le=0.10)
     max_daily_drawdown: float = Field(default=0.05, ge=0.01, le=0.50)
     max_total_drawdown: float = Field(default=0.15, ge=0.01, le=0.50)
-    max_position_pct: float = Field(default=0.05, ge=0.01, le=0.50)
+    max_position_pct: float = Field(default=0.50, ge=0.01, le=1.0)
     max_correlated_exposure: float = Field(default=0.50, ge=0.0, le=1.0)
     max_total_open_positions: int = Field(
         default=20,

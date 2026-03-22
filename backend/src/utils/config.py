@@ -217,17 +217,45 @@ class Settings(BaseSettings):
     scalp_check_interval: int = Field(default=60, alias="SCALP_CHECK_INTERVAL")
     scalp_score_threshold: int = Field(default=55, alias="SCALP_SCORE_THRESHOLD")
     scalp_score_full_threshold: int = Field(default=70, alias="SCALP_SCORE_FULL_THRESHOLD")
-    scalp_sl_multiplier: float = Field(default=1.0, alias="SCALP_SL_MULTIPLIER")
+    scalp_sl_multiplier: float = Field(default=1.5, alias="SCALP_SL_MULTIPLIER")
+    scalp_dynamic_sl_min: float = Field(default=1.0, alias="SCALP_DYNAMIC_SL_MIN")
+    scalp_dynamic_sl_max: float = Field(default=3.0, alias="SCALP_DYNAMIC_SL_MAX")
     scalp_tp_risk_reward: float = Field(default=2.0, alias="SCALP_TP_RISK_REWARD")
     scalp_signal_dedup_seconds: int = Field(default=900, alias="SCALP_SIGNAL_DEDUP_SECONDS")
     scalp_max_open_positions: int = Field(default=3, alias="SCALP_MAX_OPEN_POSITIONS")
     scalp_max_risk_per_trade: float = Field(default=0.01, alias="SCALP_MAX_RISK_PER_TRADE")
     scalp_max_trades_per_day: int = Field(default=30, alias="SCALP_MAX_TRADES_PER_DAY")
     scalp_htf_enabled: bool = Field(default=True, alias="SCALP_HTF_ENABLED")
+    scalp_htf_gate_enabled: bool = Field(default=True, alias="SCALP_HTF_GATE_ENABLED")
+    scalp_max_hold_hours: float = Field(default=12.0, alias="SCALP_MAX_HOLD_HOURS")
+    scalp_chop_zone_min_confluence: int = Field(default=5, alias="SCALP_CHOP_ZONE_MIN_CONFLUENCE")
+    scalp_chop_zone_start: int = Field(default=16, alias="SCALP_CHOP_ZONE_START")
+    scalp_chop_zone_end: int = Field(default=20, alias="SCALP_CHOP_ZONE_END")
+    scalp_tp1_risk_multiple: float = Field(default=0.5, alias="SCALP_TP1_RISK_MULTIPLE")
+    scalp_tp2_risk_multiple: float = Field(default=1.5, alias="SCALP_TP2_RISK_MULTIPLE")
+    scalp_dead_market_adx: float = Field(default=20.0, alias="SCALP_DEAD_MARKET_ADX")
+    scalp_dead_market_bb_pctile: float = Field(default=20.0, alias="SCALP_DEAD_MARKET_BB_PCTILE")
+    scalp_asset_exclusion_enabled: bool = Field(default=True, alias="SCALP_ASSET_EXCLUSION_ENABLED")
+    scalp_asset_exclusion_lookback_days: int = Field(default=14, alias="SCALP_ASSET_EXCLUSION_LOOKBACK_DAYS")
+    scalp_asset_exclusion_min_trades: int = Field(default=5, alias="SCALP_ASSET_EXCLUSION_MIN_TRADES")
+    scalp_asset_exclusion_sharpe_threshold: float = Field(
+        default=-0.5, alias="SCALP_ASSET_EXCLUSION_SHARPE_THRESHOLD"
+    )
 
     # ===== External APIs =====
     finnhub_api_key: str = Field(default="", alias="FINNHUB_API_KEY")
     marketaux_api_key: str = Field(default="", alias="MARKETAUX_API_KEY")
+    alpha_vantage_api_key: str = Field(default="", alias="ALPHA_VANTAGE_API_KEY")
+    twelve_data_api_key: str = Field(default="", alias="TWELVE_DATA_API_KEY")
+    fred_api_key: str = Field(default="", alias="FRED_API_KEY")
+
+    # ===== Signal Intelligence Layer (SIL) =====
+    sil_enabled: bool = Field(default=False, alias="SIL_ENABLED")
+    sil_cache_ttl_minutes: int = Field(default=60, alias="SIL_CACHE_TTL_MINUTES")
+    sil_calendar_gate_enabled: bool = Field(default=True, alias="SIL_CALENDAR_GATE_ENABLED")
+    sil_calendar_minutes_before: int = Field(default=30, alias="SIL_CALENDAR_MINUTES_BEFORE")
+    sil_calendar_minutes_after: int = Field(default=15, alias="SIL_CALENDAR_MINUTES_AFTER")
+    nasdaq_data_link_api_key: str = Field(default="", alias="NASDAQ_DATA_LINK_API_KEY")
 
     # ===== Security =====
     secret_key: str = Field(default="dev_secret_key_change_in_production", alias="SECRET_KEY")

@@ -21,8 +21,8 @@ class TrailingPhase(IntEnum):
 class TrailingStopConfig(BaseModel):
     """Configuration for step trailing stop."""
 
-    tp1_risk_multiple: float = Field(default=1.0, ge=0.5, le=5.0)
-    tp2_risk_multiple: float = Field(default=2.0, ge=1.0, le=10.0)
+    tp1_risk_multiple: float = Field(default=0.5, ge=0.1, le=5.0)
+    tp2_risk_multiple: float = Field(default=1.5, ge=0.5, le=10.0)
     trailing_atr_multiplier: float = Field(default=1.5, ge=0.5, le=5.0)
     breakeven_offset_pct: float = Field(default=0.001, ge=0.0, le=0.01)
 

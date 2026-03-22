@@ -18,6 +18,8 @@ import { AuthService } from '../../core/services/auth.service';
 import { User } from '../../core/models/auth.models';
 import { AvatarComponent } from '../../shared/components/avatar/avatar.component';
 import { AvatarUploadComponent } from '../../shared/components/avatar-upload/avatar-upload.component';
+import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
+import { ToastService } from '../../shared/services/toast.service';
 
 /**
  * User Profile Component
@@ -49,6 +51,8 @@ import { AvatarUploadComponent } from '../../shared/components/avatar-upload/ava
 })
 export class UserProfileComponent implements OnInit {
   private readonly authService = inject(AuthService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly toast = inject(ToastService);
 
   readonly user = this.authService.currentUser;
   readonly loading = signal(false);
@@ -100,10 +104,15 @@ export class UserProfileComponent implements OnInit {
     this.refreshProfile();
   }
 
-  deleteAvatar(): void {
-    if (!confirm('Sei sicuro di voler eliminare il tuo avatar?')) {
-      return;
-    }
+  async deleteAvatar(): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: 'Elimina avatar',
+      message: 'Sei sicuro di voler eliminare il tuo avatar?',
+      confirmText: 'Elimina',
+      cancelText: 'Annulla',
+      color: 'danger',
+    });
+    if (!confirmed) return;
 
     this.deletingAvatar.set(true);
     this.authService.deleteAvatar().subscribe({
@@ -114,7 +123,7 @@ export class UserProfileComponent implements OnInit {
       error: (error) => {
         this.deletingAvatar.set(false);
         console.error('[UserProfileComponent] Failed to delete avatar', error);
-        alert('Errore durante l\'eliminazione dell\'avatar');
+        this.toast.error('Errore durante l\'eliminazione dell\'avatar');
       }
     });
   }

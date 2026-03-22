@@ -156,7 +156,7 @@ class AdaptiveKellySizer:
             # recover its stats instead of deadlocking.
             fallback = self._fixed_fractional(
                 equity, stop_distance, entry_price, confidence, max_position_pct
-            ) * 0.5
+            ) * 1.0
             logger.info(
                 f"Kelly negative ({stats.kelly_fraction:.4f}), "
                 f"fallback to 50% fixed-fractional: size={fallback:.4f} "

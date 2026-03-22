@@ -153,6 +153,7 @@ class FeatureBuilder:
         sentiment_data: dict | None = None,
         include_macro: bool = False,
         macro_df: pl.DataFrame | None = None,
+        sil_data: "SILData | None" = None,
     ) -> tuple[pl.DataFrame, FeatureMatrix]:
         """
         Build complete feature matrix for an asset.
@@ -213,6 +214,10 @@ class FeatureBuilder:
         # Step 4: Macro features (VIX, DXY, 10Y yield)
         if include_macro:
             df = self._add_macro_features(df, macro_df)
+
+        # Step 5: SIL features (Signal Intelligence Layer)
+        from src.features.sil_features import compute_sil_features
+        df = compute_sil_features(df, sil_data)
 
         # Step 6: Multi-timeframe alignment (optional)
         if multi_timeframe and config.additional_timeframes:

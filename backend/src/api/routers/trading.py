@@ -276,6 +276,44 @@ async def reset_circuit_breakers(request: Request):
     })
 
 
+@router.post("/reset-risk-state")
+@limiter.limit("3/minute")
+async def reset_risk_state(request: Request):
+    """Reset Kelly trade history + equity curve filter for fresh strategy start."""
+    loop = _get_loop(request)
+    if loop is None:
+        return error_response("Trading loop not initialized", 503)
+
+    # Clear Kelly trade history
+    old_kelly_size = len(loop._trade_history)
+    loop._trade_history.clear()
+
+    # Clear equity curve filter
+    old_eq_points = 0
+    if hasattr(loop.risk_manager, "equity_curve_filter"):
+        ecf = loop.risk_manager.equity_curve_filter
+        old_eq_points = len(ecf._equity_points)
+        ecf._equity_points.clear()
+
+    # Reset circuit breakers too
+    reset_list = loop.risk_manager.circuit_breakers.reset_all()
+    loop._per_asset_losses.clear()
+
+    logger.warning(
+        f"[RISK RESET] Manual full reset: "
+        f"kelly_history={old_kelly_size}->0, "
+        f"equity_points={old_eq_points}->0, "
+        f"cb={len(reset_list)}"
+    )
+
+    return success_response({
+        "message": "Risk state resettato completamente",
+        "kelly_trades_cleared": old_kelly_size,
+        "equity_points_cleared": old_eq_points,
+        "circuit_breakers_reset": len(reset_list),
+    })
+
+
 # ── Signal Notes (Trade Journal annotations) ──
 
 

@@ -14,7 +14,7 @@ class EquityCurveConfig(BaseModel):
     """Configuration for equity curve filter."""
 
     sma_window: int = Field(default=20, ge=5, le=100)
-    reduction_factor: float = Field(default=0.50, ge=0.1, le=0.9)
+    reduction_factor: float = Field(default=1.0, ge=0.1, le=1.0)
     min_trades_to_activate: int = Field(default=10, ge=3, le=50)
 
 

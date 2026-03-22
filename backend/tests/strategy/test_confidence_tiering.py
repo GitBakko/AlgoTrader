@@ -54,17 +54,23 @@ class TestMinConfidenceThreshold:
 class TestConfidenceSizeMultiplier:
     """RiskManager.confidence_size_multiplier tiers position size by confidence."""
 
-    def test_confidence_below_050_returns_zero(self):
-        assert RiskManager.confidence_size_multiplier(0.30) == 0.0
-        assert RiskManager.confidence_size_multiplier(0.49) == 0.0
+    def test_confidence_below_025_returns_zero(self):
+        assert RiskManager.confidence_size_multiplier(0.10) == 0.0
+        assert RiskManager.confidence_size_multiplier(0.24) == 0.0
 
-    def test_confidence_tier_050_gets_half_size(self):
+    def test_confidence_tier_025_gets_quarter_size(self):
+        """ML-disagree signals with confluence (0.33 typical) get 25% size."""
+        assert RiskManager.confidence_size_multiplier(0.25) == 0.25
+        assert RiskManager.confidence_size_multiplier(0.33) == 0.25
+        assert RiskManager.confidence_size_multiplier(0.39) == 0.25
+
+    def test_confidence_tier_040_gets_half_size(self):
+        assert RiskManager.confidence_size_multiplier(0.40) == 0.50
         assert RiskManager.confidence_size_multiplier(0.50) == 0.50
-        assert RiskManager.confidence_size_multiplier(0.52) == 0.50
-        assert RiskManager.confidence_size_multiplier(0.57) == 0.50
+        assert RiskManager.confidence_size_multiplier(0.54) == 0.50
 
-    def test_confidence_tier_058_gets_75pct(self):
-        assert RiskManager.confidence_size_multiplier(0.58) == 0.75
+    def test_confidence_tier_055_gets_75pct(self):
+        assert RiskManager.confidence_size_multiplier(0.55) == 0.75
         assert RiskManager.confidence_size_multiplier(0.60) == 0.75
         assert RiskManager.confidence_size_multiplier(0.64) == 0.75
 
@@ -74,13 +80,11 @@ class TestConfidenceSizeMultiplier:
         assert RiskManager.confidence_size_multiplier(0.80) == 1.0
         assert RiskManager.confidence_size_multiplier(1.0) == 1.0
 
-    def test_boundary_at_058(self):
-        """0.5799... rounds to 0.50x tier, 0.58 goes to 0.75x tier."""
-        assert RiskManager.confidence_size_multiplier(0.5799) == 0.50
-        assert RiskManager.confidence_size_multiplier(0.58) == 0.75
+    def test_boundary_at_040(self):
+        assert RiskManager.confidence_size_multiplier(0.399) == 0.25
+        assert RiskManager.confidence_size_multiplier(0.40) == 0.50
 
     def test_boundary_at_065(self):
-        """0.6499... stays in 0.75x tier, 0.65 goes to 1.0x tier."""
         assert RiskManager.confidence_size_multiplier(0.6499) == 0.75
         assert RiskManager.confidence_size_multiplier(0.65) == 1.0
 

@@ -57,6 +57,11 @@ class EquityCurvePoint(BaseModel):
     date: str
     equity: float
     drawdown_pct: float = 0.0
+    daily_pnl: float = 0.0
+    trade_count: int = 0
+    win_count: int = 0
+    cumulative_trades: int = 0
+    cumulative_win_rate: float = 0.0
 
 
 class TradeResponse(BaseModel):
