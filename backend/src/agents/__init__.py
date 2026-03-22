@@ -16,6 +16,7 @@ from src.agents.sentiment_analyst import SentimentAnalystAgent
 from src.agents.risk_manager_agent import RiskManagerAgent
 from src.agents.trader_agent import TraderAgent
 from src.agents.debate import BullBearDebate
+from src.agents.fund_manager import FundManagerAgent
 
 __all__ = [
     "AgentRole",
@@ -33,4 +34,5 @@ __all__ = [
     "RiskManagerAgent",
     "TraderAgent",
     "BullBearDebate",
+    "FundManagerAgent",
 ]
