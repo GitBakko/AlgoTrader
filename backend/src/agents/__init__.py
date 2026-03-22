@@ -12,6 +12,7 @@ from src.agents.schemas import (
 )
 from src.agents.base_agent import MantisBaseAgent
 from src.agents.technical_analyst import TechnicalAnalystAgent
+from src.agents.sentiment_analyst import SentimentAnalystAgent
 
 __all__ = [
     "AgentRole",
@@ -25,4 +26,5 @@ __all__ = [
     "FinalDecision",
     "MantisBaseAgent",
     "TechnicalAnalystAgent",
+    "SentimentAnalystAgent",
 ]
