@@ -257,6 +257,18 @@ class Settings(BaseSettings):
     sil_calendar_minutes_after: int = Field(default=15, alias="SIL_CALENDAR_MINUTES_AFTER")
     nasdaq_data_link_api_key: str = Field(default="", alias="NASDAQ_DATA_LINK_API_KEY")
 
+    # ===== Multi-Agent System (Sprint 1) =====
+    agents_enabled: bool = Field(default=False, alias="AGENTS_ENABLED")
+    agents_llm_model: str = Field(default="claude-sonnet-4-20250514", alias="AGENTS_LLM_MODEL")
+    agents_temperature: float = Field(default=0.2, alias="AGENTS_TEMPERATURE")
+    agents_max_tokens: int = Field(default=2000, alias="AGENTS_MAX_TOKENS")
+    agents_technical_weight: float = Field(default=0.4, alias="AGENTS_TECHNICAL_WEIGHT")
+    agents_sentiment_weight: float = Field(default=0.2, alias="AGENTS_SENTIMENT_WEIGHT")
+    agents_risk_weight: float = Field(default=0.4, alias="AGENTS_RISK_WEIGHT")
+    agents_risk_block_threshold: float = Field(default=0.8, alias="AGENTS_RISK_BLOCK_THRESHOLD")
+    agents_debate_enabled: bool = Field(default=True, alias="AGENTS_DEBATE_ENABLED")
+    anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
+
     # ===== Security =====
     secret_key: str = Field(default="dev_secret_key_change_in_production", alias="SECRET_KEY")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")

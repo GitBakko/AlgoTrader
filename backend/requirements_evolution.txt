@@ -1,0 +1,18 @@
+# MANTIS AI - Evolution Dependencies
+# Sprint 1-5 new dependencies (separate from main requirements.txt)
+# Install: pip install -r requirements_evolution.txt
+
+# Sprint 1: Multi-Agent Architecture
+anthropic>=0.40.0            # Claude API for LLM-based agents
+
+# Sprint 2: Reinforcement Learning
+stable-baselines3[extra]>=2.3.0  # RL algorithms (PPO, SAC, A2C, TD3)
+gymnasium>=1.0.0             # RL environments (successor to gym)
+shimmy>=2.0.0                # Compatibility layer for gymnasium
+
+# Sprint 3: Layered Memory
+sentence-transformers>=3.0.0 # Lightweight embeddings (all-MiniLM-L6-v2)
+faiss-cpu>=1.8.0             # Vector similarity search
+
+# Sprint 4: Vision AI + RAG
+mplfinance>=0.12.10b0        # Financial chart generation (matplotlib-based)
