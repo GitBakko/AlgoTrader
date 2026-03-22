@@ -1,0 +1,186 @@
+# MANTIS-EVOLUTION: Agent Orchestrator
+"""
+MantisAgentOrchestrator — the central coordinator for the MANTIS AI multi-agent
+trading pipeline.
+
+Flow:
+1. TechnicalAnalyst.analyze(context) -> TechnicalReport
+2. SentimentAnalyst.analyze(context) -> SentimentReport
+3. RiskManager.analyze(context) -> RiskReport
+4. TraderAgent.propose(technical, sentiment, risk, context) -> TradeProposal
+5. BullBearDebate.debate(proposal, technical, sentiment, risk) -> DebateSummary
+6. FundManager.decide(proposal, debate, risk) -> FinalDecision
+
+Every step is wrapped in error handling — a single-agent failure never crashes
+the pipeline. On total failure, the orchestrator returns a safe HOLD decision.
+
+An audit trail is accumulated throughout the pipeline and attached to the
+FinalDecision, providing full observability into every agent's contribution.
+"""
+
+from __future__ import annotations
+
+from loguru import logger
+
+from src.agents.debate import BullBearDebate
+from src.agents.fund_manager import FundManagerAgent
+from src.agents.risk_manager_agent import RiskManagerAgent
+from src.agents.schemas import FinalDecision, MarketContext
+from src.agents.sentiment_analyst import SentimentAnalystAgent
+from src.agents.technical_analyst import TechnicalAnalystAgent
+from src.agents.trader_agent import TraderAgent
+
+
+class MantisAgentOrchestrator:
+    """
+    Coordinates the multi-agent pipeline.
+
+    Parameters
+    ----------
+    llm_model:
+        Anthropic model identifier passed to LLM-backed agents.
+    temperature:
+        Sampling temperature for Claude calls.
+    max_tokens:
+        Max tokens per Claude response.
+    technical_weight:
+        Weight for technical analysis in the TraderAgent scoring.
+    sentiment_weight:
+        Weight for sentiment analysis in the TraderAgent scoring.
+    risk_weight:
+        Weight for risk assessment in the TraderAgent scoring.
+    debate_enabled:
+        Whether to run the BullBearDebate step.
+    risk_block_threshold:
+        Risk score above which the RiskManagerAgent sets blocking=True.
+    """
+
+    def __init__(
+        self,
+        llm_model: str = "claude-sonnet-4-20250514",
+        temperature: float = 0.2,
+        max_tokens: int = 2000,
+        technical_weight: float = 0.4,
+        sentiment_weight: float = 0.2,
+        risk_weight: float = 0.4,
+        debate_enabled: bool = True,
+        risk_block_threshold: float = 0.8,
+    ) -> None:
+        self.technical = TechnicalAnalystAgent(
+            model=llm_model, temperature=temperature, max_tokens=max_tokens
+        )
+        self.sentiment = SentimentAnalystAgent(
+            model=llm_model, temperature=temperature, max_tokens=max_tokens
+        )
+        self.risk = RiskManagerAgent(
+            model=llm_model, temperature=temperature, max_tokens=max_tokens
+        )
+        self.risk.RISK_BLOCK_THRESHOLD = risk_block_threshold
+        self.trader = TraderAgent(
+            technical_weight=technical_weight,
+            sentiment_weight=sentiment_weight,
+            risk_weight=risk_weight,
+        )
+        self.debate = BullBearDebate(use_llm=False)  # heuristic debate by default
+        self.fund_manager = FundManagerAgent()
+        self.debate_enabled = debate_enabled
+
+    # ------------------------------------------------------------------
+    # Public entry point
+    # ------------------------------------------------------------------
+
+    async def run(self, context: MarketContext) -> FinalDecision:
+        """
+        Execute the full agent pipeline. Never raises — returns HOLD on total failure.
+
+        Steps:
+        1. Technical analysis (safe)
+        2. Sentiment analysis (safe)
+        3. Risk assessment (safe)
+        4. Trade proposal (deterministic)
+        5. Bull/bear debate (optional, safe)
+        6. Fund manager final decision
+        """
+        audit_trail: list[dict] = []
+
+        # Step 1: Technical Analysis
+        technical = await self._safe_analyze(
+            self.technical, context, audit_trail, "technical"
+        )
+
+        # Step 2: Sentiment Analysis
+        sentiment = await self._safe_analyze(
+            self.sentiment, context, audit_trail, "sentiment"
+        )
+
+        # Step 3: Risk Assessment
+        risk_report = await self._safe_analyze(
+            self.risk, context, audit_trail, "risk"
+        )
+
+        # Step 4: Trade Proposal
+        proposal = self.trader.propose(technical, sentiment, risk_report, context)
+        audit_trail.append({
+            "agent": "trader",
+            "action": proposal.action,
+            "confidence": proposal.confidence,
+        })
+
+        # Step 5: Debate (optional)
+        debate_summary = None
+        if self.debate_enabled:
+            try:
+                debate_summary = await self.debate.debate(
+                    proposal, technical, sentiment, risk_report
+                )
+                audit_trail.append({
+                    "agent": "debate",
+                    "consensus": debate_summary.consensus,
+                    "confidence": debate_summary.consensus_confidence,
+                })
+            except Exception as e:
+                logger.warning(f"Debate failed: {e!r}")
+                audit_trail.append({"agent": "debate", "error": str(e)})
+
+        # Step 6: Final Decision
+        decision = self.fund_manager.decide(proposal, debate_summary, risk_report)
+        # Merge full audit trail: pipeline trail + fund_manager's own trail
+        decision.agent_audit_trail = audit_trail + decision.agent_audit_trail
+
+        return decision
+
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+
+    async def _safe_analyze(self, agent, context, audit_trail, name):
+        """Run agent analysis safely — log failure, return None on error."""
+        try:
+            result = await agent.analyze(context)
+            if result:
+                audit_trail.append({
+                    "agent": name,
+                    "status": "success",
+                    "summary": self._summarize(result, name),
+                })
+            else:
+                audit_trail.append({"agent": name, "status": "no_result"})
+            return result
+        except Exception as e:
+            logger.warning(f"[{name}] Agent failed: {e!r}")
+            audit_trail.append({
+                "agent": name,
+                "status": "error",
+                "error": str(e),
+            })
+            return None
+
+    def _summarize(self, result, name: str) -> str:
+        """Create a brief audit summary of an agent result."""
+        if name == "technical" and hasattr(result, "trend_direction"):
+            return f"{result.trend_direction} ({result.strength_score:.2f})"
+        elif name == "sentiment" and hasattr(result, "composite_score"):
+            return f"composite={result.composite_score:.2f}"
+        elif name == "risk" and hasattr(result, "risk_score"):
+            return f"risk={result.risk_score:.2f}, blocking={result.blocking}"
+        return "ok"

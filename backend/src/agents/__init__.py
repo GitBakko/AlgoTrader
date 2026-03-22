@@ -1,4 +1,4 @@
-# MANTIS-EVOLUTION: Agent schema contracts + base agent + concrete agents
+# MANTIS-EVOLUTION: Agent schema contracts + base agent + concrete agents + orchestrator
 from src.agents.schemas import (
     AgentRole,
     MarketContext,
@@ -17,6 +17,7 @@ from src.agents.risk_manager_agent import RiskManagerAgent
 from src.agents.trader_agent import TraderAgent
 from src.agents.debate import BullBearDebate
 from src.agents.fund_manager import FundManagerAgent
+from src.agents.orchestrator import MantisAgentOrchestrator
 
 __all__ = [
     "AgentRole",
@@ -35,4 +36,5 @@ __all__ = [
     "TraderAgent",
     "BullBearDebate",
     "FundManagerAgent",
+    "MantisAgentOrchestrator",
 ]
