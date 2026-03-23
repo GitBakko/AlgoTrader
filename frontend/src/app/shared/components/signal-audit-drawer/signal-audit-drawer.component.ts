@@ -50,6 +50,7 @@ export class SignalAuditDrawerComponent {
     const labels: Record<string, string> = {
       ema: 'EMA', rsi: 'RSI', macd: 'MACD',
       volume: 'Volume', adx: 'ADX', bb_keltner: 'BB/Keltner',
+      sentiment: 'Sentiment',
     };
     return labels[key] ?? key.toUpperCase();
   }
