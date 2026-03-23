@@ -30,6 +30,8 @@ from src.agents.sentiment_analyst import SentimentAnalystAgent
 from src.agents.technical_analyst import TechnicalAnalystAgent
 from src.agents.trader_agent import TraderAgent
 from src.agents.vision_agent import VisionAgent
+from src.drl.drl_ensemble_agent import MantisDRLEnsembleAgent
+from src.drl.ensemble import MantisDRLEnsemble
 
 
 class MantisAgentOrchestrator:
@@ -54,6 +56,8 @@ class MantisAgentOrchestrator:
         Whether to run the BullBearDebate step.
     vision_enabled:
         Whether to run the VisionAgent step.
+    drl_enabled:
+        Whether to run the DRL Ensemble step (step 3c).
     risk_block_threshold:
         Risk score above which the RiskManagerAgent sets blocking=True.
     """
@@ -68,6 +72,7 @@ class MantisAgentOrchestrator:
         risk_weight: float = 0.4,
         debate_enabled: bool = True,
         vision_enabled: bool = False,
+        drl_enabled: bool = False,
         risk_block_threshold: float = 0.8,
     ) -> None:
         self.technical = TechnicalAnalystAgent(
@@ -90,6 +95,13 @@ class MantisAgentOrchestrator:
         self.debate_enabled = debate_enabled
         self.vision_enabled = vision_enabled
         self.vision_agent = VisionAgent(vision_model=llm_model) if vision_enabled else None
+        self.drl_enabled = drl_enabled
+        # DRL ensemble agent: start with an empty ensemble (agents are loaded/trained separately)
+        self.drl_agent = (
+            MantisDRLEnsembleAgent(ensemble=MantisDRLEnsemble(agents={}))
+            if drl_enabled
+            else None
+        )
 
     # ------------------------------------------------------------------
     # Public entry point
@@ -144,6 +156,30 @@ class MantisAgentOrchestrator:
             except Exception as e:
                 logger.warning(f"Vision agent failed: {e!r}")
                 audit_trail.append({"agent": "vision", "status": "error", "error": str(e)})
+
+        # Step 3c: DRL Ensemble (optional)
+        if self.drl_enabled and self.drl_agent is not None:
+            try:
+                drl_signal = await self.drl_agent.analyze(context)
+                # Inject DRL signal data into context for downstream agents
+                context.drl_signal = {
+                    "action": drl_signal.action,
+                    "confidence": drl_signal.confidence,
+                    "voting_mode": drl_signal.voting_mode,
+                    "contributing_agents": drl_signal.contributing_agents,
+                }
+                audit_trail.append({
+                    "agent": "drl",
+                    "status": "success",
+                    "summary": (
+                        f"action={drl_signal.action} "
+                        f"(conf={drl_signal.confidence:.2f}, "
+                        f"mode={drl_signal.voting_mode})"
+                    ),
+                })
+            except Exception as e:
+                logger.warning(f"DRL ensemble agent failed: {e!r}")
+                audit_trail.append({"agent": "drl", "status": "error", "error": str(e)})
 
         # Step 4: Trade Proposal
         proposal = self.trader.propose(technical, sentiment, risk_report, context)

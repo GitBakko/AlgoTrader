@@ -58,6 +58,8 @@ class MarketContext(BaseModel):
     # Sprint 4: Vision AI + RAG context (optional, populated when enabled)
     vision_data: dict[str, Any] | None = None
     rag_context: str | None = None
+    # Sprint 5: DRL ensemble signal (optional, populated when drl_enabled)
+    drl_signal: dict[str, Any] | None = None
 
 
 # ---------------------------------------------------------------------------

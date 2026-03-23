@@ -19,6 +19,7 @@ from src.agents.debate import BullBearDebate
 from src.agents.fund_manager import FundManagerAgent
 from src.agents.orchestrator import MantisAgentOrchestrator
 from src.agents.vision_agent import VisionAgent
+from src.drl.drl_ensemble_agent import MantisDRLEnsembleAgent
 
 __all__ = [
     "AgentRole",
@@ -39,4 +40,5 @@ __all__ = [
     "FundManagerAgent",
     "MantisAgentOrchestrator",
     "VisionAgent",
+    "MantisDRLEnsembleAgent",
 ]
