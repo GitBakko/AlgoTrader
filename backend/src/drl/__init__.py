@@ -13,6 +13,7 @@ from src.drl.schemas import (
 from src.drl.base_drl_agent import MantisDRLAgent
 from src.drl.agents import PPOAgent, SACAgent, A2CAgent, TD3Agent
 from src.drl.performance_analyzer import MantisPerformanceAnalyzer
+from src.drl.ensemble import MantisDRLEnsemble
 
 __all__ = [
     "DRLConfig",
@@ -29,4 +30,5 @@ __all__ = [
     "A2CAgent",
     "TD3Agent",
     "MantisPerformanceAnalyzer",
+    "MantisDRLEnsemble",
 ]
