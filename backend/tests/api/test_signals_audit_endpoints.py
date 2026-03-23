@@ -78,8 +78,10 @@ class TestGetSignalByPosition:
         from src.api.routers.signals import get_signal_by_position
         mock_repo = AsyncMock()
         mock_repo.get_by_position_deal_id.return_value = None
+        mock_repo.get_latest_by_epic.return_value = None
 
         result = await get_signal_by_position(deal_id="NONE", signal_repo=mock_repo)
+        # error_response returns JSONResponse with status_code attribute
         assert result.status_code == 404
 
 
