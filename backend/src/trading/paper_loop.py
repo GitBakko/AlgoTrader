@@ -899,6 +899,14 @@ class PaperTradingLoop:
         # Phase 8: circuit breaker heartbeat (resets timeout counter)
         self.risk_manager.circuit_breakers.heartbeat()
 
+        # Daily reset: reset daily P&L tracking and daily circuit breakers at midnight UTC
+        today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if not hasattr(self, "_last_daily_reset_date") or self._last_daily_reset_date != today_utc:
+            self.risk_manager.drawdown_monitor.reset_daily()
+            self.risk_manager.circuit_breakers.reset_daily()
+            self._last_daily_reset_date = today_utc
+            logger.info(f"Daily reset triggered for {today_utc}")
+
         # Fetch positions once per iteration (avoid N+1)
         try:
             current_positions = await asyncio.wait_for(
