@@ -2,10 +2,12 @@
 """Retrieval-Augmented Generation utilities for MANTIS AI agents."""
 from src.rag.schemas import NewsItem, RAGContext, SearchResult
 from src.rag.news_ingester import MantisNewsIngester
+from src.rag.context_builder import MantisRAGContextBuilder
 
 __all__ = [
     "NewsItem",
     "RAGContext",
     "SearchResult",
     "MantisNewsIngester",
+    "MantisRAGContextBuilder",
 ]
