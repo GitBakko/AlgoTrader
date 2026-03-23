@@ -237,6 +237,16 @@ async def lifespan(app: FastAPI):
             f"{recovery_report.trade_history_count} trades"
         )
 
+    # MANTIS-FIX: Force daily reset after state recovery to prevent stale
+    # daily_start_equity from tripping the daily loss circuit breaker.
+    # This ensures daily P&L tracking starts fresh from current equity.
+    app.state.risk_manager.drawdown_monitor.reset_daily()
+    app.state.risk_manager.circuit_breakers.reset_daily()
+    logger.info(
+        f"Daily P&L reset after state recovery — "
+        f"daily_start={app.state.risk_manager.drawdown_monitor.state.daily_start_equity:.2f}"
+    )
+
     # Store recovered trailing stop manager for PaperTradingLoop
     app.state.recovered_trailing_stop_manager = temp_trailing_stop_manager
 
