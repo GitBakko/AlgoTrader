@@ -20,6 +20,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from src.api.routers import (
+    agents,
     analytics,
     auth,
     backtest,
@@ -677,6 +678,7 @@ app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"]
 app.include_router(sil.router, prefix="/api/sil", tags=["SIL"])
 app.include_router(vision.router, prefix="/api/vision", tags=["Vision AI"])
 app.include_router(drl.router, prefix="/api/drl", tags=["DRL Ensemble"])
+app.include_router(agents.router, prefix="/api/agents", tags=["Agents"])
 
 # ===== WebSocket Endpoints =====
 app.websocket("/ws/prices")(prices_endpoint)
