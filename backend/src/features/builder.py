@@ -278,6 +278,7 @@ class FeatureBuilder:
         config: AssetFeatureConfig | None = None,
         include_regime: bool = True,
         normalize: bool = True,
+        sil_data: "SILData | None" = None,  # NEW: sentiment/macro from Signal Intelligence Layer
     ) -> tuple[pl.DataFrame, FeatureMatrix]:
         """
         Build features from an existing DataFrame (no data loading).
@@ -309,6 +310,10 @@ class FeatureBuilder:
             if "adx" in df.columns and f"ema_{detector.ema_period}" in df.columns:
                 df = detector.detect(df)
                 df = self._add_regime_features(df)
+
+        # SIL features (sentiment/macro from Signal Intelligence Layer)
+        from src.features.sil_features import compute_sil_features
+        df = compute_sil_features(df, sil_data)
 
         # Normalize
         feature_cols = [c for c in df.columns if c not in initial_cols and c != "regime"]

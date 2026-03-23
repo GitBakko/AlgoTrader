@@ -93,7 +93,7 @@ class PredictionService:
         logger.info(f"PredictionService: {loaded} models loaded")
         return loaded
 
-    def predict(self, epic: str, timeframe: str = "1h") -> PredictionResult | None:
+    def predict(self, epic: str, timeframe: str = "1h", sil_data=None) -> PredictionResult | None:
         """
         Generate prediction for an asset using loaded model.
 
@@ -121,6 +121,7 @@ class PredictionService:
             df_features, matrix = self.feature_builder.build_features(
                 epic=epic, timeframe=timeframe,
                 normalize=True, include_regime=True, multi_timeframe=True,
+                sil_data=sil_data,
             )
         else:
             df = self.data_access.get_candles(epic, timeframe, limit=300)
@@ -130,6 +131,7 @@ class PredictionService:
             self._last_candles_cache[epic] = (timeframe, df)
             df_features, matrix = self.feature_builder.build_features_from_df(
                 df, epic, timeframe, normalize=True, include_regime=True,
+                sil_data=sil_data,
             )
 
         if df_features.is_empty() or len(df_features) < 1:
