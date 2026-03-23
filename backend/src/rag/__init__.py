@@ -3,6 +3,7 @@
 from src.rag.schemas import NewsItem, RAGContext, SearchResult
 from src.rag.news_ingester import MantisNewsIngester
 from src.rag.context_builder import MantisRAGContextBuilder
+from src.rag.vector_store import MantisVectorStore
 
 __all__ = [
     "NewsItem",
@@ -10,4 +11,5 @@ __all__ = [
     "SearchResult",
     "MantisNewsIngester",
     "MantisRAGContextBuilder",
+    "MantisVectorStore",
 ]
