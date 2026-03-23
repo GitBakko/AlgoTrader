@@ -281,6 +281,15 @@ class Settings(BaseSettings):
     rl_learning_rate: float = Field(default=3e-4, alias="RL_LEARNING_RATE")
     rl_total_timesteps: int = Field(default=50000, alias="RL_TOTAL_TIMESTEPS")
 
+    # ===== Memory System (Sprint 3) =====
+    memory_enabled: bool = Field(default=False, alias="MEMORY_ENABLED")
+    memory_stm_max_signals: int = Field(default=50, alias="MEMORY_STM_MAX_SIGNALS")
+    memory_stm_max_trades: int = Field(default=20, alias="MEMORY_STM_MAX_TRADES")
+    memory_decay_lambda: float = Field(default=0.1, alias="MEMORY_DECAY_LAMBDA")
+    memory_consolidation_hours: int = Field(default=24, alias="MEMORY_CONSOLIDATION_HOURS")
+    memory_episodic_threshold: float = Field(default=0.8, alias="MEMORY_EPISODIC_THRESHOLD")
+    memory_db_path: str = Field(default="data/memory/mantis_memory.db", alias="MEMORY_DB_PATH")
+
     # ===== Security =====
     secret_key: str = Field(default="dev_secret_key_change_in_production", alias="SECRET_KEY")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
