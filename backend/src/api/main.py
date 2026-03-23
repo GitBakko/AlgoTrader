@@ -36,6 +36,7 @@ from src.api.routers import (
     strategy,
     system,
     trading,
+    vision,
 )
 from src.api.websocket import notifications_endpoint, prices_endpoint, trades_endpoint
 from src.database.session import DatabaseManager
@@ -673,6 +674,7 @@ app.include_router(monitoring.router, prefix="/api", tags=["Monitoring"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(sil.router, prefix="/api/sil", tags=["SIL"])
+app.include_router(vision.router, prefix="/api/vision", tags=["Vision AI"])
 
 # ===== WebSocket Endpoints =====
 app.websocket("/ws/prices")(prices_endpoint)
