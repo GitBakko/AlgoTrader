@@ -58,6 +58,7 @@ class ModelTrainer:
         save_best: bool = True,
         multi_timeframe: bool = False,
         include_sentiment: bool = False,
+        sil_data=None,
     ) -> TrainingResult:
         """
         Run the full training pipeline.
@@ -88,6 +89,7 @@ class ModelTrainer:
             include_regime=True,
             multi_timeframe=multi_timeframe,
             include_sentiment=include_sentiment,
+            sil_data=sil_data,
         )
 
         if df.is_empty():

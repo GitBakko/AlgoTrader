@@ -8,7 +8,7 @@ import subprocess
 import sys
 from pathlib import Path as FilePath
 
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, Path, Request
 from loguru import logger
 
 from src.api.dependencies import get_model_versioning, get_prediction_service
@@ -282,6 +282,7 @@ async def train_model(epic: str = Path(...)):
 
 @router.post("/retrain-all")
 async def retrain_all(
+    request: Request,
     prediction_service=Depends(get_prediction_service),
 ):
     """Trigger background retraining for all active assets."""
@@ -289,8 +290,14 @@ async def retrain_all(
 
     from src.models.auto_retrain import retrain_all_models
 
+    # Pass current SIL data so models train with sentiment features
+    sil_data = None
+    loop = getattr(request.app.state, "paper_loop", None)
+    if loop and getattr(loop, "_sil_clients_initialized", False):
+        sil_data = getattr(loop, "_sil_data", None)
+
     async def _run():
-        await retrain_all_models(prediction_service=prediction_service)
+        await retrain_all_models(prediction_service=prediction_service, sil_data=sil_data)
 
     asyncio.create_task(_run(), name="manual_retrain_all")
     logger.info("Manual retrain-all triggered via API")

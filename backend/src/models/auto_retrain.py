@@ -52,6 +52,7 @@ def _train_single_asset(
     epic: str,
     timeframe: str = "1h",
     horizon_bars: int = 12,
+    sil_data=None,
 ) -> tuple[str, bool, str]:
     """
     Train model for a single asset (blocking/sync).
@@ -97,6 +98,7 @@ def _train_single_asset(
             timeframe=timeframe,
             save_best=True,
             multi_timeframe=True,
+            sil_data=sil_data,
         )
 
         avg_f1 = result.avg_test_metrics.get("f1_macro", 0.0)
@@ -111,6 +113,7 @@ async def retrain_all_models(
     prediction_service=None,
     timeframe: str = "1h",
     horizon_bars: int = 12,
+    sil_data=None,
 ) -> dict[str, bool]:
     """
     Retrain all active asset models in a background thread pool.
@@ -126,7 +129,7 @@ async def retrain_all_models(
     for epic in assets:
         # Run CPU-intensive training in thread pool to avoid blocking event loop
         epic_result, success, msg = await asyncio.to_thread(
-            _train_single_asset, epic, timeframe, horizon_bars,
+            _train_single_asset, epic, timeframe, horizon_bars, sil_data,
         )
         results[epic_result] = success
         status = "OK" if success else "FAIL"
