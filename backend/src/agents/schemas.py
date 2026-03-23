@@ -55,6 +55,9 @@ class MarketContext(BaseModel):
     timestamp: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
+    # Sprint 4: Vision AI + RAG context (optional, populated when enabled)
+    vision_data: dict[str, Any] | None = None
+    rag_context: str | None = None
 
 
 # ---------------------------------------------------------------------------

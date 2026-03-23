@@ -18,6 +18,7 @@ from src.agents.trader_agent import TraderAgent
 from src.agents.debate import BullBearDebate
 from src.agents.fund_manager import FundManagerAgent
 from src.agents.orchestrator import MantisAgentOrchestrator
+from src.agents.vision_agent import VisionAgent
 
 __all__ = [
     "AgentRole",
@@ -37,4 +38,5 @@ __all__ = [
     "BullBearDebate",
     "FundManagerAgent",
     "MantisAgentOrchestrator",
+    "VisionAgent",
 ]

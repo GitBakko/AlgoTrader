@@ -29,6 +29,7 @@ from src.agents.schemas import FinalDecision, MarketContext
 from src.agents.sentiment_analyst import SentimentAnalystAgent
 from src.agents.technical_analyst import TechnicalAnalystAgent
 from src.agents.trader_agent import TraderAgent
+from src.agents.vision_agent import VisionAgent
 
 
 class MantisAgentOrchestrator:
@@ -51,6 +52,8 @@ class MantisAgentOrchestrator:
         Weight for risk assessment in the TraderAgent scoring.
     debate_enabled:
         Whether to run the BullBearDebate step.
+    vision_enabled:
+        Whether to run the VisionAgent step.
     risk_block_threshold:
         Risk score above which the RiskManagerAgent sets blocking=True.
     """
@@ -64,6 +67,7 @@ class MantisAgentOrchestrator:
         sentiment_weight: float = 0.2,
         risk_weight: float = 0.4,
         debate_enabled: bool = True,
+        vision_enabled: bool = False,
         risk_block_threshold: float = 0.8,
     ) -> None:
         self.technical = TechnicalAnalystAgent(
@@ -84,6 +88,8 @@ class MantisAgentOrchestrator:
         self.debate = BullBearDebate(use_llm=False)  # heuristic debate by default
         self.fund_manager = FundManagerAgent()
         self.debate_enabled = debate_enabled
+        self.vision_enabled = vision_enabled
+        self.vision_agent = VisionAgent(vision_model=llm_model) if vision_enabled else None
 
     # ------------------------------------------------------------------
     # Public entry point
@@ -117,6 +123,27 @@ class MantisAgentOrchestrator:
         risk_report = await self._safe_analyze(
             self.risk, context, audit_trail, "risk"
         )
+
+        # Step 3b: Vision + RAG (optional)
+        if self.vision_enabled and self.vision_agent is not None:
+            try:
+                vision_signal = await self.vision_agent.analyze(context)
+                # Inject vision data into context for downstream agents
+                context.vision_data = {
+                    "trend": vision_signal.vision_report.trend_direction if vision_signal.vision_report else "NEUTRAL",
+                    "confidence": vision_signal.chart_confidence,
+                    "patterns": vision_signal.vision_report.key_patterns if vision_signal.vision_report else [],
+                    "insight": vision_signal.vision_report.actionable_insight if vision_signal.vision_report else "",
+                }
+                context.rag_context = vision_signal.rag_context_summary
+                audit_trail.append({
+                    "agent": "vision",
+                    "status": "success",
+                    "summary": f"{vision_signal.vision_report.trend_direction if vision_signal.vision_report else 'N/A'} (conf={vision_signal.chart_confidence:.2f})",
+                })
+            except Exception as e:
+                logger.warning(f"Vision agent failed: {e!r}")
+                audit_trail.append({"agent": "vision", "status": "error", "error": str(e)})
 
         # Step 4: Trade Proposal
         proposal = self.trader.propose(technical, sentiment, risk_report, context)
