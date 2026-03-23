@@ -302,6 +302,19 @@ class Settings(BaseSettings):
     rag_news_lookback_hours: int = Field(default=4, alias="RAG_NEWS_LOOKBACK_HOURS")
     rag_vector_store_path: str = Field(default="data/rag/vector_store", alias="RAG_VECTOR_STORE_PATH")
 
+    # ===== DRL Ensemble (Sprint 5) =====
+    drl_enabled: bool = Field(default=False, alias="DRL_ENABLED")
+    drl_algorithms: str = Field(default="PPO,SAC,A2C,TD3", alias="DRL_ALGORITHMS")
+    drl_voting_mode: str = Field(default="REGIME_ROUTING", alias="DRL_VOTING_MODE")
+    drl_confidence_threshold: float = Field(default=0.6, alias="DRL_CONFIDENCE_THRESHOLD")
+    drl_ensemble_weight: float = Field(default=0.25, alias="DRL_ENSEMBLE_WEIGHT")
+    drl_total_timesteps: int = Field(default=50000, alias="DRL_TOTAL_TIMESTEPS")
+    drl_retrain_interval_days: int = Field(default=7, alias="DRL_RETRAIN_INTERVAL_DAYS")
+    drl_train_test_split: float = Field(default=0.8, alias="DRL_TRAIN_TEST_SPLIT")
+    drl_sliding_window_candles: int = Field(default=2000, alias="DRL_SLIDING_WINDOW_CANDLES")
+    drl_min_sharpe_for_deploy: float = Field(default=0.5, alias="DRL_MIN_SHARPE_DEPLOY")
+    drl_max_drawdown_for_deploy: float = Field(default=0.15, alias="DRL_MAX_DD_DEPLOY")
+
     # ===== Security =====
     secret_key: str = Field(default="dev_secret_key_change_in_production", alias="SECRET_KEY")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
