@@ -8,20 +8,21 @@ Instead of additive scoring with a threshold, each indicator group
 votes BUY/SELL/NEUTRAL independently. A trade fires when enough
 indicator groups agree on the same direction.
 
-6 indicator groups (each votes independently):
+7 indicator groups (each votes independently):
   1. EMA Trend  — EMA(9) vs EMA(21) cross direction
   2. RSI        — Oversold (<45) = BUY, Overbought (>55) = SELL
   3. MACD       — Histogram + crossover direction
   4. Volume     — Confirmation boost (volume > 1.2x SMA)
   5. ADX        — Trend strength confirmation (ADX > 20)
   6. BB/Keltner — Squeeze breakout direction
+  7. Sentiment  — SIL composite score (Fear&Greed, FRED, Alpha Vantage, COT, Social)
 
 Gate filters (binary pass/fail):
   - Session: kill zone or active session (off-session = hard block)
   - VWAP: directional gate (buy only above VWAP, sell only below)
   - HTF: adds/removes 1 vote for alignment/opposition
 
-Entry rule: confluence_count >= MIN_CONFLUENCE (default 3/6)
+Entry rule: confluence_count >= MIN_CONFLUENCE (default 3/7)
 """
 
 import polars as pl
@@ -152,6 +153,29 @@ class ScalpScoreStrategy(BaseStrategy):
 
         return 0, details
 
+    @staticmethod
+    def _vote_sentiment(
+        composite_score: float,
+        bullish_threshold: float = 0.6,
+        bearish_threshold: float = 0.35,
+    ) -> tuple[int, dict]:
+        """Sentiment vote based on SIL composite score.
+
+        Thresholds:
+        - composite > 0.6 → BULLISH (+1)
+        - composite < 0.35 → BEARISH (-1)
+        - otherwise → NEUTRAL (0)
+        - composite == 0.0 → NEUTRAL (no SIL data, don't influence)
+        """
+        details = {"composite": composite_score}
+        if composite_score <= 0.0:
+            return 0, details
+        if composite_score > bullish_threshold:
+            return 1, details
+        elif composite_score < bearish_threshold:
+            return -1, details
+        return 0, details
+
     # ------------------------------------------------------------------
     # Main signal generation
     # ------------------------------------------------------------------
@@ -234,6 +258,10 @@ class ScalpScoreStrategy(BaseStrategy):
             float(current_bar.get("bb_middle", 0)),
         )
 
+        # 7th vote: Sentiment (SIL composite score)
+        sil_composite = float(current_bar.get("sil_composite_score", 0.0))
+        sentiment_vote, sentiment_details = self._vote_sentiment(sil_composite)
+
         # Build votes data for audit trail
         votes_data = {
             "ema": {"value": ema_vote, **ema_details},
@@ -242,11 +270,12 @@ class ScalpScoreStrategy(BaseStrategy):
             "volume": {"value": vol_vote, **vol_details},
             "adx": {"value": adx_vote, **adx_details},
             "bb_keltner": {"value": bb_vote, **bb_details},
+            "sentiment": {"value": sentiment_vote, **sentiment_details},
         }
 
         # Volume and ADX are direction-agnostic confirmations.
         # They amplify the majority direction.
-        directional_votes = [ema_vote, rsi_vote, macd_vote, bb_vote]
+        directional_votes = [ema_vote, rsi_vote, macd_vote, bb_vote, sentiment_vote]
         buy_dir = sum(1 for v in directional_votes if v > 0)
         sell_dir = sum(1 for v in directional_votes if v < 0)
 
@@ -309,7 +338,8 @@ class ScalpScoreStrategy(BaseStrategy):
         # Vote summary for logging
         votes_str = (
             f"EMA={ema_vote:+d} RSI={rsi_vote:+d} MACD={macd_vote:+d} "
-            f"BB={bb_vote:+d} VOL={vol_vote:+d} ADX={adx_vote:+d}"
+            f"BB={bb_vote:+d} VOL={vol_vote:+d} ADX={adx_vote:+d} "
+            f"SENT={sentiment_vote:+d}"
         )
 
         # Determine signal
@@ -336,19 +366,19 @@ class ScalpScoreStrategy(BaseStrategy):
             if direction == SignalDirection.BUY and htf_bias == "bearish":
                 logger.info(
                     f"[{epic}] HTF gate: BUY blocked by bearish 1H trend "
-                    f"(confluence={confluence}/6)"
+                    f"(confluence={confluence}/7)"
                 )
                 return self._hold(epic, price)
             if direction == SignalDirection.SELL and htf_bias == "bullish":
                 logger.info(
                     f"[{epic}] HTF gate: SELL blocked by bullish 1H trend "
-                    f"(confluence={confluence}/6)"
+                    f"(confluence={confluence}/7)"
                 )
                 return self._hold(epic, price)
 
         # Confidence: map confluence count to [0.3, 1.0]
-        # 3/6 = 0.50, 4/6 = 0.67, 5/6 = 0.83, 6/6 = 1.0
-        confidence = min(1.0, confluence / 6.0)
+        # 3/7 = 0.43, 4/7 = 0.57, 5/7 = 0.71, 6/7 = 0.86, 7/7 = 1.0
+        confidence = min(1.0, confluence / 7.0)
 
         # SL / TP from config
         sl_mult = config.stop_multiplier
@@ -365,7 +395,7 @@ class ScalpScoreStrategy(BaseStrategy):
         htf_info = f" HTF={htf_bias}" if htf_bias else ""
         logger.info(
             f"[{epic}] Confluence: {direction.value} "
-            f"({confluence}/6) [{votes_str}]{vwap_info}{htf_info}"
+            f"({confluence}/7) [{votes_str}]{vwap_info}{htf_info}"
         )
 
         # Assemble audit metadata

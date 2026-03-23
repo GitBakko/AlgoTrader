@@ -1132,7 +1132,10 @@ class PaperTradingLoop:
                 logger.debug(f"[{epic}] Calendar gate error (non-blocking): {e}")
 
         # Step 1: ML Prediction
-        prediction = self.prediction_service.predict(epic, timeframe=self._candle_resolution)
+        prediction = self.prediction_service.predict(
+            epic, timeframe=self._candle_resolution,
+            sil_data=self._sil_data if self._sil_clients_initialized else None,
+        )
         if prediction is None:
             logger.debug(f"[{epic}] No prediction generated")
             return
@@ -1149,6 +1152,20 @@ class PaperTradingLoop:
         if market_data is None:
             logger.warning(f"[{epic}] No market data available")
             return
+
+        # Step 2a: Inject SIL composite score for ScalpScore sentiment vote
+        if self._sil_data and self._sil_clients_initialized:
+            from src.features.sil_features import _compute_composite
+            _fg = self._sil_data.fear_greed
+            _fred = self._sil_data.fred
+            _real_yield = _fred.real_yield_10y if _fred.real_yield_10y is not None else 0.0
+            market_data["sil_composite_score"] = _compute_composite(
+                fear_greed_value=_fg.normalized,
+                gold_bullish_yield=1.0 if _real_yield < -1.0 else 0.0,
+                alpha_bullish=self._sil_data.alpha_vantage.bullish_ratio,
+                cot_net_norm=self._sil_data.cot.net_position_normalized,
+                social_bullish=self._sil_data.social.combined_bullish_ratio,
+            )
 
         # Step 2b: Fetch M1 bars for ORB+FVG epics
         if epic in self.strategy_manager.orb_fvg_epics:
