@@ -290,6 +290,18 @@ class Settings(BaseSettings):
     memory_episodic_threshold: float = Field(default=0.8, alias="MEMORY_EPISODIC_THRESHOLD")
     memory_db_path: str = Field(default="data/memory/mantis_memory.db", alias="MEMORY_DB_PATH")
 
+    # ===== Vision AI (Sprint 4) =====
+    vision_enabled: bool = Field(default=False, alias="VISION_ENABLED")
+    vision_llm_model: str = Field(default="claude-sonnet-4-20250514", alias="VISION_LLM_MODEL")
+    vision_chart_width: int = Field(default=1200, alias="VISION_CHART_WIDTH")
+    vision_chart_height: int = Field(default=600, alias="VISION_CHART_HEIGHT")
+
+    # ===== RAG Pipeline (Sprint 4) =====
+    rag_enabled: bool = Field(default=False, alias="RAG_ENABLED")
+    rag_max_context_tokens: int = Field(default=2000, alias="RAG_MAX_CONTEXT_TOKENS")
+    rag_news_lookback_hours: int = Field(default=4, alias="RAG_NEWS_LOOKBACK_HOURS")
+    rag_vector_store_path: str = Field(default="data/rag/vector_store", alias="RAG_VECTOR_STORE_PATH")
+
     # ===== Security =====
     secret_key: str = Field(default="dev_secret_key_change_in_production", alias="SECRET_KEY")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
