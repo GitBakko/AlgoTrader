@@ -102,7 +102,10 @@ class MantisDRLAgent(ABC):
             return 0, {"confidence": 0.0}  # HOLD
 
         action, _states = self._model.predict(observation, deterministic=deterministic)
-        return int(action), {"confidence": 0.7 if deterministic else 0.5}
+        # For continuous (Box) action spaces, action is a numpy array.
+        # Flatten to scalar: take first element and convert to int.
+        action_scalar = np.asarray(action).flat[0]
+        return int(action_scalar), {"confidence": 0.7 if deterministic else 0.5}
 
     # ------------------------------------------------------------------
     # Persistence
