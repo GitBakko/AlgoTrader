@@ -147,6 +147,21 @@ class PaperTradingLoop:
         if _settings.sil_enabled:
             self._init_sil_clients()
 
+        # MANTIS-EVOLUTION: Multi-agent orchestrator (optional, feature-flag gated)
+        self._agents_enabled = _init_settings.agents_enabled
+        self._orchestrator = None
+        if self._agents_enabled:
+            try:
+                from src.agents.orchestrator import MantisAgentOrchestrator
+                self._orchestrator = MantisAgentOrchestrator(
+                    vision_enabled=_init_settings.vision_enabled,
+                    drl_enabled=_init_settings.drl_enabled,
+                )
+                logger.info("Multi-agent orchestrator initialized")
+            except Exception as e:
+                logger.warning(f"Orchestrator init failed: {e!r} — agents disabled")
+                self._agents_enabled = False
+
     @property
     def is_running(self) -> bool:
         return self._running
@@ -1477,6 +1492,34 @@ class PaperTradingLoop:
                     except Exception as e:
                         logger.warning(f"[{epic}] Signal-position link failed: {e}")
 
+            # MANTIS-EVOLUTION: Run multi-agent analysis (non-blocking enrichment)
+            if self._agents_enabled and self._orchestrator:
+                try:
+                    from src.agents.schemas import MarketContext
+                    agent_ctx = MarketContext(
+                        epic=epic,
+                        current_price=signal.entry_price,
+                        atr=market_data.get("atr", 1.0),
+                        features=market_data,
+                        regime=market_data.get("regime"),
+                        open_positions=len(open_positions),
+                        equity=equity,
+                    )
+                    agent_decision = await self._orchestrator.run(agent_ctx)
+                    signal_info["agent_decision"] = {
+                        "action": agent_decision.action,
+                        "approved": agent_decision.approved,
+                        "confidence": agent_decision.confidence,
+                        "override_reason": agent_decision.override_reason,
+                        "audit_trail": agent_decision.agent_audit_trail[:5],  # first 5 entries
+                    }
+                    logger.info(
+                        f"[{epic}] Agent decision: {agent_decision.action} "
+                        f"(approved={agent_decision.approved}, conf={agent_decision.confidence:.2f})"
+                    )
+                except Exception as e:
+                    logger.debug(f"[{epic}] Agent enrichment failed: {e!r}")
+
         else:
             signal_info["status"] = "exec_failed"
             signal_info["rejection_reason"] = exec_result.error
@@ -1962,6 +2005,12 @@ class PaperTradingLoop:
                 "fetch_errors": self._sil_data.fetch_errors if self._sil_data else [],
                 "fear_greed_value": self._sil_data.fear_greed.value if self._sil_data else None,
                 "composite_score": None,  # Populated from features
+            },
+            "agents": {
+                "enabled": self._agents_enabled,
+                "orchestrator_active": self._orchestrator is not None,
+                "vision_enabled": _settings.vision_enabled,
+                "drl_enabled": _settings.drl_enabled,
             },
         }
 
