@@ -202,6 +202,7 @@ class Settings(BaseSettings):
     max_risk_per_trade: float = Field(default=0.02, alias="MAX_RISK_PER_TRADE")
     max_daily_drawdown: float = Field(default=0.05, alias="MAX_DAILY_DRAWDOWN")
     max_total_drawdown: float = Field(default=0.15, alias="MAX_TOTAL_DRAWDOWN")
+    cb_daily_loss_limit: float = Field(default=0.10, alias="CB_DAILY_LOSS_LIMIT")
 
     # ===== Trading =====
     trading_enabled: bool = Field(default=False, alias="TRADING_ENABLED")

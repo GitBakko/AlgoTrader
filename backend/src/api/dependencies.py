@@ -190,10 +190,14 @@ def init_services(app) -> None:
     )
 
     # Core trading services
+    from src.risk.circuit_breakers import CircuitBreakerConfig
+    cb_config = CircuitBreakerConfig(daily_loss_limit=settings.cb_daily_loss_limit)
+
     app.state.execution_engine = ExecutionEngine(mode=ExecutionMode.PAPER)
     app.state.risk_manager = RiskManager(
         initial_equity=10000.0,
         limits=limits,
+        circuit_breaker_config=cb_config,
         kelly_sizer=AdaptiveKellySizer(),
     )
     app.state.strategy_manager = StrategyManager.from_optimal_thresholds()
