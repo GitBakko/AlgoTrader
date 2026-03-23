@@ -24,6 +24,7 @@ from src.api.routers import (
     auth,
     backtest,
     dashboard,
+    drl,
     export,
     markets,
     models,
@@ -675,6 +676,7 @@ app.include_router(notifications.router, prefix="/api/notifications", tags=["Not
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(sil.router, prefix="/api/sil", tags=["SIL"])
 app.include_router(vision.router, prefix="/api/vision", tags=["Vision AI"])
+app.include_router(drl.router, prefix="/api/drl", tags=["DRL Ensemble"])
 
 # ===== WebSocket Endpoints =====
 app.websocket("/ws/prices")(prices_endpoint)
