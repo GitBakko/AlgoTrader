@@ -499,8 +499,21 @@ class StateRecoveryService:
                 # .state property returns a model_copy() which would be discarded)
                 dm = self.risk_manager.drawdown_monitor
                 dm._state.peak_equity = float(snapshot.peak_equity)
-                dm._state.daily_start_equity = float(snapshot.daily_start_equity)
                 dm._state.current_equity = float(snapshot.current_equity)
+
+                # FIX: If snapshot is from a previous day, reset daily_start to current equity
+                # to prevent stale daily P&L from tripping circuit breakers on restart
+                from datetime import datetime, timezone
+                snapshot_date = snapshot.snapshot_at.strftime("%Y-%m-%d") if snapshot.snapshot_at else ""
+                today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                if snapshot_date != today:
+                    dm._state.daily_start_equity = float(snapshot.current_equity)
+                    logger.info(
+                        f"Daily start equity reset to current ({snapshot.current_equity:.2f}) — "
+                        f"snapshot from {snapshot_date}, today is {today}"
+                    )
+                else:
+                    dm._state.daily_start_equity = float(snapshot.daily_start_equity)
 
                 # Restore CircuitBreaker state (_consecutive_losses is private)
                 cb = self.risk_manager.circuit_breakers
