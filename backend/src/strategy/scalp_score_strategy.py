@@ -279,24 +279,30 @@ class ScalpScoreStrategy(BaseStrategy):
         buy_dir = sum(1 for v in directional_votes if v > 0)
         sell_dir = sum(1 for v in directional_votes if v < 0)
 
-        # Determine majority direction
+        # Determine majority direction.
+        # FIX: Require minimum 3 directional votes before adding confirmations.
+        # This prevents VOL+ADX from inflating weak 2/5 signals into tradeable ones.
+        MIN_DIRECTIONAL_FOR_CONFIRMATION = 3
+
         if buy_dir > sell_dir:
             majority = 1  # BUY majority
             buy_count = buy_dir
             sell_count = sell_dir
-            # Confirmation votes add to majority
-            if vol_vote > 0:
-                buy_count += 1
-            if adx_vote > 0:
-                buy_count += 1
+            # Confirmation votes only add if directional consensus is strong enough
+            if buy_dir >= MIN_DIRECTIONAL_FOR_CONFIRMATION:
+                if vol_vote > 0:
+                    buy_count += 1
+                if adx_vote > 0:
+                    buy_count += 1
         elif sell_dir > buy_dir:
             majority = -1  # SELL majority
             buy_count = buy_dir
             sell_count = sell_dir
-            if vol_vote > 0:
-                sell_count += 1
-            if adx_vote > 0:
-                sell_count += 1
+            if sell_dir >= MIN_DIRECTIONAL_FOR_CONFIRMATION:
+                if vol_vote > 0:
+                    sell_count += 1
+                if adx_vote > 0:
+                    sell_count += 1
         else:
             # Tied or all neutral — no trade
             majority = 0

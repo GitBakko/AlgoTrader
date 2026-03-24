@@ -24,6 +24,7 @@ from src.execution.schemas import ExecutionMode
 from src.models.prediction_service import PredictionService
 from src.risk.asset_performance_tracker import AssetPerformanceTracker
 from src.risk.risk_manager import RiskManager
+from src.risk.stop_manager import StopManager
 from src.risk.trailing_stop_manager import TrailingPhase, TrailingStopConfig, TrailingStopManager
 from src.monitoring.metrics import MetricsCollector
 from src.monitoring.trade_logger import get_trade_logger, SignalType, ExecutionStatus, RiskEventType
@@ -36,6 +37,26 @@ from src.utils.constants import TRADABLE_ASSETS
 _settings = get_settings()
 CHECK_INTERVAL = _settings.scalp_check_interval if _settings.scalp_mode_enabled else 300
 MAX_SIGNAL_HISTORY = 200
+
+
+def _recalculate_sl_tp_from_fill(
+    direction: str,
+    fill_price: float,
+    atr: float,
+    stop_multiplier: float,
+    risk_reward: float,
+) -> tuple[float, float]:
+    """Recalculate SL/TP from actual fill price (not candle close)."""
+    sl = StopManager.calculate_stop_loss(direction, fill_price, atr, stop_multiplier)
+    tp = StopManager.calculate_take_profit(direction, fill_price, atr, stop_multiplier, risk_reward)
+    return sl, tp
+
+
+def _validate_sl_side(direction: str, entry: float, sl: float) -> bool:
+    """Validate that SL is on the correct side of entry price."""
+    if direction == "BUY":
+        return sl < entry
+    return sl > entry  # SELL: SL must be above entry
 
 
 class PaperTradingLoop:
@@ -1155,17 +1176,30 @@ class PaperTradingLoop:
 
         # Step 2a: Inject SIL composite score for ScalpScore sentiment vote
         if self._sil_data and self._sil_clients_initialized:
-            from src.features.sil_features import _compute_composite
             _fg = self._sil_data.fear_greed
             _fred = self._sil_data.fred
-            _real_yield = _fred.real_yield_10y if _fred.real_yield_10y is not None else 0.0
-            market_data["sil_composite_score"] = _compute_composite(
-                fear_greed_value=_fg.normalized,
-                gold_bullish_yield=1.0 if _real_yield < -1.0 else 0.0,
-                alpha_bullish=self._sil_data.alpha_vantage.bullish_ratio,
-                cot_net_norm=self._sil_data.cot.net_position_normalized,
-                social_bullish=self._sil_data.social.combined_bullish_ratio,
+
+            # FIX: Only compute composite if we have REAL data (not just defaults).
+            # Default SILData has fear_greed.value=50, bullish_ratio=0.5, etc.
+            # which produces a fake neutral composite (~0.375) masking real sentiment.
+            _has_real_data = (
+                _fg.value != 50.0  # default is 50
+                or _fred.real_yield_10y is not None
+                or self._sil_data.cot.net_position_normalized != 0.0
             )
+
+            if _has_real_data:
+                from src.features.sil_features import _compute_composite
+                _real_yield = _fred.real_yield_10y if _fred.real_yield_10y is not None else 0.0
+                market_data["sil_composite_score"] = _compute_composite(
+                    fear_greed_value=_fg.normalized,
+                    gold_bullish_yield=1.0 if _real_yield < -1.0 else 0.0,
+                    alpha_bullish=self._sil_data.alpha_vantage.bullish_ratio,
+                    cot_net_norm=self._sil_data.cot.net_position_normalized,
+                    social_bullish=self._sil_data.social.combined_bullish_ratio,
+                )
+            else:
+                market_data["sil_composite_score"] = 0.0  # No real data → neutral
 
         # Step 2b: Fetch M1 bars for ORB+FVG epics
         if epic in self.strategy_manager.orb_fvg_epics:
@@ -1447,13 +1481,38 @@ class PaperTradingLoop:
                 duration_seconds=exec_duration,
             )
 
+            # FIX: Recalculate SL/TP from actual fill price (not candle close).
+            # When fill drifts from signal.entry_price, the original SL can end up
+            # on the wrong side of entry (e.g. SL above entry for BUY).
+            actual_entry = exec_result.fill_price or signal.entry_price
+            _risk_settings = get_settings()
+            _sl_mult = _risk_settings.scalp_sl_multiplier if _risk_settings.scalp_mode_enabled else 2.0
+            _rr = _risk_settings.scalp_tp_risk_reward if _risk_settings.scalp_mode_enabled else 2.5
+
+            if not _validate_sl_side(signal.direction.value, actual_entry, risk_result.stop_loss):
+                new_sl, new_tp = _recalculate_sl_tp_from_fill(
+                    direction=signal.direction.value,
+                    fill_price=actual_entry,
+                    atr=market_data["atr"],
+                    stop_multiplier=_sl_mult,
+                    risk_reward=_rr,
+                )
+                logger.warning(
+                    f"[{epic}] SL on wrong side of fill! Recalculated: "
+                    f"SL {risk_result.stop_loss:.2f} -> {new_sl:.2f}, "
+                    f"TP {risk_result.take_profit:.2f} -> {new_tp:.2f} "
+                    f"(fill={actual_entry:.2f}, signal={signal.entry_price:.2f})"
+                )
+                risk_result.stop_loss = new_sl
+                risk_result.take_profit = new_tp
+
             # Phase 8: register position for trailing stop management
             if exec_result.deal_id:
                 self.trailing_stop_manager.register_position(
                     deal_id=exec_result.deal_id,
                     epic=epic,
                     direction=signal.direction.value,
-                    entry_price=exec_result.fill_price or signal.entry_price,
+                    entry_price=actual_entry,
                     stop_loss=risk_result.stop_loss,
                     atr=market_data["atr"],
                 )
