@@ -1616,6 +1616,68 @@ class PaperTradingLoop:
                 except Exception as e:
                     logger.debug(f"[{epic}] Agent enrichment failed: {e!r}")
 
+        elif (
+            exec_result.error_detail
+            and exec_result.error_detail.get("error_type") == "min_size"
+        ):
+            # Broker rejected for minimum size — retry with min_deal_size from broker
+            broker_min = None
+            try:
+                info = await asyncio.wait_for(
+                    self.broker.get_market_details(epic), timeout=10.0
+                )
+                broker_min_raw = info.get("dealingRules", {}).get("minDealSize", {}).get("value")
+                if broker_min_raw is not None:
+                    broker_min = float(broker_min_raw)
+                    self._min_deal_size_cache[epic] = broker_min
+            except Exception:
+                pass
+
+            if broker_min is not None and broker_min > risk_result.position_size:
+                logger.info(
+                    f"[{epic}] Retrying with broker min_deal_size: "
+                    f"{risk_result.position_size:.4f} -> {broker_min}"
+                )
+                risk_result.position_size = broker_min
+                exec_result = await self.execution_engine.execute_signal(signal, risk_result)
+
+            if exec_result.success:
+                # Retry succeeded — fall through to success handling below
+                self._trade_count += 1
+                signal_info["status"] = "executed"
+                logger.info(
+                    f"[{epic}] EXECUTED (retry): deal_id={exec_result.deal_id}, "
+                    f"fill={exec_result.fill_price:.2f}"
+                )
+                # Register trailing stop with corrected values
+                actual_entry = exec_result.fill_price or signal.entry_price
+                _risk_settings = get_settings()
+                _sl_m = _risk_settings.scalp_sl_multiplier if _risk_settings.scalp_mode_enabled else 2.0
+                _rr_m = _risk_settings.scalp_tp_risk_reward if _risk_settings.scalp_mode_enabled else 2.5
+                _sl_valid = _validate_sl_side(signal.direction.value, actual_entry, risk_result.stop_loss)
+                _tp_valid = _validate_tp_side(signal.direction.value, actual_entry, risk_result.take_profit)
+                if not _sl_valid or not _tp_valid:
+                    risk_result.stop_loss, risk_result.take_profit = _recalculate_sl_tp_from_fill(
+                        direction=signal.direction.value, fill_price=actual_entry,
+                        atr=market_data["atr"], stop_multiplier=_sl_m, risk_reward=_rr_m,
+                    )
+                if exec_result.deal_id:
+                    self.trailing_stop_manager.register_position(
+                        deal_id=exec_result.deal_id, epic=epic,
+                        direction=signal.direction.value, entry_price=actual_entry,
+                        stop_loss=risk_result.stop_loss, atr=market_data["atr"],
+                    )
+                    await self._persist_trailing_stop_state(exec_result.deal_id)
+                await self._persist_position_open(
+                    deal_id=exec_result.deal_id or "", epic=epic,
+                    direction=signal.direction.value, size=risk_result.position_size,
+                    entry_price=actual_entry,
+                    stop_loss=risk_result.stop_loss, take_profit=risk_result.take_profit,
+                )
+            else:
+                signal_info["status"] = "exec_failed"
+                signal_info["rejection_reason"] = exec_result.error
+                logger.warning(f"[{epic}] Execution retry also failed: {exec_result.error}")
         else:
             signal_info["status"] = "exec_failed"
             signal_info["rejection_reason"] = exec_result.error
