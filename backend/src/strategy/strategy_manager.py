@@ -277,12 +277,14 @@ class StrategyManager:
                 f"(score->signal, ML agrees conf={prediction.confidence:.2f})"
             )
         elif ml_direction == SignalDirection.HOLD or prediction.confidence <= 0.40:
-            # ML neutral -> halve confidence
+            # ML neutral -> mild reduction (×0.75), not halving.
+            # Halving a 3/7 (0.43) signal to 0.21 kills it below the 0.25 floor.
+            # Neutral ML means "no opinion", not "bad signal".
             agreement = "neutral"
-            signal = signal.model_copy(update={"confidence": signal.confidence * 0.5})
+            signal = signal.model_copy(update={"confidence": signal.confidence * 0.75})
             logger.info(
                 f"Scalp [{epic}]: {signal.direction.value} "
-                f"(score->signal, ML neutral -> half conf={signal.confidence:.2f})"
+                f"(score->signal, ML neutral -> 0.75x conf={signal.confidence:.2f})"
             )
         else:
             # ML disagrees — halve confidence but never veto
