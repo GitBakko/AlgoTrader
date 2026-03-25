@@ -270,11 +270,69 @@ class OrderManager:
                 success=False, error=parsed.summary, error_detail=parsed.to_dict(),
             )
         except CapitalComError as e:
-            # Check if it's a SL/TP error — retry without stops
+            # Check if it's a SL/TP error — retry with corrected levels or without
             error_str = str(e).lower()
             if "stoploss" in error_str or "takeprofit" in error_str:
+                # Extract broker's minimum/maximum from error message
+                import re as _re
+                val_match = _re.search(r":\s*([\d.]+)", str(e))
+                broker_limit = float(val_match.group(1)) if val_match else None
+
+                # First attempt: retry with broker's corrected SL/TP
+                if broker_limit is not None:
+                    direction = Direction.BUY if order.direction == "BUY" else Direction.SELL
+                    corrected_sl = order.stop_loss
+                    corrected_tp = order.take_profit
+
+                    if "stoploss.minvalue" in error_str:
+                        # Broker says SL must be >= minvalue (for SELL) or <= for BUY
+                        # Add 0.5% margin beyond broker's minimum
+                        margin = broker_limit * 0.005
+                        if order.direction == "SELL":
+                            corrected_sl = broker_limit + margin
+                        else:
+                            corrected_sl = broker_limit - margin
+                    elif "takeprofit.maxvalue" in error_str:
+                        margin = broker_limit * 0.005
+                        if order.direction == "SELL":
+                            corrected_tp = broker_limit - margin
+                        else:
+                            corrected_tp = broker_limit + margin
+
+                    logger.warning(
+                        f"[{order.epic}] Broker SL/TP error ({e}), "
+                        f"retrying with corrected SL={corrected_sl:.5f} TP={corrected_tp:.5f}"
+                    )
+                    try:
+                        request_corrected = CreatePositionRequest(
+                            epic=order.epic,
+                            direction=direction,
+                            size=order.size,
+                            stop_level=corrected_sl,
+                            profit_level=corrected_tp,
+                        )
+                        confirmation = await self._send_position_request(
+                            request_corrected, order,
+                        )
+                        if confirmation and confirmation.deal_status != "REJECTED":
+                            slippage = abs(confirmation.level - order.entry_price)
+                            logger.info(
+                                f"Live fill (corrected SL/TP): {order.epic} "
+                                f"{order.direction} size={order.size:.4f} "
+                                f"@ {confirmation.level:.2f}"
+                            )
+                            return ExecutionResult(
+                                success=True,
+                                deal_id=confirmation.deal_id,
+                                fill_price=confirmation.level,
+                                slippage=slippage,
+                            )
+                    except Exception:
+                        pass  # Fall through to no-stops retry
+
+                # Second attempt: retry without SL/TP entirely, set after fill
                 logger.warning(
-                    f"[{order.epic}] Broker SL/TP error ({e}), retrying without stops"
+                    f"[{order.epic}] Corrected SL/TP also failed, retrying without stops"
                 )
                 try:
                     direction = Direction.BUY if order.direction == "BUY" else Direction.SELL

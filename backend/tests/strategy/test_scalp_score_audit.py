@@ -274,6 +274,7 @@ class TestProcessScalpMlMetadata:
         result = sm._process_scalp(prediction, "XAUUSD", market_data)
 
         assert result.metadata["ml"]["agreement"] == "disagree"
+        # ML disagree applies 0.5x — 0.67 * 0.5 = 0.335
         assert result.metadata["ml"]["confidence_after"] == pytest.approx(0.335, abs=0.01)
 
     def test_ml_neutral_halves_confidence(self):
@@ -291,4 +292,5 @@ class TestProcessScalpMlMetadata:
         result = sm._process_scalp(prediction, "XAUUSD", market_data)
 
         assert result.metadata["ml"]["agreement"] == "neutral"
-        assert result.metadata["ml"]["confidence_after"] == pytest.approx(0.335, abs=0.01)
+        # ML neutral applies 0.75x — 0.67 * 0.75 ≈ 0.5025
+        assert result.metadata["ml"]["confidence_after"] == pytest.approx(0.5025, abs=0.01)

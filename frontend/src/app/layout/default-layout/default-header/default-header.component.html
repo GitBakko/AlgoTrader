@@ -23,6 +23,23 @@
     </c-header-nav>
 
     <c-header-nav class="ms-auto">
+      <!-- Live P&L -->
+      @if (openPositionCount() > 0) {
+        <c-nav-item>
+          <span class="pnl-pill"
+            [class.pnl-pill--profit]="livePnl() >= 0"
+            [class.pnl-pill--loss]="livePnl() < 0"
+            [cTooltip]="openPositionCount() + ' posizioni aperte'">
+            <span class="pnl-pill__label">P&amp;L</span>
+            <span class="pnl-pill__value mantis-mono">
+              {{ livePnl() >= 0 ? '+' : '' }}{{ livePnl() | number:'1.2-2' }}
+            </span>
+          </span>
+        </c-nav-item>
+        <div class="nav-item py-1">
+          <div class="vr h-100 mx-2 text-body text-opacity-75"></div>
+        </div>
+      }
       <!-- WS Status -->
       <c-nav-item>
         @if (wsConnected() && isMockPrices()) {

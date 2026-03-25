@@ -52,41 +52,49 @@ class TestMinConfidenceThreshold:
 
 
 class TestConfidenceSizeMultiplier:
-    """RiskManager.confidence_size_multiplier tiers position size by confidence."""
+    """RiskManager.confidence_size_multiplier tiers position size by confidence.
 
-    def test_confidence_below_025_returns_zero(self):
-        assert RiskManager.confidence_size_multiplier(0.10) == 0.0
-        assert RiskManager.confidence_size_multiplier(0.24) == 0.0
+    Tiers (updated):
+        < 0.15: 0.0x (rejected)
+        0.15-0.30: 0.25x (ML-disagree signals)
+        0.30-0.45: 0.50x
+        0.45-0.60: 0.75x
+        >= 0.60: 1.0x
+    """
 
-    def test_confidence_tier_025_gets_quarter_size(self):
-        """ML-disagree signals with confluence (0.33 typical) get 25% size."""
-        assert RiskManager.confidence_size_multiplier(0.25) == 0.25
-        assert RiskManager.confidence_size_multiplier(0.33) == 0.25
-        assert RiskManager.confidence_size_multiplier(0.39) == 0.25
+    def test_confidence_below_015_returns_zero(self):
+        assert RiskManager.confidence_size_multiplier(0.05) == 0.0
+        assert RiskManager.confidence_size_multiplier(0.14) == 0.0
 
-    def test_confidence_tier_040_gets_half_size(self):
+    def test_confidence_tier_015_gets_quarter_size(self):
+        """ML-disagree signals (0.21 typical) get 25% size."""
+        assert RiskManager.confidence_size_multiplier(0.15) == 0.25
+        assert RiskManager.confidence_size_multiplier(0.214) == 0.25
+        assert RiskManager.confidence_size_multiplier(0.29) == 0.25
+
+    def test_confidence_tier_030_gets_half_size(self):
+        assert RiskManager.confidence_size_multiplier(0.30) == 0.50
         assert RiskManager.confidence_size_multiplier(0.40) == 0.50
-        assert RiskManager.confidence_size_multiplier(0.50) == 0.50
-        assert RiskManager.confidence_size_multiplier(0.54) == 0.50
+        assert RiskManager.confidence_size_multiplier(0.44) == 0.50
 
-    def test_confidence_tier_055_gets_75pct(self):
-        assert RiskManager.confidence_size_multiplier(0.55) == 0.75
-        assert RiskManager.confidence_size_multiplier(0.60) == 0.75
-        assert RiskManager.confidence_size_multiplier(0.64) == 0.75
+    def test_confidence_tier_045_gets_75pct(self):
+        assert RiskManager.confidence_size_multiplier(0.45) == 0.75
+        assert RiskManager.confidence_size_multiplier(0.50) == 0.75
+        assert RiskManager.confidence_size_multiplier(0.59) == 0.75
 
-    def test_confidence_tier_065_gets_full(self):
-        assert RiskManager.confidence_size_multiplier(0.65) == 1.0
+    def test_confidence_tier_060_gets_full(self):
+        assert RiskManager.confidence_size_multiplier(0.60) == 1.0
         assert RiskManager.confidence_size_multiplier(0.68) == 1.0
         assert RiskManager.confidence_size_multiplier(0.80) == 1.0
         assert RiskManager.confidence_size_multiplier(1.0) == 1.0
 
-    def test_boundary_at_040(self):
-        assert RiskManager.confidence_size_multiplier(0.399) == 0.25
-        assert RiskManager.confidence_size_multiplier(0.40) == 0.50
+    def test_boundary_at_030(self):
+        assert RiskManager.confidence_size_multiplier(0.299) == 0.25
+        assert RiskManager.confidence_size_multiplier(0.30) == 0.50
 
-    def test_boundary_at_065(self):
-        assert RiskManager.confidence_size_multiplier(0.6499) == 0.75
-        assert RiskManager.confidence_size_multiplier(0.65) == 1.0
+    def test_boundary_at_060(self):
+        assert RiskManager.confidence_size_multiplier(0.5999) == 0.75
+        assert RiskManager.confidence_size_multiplier(0.60) == 1.0
 
 
 class TestConfidenceTieringIntegration:
@@ -105,13 +113,13 @@ class TestConfidenceTieringIntegration:
     def test_low_confidence_reduces_position_size(self):
         rm = RiskManager(initial_equity=10000.0)
         result_high = rm.check_trade(self._make_signal(0.70), equity=10000.0, atr=20.0)
-        result_low = rm.check_trade(self._make_signal(0.52), equity=10000.0, atr=20.0)
+        result_low = rm.check_trade(self._make_signal(0.42), equity=10000.0, atr=20.0)
         assert result_high.approved and result_low.approved
         assert result_low.position_size < result_high.position_size
 
     def test_confidence_tier_adjustment_logged(self):
         rm = RiskManager(initial_equity=10000.0)
-        result = rm.check_trade(self._make_signal(0.52), equity=10000.0, atr=20.0)
+        result = rm.check_trade(self._make_signal(0.42), equity=10000.0, atr=20.0)
         assert result.approved
         assert any("Confidence tier" in adj for adj in result.adjustments)
 

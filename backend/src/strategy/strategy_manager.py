@@ -31,6 +31,7 @@ class StrategyManager:
         excluded_epics: set[str] | None = None,
         scalp_mode: bool = False,
         orb_fvg_epics: set[str] | None = None,
+        ml_primary_enabled: bool = False,
     ):
         """
         Initialize strategy manager.
@@ -40,14 +41,16 @@ class StrategyManager:
             excluded_epics: Epics to skip (decision=EXCLUDE from scorecard).
             scalp_mode: If True, use ScalpScoreStrategy as primary signal source.
             orb_fvg_epics: Epics to use ORB+FVG strategy (default: {"US500"}).
+            ml_primary_enabled: If True, ML decides direction, ScalpScore confirms quality.
         """
         self._configs = configs or {}
         self.excluded_epics: set[str] = excluded_epics or set()
         self.scalp_mode = scalp_mode
+        self._ml_primary_enabled = ml_primary_enabled
         self._scalp_strategy = None
         self._orb_fvg_strategy = None
         self.orb_fvg_epics: set[str] = orb_fvg_epics if orb_fvg_epics is not None else {"US500"}
-        if scalp_mode:
+        if scalp_mode or ml_primary_enabled:
             from src.strategy.scalp_score_strategy import ScalpScoreStrategy
             self._scalp_strategy = ScalpScoreStrategy()
         if self.orb_fvg_epics:
@@ -138,6 +141,10 @@ class StrategyManager:
             and market_data.get("m1_bars") is not None
         ):
             return self._process_orb_fvg(epic, market_data)
+
+        # ML-Primary mode: ML decides direction, ScalpScore confirms quality
+        if self._ml_primary_enabled and self._scalp_strategy is not None:
+            return self._process_ml_primary(prediction, epic, market_data)
 
         if self.scalp_mode and self._scalp_strategy is not None:
             return self._process_scalp(prediction, epic, market_data)
@@ -309,6 +316,189 @@ class StrategyManager:
         updated_metadata = {**signal.metadata, "ml": ml_audit}
         signal = signal.model_copy(update={"strategy_name": "scalp_score", "metadata": updated_metadata})
         return signal
+
+    def _process_ml_primary(
+        self,
+        prediction: PredictionResult,
+        epic: str,
+        market_data: dict,
+    ) -> TradingSignal:
+        """ML-Primary mode: ML decides direction, ScalpScore confirms quality."""
+        import polars as pl
+        from datetime import datetime, timezone
+        from src.strategy.schemas import SignalDirection
+        from src.models.schemas import SignalClass
+        from src.utils.config import get_settings
+
+        settings = get_settings()
+        current_price = float(market_data["current_price"])
+        atr = float(market_data["atr"])
+        utc_hour = datetime.now(timezone.utc).hour
+
+        # Step 1: Map ML prediction to direction
+        ml_direction = {
+            SignalClass.BUY: SignalDirection.BUY,
+            SignalClass.SELL: SignalDirection.SELL,
+            SignalClass.HOLD: SignalDirection.HOLD,
+        }.get(prediction.signal_class, SignalDirection.HOLD)
+
+        # Step 2: HOLD gate
+        if ml_direction == SignalDirection.HOLD:
+            logger.info(f"ML-Primary [{epic}]: HOLD (ML predicts HOLD)")
+            return self._make_hold(epic, current_price)
+
+        # Step 3: Min confidence gate
+        if prediction.confidence < settings.ml_primary_min_confidence:
+            logger.info(
+                f"ML-Primary [{epic}]: HOLD (ML conf={prediction.confidence:.2f} "
+                f"< min={settings.ml_primary_min_confidence})"
+            )
+            return self._make_hold(epic, current_price)
+
+        # Step 4: Build current_bar (same as _process_scalp)
+        current_bar = {
+            "close": current_price,
+            "atr_14": atr,
+            "rsi_14": market_data.get("rsi", 50),
+            "adx_14": market_data.get("adx", 0),
+            "ema_9": market_data.get("ema_9", 0),
+            "ema_21": market_data.get("ema_21", 0),
+            "macd_histogram": market_data.get("macd_histogram", 0),
+            "macd": market_data.get("macd", 0),
+            "macd_signal": market_data.get("macd_signal", 0),
+            "volume": market_data.get("volume", 0),
+            "volume_sma_20": market_data.get("volume_sma_20", 0),
+            "bb_upper": market_data.get("bb_upper", 0),
+            "bb_lower": market_data.get("bb_lower", 0),
+            "bb_middle": market_data.get("bb_middle", 0),
+            "keltner_upper": market_data.get("keltner_upper", 0),
+            "keltner_lower": market_data.get("keltner_lower", 0),
+            "vwap": market_data.get("vwap", 0),
+            "utc_hour": utc_hour,
+            "htf_bias": market_data.get("htf_bias"),
+            "sil_composite_score": market_data.get("sil_composite_score", 0.0),
+        }
+        recent_bars = market_data.get(
+            "recent_bars", pl.DataFrame({"close": [current_price]})
+        )
+
+        # Step 5: Evaluate technical quality
+        quality = self._scalp_strategy.evaluate_technical_quality(
+            ml_direction, epic, current_bar, recent_bars,
+        )
+
+        # Step 6: Hard gates (session, dead market)
+        if quality["session_blocked"]:
+            logger.debug(f"ML-Primary [{epic}]: HOLD (session blocked)")
+            return self._make_hold(epic, current_price)
+        if quality["dead_market_blocked"]:
+            logger.debug(f"ML-Primary [{epic}]: HOLD (dead market)")
+            return self._make_hold(epic, current_price)
+
+        # Step 7: Composite confidence
+        tech_quality = quality["quality_score"]
+        tech_mult = min(1.0, 0.40 + tech_quality * 0.85)
+        composite = prediction.confidence * tech_mult
+
+        if not quality["vwap_aligned"]:
+            composite *= settings.ml_primary_vwap_penalty
+
+        if quality["htf_aligned"] is False:
+            composite *= settings.ml_primary_htf_penalty
+        elif quality["htf_aligned"] is True:
+            composite = min(1.0, composite * 1.05)
+
+        # Step 8: Technical floor
+        if tech_quality < settings.ml_primary_min_technical_quality:
+            logger.info(
+                f"ML-Primary [{epic}]: HOLD (tech quality {tech_quality:.2f} "
+                f"< min={settings.ml_primary_min_technical_quality})"
+            )
+            return self._make_hold(epic, current_price)
+
+        # Step 9: SL/TP
+        config = StrategyConfig(
+            epic=epic, stop_multiplier=1.0, risk_reward_ratio=2.0,
+        )
+        sl_mult = config.stop_multiplier
+        rr = config.risk_reward_ratio
+        if ml_direction == SignalDirection.BUY:
+            stop = current_price - atr * sl_mult
+            tp = current_price + atr * sl_mult * rr
+            signal_class = SignalClass.BUY
+        else:
+            stop = current_price + atr * sl_mult
+            tp = current_price - atr * sl_mult * rr
+            signal_class = SignalClass.SELL
+
+        # Log
+        votes = quality["votes_detail"]
+        votes_str = (
+            f"EMA={votes.get('ema', 0):+d} RSI={votes.get('rsi', 0):+d} "
+            f"MACD={votes.get('macd', 0):+d} BB={votes.get('bb', 0):+d} "
+            f"VOL={votes.get('vol', 0):+d} ADX={votes.get('adx', 0):+d} "
+            f"SENT={votes.get('sentiment', 0):+d}"
+        )
+        vwap_tag = " VWAP=opposed" if not quality["vwap_aligned"] else ""
+        htf_tag = " HTF=opposed" if quality["htf_aligned"] is False else ""
+        logger.info(
+            f"ML-Primary [{epic}]: {ml_direction.value} "
+            f"(ml_conf={prediction.confidence:.2f}, "
+            f"tech={quality['agreeing_votes']}/7, "
+            f"composite={composite:.2f}) "
+            f"[{votes_str}]{vwap_tag}{htf_tag}"
+        )
+
+        # Step 10: Build signal
+        audit_metadata = {
+            "ml": {
+                "signal_class": prediction.signal_class,
+                "signal_name": prediction.signal_name,
+                "confidence": round(prediction.confidence, 4),
+                "probabilities": prediction.probabilities,
+            },
+            "technical_quality": {
+                "agreeing_votes": quality["agreeing_votes"],
+                "opposing_votes": quality["opposing_votes"],
+                "quality_score": quality["quality_score"],
+                "tech_multiplier": round(tech_mult, 4),
+                "vwap_aligned": quality["vwap_aligned"],
+                "htf_aligned": quality["htf_aligned"],
+                "votes_detail": quality["votes_detail"],
+            },
+            "composite_confidence": round(composite, 4),
+            "penalties": {
+                "vwap": not quality["vwap_aligned"],
+                "htf": quality["htf_aligned"] is False,
+            },
+        }
+
+        return TradingSignal(
+            epic=epic,
+            direction=ml_direction,
+            confidence=composite,
+            signal_class=signal_class,
+            entry_price=current_price,
+            suggested_stop=stop,
+            suggested_tp=tp,
+            technical_confirmation=quality["agreeing_votes"] >= 3,
+            strategy_name="ml_primary",
+            metadata=audit_metadata,
+        )
+
+    @staticmethod
+    def _make_hold(epic: str, price: float) -> TradingSignal:
+        """Create a HOLD signal."""
+        from src.strategy.schemas import SignalDirection
+        from src.models.schemas import SignalClass
+        return TradingSignal(
+            epic=epic,
+            direction=SignalDirection.HOLD,
+            confidence=0.0,
+            signal_class=SignalClass.HOLD,
+            entry_price=price,
+            technical_confirmation=False,
+        )
 
     def get_allocation(self, regime: str | None = None) -> dict[str, float]:
         """

@@ -79,12 +79,12 @@ class TestScalpModeSignalGeneration:
         # ML agrees (BUY) -> no penalty
         assert signal.confidence > 0.5
 
-    def test_ml_hold_halves_confidence(self, scalp_manager, prediction_hold, bullish_market_data):
-        """When ML says HOLD, technical signal's confidence is halved."""
+    def test_ml_hold_reduces_confidence(self, scalp_manager, prediction_hold, bullish_market_data):
+        """When ML says HOLD, technical signal's confidence is reduced (0.75x)."""
         signal = scalp_manager.process_prediction(prediction_hold, "XAUUSD", bullish_market_data)
-        # Technical says BUY, ML says HOLD -> confidence reduced
+        # Technical says BUY, ML says HOLD -> confidence × 0.75
         if signal.direction == SignalDirection.BUY:
-            assert signal.confidence <= 0.5  # halved
+            assert signal.confidence <= 0.75  # 0.75x reduction
 
     def test_ml_disagree_halves_confidence(self, scalp_manager, prediction_sell, bullish_market_data):
         """When ML disagrees (SELL vs technical BUY), confidence halved but not blocked."""

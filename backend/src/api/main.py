@@ -375,12 +375,25 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Signal handlers registration failed (Windows compatibility): {e}")
 
+    # Start Telegram bot poller (if configured)
+    from src.monitoring.telegram_bot import init_telegram_bot
+    tg_bot = init_telegram_bot()
+    if tg_bot:
+        tg_bot._get_loop = lambda: getattr(app.state, "paper_loop", None)
+        await tg_bot.start()
+        app.state.telegram_bot = tg_bot
+        logger.info("Telegram bot poller started — /status, /reset, /stop, /help")
+
     logger.success("✅ Application startup complete")
 
     yield
 
     # Shutdown
     logger.info("🛑 Shutting down AlgoTrader AI Backend...")
+
+    # Stop Telegram bot
+    if getattr(app.state, "telegram_bot", None):
+        await app.state.telegram_bot.stop()
 
     # Stop paper trading loop
     if getattr(app.state, "paper_loop", None) and app.state.paper_loop.is_running:

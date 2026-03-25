@@ -462,6 +462,151 @@ class ScalpScoreStrategy(BaseStrategy):
             metadata=audit_metadata,
         )
 
+    def evaluate_technical_quality(
+        self,
+        ml_direction: SignalDirection,
+        epic: str,
+        current_bar: dict,
+        recent_bars: pl.DataFrame,
+    ) -> dict:
+        """Evaluate technical quality for a given ML direction.
+
+        Used by ML-Primary mode: ML decides direction, this method reports
+        how well the technicals support that direction (without applying
+        gates or thresholds).
+
+        Returns dict with vote breakdown, quality score, and gate alignment.
+        """
+        price = float(current_bar.get("close", 0))
+        utc_hour = int(current_bar.get("utc_hour", 12))
+
+        # Session check (hard block)
+        session_mult = SessionFilter.get_session_multiplier(epic, utc_hour)
+        if session_mult == 0.0:
+            return {
+                "agreeing_votes": 0, "opposing_votes": 0, "neutral_votes": 7,
+                "quality_score": 0.0,
+                "vwap_aligned": False, "htf_aligned": None,
+                "session_blocked": True, "dead_market_blocked": False,
+                "votes_detail": {}, "session_mult": 0.0,
+            }
+
+        # Dead market check
+        _dm_settings = get_settings()
+        adx_val = float(current_bar.get("adx_14", 0))
+        bb_upper = float(current_bar.get("bb_upper", 0))
+        bb_lower = float(current_bar.get("bb_lower", 0))
+        bb_mid = float(current_bar.get("bb_middle", 0))
+        dead_market = False
+        if (adx_val > 0 and bb_mid > 0
+                and adx_val < _dm_settings.scalp_dead_market_adx):
+            bb_width_now = (bb_upper - bb_lower) / bb_mid if bb_mid > 0 else 0
+            bb_pctile = 50.0
+            if ("bb_upper" in recent_bars.columns
+                    and "bb_lower" in recent_bars.columns
+                    and "bb_middle" in recent_bars.columns
+                    and len(recent_bars) > 10):
+                widths = (
+                    (recent_bars["bb_upper"] - recent_bars["bb_lower"])
+                    / recent_bars["bb_middle"]
+                ).drop_nulls().to_list()
+                if widths:
+                    count_below = sum(1 for w in widths if w <= bb_width_now)
+                    bb_pctile = count_below / len(widths) * 100
+            if bb_pctile < _dm_settings.scalp_dead_market_bb_pctile:
+                dead_market = True
+
+        if dead_market:
+            return {
+                "agreeing_votes": 0, "opposing_votes": 0, "neutral_votes": 7,
+                "quality_score": 0.0,
+                "vwap_aligned": False, "htf_aligned": None,
+                "session_blocked": False, "dead_market_blocked": True,
+                "votes_detail": {}, "session_mult": session_mult,
+            }
+
+        # Collect all 7 votes (same as generate_signal)
+        ema_vote, _ = self._vote_ema(
+            float(current_bar.get("ema_9", 0)),
+            float(current_bar.get("ema_21", 0)),
+        )
+        rsi_vote, _ = self._vote_rsi(float(current_bar.get("rsi_14", 50)))
+        macd_vote, _ = self._vote_macd(
+            float(current_bar.get("macd_histogram", 0)),
+            float(current_bar.get("macd", 0)),
+            float(current_bar.get("macd_signal", 0)),
+        )
+        vol_vote, _ = self._vote_volume(
+            float(current_bar.get("volume", 0)),
+            float(current_bar.get("volume_sma_20", 0)),
+        )
+        adx_vote, _ = self._vote_adx(float(current_bar.get("adx_14", 0)))
+        bb_vote, _ = self._vote_bb_squeeze(
+            bb_upper, bb_lower,
+            float(current_bar.get("keltner_upper", 0)),
+            float(current_bar.get("keltner_lower", 0)),
+            price,
+            bb_mid,
+        )
+        sil_composite = float(current_bar.get("sil_composite_score", 0.0))
+        sentiment_vote, _ = self._vote_sentiment(sil_composite)
+
+        # Map ML direction to target sign
+        target_sign = 1 if ml_direction == SignalDirection.BUY else -1
+
+        # Count directional votes relative to ML direction
+        directional_votes = [ema_vote, rsi_vote, macd_vote, bb_vote, sentiment_vote]
+        agreeing = sum(1 for v in directional_votes if v == target_sign)
+        opposing = sum(1 for v in directional_votes if v == -target_sign)
+        neutral = sum(1 for v in directional_votes if v == 0)
+
+        # Confirmation votes (VOL, ADX) add only if >= 2 directional agree
+        if agreeing >= 2:
+            if vol_vote > 0:
+                agreeing += 1
+            if adx_vote > 0:
+                agreeing += 1
+
+        quality_score = agreeing / 7.0
+
+        # VWAP alignment (soft — reported, not gated)
+        vwap = float(current_bar.get("vwap", 0))
+        if vwap > 0:
+            vwap_aligned = (
+                (ml_direction == SignalDirection.BUY and price >= vwap)
+                or (ml_direction == SignalDirection.SELL and price <= vwap)
+            )
+        else:
+            vwap_aligned = True  # no VWAP data → assume aligned
+
+        # HTF alignment (soft — reported, not gated)
+        htf_bias = current_bar.get("htf_bias")
+        if htf_bias == "bullish":
+            htf_aligned = ml_direction == SignalDirection.BUY
+        elif htf_bias == "bearish":
+            htf_aligned = ml_direction == SignalDirection.SELL
+        else:
+            htf_aligned = None  # no HTF data
+
+        votes_detail = {
+            "ema": ema_vote, "rsi": rsi_vote, "macd": macd_vote,
+            "bb": bb_vote, "vol": vol_vote, "adx": adx_vote,
+            "sentiment": sentiment_vote,
+        }
+
+        return {
+            "agreeing_votes": agreeing,
+            "opposing_votes": opposing,
+            "neutral_votes": neutral,
+            "quality_score": round(quality_score, 4),
+            "vwap_aligned": vwap_aligned,
+            "htf_aligned": htf_aligned,
+            "session_blocked": False,
+            "dead_market_blocked": False,
+            "votes_detail": votes_detail,
+            "session_mult": session_mult,
+        }
+
     def generate_backtest_signals(
         self,
         ohlc_df: pl.DataFrame,

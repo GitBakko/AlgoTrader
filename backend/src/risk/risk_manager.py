@@ -110,6 +110,7 @@ class RiskManager:
                 rejection_reason=reason,
                 circuit_breaker_details={
                     "tripped": self.circuit_breakers.tripped_breakers,
+                    "consecutive_losses": self.circuit_breakers._consecutive_losses,
                 },
                 audit=audit,
             )
@@ -358,18 +359,18 @@ class RiskManager:
     def confidence_size_multiplier(confidence: float) -> float:
         """Scale position size by confidence tier.
 
-        < 0.25: 0.0 (rejected — too low even for reduced sizing)
-        0.25-0.40: 0.25x (ML-disagree signals with confluence)
-        0.40-0.55: 0.50x
-        0.55-0.65: 0.75x
-        >= 0.65: 1.0x
+        < 0.15: 0.0 (rejected — too low even for reduced sizing)
+        0.15-0.30: 0.25x (ML-disagree signals with confluence)
+        0.30-0.45: 0.50x
+        0.45-0.60: 0.75x
+        >= 0.60: 1.0x
         """
-        if confidence < 0.25:
+        if confidence < 0.15:
             return 0.0
-        elif confidence < 0.40:
+        elif confidence < 0.30:
             return 0.25
-        elif confidence < 0.55:
+        elif confidence < 0.45:
             return 0.50
-        elif confidence < 0.65:
+        elif confidence < 0.60:
             return 0.75
         return 1.0

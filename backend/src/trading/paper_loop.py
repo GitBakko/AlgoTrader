@@ -1313,31 +1313,10 @@ class PaperTradingLoop:
             logger.info(f"[{epic}] HOLD signal, skipping execution")
             return
 
-        # HIGH-7 FIX: Duplicate signal detection
-        signal_key = (epic, signal.direction.value, round(signal.entry_price, 2))
-        now = datetime.now(timezone.utc)
-
-        if signal_key in self._recent_signals:
-            last_time = self._recent_signals[signal_key]
-            age_seconds = (now - last_time).total_seconds()
-
-            if age_seconds < self._signal_dedup_window_seconds:
-                signal_info["status"] = "duplicate"
-                signal_info["rejection_reason"] = f"Duplicate signal (last seen {age_seconds:.1f}s ago)"
-                logger.warning(
-                    f"[{epic}] DUPLICATE signal detected: {signal.direction.value} "
-                    f"@ {signal.entry_price:.2f} (last seen {age_seconds:.1f}s ago) - SKIPPING"
-                )
-                return
-
-        # Record this signal
-        self._recent_signals[signal_key] = now
-
-        # Cleanup old signals (>5 minutes)
-        self._recent_signals = {
-            k: v for k, v in self._recent_signals.items()
-            if (now - v).total_seconds() < 300
-        }
+        # Duplicate protection: open_epics check already done in _run_iteration
+        # (line 975: `if epic in open_epics: continue`).
+        # No time-based dedup — if a position was closed and the signal is still
+        # valid, the system should be free to re-enter immediately.
 
         # Step 4: Risk check (Phase 8: pass trade_history for Kelly sizing)
         equity = await self._fetch_equity()
@@ -1366,11 +1345,22 @@ class PaperTradingLoop:
                     rejection_reason=risk_result.rejection_reason,
                     source=self._log_source,
                 )
+                # Detect circuit breaker vs other rejection types
+                is_cb = bool(risk_result.circuit_breaker_details)
+                _event_type = (
+                    RiskEventType.CIRCUIT_BREAKER if is_cb
+                    else RiskEventType.POSITION_LIMIT
+                )
+                _cb_losses = None
+                if is_cb:
+                    _tripped = risk_result.circuit_breaker_details.get("tripped", {})
+                    _cb_losses = _tripped.get("consecutive_losses")
                 await tl.log_risk_decision(
-                    event_type=RiskEventType.POSITION_LIMIT, epic=epic,
+                    event_type=_event_type, epic=epic,
                     description=risk_result.rejection_reason or "Risk check failed",
                     action="rejected_trade", current_equity=equity,
                     open_positions=len(open_positions),
+                    consecutive_losses=_cb_losses,
                     source=self._log_source,
                 )
             except Exception:
@@ -1403,56 +1393,13 @@ class PaperTradingLoop:
         # If size is close to minimum (>=80%), round up instead of rejecting
         min_deal_size = self._get_min_deal_size(epic)
         if min_deal_size is not None and risk_result.position_size < min_deal_size:
-            if risk_result.position_size >= min_deal_size * 0.80:
-                logger.info(
-                    f"[{epic}] Size {risk_result.position_size:.4f} rounded up "
-                    f"to min_deal_size {min_deal_size}"
-                )
-                risk_result.position_size = min_deal_size
-            else:
-                reason = (
-                    f"Size calcolata ({risk_result.position_size:.4f}) inferiore "
-                    f"al minimo del broker ({min_deal_size}) per {epic}"
-                )
-                signal_info["status"] = "rejected"
-                signal_info["rejection_reason"] = reason
-                signal_info["error_detail"] = {
-                    "error_type": "min_size",
-                    "summary": f"Size troppo piccola per {epic} (min: {min_deal_size})",
-                    "details": f"Size calcolata: {risk_result.position_size:.4f}, minimo broker: {min_deal_size}",
-                    "size": risk_result.position_size,
-                    "min_deal_size": min_deal_size,
-                    "direction": signal.direction.value,
-                }
-                logger.warning(f"[{epic}] MIN SIZE REJECTED: {reason}")
-                try:
-                    tl = get_trade_logger()
-                    await tl.log_signal(
-                        epic=epic, direction=_signal_type, confidence=signal.confidence,
-                        strategy=signal.strategy_name or "unknown",
-                        execution_status=ExecutionStatus.REJECTED,
-                        rejection_reason=reason,
-                        source=self._log_source,
-                    )
-                except Exception:
-                    pass
-
-                # Persist REJECTED signal (min deal size)
-                if audit_features is not None:
-                    audit_features["risk"] = risk_result.audit
-                    audit_features["rejection_reason"] = reason
-                    await self._persist_signal_audit(
-                        epic=epic,
-                        direction=signal.direction.value,
-                        confidence=signal.confidence,
-                        entry_price=signal.entry_price,
-                        stop_loss=risk_result.stop_loss,
-                        take_profit=risk_result.take_profit,
-                        status="REJECTED",
-                        features=audit_features,
-                    )
-
-                return
+            # Always round up to broker minimum — risk already approved the trade,
+            # the size difference is marginal and blocking it wastes valid signals.
+            logger.info(
+                f"[{epic}] Size {risk_result.position_size:.4f} rounded up "
+                f"to min_deal_size {min_deal_size}"
+            )
+            risk_result.position_size = min_deal_size
 
         # Add approved risk audit data to features
         if audit_features is not None:

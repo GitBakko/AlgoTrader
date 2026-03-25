@@ -243,6 +243,15 @@ class Settings(BaseSettings):
         default=-0.5, alias="SCALP_ASSET_EXCLUSION_SHARPE_THRESHOLD"
     )
 
+    # ===== ML-Primary Mode =====
+    ml_primary_enabled: bool = Field(default=False, alias="ML_PRIMARY_ENABLED")
+    ml_primary_min_confidence: float = Field(default=0.45, alias="ML_PRIMARY_MIN_CONFIDENCE")
+    ml_primary_min_technical_quality: float = Field(
+        default=0.25, alias="ML_PRIMARY_MIN_TECHNICAL_QUALITY"
+    )
+    ml_primary_vwap_penalty: float = Field(default=0.70, alias="ML_PRIMARY_VWAP_PENALTY")
+    ml_primary_htf_penalty: float = Field(default=0.60, alias="ML_PRIMARY_HTF_PENALTY")
+
     # ===== External APIs =====
     finnhub_api_key: str = Field(default="", alias="FINNHUB_API_KEY")
     marketaux_api_key: str = Field(default="", alias="MARKETAUX_API_KEY")

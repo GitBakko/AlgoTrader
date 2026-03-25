@@ -138,10 +138,24 @@ def parse_broker_error(error_message: str, epic: str | None = None) -> ParsedBro
             raw=msg,
         )
 
+    # --- Invalid stop-loss / take-profit ---
+    if "stoploss" in msg_lower or "takeprofit" in msg_lower:
+        val_match = re.search(r":\s*([\d.]+)", msg)
+        val_info = f" (limit: {val_match.group(1)})" if val_match else ""
+        is_sl = "stoploss" in msg_lower
+        level_type = "Stop-Loss" if is_sl else "Take-Profit"
+        return ParsedBrokerError(
+            error_type="invalid_stops",
+            summary=f"{level_type} non valido per {label}{val_info}",
+            details=f"Il {level_type} è troppo vicino al prezzo corrente.",
+            market_hours=None,
+            raw=msg,
+        )
+
     # --- Minimum position size ---
     if (
         ("minimum" in msg_lower and "size" in msg_lower)
-        or "minvalue" in msg_lower
+        or ("minvalue" in msg_lower and "size" in msg_lower)
         or "error.invalid.size" in msg_lower
     ):
         # Try to extract the minimum size value

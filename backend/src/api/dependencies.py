@@ -214,6 +214,16 @@ def init_services(app) -> None:
             f"check every {settings.scalp_check_interval}s, CB=4 losses"
         )
 
+    # Enable ML-Primary mode (takes precedence over scalp when both enabled)
+    if settings.ml_primary_enabled:
+        from src.strategy.scalp_score_strategy import ScalpScoreStrategy
+        app.state.strategy_manager._ml_primary_enabled = True
+        if app.state.strategy_manager._scalp_strategy is None:
+            app.state.strategy_manager._scalp_strategy = ScalpScoreStrategy()
+        logger.info(
+            "ML-Primary mode ENABLED — ML direction + ScalpScore quality gate"
+        )
+
     # In-memory stores (fallback when DB not available)
     app.state.signal_history = []
     app.state.backtest_runs = {}
