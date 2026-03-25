@@ -59,6 +59,13 @@ def _validate_sl_side(direction: str, entry: float, sl: float) -> bool:
     return sl > entry  # SELL: SL must be above entry
 
 
+def _validate_tp_side(direction: str, entry: float, tp: float) -> bool:
+    """Validate that TP is on the correct side of entry price."""
+    if direction == "BUY":
+        return tp > entry
+    return tp < entry  # SELL: TP must be below entry
+
+
 class PaperTradingLoop:
     """
     Controllable background loop that runs paper trading iterations.
@@ -1482,14 +1489,17 @@ class PaperTradingLoop:
             )
 
             # FIX: Recalculate SL/TP from actual fill price (not candle close).
-            # When fill drifts from signal.entry_price, the original SL can end up
-            # on the wrong side of entry (e.g. SL above entry for BUY).
+            # When fill drifts from signal.entry_price, the original SL or TP can
+            # end up on the wrong side (e.g. SL above entry for BUY, TP below).
             actual_entry = exec_result.fill_price or signal.entry_price
             _risk_settings = get_settings()
             _sl_mult = _risk_settings.scalp_sl_multiplier if _risk_settings.scalp_mode_enabled else 2.0
             _rr = _risk_settings.scalp_tp_risk_reward if _risk_settings.scalp_mode_enabled else 2.5
 
-            if not _validate_sl_side(signal.direction.value, actual_entry, risk_result.stop_loss):
+            _sl_ok = _validate_sl_side(signal.direction.value, actual_entry, risk_result.stop_loss)
+            _tp_ok = _validate_tp_side(signal.direction.value, actual_entry, risk_result.take_profit)
+
+            if not _sl_ok or not _tp_ok:
                 new_sl, new_tp = _recalculate_sl_tp_from_fill(
                     direction=signal.direction.value,
                     fill_price=actual_entry,
@@ -1498,10 +1508,12 @@ class PaperTradingLoop:
                     risk_reward=_rr,
                 )
                 logger.warning(
-                    f"[{epic}] SL on wrong side of fill! Recalculated: "
+                    f"[{epic}] SL/TP invalid for fill! "
+                    f"{'SL wrong side' if not _sl_ok else ''}"
+                    f"{'TP wrong side' if not _tp_ok else ''} "
+                    f"Recalculated from fill={actual_entry:.2f}: "
                     f"SL {risk_result.stop_loss:.2f} -> {new_sl:.2f}, "
-                    f"TP {risk_result.take_profit:.2f} -> {new_tp:.2f} "
-                    f"(fill={actual_entry:.2f}, signal={signal.entry_price:.2f})"
+                    f"TP {risk_result.take_profit:.2f} -> {new_tp:.2f}"
                 )
                 risk_result.stop_loss = new_sl
                 risk_result.take_profit = new_tp

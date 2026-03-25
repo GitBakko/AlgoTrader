@@ -85,3 +85,37 @@ def test_sl_side_validation_sell():
 
     assert _validate_sl_side("SELL", entry=100.0, sl=105.0) is True
     assert _validate_sl_side("SELL", entry=100.0, sl=95.0) is False
+
+
+def test_tp_side_validation_buy():
+    """BUY with TP below entry must be caught."""
+    from src.trading.paper_loop import _validate_tp_side
+
+    assert _validate_tp_side("BUY", entry=100.0, tp=110.0) is True
+    assert _validate_tp_side("BUY", entry=100.0, tp=95.0) is False
+
+
+def test_tp_side_validation_sell():
+    """SELL with TP above entry must be caught."""
+    from src.trading.paper_loop import _validate_tp_side
+
+    assert _validate_tp_side("SELL", entry=100.0, tp=90.0) is True
+    assert _validate_tp_side("SELL", entry=100.0, tp=105.0) is False
+
+
+def test_platinum_scenario_tp_below_fill():
+    """Real-world: PLATINUM fill=1972.40 but TP=1913.34 (from candle 1892.90).
+    TP below fill for BUY must trigger recalculation."""
+    from src.trading.paper_loop import _validate_tp_side, _recalculate_sl_tp_from_fill
+
+    fill = 1972.40
+    old_tp = 1913.34  # computed from candle close 1892.90
+
+    assert not _validate_tp_side("BUY", fill, old_tp), "TP below fill for BUY must be invalid"
+
+    new_sl, new_tp = _recalculate_sl_tp_from_fill(
+        direction="BUY", fill_price=fill,
+        atr=10.22, stop_multiplier=1.0, risk_reward=2.0,
+    )
+    assert new_sl < fill, f"Recalculated SL {new_sl} must be below fill {fill}"
+    assert new_tp > fill, f"Recalculated TP {new_tp} must be above fill {fill}"
