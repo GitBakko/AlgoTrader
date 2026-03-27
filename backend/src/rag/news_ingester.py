@@ -1,5 +1,6 @@
 # MANTIS-EVOLUTION: News RAG Ingester
 """Aggregates and processes news from existing SIL feeds."""
+
 from __future__ import annotations
 
 import hashlib
@@ -10,16 +11,33 @@ from loguru import logger
 
 from src.rag.schemas import NewsItem
 
-
 # ---------------------------------------------------------------------------
 # Relevance keyword sets
 # ---------------------------------------------------------------------------
 
 CRYPTO_KEYWORDS = {"bitcoin", "btc", "crypto", "ethereum", "blockchain", "defi", "altcoin"}
 FOREX_KEYWORDS = {"forex", "dollar", "euro", "gbp", "yen", "fed", "ecb", "boj", "interest rate"}
-MACRO_KEYWORDS = {"inflation", "cpi", "gdp", "employment", "nonfarm", "fomc", "rate hike", "rate cut"}
+MACRO_KEYWORDS = {
+    "inflation",
+    "cpi",
+    "gdp",
+    "employment",
+    "nonfarm",
+    "fomc",
+    "rate hike",
+    "rate cut",
+}
 COMMODITY_KEYWORDS = {"gold", "silver", "oil", "crude", "copper", "commodity", "precious metal"}
-HIGH_IMPACT = {"crash", "surge", "plunge", "rally", "breakout", "collapse", "record high", "record low"}
+HIGH_IMPACT = {
+    "crash",
+    "surge",
+    "plunge",
+    "rally",
+    "breakout",
+    "collapse",
+    "record high",
+    "record low",
+}
 
 # Source credibility tiers (0.0–1.0)
 SOURCE_CREDIBILITY = {
@@ -68,11 +86,7 @@ class MantisNewsIngester:
         processed: list[NewsItem] = []
         for raw in raw_items:
             # --- Parse publication timestamp ---
-            pub_str = (
-                raw.get("published_at")
-                or raw.get("datetime")
-                or raw.get("timestamp", "")
-            )
+            pub_str = raw.get("published_at") or raw.get("datetime") or raw.get("timestamp", "")
             try:
                 pub_dt = datetime.fromisoformat(str(pub_str).replace("Z", "+00:00"))
             except (ValueError, TypeError):
@@ -95,10 +109,7 @@ class MantisNewsIngester:
 
             # --- Extract content ---
             full_text = (
-                raw.get("text", "")
-                or raw.get("summary", "")
-                or raw.get("description", "")
-                or ""
+                raw.get("text", "") or raw.get("summary", "") or raw.get("description", "") or ""
             )
             lead = self.extract_lead_paragraph(full_text)
 
@@ -165,9 +176,7 @@ class MantisNewsIngester:
         text_lower = f"{item.title} {item.lead_paragraph}".lower()
 
         # 1. Keyword matching (max 0.40) --------------------------------
-        all_keywords = (
-            CRYPTO_KEYWORDS | FOREX_KEYWORDS | MACRO_KEYWORDS | COMMODITY_KEYWORDS
-        )
+        all_keywords = CRYPTO_KEYWORDS | FOREX_KEYWORDS | MACRO_KEYWORDS | COMMODITY_KEYWORDS
         matches = sum(1 for kw in all_keywords if kw in text_lower)
         keyword_score = min(matches * 0.1, 0.4)
 

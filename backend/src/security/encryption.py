@@ -38,7 +38,9 @@ class EncryptionService:
             )
 
         try:
-            self.fernet = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
+            self.fernet = Fernet(
+                encryption_key.encode() if isinstance(encryption_key, str) else encryption_key
+            )
         except Exception as e:
             raise ValueError(f"Invalid encryption key: {e}")
 

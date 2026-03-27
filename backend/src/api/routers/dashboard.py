@@ -58,9 +58,7 @@ async def get_overview(
     if trade_repo is not None:
         try:
             now = datetime.now(timezone.utc)
-            summary = await trade_repo.get_pnl_summary(
-                now - timedelta(days=30), now
-            )
+            summary = await trade_repo.get_pnl_summary(now - timedelta(days=30), now)
             if summary["trade_count"] > 0:
                 win_rate = summary.get("win_rate", 0.0)
         except Exception as e:
@@ -74,9 +72,7 @@ async def get_overview(
                 datetime(2020, 1, 1, tzinfo=timezone.utc),
                 datetime.now(timezone.utc),
             )
-            realized_pnl = sum(
-                float(p.profit_loss) for p in closed if p.profit_loss is not None
-            )
+            realized_pnl = sum(float(p.profit_loss) for p in closed if p.profit_loss is not None)
         except Exception as e:
             logger.debug(f"DB realized P&L query failed: {e}")
 
@@ -84,13 +80,32 @@ async def get_overview(
     if realized_pnl == 0.0:
         paper_loop = getattr(request.app.state, "paper_loop", None)
         if paper_loop is not None:
-            realized_pnl = sum(
-                h.get("pnl", 0) for h in paper_loop._trade_history
+            realized_pnl = sum(h.get("pnl", 0) for h in paper_loop._trade_history)
+
+    # Today's realized P&L (closed trades only, not equity delta)
+    today_realized_pnl = 0.0
+    if position_repo is not None:
+        try:
+            today_start = datetime.now(timezone.utc).replace(
+                hour=0,
+                minute=0,
+                second=0,
+                microsecond=0,
             )
+            closed_today = await position_repo.get_closed_in_period(
+                today_start,
+                datetime.now(timezone.utc),
+            )
+            today_realized_pnl = sum(
+                float(p.profit_loss) for p in closed_today if p.profit_loss is not None
+            )
+        except Exception as e:
+            logger.debug(f"DB today realized P&L query failed: {e}")
 
     overview = DashboardOverview(
         equity=state.current_equity,
         daily_pnl=state.daily_pnl,
+        today_realized_pnl=round(today_realized_pnl, 2),
         total_pnl=round(realized_pnl, 2),
         open_positions_count=open_count,
         win_rate=win_rate,
@@ -149,9 +164,7 @@ async def get_equity_curve(
 
     # Fallback: single placeholder point
     now = datetime.now(timezone.utc).isoformat()
-    points = [
-        EquityCurvePoint(date=now, equity=10000.0, drawdown_pct=0.0).model_dump()
-    ]
+    points = [EquityCurvePoint(date=now, equity=10000.0, drawdown_pct=0.0).model_dump()]
 
     return success_response(points)
 

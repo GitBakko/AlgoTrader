@@ -96,8 +96,8 @@ class PairsBacktester:
             lookback = self.config.zscore_lookback + 10
             lb_start = max(0, i - lookback)
             signal = strategy.generate_signal(
-                prices_a=prices_a[lb_start:i + 1],
-                prices_b=prices_b[lb_start:i + 1],
+                prices_a=prices_a[lb_start : i + 1],
+                prices_b=prices_b[lb_start : i + 1],
                 current_price_a=float(prices_a[i]),
                 current_price_b=float(prices_b[i]),
             )
@@ -109,32 +109,40 @@ class PairsBacktester:
                 current_entry_a = float(prices_a[i])
                 current_entry_b = float(prices_b[i])
                 # Transaction cost
-                cost = (signal.size_a * current_entry_a + signal.size_b * current_entry_b) * transaction_cost_pct
+                cost = (
+                    signal.size_a * current_entry_a + signal.size_b * current_entry_b
+                ) * transaction_cost_pct
                 equity -= cost
 
             elif signal.action == "CLOSE" and current_signal is not None:
                 # Closing trade
                 pnl = self._compute_trade_pnl(
                     current_signal,
-                    current_entry_a, current_entry_b,
-                    float(prices_a[i]), float(prices_b[i]),
+                    current_entry_a,
+                    current_entry_b,
+                    float(prices_a[i]),
+                    float(prices_b[i]),
                 )
                 # Transaction cost on close
-                cost = (current_signal.size_a * float(prices_a[i]) +
-                        current_signal.size_b * float(prices_b[i])) * transaction_cost_pct
+                cost = (
+                    current_signal.size_a * float(prices_a[i])
+                    + current_signal.size_b * float(prices_b[i])
+                ) * transaction_cost_pct
                 pnl -= cost
 
                 equity += pnl
-                trades.append({
-                    "action": current_signal.action,
-                    "entry_price_a": current_entry_a,
-                    "entry_price_b": current_entry_b,
-                    "exit_price_a": float(prices_a[i]),
-                    "exit_price_b": float(prices_b[i]),
-                    "pnl": pnl,
-                    "bars_held": strategy._bars_in_trade,
-                    "exit_reason": signal.reason,
-                })
+                trades.append(
+                    {
+                        "action": current_signal.action,
+                        "entry_price_a": current_entry_a,
+                        "entry_price_b": current_entry_b,
+                        "exit_price_a": float(prices_a[i]),
+                        "exit_price_b": float(prices_b[i]),
+                        "pnl": pnl,
+                        "bars_held": strategy._bars_in_trade,
+                        "exit_reason": signal.reason,
+                    }
+                )
 
                 current_signal = None
 

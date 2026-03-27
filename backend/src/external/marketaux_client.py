@@ -76,7 +76,9 @@ class MarketauxClient:
         Returns:
             List of news articles with sentiment scores
         """
-        logger.info(f"[MarketauxClient] get_news_sentiment called: epic={epic}, limit={limit}, days={days}")
+        logger.info(
+            f"[MarketauxClient] get_news_sentiment called: epic={epic}, limit={limit}, days={days}"
+        )
 
         # Check cache first
         cache_key = self._cache_key(epic, limit, days)

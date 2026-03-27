@@ -12,7 +12,9 @@ class FearGreedData(BaseModel):
     """Composite Fear & Greed index data."""
 
     value: float = Field(
-        default=50.0, ge=0, le=100,
+        default=50.0,
+        ge=0,
+        le=100,
         description="0=extreme fear, 100=extreme greed",
     )
     normalized: float = Field(default=0.5, ge=0.0, le=1.0)
@@ -20,7 +22,9 @@ class FearGreedData(BaseModel):
     is_extreme_fear: bool = False
     is_extreme_greed: bool = False
     gold_bias: float = Field(
-        default=0.0, ge=-1.0, le=1.0,
+        default=0.0,
+        ge=-1.0,
+        le=1.0,
         description="+1=bullish gold (fear), -1=bearish gold (greed)",
     )
     timestamp: datetime | None = None
@@ -30,19 +34,19 @@ class FREDData(BaseModel):
     """FRED economic indicators (12 series)."""
 
     # New SIL series (from Prompt Contract)
-    fed_funds_rate: float | None = None         # DFF
-    yield_spread_10y2y: float | None = None     # T10Y2Y
-    high_yield_spread: float | None = None      # BAMLH0A0HYM2
-    consumer_sentiment: float | None = None     # UMCSENT
-    unemployment_rate: float | None = None      # UNRATE
-    nonfarm_payrolls: float | None = None       # PAYEMS
+    fed_funds_rate: float | None = None  # DFF
+    yield_spread_10y2y: float | None = None  # T10Y2Y
+    high_yield_spread: float | None = None  # BAMLH0A0HYM2
+    consumer_sentiment: float | None = None  # UMCSENT
+    unemployment_rate: float | None = None  # UNRATE
+    nonfarm_payrolls: float | None = None  # PAYEMS
     # Existing macro overlap
-    real_yield_10y: float | None = None         # DFII10
-    breakeven_inflation: float | None = None    # T10YIE
-    nominal_yield_10y: float | None = None      # DGS10
-    broad_dollar: float | None = None           # DTWEXBGS
-    vix_close: float | None = None              # VIXCLS
-    wti_crude: float | None = None              # DCOILWTICO
+    real_yield_10y: float | None = None  # DFII10
+    breakeven_inflation: float | None = None  # T10YIE
+    nominal_yield_10y: float | None = None  # DGS10
+    broad_dollar: float | None = None  # DTWEXBGS
+    vix_close: float | None = None  # VIXCLS
+    wti_crude: float | None = None  # DCOILWTICO
     timestamp: datetime | None = None
 
 
@@ -63,7 +67,7 @@ class COTData(BaseModel):
     noncomm_long: int = 0
     noncomm_short: int = 0
     net_position: int = 0
-    net_position_normalized: float = 0.0    # normalized on 52w history
+    net_position_normalized: float = 0.0  # normalized on 52w history
     is_institutional_bullish: bool = False
     z_score_4w: float = 0.0
     report_date: datetime | None = None
@@ -88,7 +92,7 @@ class CalendarEvent(BaseModel):
     event: str = ""
     country: str = ""
     currency: str = ""
-    impact: str = "low"     # low, medium, high
+    impact: str = "low"  # low, medium, high
     event_time: datetime | None = None
     actual: str | None = None
     forecast: str | None = None

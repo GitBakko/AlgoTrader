@@ -86,7 +86,9 @@ class PortfolioTracker:
         self.open_positions.append(trade)
         return trade
 
-    def check_exits(self, high: float, low: float, close: float, bar_time: datetime) -> list[BacktestTrade]:
+    def check_exits(
+        self, high: float, low: float, close: float, bar_time: datetime
+    ) -> list[BacktestTrade]:
         """
         Check if any open positions hit SL/TP.
 
@@ -165,13 +167,15 @@ class PortfolioTracker:
 
         self.equity = self.cash + unrealized_pnl
 
-        self.equity_history.append({
-            "timestamp": bar_time,
-            "equity": self.equity,
-            "cash": self.cash,
-            "unrealized_pnl": unrealized_pnl,
-            "open_positions": len(self.open_positions),
-        })
+        self.equity_history.append(
+            {
+                "timestamp": bar_time,
+                "equity": self.equity,
+                "cash": self.cash,
+                "unrealized_pnl": unrealized_pnl,
+                "open_positions": len(self.open_positions),
+            }
+        )
 
     @property
     def all_trades(self) -> list[BacktestTrade]:
@@ -228,9 +232,7 @@ class PortfolioTracker:
         self.cash += trade.net_pnl
         self.closed_trades.append(trade)
 
-    def _calculate_position_size(
-        self, entry_price: float, stop_loss: float | None
-    ) -> float:
+    def _calculate_position_size(self, entry_price: float, stop_loss: float | None) -> float:
         """
         Calculate position size based on risk per trade.
 

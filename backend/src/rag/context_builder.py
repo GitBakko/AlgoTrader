@@ -1,5 +1,6 @@
 # MANTIS-EVOLUTION: RAG Context Builder
 """Builds enriched context for LLM agents from news, macro, and memory data."""
+
 from __future__ import annotations
 
 from loguru import logger
@@ -105,10 +106,7 @@ class MantisRAGContextBuilder:
             return ""
         lines = ["## Recent News"]
         for item in news:
-            sentiment_tag = (
-                "+" if item.sentiment > 0.1
-                else ("-" if item.sentiment < -0.1 else "~")
-            )
+            sentiment_tag = "+" if item.sentiment > 0.1 else ("-" if item.sentiment < -0.1 else "~")
             line = f"- [{sentiment_tag}] {item.title}"
             if item.lead_paragraph:
                 line += f": {item.lead_paragraph[:150]}"
@@ -177,8 +175,7 @@ class MantisRAGContextBuilder:
 
         lines.append(f"- Recent win rate (24h): {memory.recent_win_rate:.0%}")
         lines.append(
-            f"- STM items: {memory.stm_item_count}, "
-            f"LTM patterns: {memory.ltm_pattern_count}"
+            f"- STM items: {memory.stm_item_count}, " f"LTM patterns: {memory.ltm_pattern_count}"
         )
 
         if memory.similar_patterns:
@@ -192,9 +189,7 @@ class MantisRAGContextBuilder:
         if memory.episodic_warnings:
             lines.append("- WARNINGS from past episodes:")
             for w in memory.episodic_warnings:
-                lines.append(
-                    f"  - ⚠ {w.description}: {w.lesson} (action={w.recommended_action})"
-                )
+                lines.append(f"  - ⚠ {w.description}: {w.lesson} (action={w.recommended_action})")
 
         if memory.blacklist_conditions:
             lines.append(f"- {len(memory.blacklist_conditions)} active blacklist conditions")
@@ -212,7 +207,7 @@ class MantisRAGContextBuilder:
                 result.append(section)
                 remaining -= len(section)
             elif remaining > 100:  # only truncate if meaningful space left
-                result.append(section[:remaining - 3] + "...")
+                result.append(section[: remaining - 3] + "...")
                 remaining = 0
 
             if remaining <= 0:

@@ -1,5 +1,6 @@
 # MANTIS-EVOLUTION: RL Trading Environment
 """Custom gymnasium environment for MANTIS RL trading."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -152,9 +153,7 @@ class MantisRLEnvironment(_BaseEnv):
             self._done = True
 
         obs = (
-            self._get_observation()
-            if not self._done
-            else np.zeros(self.obs_size, dtype=np.float32)
+            self._get_observation() if not self._done else np.zeros(self.obs_size, dtype=np.float32)
         )
 
         info: dict = {
@@ -213,12 +212,12 @@ class MantisRLEnvironment(_BaseEnv):
             self._state.trade_duration += 1
             if self._state.position == 1:
                 self._state.current_profit = (
-                    (price - self._state.entry_price) / self._state.entry_price
-                )
+                    price - self._state.entry_price
+                ) / self._state.entry_price
             else:  # short
                 self._state.current_profit = (
-                    (self._state.entry_price - price) / self._state.entry_price
-                )
+                    self._state.entry_price - price
+                ) / self._state.entry_price
         else:
             self._state.current_profit = 0.0
 

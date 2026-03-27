@@ -65,7 +65,7 @@ class AdaptiveKellySizer:
             return None
 
         # Use only recent trades
-        recent = trade_history[-self.lookback_trades:]
+        recent = trade_history[-self.lookback_trades :]
         pnls = [t.get("pnl", t.get("net_pnl", 0.0)) for t in recent]
 
         wins = [p for p in pnls if p > 0]
@@ -143,9 +143,12 @@ class AdaptiveKellySizer:
 
         if stats is None:
             # Fallback: fixed-fractional (same as PositionSizer)
-            return self._fixed_fractional(
-                equity, stop_distance, entry_price, confidence, max_position_pct
-            ), "fixed_fractional"
+            return (
+                self._fixed_fractional(
+                    equity, stop_distance, entry_price, confidence, max_position_pct
+                ),
+                "fixed_fractional",
+            )
 
         # Kelly-based sizing
         kelly_frac = stats.half_kelly if self.use_half_kelly else stats.kelly_fraction
@@ -154,9 +157,12 @@ class AdaptiveKellySizer:
             # Negative Kelly = no statistical edge. Fall back to fixed-fractional
             # at 50% size so the system keeps trading conservatively and can
             # recover its stats instead of deadlocking.
-            fallback = self._fixed_fractional(
-                equity, stop_distance, entry_price, confidence, max_position_pct
-            ) * 1.0
+            fallback = (
+                self._fixed_fractional(
+                    equity, stop_distance, entry_price, confidence, max_position_pct
+                )
+                * 1.0
+            )
             logger.info(
                 f"Kelly negative ({stats.kelly_fraction:.4f}), "
                 f"fallback to 50% fixed-fractional: size={fallback:.4f} "

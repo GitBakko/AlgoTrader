@@ -7,7 +7,12 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from loguru import logger
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.pool import NullPool
 
 from src.utils.config import get_settings

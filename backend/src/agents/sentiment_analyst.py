@@ -78,7 +78,8 @@ class SentimentAnalystAgent(MantisBaseAgent):
         if sil:
             for key, value in sil.items():
                 formatted_v = (
-                    f"{value:.6g}" if isinstance(value, (int, float)) and value is not None
+                    f"{value:.6g}"
+                    if isinstance(value, (int, float)) and value is not None
                     else str(value)
                 )
                 lines.append(f"  - {key}: {formatted_v}")
@@ -115,8 +116,7 @@ class SentimentAnalystAgent(MantisBaseAgent):
         if result is not None:
             return result
         logger.info(
-            f"[SENTIMENT] LLM path unavailable for {context.epic}, "
-            "using heuristic fallback."
+            f"[SENTIMENT] LLM path unavailable for {context.epic}, " "using heuristic fallback."
         )
         return self._heuristic_analyze(context)
 

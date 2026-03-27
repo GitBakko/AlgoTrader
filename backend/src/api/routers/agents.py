@@ -31,14 +31,20 @@ def _error(msg: str, status: int = 400):
 async def agents_status():
     """Get multi-agent pipeline status and configuration."""
     settings = get_settings()
-    return _success({
-        "agents_enabled": settings.agents_enabled,
-        "vision_enabled": settings.vision_enabled,
-        "drl_enabled": settings.drl_enabled,
-        "debate_enabled": settings.agents_debate_enabled,
-        "orchestrator_active": settings.agents_enabled,
-        "llm_model": settings.agents_llm_model if hasattr(settings, "agents_llm_model") else "claude-sonnet-4-20250514",
-    })
+    return _success(
+        {
+            "agents_enabled": settings.agents_enabled,
+            "vision_enabled": settings.vision_enabled,
+            "drl_enabled": settings.drl_enabled,
+            "debate_enabled": settings.agents_debate_enabled,
+            "orchestrator_active": settings.agents_enabled,
+            "llm_model": (
+                settings.agents_llm_model
+                if hasattr(settings, "agents_llm_model")
+                else "claude-sonnet-4-20250514"
+            ),
+        }
+    )
 
 
 @router.post("/analyze/{epic}")
@@ -59,8 +65,8 @@ async def analyze_epic(epic: str, request: Request):
 
         orchestrator = MantisAgentOrchestrator(
             debate_enabled=settings.agents_debate_enabled,
-            vision_enabled=False,   # skip LLM-backed vision for manual trigger
-            drl_enabled=False,      # skip DRL for manual trigger
+            vision_enabled=False,  # skip LLM-backed vision for manual trigger
+            drl_enabled=False,  # skip DRL for manual trigger
         )
 
         # Build a minimal context — price unknown without live feed
@@ -101,20 +107,22 @@ async def analyze_epic(epic: str, request: Request):
 
         decision = await orchestrator.run(context)
 
-        return _success({
-            "epic": epic,
-            "action": decision.action,
-            "approved": decision.approved,
-            "confidence": decision.confidence,
-            "size_pct": decision.size_pct,
-            "entry_price": decision.entry_price,
-            "stop_loss": decision.stop_loss,
-            "take_profit_levels": decision.take_profit_levels,
-            "rationale": decision.rationale,
-            "override_reason": decision.override_reason,
-            "debate_summary": decision.debate_summary,
-            "agent_audit_trail": decision.agent_audit_trail,
-        })
+        return _success(
+            {
+                "epic": epic,
+                "action": decision.action,
+                "approved": decision.approved,
+                "confidence": decision.confidence,
+                "size_pct": decision.size_pct,
+                "entry_price": decision.entry_price,
+                "stop_loss": decision.stop_loss,
+                "take_profit_levels": decision.take_profit_levels,
+                "rationale": decision.rationale,
+                "override_reason": decision.override_reason,
+                "debate_summary": decision.debate_summary,
+                "agent_audit_trail": decision.agent_audit_trail,
+            }
+        )
 
     except Exception as e:
         logger.error(f"Agent analysis failed for {epic}: {e!r}")
@@ -143,11 +151,13 @@ async def last_decision(epic: str, request: Request):
             return _success({"epic": epic, "agent_decision": None, "reason": "no_signal_yet"})
 
         agent_decision = signal_info.get("agent_decision")
-        return _success({
-            "epic": epic,
-            "agent_decision": agent_decision,
-            "signal_timestamp": signal_info.get("timestamp"),
-        })
+        return _success(
+            {
+                "epic": epic,
+                "agent_decision": agent_decision,
+                "signal_timestamp": signal_info.get("timestamp"),
+            }
+        )
 
     except Exception as e:
         logger.error(f"Failed to retrieve last agent decision for {epic}: {e!r}")

@@ -64,16 +64,16 @@ class BacktestReporter:
             },
             "equity_curve": [
                 {
-                    "timestamp": pt["timestamp"].isoformat()
-                    if hasattr(pt["timestamp"], "isoformat")
-                    else str(pt["timestamp"]),
+                    "timestamp": (
+                        pt["timestamp"].isoformat()
+                        if hasattr(pt["timestamp"], "isoformat")
+                        else str(pt["timestamp"])
+                    ),
                     "equity": pt["equity"],
                 }
                 for pt in result.equity_curve
             ],
-            "trades": [
-                BacktestReporter._trade_to_dict(t) for t in result.trades
-            ],
+            "trades": [BacktestReporter._trade_to_dict(t) for t in result.trades],
             "generated_at": result.generated_at.isoformat(),
         }
 
@@ -128,13 +128,17 @@ class BacktestReporter:
             "epic": trade.epic,
             "direction": trade.direction,
             "entry_price": trade.entry_price,
-            "entry_time": trade.entry_time.isoformat()
-            if hasattr(trade.entry_time, "isoformat")
-            else str(trade.entry_time),
+            "entry_time": (
+                trade.entry_time.isoformat()
+                if hasattr(trade.entry_time, "isoformat")
+                else str(trade.entry_time)
+            ),
             "exit_price": trade.exit_price,
-            "exit_time": trade.exit_time.isoformat()
-            if trade.exit_time and hasattr(trade.exit_time, "isoformat")
-            else str(trade.exit_time) if trade.exit_time else None,
+            "exit_time": (
+                trade.exit_time.isoformat()
+                if trade.exit_time and hasattr(trade.exit_time, "isoformat")
+                else str(trade.exit_time) if trade.exit_time else None
+            ),
             "size": trade.size,
             "status": trade.status,
             "pnl": trade.pnl,

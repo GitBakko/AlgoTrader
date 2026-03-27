@@ -37,32 +37,32 @@ class KeltnerChannel:
         kc_middle_name = "kc_middle"
         if kc_middle_name not in df.columns:
             df = df.with_columns(
-                pl.col("close").ewm_mean(span=ema_period, ignore_nulls=True)
-                .alias(kc_middle_name)
+                pl.col("close").ewm_mean(span=ema_period, ignore_nulls=True).alias(kc_middle_name)
             )
 
         # ATR (simplified inline to avoid dependency on TechnicalIndicators)
         atr_col = f"_kc_atr_{atr_period}"
         if atr_col not in df.columns:
-            df = df.with_columns([
-                (pl.col("high") - pl.col("low")).alias("_kc_tr1"),
-                (pl.col("high") - pl.col("close").shift(1)).abs().alias("_kc_tr2"),
-                (pl.col("low") - pl.col("close").shift(1)).abs().alias("_kc_tr3"),
-            ])
             df = df.with_columns(
-                pl.max_horizontal("_kc_tr1", "_kc_tr2", "_kc_tr3").alias("_kc_tr")
+                [
+                    (pl.col("high") - pl.col("low")).alias("_kc_tr1"),
+                    (pl.col("high") - pl.col("close").shift(1)).abs().alias("_kc_tr2"),
+                    (pl.col("low") - pl.col("close").shift(1)).abs().alias("_kc_tr3"),
+                ]
             )
+            df = df.with_columns(pl.max_horizontal("_kc_tr1", "_kc_tr2", "_kc_tr3").alias("_kc_tr"))
             df = df.with_columns(
-                pl.col("_kc_tr").ewm_mean(span=atr_period, ignore_nulls=True)
-                .alias(atr_col)
+                pl.col("_kc_tr").ewm_mean(span=atr_period, ignore_nulls=True).alias(atr_col)
             )
             df = df.drop(["_kc_tr1", "_kc_tr2", "_kc_tr3", "_kc_tr"])
 
         # Upper and lower bands
-        df = df.with_columns([
-            (pl.col(kc_middle_name) + multiplier * pl.col(atr_col)).alias("kc_upper"),
-            (pl.col(kc_middle_name) - multiplier * pl.col(atr_col)).alias("kc_lower"),
-        ])
+        df = df.with_columns(
+            [
+                (pl.col(kc_middle_name) + multiplier * pl.col(atr_col)).alias("kc_upper"),
+                (pl.col(kc_middle_name) - multiplier * pl.col(atr_col)).alias("kc_lower"),
+            ]
+        )
 
         # Clean up temp ATR column
         df = df.drop([atr_col])
@@ -98,6 +98,7 @@ class KeltnerChannel:
         # Ensure BB columns exist
         if "bb_upper" not in df.columns:
             from src.features.technical import TechnicalIndicators
+
             df = TechnicalIndicators.add_bollinger_bands(df, period=bb_period, num_std=bb_std)
 
         # Ensure KC columns exist
@@ -122,10 +123,7 @@ class KeltnerChannel:
 
         # Squeeze release: was squeeze, now not
         df = df.with_columns(
-            pl.when(
-                (pl.col("squeeze_on") == 0)
-                & (pl.col("squeeze_on").shift(1) == 1)
-            )
+            pl.when((pl.col("squeeze_on") == 0) & (pl.col("squeeze_on").shift(1) == 1))
             .then(1)
             .otherwise(0)
             .alias("squeeze_off")
@@ -135,9 +133,7 @@ class KeltnerChannel:
         if "macd_histogram" in df.columns:
             df = df.with_columns(
                 pl.when(pl.col("squeeze_off") == 1)
-                .then(
-                    pl.when(pl.col("macd_histogram") > 0).then(1).otherwise(-1)
-                )
+                .then(pl.when(pl.col("macd_histogram") > 0).then(1).otherwise(-1))
                 .otherwise(0)
                 .alias("squeeze_momentum")
             )

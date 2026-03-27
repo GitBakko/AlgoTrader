@@ -45,7 +45,9 @@ class ExecutionEngine:
         """
         self._mode = mode
         self._position_tracker = PositionTracker(broker=broker, mode=mode)
-        self._order_manager = OrderManager(broker=broker, mode=mode, position_tracker=self._position_tracker)
+        self._order_manager = OrderManager(
+            broker=broker, mode=mode, position_tracker=self._position_tracker
+        )
         self._slippage_tracker = SlippageTracker()
 
         # Database persistence: prefer session factory (creates own sessions per-operation)
@@ -53,7 +55,9 @@ class ExecutionEngine:
         self._trade_repository = trade_repository
         self._db_session_factory = db_session_factory
 
-        has_db = (position_repository is not None and trade_repository is not None) or db_session_factory is not None
+        has_db = (
+            position_repository is not None and trade_repository is not None
+        ) or db_session_factory is not None
         if not has_db:
             logger.warning(
                 "ExecutionEngine initialized WITHOUT database persistence - "
@@ -120,14 +124,21 @@ class ExecutionEngine:
                 try:
                     # Create Position record
                     from src.database.models import Position
+
                     position_db = Position(
                         deal_id=result.deal_id,
                         epic=signal.epic,
                         direction=signal.direction.value,
                         size=Decimal(str(risk_result.position_size)),
                         entry_price=Decimal(str(result.fill_price)),
-                        stop_loss=Decimal(str(risk_result.stop_loss)) if risk_result.stop_loss else None,
-                        take_profit=Decimal(str(risk_result.take_profit)) if risk_result.take_profit else None,
+                        stop_loss=(
+                            Decimal(str(risk_result.stop_loss)) if risk_result.stop_loss else None
+                        ),
+                        take_profit=(
+                            Decimal(str(risk_result.take_profit))
+                            if risk_result.take_profit
+                            else None
+                        ),
                         status="OPEN",
                         opened_at=datetime.now(timezone.utc).replace(tzinfo=None),
                     )
@@ -135,6 +146,7 @@ class ExecutionEngine:
 
                     # Create Trade audit record
                     from src.database.models import Trade
+
                     trade_db = Trade(
                         position_id=position_db.id,
                         deal_reference=result.deal_id,
@@ -158,8 +170,7 @@ class ExecutionEngine:
             )
         else:
             logger.warning(
-                f"Execution failed: {signal.epic} {signal.direction.value} "
-                f"error={result.error}"
+                f"Execution failed: {signal.epic} {signal.direction.value} " f"error={result.error}"
             )
 
         return result
@@ -216,15 +227,19 @@ class ExecutionEngine:
             # Broadcast trade_closed event to frontend via WebSocket
             try:
                 from src.api.websocket import ws_manager
-                await ws_manager.broadcast("trades", {
-                    "type": "trade_closed",
-                    "deal_id": deal_id,
-                    "epic": epic,
-                    "direction": direction,
-                    "pnl": round(pnl, 2),
-                    "close_reason": reason,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                })
+
+                await ws_manager.broadcast(
+                    "trades",
+                    {
+                        "type": "trade_closed",
+                        "deal_id": deal_id,
+                        "epic": epic,
+                        "direction": direction,
+                        "pnl": round(pnl, 2),
+                        "close_reason": reason,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    },
+                )
             except Exception as e:
                 logger.debug(f"WS broadcast trade_closed failed: {e}")
 
@@ -233,8 +248,14 @@ class ExecutionEngine:
         return result
 
     async def _persist_close_to_db(
-        self, deal_id: str, reason: str, fill_price: float | None,
-        epic: str, direction: str, size: float = 0, entry_price: float = 0,
+        self,
+        deal_id: str,
+        reason: str,
+        fill_price: float | None,
+        epic: str,
+        direction: str,
+        size: float = 0,
+        entry_price: float = 0,
     ) -> tuple[str, str, float] | None:
         """
         Persist position close to DB. Returns (epic, direction, pnl) from DB if found.
@@ -243,8 +264,10 @@ class ExecutionEngine:
         """
         # Normalize close reason
         reason_map = {
-            "STOP_LOSS_HIT": "SL", "TAKE_PROFIT_HIT": "TP",
-            "TP1_HIT": "TP", "API close request": "MANUAL",
+            "STOP_LOSS_HIT": "SL",
+            "TAKE_PROFIT_HIT": "TP",
+            "TP1_HIT": "TP",
+            "API close request": "MANUAL",
             "Graceful shutdown": "MANUAL",
         }
         db_reason = reason_map.get(reason, reason)
@@ -253,6 +276,7 @@ class ExecutionEngine:
         if self._db_session_factory is not None:
             try:
                 from src.database.models import Position, Trade
+
                 now = datetime.now(timezone.utc).replace(tzinfo=None)
 
                 async with self._db_session_factory() as session:
@@ -294,10 +318,14 @@ class ExecutionEngine:
                             close_reason=db_reason,
                         )
                         position_db = await repo.create(position_db)
-                        logger.info(f"Created CLOSED position in DB (never persisted at open): {deal_id} {epic}")
+                        logger.info(
+                            f"Created CLOSED position in DB (never persisted at open): {deal_id} {epic}"
+                        )
                     else:
                         await session.commit()
-                        logger.warning(f"Position {deal_id} not found in DB and insufficient info to create")
+                        logger.warning(
+                            f"Position {deal_id} not found in DB and insufficient info to create"
+                        )
                         return None
 
                     # Create CLOSE trade record
@@ -343,6 +371,7 @@ class ExecutionEngine:
                     await self._position_repository.update(position_db)
 
                     from src.database.models import Trade
+
                     trade_db = Trade(
                         position_id=position_db.id,
                         deal_reference=deal_id,

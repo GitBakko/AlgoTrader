@@ -104,7 +104,9 @@ class RiskManagerAgent(MantisBaseAgent):
                 lines.append("")
                 lines.append("### Additional Features")
                 for k, v in list(other.items())[:20]:  # cap to avoid token overflow
-                    formatted = f"{v:.6g}" if isinstance(v, (int, float)) and v is not None else str(v)
+                    formatted = (
+                        f"{v:.6g}" if isinstance(v, (int, float)) and v is not None else str(v)
+                    )
                     lines.append(f"  - {k}: {formatted}")
         else:
             lines.append("  *(no feature data available — use ATR and position data only)*")
@@ -138,10 +140,7 @@ class RiskManagerAgent(MantisBaseAgent):
         result = await super().analyze(context)
         if result is not None:
             return result
-        logger.info(
-            f"[RISK] LLM path unavailable for {context.epic}, "
-            "using heuristic fallback."
-        )
+        logger.info(f"[RISK] LLM path unavailable for {context.epic}, " "using heuristic fallback.")
         return self._heuristic_analyze(context)
 
     # ------------------------------------------------------------------

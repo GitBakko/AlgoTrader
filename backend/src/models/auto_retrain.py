@@ -20,7 +20,6 @@ from src.models.walk_forward import WalkForwardSplitter
 from src.models.xgboost_model import XGBoostClassifier
 from src.utils.constants import TRADABLE_ASSETS
 
-
 # Stock epics with fewer trading hours per day
 STOCK_EPICS = {"NVDA", "TSLA"}
 LIMITED_HOURS_EPICS = {"NAS100"}
@@ -122,14 +121,20 @@ async def retrain_all_models(
     Returns: dict of {epic: success}
     """
     assets = list(TRADABLE_ASSETS)
-    logger.info(f"Auto-retrain starting for {len(assets)} assets (tf={timeframe}, horizon={horizon_bars})")
+    logger.info(
+        f"Auto-retrain starting for {len(assets)} assets (tf={timeframe}, horizon={horizon_bars})"
+    )
     start = time.monotonic()
 
     results = {}
     for epic in assets:
         # Run CPU-intensive training in thread pool to avoid blocking event loop
         epic_result, success, msg = await asyncio.to_thread(
-            _train_single_asset, epic, timeframe, horizon_bars, sil_data,
+            _train_single_asset,
+            epic,
+            timeframe,
+            horizon_bars,
+            sil_data,
         )
         results[epic_result] = success
         status = "OK" if success else "FAIL"
@@ -138,8 +143,7 @@ async def retrain_all_models(
     elapsed = time.monotonic() - start
     successful = sum(1 for s in results.values() if s)
     logger.info(
-        f"Auto-retrain complete: {successful}/{len(assets)} models trained "
-        f"in {elapsed:.0f}s"
+        f"Auto-retrain complete: {successful}/{len(assets)} models trained " f"in {elapsed:.0f}s"
     )
 
     # Reload models into PredictionService

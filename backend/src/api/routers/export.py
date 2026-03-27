@@ -49,31 +49,45 @@ async def export_closed_positions_csv(
     output.write("\ufeff")
     writer = csv.writer(output)
 
-    writer.writerow([
-        "Deal ID", "Epic", "Direction", "Size", "Entry Price", "Exit Price",
-        "P&L", "Stop Loss", "Take Profit", "Close Reason",
-        "Opened At", "Closed At", "Duration (min)",
-    ])
+    writer.writerow(
+        [
+            "Deal ID",
+            "Epic",
+            "Direction",
+            "Size",
+            "Entry Price",
+            "Exit Price",
+            "P&L",
+            "Stop Loss",
+            "Take Profit",
+            "Close Reason",
+            "Opened At",
+            "Closed At",
+            "Duration (min)",
+        ]
+    )
 
     for p in positions:
         duration = None
         if p.opened_at and p.closed_at:
             duration = int((p.closed_at - p.opened_at).total_seconds() / 60)
-        writer.writerow([
-            p.deal_id,
-            p.epic,
-            p.direction,
-            float(p.size),
-            float(p.entry_price),
-            float(p.current_price) if p.current_price else "",
-            float(p.profit_loss) if p.profit_loss else "",
-            float(p.stop_loss) if p.stop_loss else "",
-            float(p.take_profit) if p.take_profit else "",
-            p.close_reason or "",
-            p.opened_at.isoformat() if p.opened_at else "",
-            p.closed_at.isoformat() if p.closed_at else "",
-            duration if duration is not None else "",
-        ])
+        writer.writerow(
+            [
+                p.deal_id,
+                p.epic,
+                p.direction,
+                float(p.size),
+                float(p.entry_price),
+                float(p.current_price) if p.current_price else "",
+                float(p.profit_loss) if p.profit_loss else "",
+                float(p.stop_loss) if p.stop_loss else "",
+                float(p.take_profit) if p.take_profit else "",
+                p.close_reason or "",
+                p.opened_at.isoformat() if p.opened_at else "",
+                p.closed_at.isoformat() if p.closed_at else "",
+                duration if duration is not None else "",
+            ]
+        )
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     filename = f"mantis_positions_{timestamp}.csv"
@@ -90,16 +104,26 @@ def _empty_positions_csv() -> StreamingResponse:
     output = io.StringIO()
     output.write("\ufeff")
     writer = csv.writer(output)
-    writer.writerow([
-        "Deal ID", "Epic", "Direction", "Size", "Entry Price", "Exit Price",
-        "P&L", "Stop Loss", "Take Profit", "Close Reason",
-        "Opened At", "Closed At", "Duration (min)",
-    ])
+    writer.writerow(
+        [
+            "Deal ID",
+            "Epic",
+            "Direction",
+            "Size",
+            "Entry Price",
+            "Exit Price",
+            "P&L",
+            "Stop Loss",
+            "Take Profit",
+            "Close Reason",
+            "Opened At",
+            "Closed At",
+            "Duration (min)",
+        ]
+    )
     output.seek(0)
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
-        headers={
-            "Content-Disposition": 'attachment; filename="mantis_positions_empty.csv"'
-        },
+        headers={"Content-Disposition": 'attachment; filename="mantis_positions_empty.csv"'},
     )

@@ -1,5 +1,6 @@
 # MANTIS-EVOLUTION: Episodic Memory
 """Episodic memory: high-impact events that never decay."""
+
 from __future__ import annotations
 
 import json

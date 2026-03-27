@@ -99,9 +99,7 @@ class StrategyRepository(BaseRepository[Strategy]):
         await self.session.refresh(strategy)
         return strategy
 
-    async def update_performance_metrics(
-        self, strategy_id: int, metrics: dict
-    ) -> Strategy | None:
+    async def update_performance_metrics(self, strategy_id: int, metrics: dict) -> Strategy | None:
         """
         Update strategy performance metrics.
 

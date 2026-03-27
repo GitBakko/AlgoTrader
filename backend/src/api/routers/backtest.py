@@ -42,18 +42,23 @@ def _convert_strategy_signals(strategy_df: pl.DataFrame) -> pl.DataFrame:
     Engine expects: signal (SignalClass: BUY=2, SELL=0, HOLD=1), confidence, atr
     """
     # Map signal_direction to SignalClass values
-    signals_df = strategy_df.select([
-        pl.col("timestamp"),
-        pl.when(pl.col("signal_direction") == 1)
-        .then(pl.lit(SignalClass.BUY))      # 2
-        .when(pl.col("signal_direction") == -1)
-        .then(pl.lit(SignalClass.SELL))      # 0
-        .otherwise(pl.lit(SignalClass.HOLD)) # 1
-        .alias("signal"),
-        pl.col("signal_confidence").alias("confidence"),
-        pl.col("atr_14").alias("atr") if "atr_14" in strategy_df.columns
-        else pl.lit(0.0).alias("atr"),
-    ]).sort("timestamp")
+    signals_df = strategy_df.select(
+        [
+            pl.col("timestamp"),
+            pl.when(pl.col("signal_direction") == 1)
+            .then(pl.lit(SignalClass.BUY))  # 2
+            .when(pl.col("signal_direction") == -1)
+            .then(pl.lit(SignalClass.SELL))  # 0
+            .otherwise(pl.lit(SignalClass.HOLD))  # 1
+            .alias("signal"),
+            pl.col("signal_confidence").alias("confidence"),
+            (
+                pl.col("atr_14").alias("atr")
+                if "atr_14" in strategy_df.columns
+                else pl.lit(0.0).alias("atr")
+            ),
+        ]
+    ).sort("timestamp")
 
     return signals_df
 
@@ -80,8 +85,7 @@ async def run_backtest(
     strategy_name = body.strategy
     if strategy_name not in VALID_STRATEGIES:
         return error_response(
-            f"Invalid strategy '{strategy_name}'. "
-            f"Valid: {', '.join(sorted(VALID_STRATEGIES))}",
+            f"Invalid strategy '{strategy_name}'. " f"Valid: {', '.join(sorted(VALID_STRATEGIES))}",
             400,
         )
 
@@ -125,8 +129,10 @@ async def run_backtest(
 
     # Load OHLC data
     ohlc_df = data_access.get_candles(
-        epic=epic, timeframe=timeframe,
-        start_date=start_date, end_date=end_date,
+        epic=epic,
+        timeframe=timeframe,
+        start_date=start_date,
+        end_date=end_date,
     )
 
     if ohlc_df.is_empty() or len(ohlc_df) < 100:
@@ -161,8 +167,11 @@ async def run_backtest(
         # Build features (single-timeframe, no DataAccessLayer needed for indicators)
         fb = FeatureBuilder(data_access=None)
         df_with_features, _ = fb.build_features_from_df(
-            ohlc_df, epic, timeframe,
-            include_regime=True, normalize=False,
+            ohlc_df,
+            epic,
+            timeframe,
+            include_regime=True,
+            normalize=False,
         )
 
         # Create strategy instance and generate signals
@@ -179,7 +188,9 @@ async def run_backtest(
             return error_response(f"Unknown strategy: {strategy_name}", 400)
 
         strategy_df = strategy.generate_backtest_signals(
-            df_with_features, epic, timeframe,
+            df_with_features,
+            epic,
+            timeframe,
         )
 
         # Convert strategy signals to BacktestEngine format

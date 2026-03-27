@@ -53,18 +53,18 @@ class VWAPBands:
         tp = (pl.col("high") + pl.col("low") + pl.col("close")) / 3.0
 
         # Rolling VWAP: sum(TP * volume) / sum(volume) over window
-        df = df.with_columns([
-            (tp * pl.col("volume")).alias("_tp_vol"),
-        ])
+        df = df.with_columns(
+            [
+                (tp * pl.col("volume")).alias("_tp_vol"),
+            ]
+        )
 
-        df = df.with_columns([
-            pl.col("_tp_vol")
-            .rolling_sum(window_size=vwap_period)
-            .alias("_tp_vol_roll"),
-            pl.col("volume")
-            .rolling_sum(window_size=vwap_period)
-            .alias("_vol_roll"),
-        ])
+        df = df.with_columns(
+            [
+                pl.col("_tp_vol").rolling_sum(window_size=vwap_period).alias("_tp_vol_roll"),
+                pl.col("volume").rolling_sum(window_size=vwap_period).alias("_vol_roll"),
+            ]
+        )
 
         df = df.with_columns(
             pl.when(pl.col("_vol_roll") > 0)
@@ -75,16 +75,11 @@ class VWAPBands:
         )
 
         # Deviation from VWAP
-        df = df.with_columns(
-            (pl.col("close") - pl.col("vwap_rolling")).alias("_vwap_dev")
-        )
+        df = df.with_columns((pl.col("close") - pl.col("vwap_rolling")).alias("_vwap_dev"))
 
         # Rolling SD of deviation
         df = df.with_columns(
-            pl.col("_vwap_dev")
-            .rolling_std(window_size=sd_period)
-            .fill_null(0.0)
-            .alias("vwap_sd")
+            pl.col("_vwap_dev").rolling_std(window_size=sd_period).fill_null(0.0).alias("vwap_sd")
         )
 
         # Z-score: how far close is from VWAP in SD units
@@ -100,12 +95,12 @@ class VWAPBands:
         # SD bands
         for n in num_sd:
             suffix = str(n).replace(".", "")
-            df = df.with_columns([
-                (pl.col("vwap_rolling") + n * pl.col("vwap_sd"))
-                .alias(f"vwap_upper_{suffix}"),
-                (pl.col("vwap_rolling") - n * pl.col("vwap_sd"))
-                .alias(f"vwap_lower_{suffix}"),
-            ])
+            df = df.with_columns(
+                [
+                    (pl.col("vwap_rolling") + n * pl.col("vwap_sd")).alias(f"vwap_upper_{suffix}"),
+                    (pl.col("vwap_rolling") - n * pl.col("vwap_sd")).alias(f"vwap_lower_{suffix}"),
+                ]
+            )
 
         # Cleanup
         df = df.drop(["_tp_vol", "_tp_vol_roll", "_vol_roll", "_vwap_dev"])

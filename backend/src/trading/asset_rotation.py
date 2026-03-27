@@ -54,7 +54,7 @@ def compute_momentum_scores(
             # Momentum = cumulative return
             cum_return = 1.0
             for r in momentum_window:
-                cum_return *= (1 + r)
+                cum_return *= 1 + r
             momentum = cum_return - 1.0
 
             # Volatility for risk-adjustment

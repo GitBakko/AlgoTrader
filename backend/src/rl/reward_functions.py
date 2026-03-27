@@ -1,5 +1,6 @@
 # MANTIS-EVOLUTION: RL Reward Functions
 """Reward functions for the MANTIS RL trading environment."""
+
 from __future__ import annotations
 
 import numpy as np

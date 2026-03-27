@@ -52,9 +52,7 @@ class GatedResidualNetwork(nn.Module):
 
         # Skip connection (if dimensions match)
         self.skip_layer = (
-            nn.Linear(input_dim, self.output_dim)
-            if input_dim != self.output_dim
-            else None
+            nn.Linear(input_dim, self.output_dim) if input_dim != self.output_dim else None
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -260,9 +258,7 @@ class TFTClassifier(BaseMLModel):
         # Build model if not exists
         if self.model is None:
             self.model = self._build_model().to(self.device)
-            self.optimizer = torch.optim.Adam(
-                self.model.parameters(), lr=self.learning_rate
-            )
+            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
         # Convert labels from {-1, 0, 1} to {0, 1, 2}
         y_train_mapped = y_train + 1

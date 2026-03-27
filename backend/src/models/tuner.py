@@ -94,7 +94,8 @@ class XGBoostTuner:
 
             clf = xgb.XGBClassifier(**params)
             clf.fit(
-                X_train, y_train,
+                X_train,
+                y_train,
                 sample_weight=sample_weights,
                 eval_set=[(X_val, y_val)],
                 verbose=False,

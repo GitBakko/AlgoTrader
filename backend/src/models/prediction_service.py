@@ -68,9 +68,7 @@ class PredictionService:
                     logger.warning(f"No XGBoost model found for {epic}")
                     continue
                 latest = xgb_models[0]  # sorted by created_at desc
-                model, meta = self.versioning.load_model(
-                    XGBoostClassifier, epic, latest.model_id
-                )
+                model, meta = self.versioning.load_model(XGBoostClassifier, epic, latest.model_id)
                 self._loaded_models[epic] = (model, meta)
 
                 # Load calibrator if available
@@ -112,15 +110,17 @@ class PredictionService:
 
         # Check if model was trained with multi-TF features
         has_multi_tf = any(
-            f.startswith("4h_") or f.startswith("1d_")
-            for f in (meta.feature_names or [])
+            f.startswith("4h_") or f.startswith("1d_") for f in (meta.feature_names or [])
         )
 
         # Build features (multi-TF uses build_features with data_access)
         if has_multi_tf and self.data_access is not None:
             df_features, matrix = self.feature_builder.build_features(
-                epic=epic, timeframe=timeframe,
-                normalize=True, include_regime=True, multi_timeframe=True,
+                epic=epic,
+                timeframe=timeframe,
+                normalize=True,
+                include_regime=True,
+                multi_timeframe=True,
                 sil_data=sil_data,
             )
         else:
@@ -130,7 +130,11 @@ class PredictionService:
                 return None
             self._last_candles_cache[epic] = (timeframe, df)
             df_features, matrix = self.feature_builder.build_features_from_df(
-                df, epic, timeframe, normalize=True, include_regime=True,
+                df,
+                epic,
+                timeframe,
+                normalize=True,
+                include_regime=True,
                 sil_data=sil_data,
             )
 
@@ -165,7 +169,9 @@ class PredictionService:
         X = df_features.tail(1).select(available).to_numpy()
         nan_count = int(np.isnan(X).sum())
         if nan_count > len(available) * 0.5:
-            logger.warning(f"[{epic}] >50% NaN in feature vector ({nan_count}/{len(available)}), skipping")
+            logger.warning(
+                f"[{epic}] >50% NaN in feature vector ({nan_count}/{len(available)}), skipping"
+            )
             return None
         X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
 
@@ -186,6 +192,7 @@ class PredictionService:
             # Record prediction metric
             try:
                 from src.monitoring.metrics import MetricsCollector
+
                 MetricsCollector.record_model_prediction(
                     epic=epic,
                     model_type="xgboost",
@@ -200,9 +207,7 @@ class PredictionService:
                 signal_class=predicted_class,
                 signal_name=SignalClass(predicted_class).name,
                 confidence=confidence,
-                probabilities={
-                    SignalClass(i).name: float(p) for i, p in enumerate(proba_row)
-                },
+                probabilities={SignalClass(i).name: float(p) for i, p in enumerate(proba_row)},
                 timestamp=datetime.now(timezone.utc),
             )
         except Exception as e:
@@ -248,9 +253,11 @@ class PredictionService:
                 pl.col("volume").rolling_mean(window_size=20).alias("volume_sma_20")
             )
             from src.features.keltner import KeltnerChannel
+
             df = KeltnerChannel.add_keltner(df)
             # VWAP for directional filter
             from src.features.vwap_bands import VWAPBands
+
             df = VWAPBands.add_vwap_bands(df)
 
         # Regime detection (requires adx + ema_50)
@@ -283,8 +290,15 @@ class PredictionService:
         # Scalp indicators (only present when scalp mode enabled)
         if settings.scalp_mode_enabled:
             for key in (
-                "ema_9", "ema_21", "macd_histogram", "macd", "macd_signal",
-                "bb_upper", "bb_lower", "bb_middle", "volume_sma_20",
+                "ema_9",
+                "ema_21",
+                "macd_histogram",
+                "macd",
+                "macd_signal",
+                "bb_upper",
+                "bb_lower",
+                "bb_middle",
+                "volume_sma_20",
             ):
                 val = last.get(key)
                 if val is not None:

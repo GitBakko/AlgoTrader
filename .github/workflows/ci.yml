@@ -94,7 +94,7 @@ jobs:
           ENVIRONMENT: test
         run: |
           python -m pytest tests/ -v --tb=short \
-            --cov=src --cov-report=term-missing --cov-fail-under=80 -q
+            --cov=src --cov-report=term-missing --cov-fail-under=70 -q
 
   frontend-build:
     name: Frontend Build

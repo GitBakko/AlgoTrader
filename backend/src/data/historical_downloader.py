@@ -16,20 +16,19 @@ from src.data.models import DataSource, DownloadProgress, OHLCBar
 from src.data.storage import ParquetStorageManager
 from src.data.utils import timeframe_to_resolution
 
-
 # Capital.com API limits: max ~1000 candles per request
 MAX_CANDLES_PER_REQUEST = 1000
 
 # Chunk size in days per request, by timeframe
 CHUNK_DAYS = {
-    "1min": 1,       # ~390 candles/day (market hours)
-    "5min": 3,       # ~78 candles/day → 234/chunk
-    "15min": 10,     # ~26 candles/day → 260/chunk
-    "30min": 20,     # ~13 candles/day → 260/chunk
-    "1h": 30,        # ~8 candles/day → 240/chunk
-    "4h": 90,        # ~2 candles/day → 180/chunk
-    "1d": 365,       # 1 candle/day → 365/chunk
-    "1w": 730,       # ~1 candle/week → 104/chunk
+    "1min": 1,  # ~390 candles/day (market hours)
+    "5min": 3,  # ~78 candles/day → 234/chunk
+    "15min": 10,  # ~26 candles/day → 260/chunk
+    "30min": 20,  # ~13 candles/day → 260/chunk
+    "1h": 30,  # ~8 candles/day → 240/chunk
+    "4h": 90,  # ~2 candles/day → 180/chunk
+    "1d": 365,  # 1 candle/day → 365/chunk
+    "1w": 730,  # ~1 candle/week → 104/chunk
 }
 
 # Default retry settings
@@ -140,9 +139,7 @@ class HistoricalDownloader:
 
             if candles:
                 # Convert to storage format
-                bars = [
-                    _broker_to_ohlc_bar(c, epic, timeframe) for c in candles
-                ]
+                bars = [_broker_to_ohlc_bar(c, epic, timeframe) for c in candles]
 
                 # Append to storage (handles deduplication)
                 new_count = self.storage.append_candles(bars, epic, timeframe)

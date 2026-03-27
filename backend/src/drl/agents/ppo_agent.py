@@ -1,5 +1,6 @@
 # MANTIS-EVOLUTION: PPO DRL Agent
 """Proximal Policy Optimization agent — best for trending markets."""
+
 from __future__ import annotations
 
 from typing import Any

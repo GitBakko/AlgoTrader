@@ -9,6 +9,7 @@ import {
 } from '@coreui/angular';
 import { IconDirective } from '@coreui/icons-angular';
 import { TradingService } from '../../core/services/trading.service';
+import { WebSocketService } from '../../core/services/websocket.service';
 import { NewsService } from '../../core/services/news.service';
 import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
 import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.component';
@@ -162,6 +163,7 @@ type SortDir = 'asc' | 'desc';
                     Prezzo {{ sortIcon('entry_price') }}
                   </th>
                   <th>Stato</th>
+                  <th class="d-mobile-none">Posizione</th>
                   <th class="d-mobile-none">Dettaglio</th>
                   <th class="text-center d-mobile-none" style="width: 44px;">Note</th>
                 </tr>
@@ -193,6 +195,43 @@ type SortDir = 'asc' | 'desc';
                     <td class="mantis-mono d-mobile-none">{{ sig.entry_price | priceFormat:sig.epic }}</td>
                     <td>
                       <c-badge [color]="statusColor(sig.status)" class="badge-sm">{{ statusLabel(sig.status) }}</c-badge>
+                      @if (sig.sl_cooldown) {
+                        <c-badge [color]="sig.sl_cooldown.blocked ? 'danger' : 'warning'" class="badge-sm ms-1"
+                                 [cTooltip]="'SL Cooldown: penalty ' + (sig.sl_cooldown.penalty * 100).toFixed(0) + '% (' + sig.sl_cooldown.window_hours + 'h)'">
+                          {{ sig.sl_cooldown.sl_count }}/{{ sig.sl_cooldown.max_strikes }} SL
+                        </c-badge>
+                      }
+                    </td>
+                    <td class="d-mobile-none">
+                      @if (sig.status === 'executed') {
+                        @let posInfo = getPositionInfo(sig);
+                        @if (posInfo.status === 'open') {
+                          <span class="d-inline-flex align-items-center gap-1">
+                            <span class="pulse-dot" style="width:6px;height:6px;"></span>
+                            <span class="small">Aperta</span>
+                            @if (posInfo.pnl !== null) {
+                              <span class="mantis-mono small ms-1"
+                                    [class.text-success]="posInfo.pnl >= 0"
+                                    [class.text-danger]="posInfo.pnl < 0">
+                                {{ posInfo.pnl >= 0 ? '+' : '' }}{{ posInfo.pnl.toFixed(2) }}
+                              </span>
+                            }
+                          </span>
+                        } @else if (posInfo.status === 'closed') {
+                          <span class="d-inline-flex align-items-center gap-1">
+                            <span class="small text-body-secondary">Chiusa</span>
+                            @if (posInfo.pnl !== null) {
+                              <span class="mantis-mono small ms-1"
+                                    [class.text-success]="posInfo.pnl >= 0"
+                                    [class.text-danger]="posInfo.pnl < 0">
+                                {{ posInfo.pnl >= 0 ? '+' : '' }}{{ posInfo.pnl.toFixed(2) }}
+                              </span>
+                            }
+                          </span>
+                        }
+                      } @else {
+                        <span class="text-body-secondary">-</span>
+                      }
                     </td>
                     <td class="small tj-detail-cell d-mobile-none">
                       @if (sig.error_detail) {
@@ -297,8 +336,37 @@ type SortDir = 'asc' | 'desc';
 })
 export class TradeJournalComponent implements OnInit {
   private readonly trading = inject(TradingService);
+  private readonly ws = inject(WebSocketService);
   readonly newsService = inject(NewsService);
   readonly auditService = inject(SignalAuditService);
+
+  // Map of open positions by epic for quick lookup (includes opened_at for matching)
+  readonly openPositionsByEpic = computed(() => {
+    const map = new Map<string, { direction: string; size: number; level: number; opened_at: string | null }>();
+    for (const pos of this.trading.paperPositions()) {
+      map.set(pos.epic, {
+        direction: pos.direction, size: pos.size, level: pos.level,
+        opened_at: pos.opened_at ?? null,
+      });
+    }
+    return map;
+  });
+
+  // Map of closed positions by epic → sorted by closed_at desc for matching
+  readonly closedByEpic = computed(() => {
+    const map = new Map<string, { pnl: number; opened_at: string; closed_at: string }[]>();
+    for (const pos of this.trading.closedPositions()) {
+      if (pos.profit_loss == null || !pos.closed_at) continue;
+      const list = map.get(pos.epic) ?? [];
+      list.push({ pnl: pos.profit_loss, opened_at: pos.opened_at ?? pos.closed_at, closed_at: pos.closed_at });
+      map.set(pos.epic, list);
+    }
+    // Sort each list desc by closed_at
+    for (const list of map.values()) {
+      list.sort((a, b) => b.closed_at.localeCompare(a.closed_at));
+    }
+    return map;
+  });
 
   readonly selectedEpic = signal<string | null>(null);
   readonly showNewsModal = signal(false);
@@ -386,6 +454,8 @@ export class TradeJournalComponent implements OnInit {
   ngOnInit(): void {
     this.trading.loadPaperSignals();
     this.trading.loadSignalNotes();
+    this.trading.loadPaperPositions();
+    this.trading.loadClosedPositions({ page_size: 200 });
   }
 
   resetFilters(): void {
@@ -567,5 +637,74 @@ export class TradeJournalComponent implements OnInit {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Get position status for an executed signal.
+   * Returns: { status: 'open'|'closed'|null, pnl: number|null }
+   */
+  getPositionInfo(sig: PaperSignal): { status: string | null; pnl: number | null } {
+    if (sig.status !== 'executed') return { status: null, pnl: null };
+
+    const openPos = this.openPositionsByEpic().get(sig.epic);
+    if (openPos) {
+      // Check if this signal is the one that opened the current position
+      // by comparing timestamps (signal must be close to position open time)
+      if (openPos.opened_at) {
+        const sigTime = this._utc(sig.timestamp);
+        const posTime = this._utc(openPos.opened_at);
+        // Signal must be within 5 minutes before position open (execution delay)
+        const isMatch = sigTime <= posTime && (posTime - sigTime) < 5 * 60_000;
+        if (!isMatch) {
+          // This signal is for an older position, not the current open one
+          return this._findClosedPnl(sig);
+        }
+      }
+      // Position is still open — compute live P&L
+      const prices = this.ws.prices();
+      const tick = prices[sig.epic];
+      if (tick) {
+        const current = openPos.direction === 'BUY' ? tick.bid : tick.offer;
+        const diff = openPos.direction === 'BUY'
+          ? current - openPos.level
+          : openPos.level - current;
+        return { status: 'open', pnl: Math.round(diff * openPos.size * 100) / 100 };
+      }
+      return { status: 'open', pnl: null };
+    }
+
+    return this._findClosedPnl(sig);
+  }
+
+  /** Parse timestamp ensuring UTC (backend sends naive timestamps = UTC) */
+  private _utc(ts: string): number {
+    // If no timezone info, treat as UTC by appending Z
+    if (!ts.includes('+') && !ts.includes('Z') && !ts.endsWith('-00:00')) {
+      return new Date(ts + 'Z').getTime();
+    }
+    return new Date(ts).getTime();
+  }
+
+  private _findClosedPnl(sig: PaperSignal): { status: string | null; pnl: number | null } {
+    const closedList = this.closedByEpic().get(sig.epic);
+    if (closedList?.length) {
+      const sigTime = this._utc(sig.timestamp);
+      let best: { pnl: number; closed_at: string; opened_at: string } | null = null;
+      let bestDist = Infinity;
+      for (const c of closedList) {
+        const closedTime = this._utc(c.closed_at);
+        const openedTime = this._utc(c.opened_at);
+        // Signal should be within a reasonable window before close
+        if (sigTime <= closedTime + 60_000) {
+          const dist = Math.abs(openedTime - sigTime);
+          if (dist < bestDist) {
+            bestDist = dist;
+            best = c;
+          }
+        }
+      }
+      if (best) return { status: 'closed', pnl: best.pnl };
+    }
+    return { status: 'closed', pnl: null };
   }
 }

@@ -104,7 +104,10 @@ async def sil_calendar(request: Request):
 
     loop = _get_loop(request)
     if loop is None:
-        return {"success": True, "data": {"enabled": True, "events": [], "message": "Trading loop not running"}}
+        return {
+            "success": True,
+            "data": {"enabled": True, "events": [], "message": "Trading loop not running"},
+        }
 
     gate = getattr(loop, "_calendar_gate", None)
     if gate is None:

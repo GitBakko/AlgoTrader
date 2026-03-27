@@ -46,12 +46,12 @@ class PositionRepository(BaseRepository[Position]):
         Returns:
             Position or None if not found
         """
-        result = await self.session.execute(
-            select(Position).where(Position.deal_id == deal_id)
-        )
+        result = await self.session.execute(select(Position).where(Position.deal_id == deal_id))
         return result.scalar_one_or_none()
 
-    async def get_by_epic(self, epic: str, status: str | None = None, limit: int = 500) -> list[Position]:
+    async def get_by_epic(
+        self, epic: str, status: str | None = None, limit: int = 500
+    ) -> list[Position]:
         """
         Get positions by epic (asset).
 
@@ -281,9 +281,7 @@ class PositionRepository(BaseRepository[Position]):
         gross_profit = sum(wins) if wins else 0
         gross_loss = abs(sum(losses)) if losses else 0
         profit_factor = (
-            gross_profit / gross_loss if gross_loss > 0
-            else float("inf") if gross_profit > 0
-            else 0
+            gross_profit / gross_loss if gross_loss > 0 else float("inf") if gross_profit > 0 else 0
         )
 
         # P&L by epic + last trade time per epic
@@ -297,6 +295,7 @@ class PositionRepository(BaseRepository[Position]):
         # Equity curve (cumulative P&L over time) — enriched per-day
         # First pass: group trades by day
         from collections import defaultdict
+
         daily_buckets: dict[str, list[float]] = defaultdict(list)
         for p in positions:
             if p.closed_at:
@@ -319,22 +318,23 @@ class PositionRepository(BaseRepository[Position]):
             cumulative_wins += day_wins
             equity_now = initial_equity + cumulative
             peak_equity = max(peak_equity, equity_now)
-            dd_pct = (
-                (equity_now - peak_equity) / peak_equity * 100
-                if peak_equity > 0 else 0.0
+            dd_pct = (equity_now - peak_equity) / peak_equity * 100 if peak_equity > 0 else 0.0
+            equity_points.append(
+                {
+                    "date": day,
+                    "value": round(cumulative, 2),
+                    "daily_pnl": round(daily_pnl, 2),
+                    "drawdown_pct": round(dd_pct, 2),
+                    "trade_count": len(day_pnls),
+                    "win_count": day_wins,
+                    "cumulative_trades": cumulative_trades,
+                    "cumulative_win_rate": (
+                        round(cumulative_wins / cumulative_trades, 3)
+                        if cumulative_trades > 0
+                        else 0.0
+                    ),
+                }
             )
-            equity_points.append({
-                "date": day,
-                "value": round(cumulative, 2),
-                "daily_pnl": round(daily_pnl, 2),
-                "drawdown_pct": round(dd_pct, 2),
-                "trade_count": len(day_pnls),
-                "win_count": day_wins,
-                "cumulative_trades": cumulative_trades,
-                "cumulative_win_rate": round(
-                    cumulative_wins / cumulative_trades, 3
-                ) if cumulative_trades > 0 else 0.0,
-            })
 
         # Risk-adjusted ratios from equity curve
         if equity_points and len(equity_points) > 1:
@@ -346,17 +346,12 @@ class PositionRepository(BaseRepository[Position]):
             std_return = float(np.std(returns, ddof=1)) if len(returns) > 1 else 0.0
             downside_returns = returns[returns < 0]
             downside_std = (
-                float(np.std(downside_returns, ddof=1))
-                if len(downside_returns) > 1 else 0.0
+                float(np.std(downside_returns, ddof=1)) if len(downside_returns) > 1 else 0.0
             )
 
             # Annualize assuming ~252 trading days
-            sharpe_ratio = (
-                (avg_return / std_return * np.sqrt(252)) if std_return > 0 else 0.0
-            )
-            sortino_ratio = (
-                (avg_return / downside_std * np.sqrt(252)) if downside_std > 0 else 0.0
-            )
+            sharpe_ratio = (avg_return / std_return * np.sqrt(252)) if std_return > 0 else 0.0
+            sortino_ratio = (avg_return / downside_std * np.sqrt(252)) if downside_std > 0 else 0.0
 
             # Max drawdown from equity curve
             peak = np.maximum.accumulate(values)
@@ -367,15 +362,12 @@ class PositionRepository(BaseRepository[Position]):
             total_days = max(len(equity_points), 1)
             if values[0] != 0 and total_days > 0:
                 total_return = values[-1] / max(abs(values[0]), 1e-10)
-                annualized_return = (
-                    (abs(total_return) ** (252 / total_days) - 1)
-                    * (1 if total_return >= 0 else -1)
+                annualized_return = (abs(total_return) ** (252 / total_days) - 1) * (
+                    1 if total_return >= 0 else -1
                 )
             else:
                 annualized_return = 0.0
-            calmar_ratio = (
-                annualized_return / max_drawdown if max_drawdown > 0 else 0.0
-            )
+            calmar_ratio = annualized_return / max_drawdown if max_drawdown > 0 else 0.0
         else:
             sharpe_ratio = sortino_ratio = max_drawdown = calmar_ratio = 0.0
 

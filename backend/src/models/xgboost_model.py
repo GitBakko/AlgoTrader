@@ -115,12 +115,12 @@ class XGBoostClassifier(BaseMLModel):
 
         # Training info
         info = {
-            "n_estimators_used": self._model.best_iteration + 1
-            if hasattr(self._model, "best_iteration") and self._model.best_iteration is not None
-            else self.params["n_estimators"],
-            "class_distribution": {
-                SignalClass(i).name: int(c) for i, c in enumerate(class_counts)
-            },
+            "n_estimators_used": (
+                self._model.best_iteration + 1
+                if hasattr(self._model, "best_iteration") and self._model.best_iteration is not None
+                else self.params["n_estimators"]
+            ),
+            "class_distribution": {SignalClass(i).name: int(c) for i, c in enumerate(class_counts)},
         }
 
         logger.info(

@@ -70,7 +70,7 @@ class ScalpScoreStrategy(BaseStrategy):
         if ema_9 <= 0 or ema_21 <= 0:
             return 0, details
         spread = (ema_9 - ema_21) / ema_21
-        if spread > 0.001:   # >0.1% spread = bullish
+        if spread > 0.001:  # >0.1% spread = bullish
             return 1, details
         elif spread < -0.001:
             return -1, details
@@ -121,15 +121,21 @@ class ScalpScoreStrategy(BaseStrategy):
 
     @staticmethod
     def _vote_bb_squeeze(
-        bb_upper: float, bb_lower: float,
-        keltner_upper: float, keltner_lower: float,
-        price: float, bb_middle: float,
+        bb_upper: float,
+        bb_lower: float,
+        keltner_upper: float,
+        keltner_lower: float,
+        price: float,
+        bb_middle: float,
     ) -> tuple[int, dict]:
         """BB squeeze: breakout direction from compression."""
         details = {
-            "bb_upper": bb_upper, "bb_lower": bb_lower,
-            "kc_upper": keltner_upper, "kc_lower": keltner_lower,
-            "price": price, "bb_mid": bb_middle,
+            "bb_upper": bb_upper,
+            "bb_lower": bb_lower,
+            "kc_upper": keltner_upper,
+            "kc_lower": keltner_lower,
+            "price": price,
+            "bb_mid": bb_middle,
         }
         if bb_upper <= 0 or keltner_upper <= 0:
             return 0, details
@@ -208,26 +214,27 @@ class ScalpScoreStrategy(BaseStrategy):
         bb_upper = float(current_bar.get("bb_upper", 0))
         bb_lower = float(current_bar.get("bb_lower", 0))
         bb_mid = float(current_bar.get("bb_middle", 0))
-        if (adx_val > 0 and bb_mid > 0
-                and adx_val < _dm_settings.scalp_dead_market_adx):
+        if adx_val > 0 and bb_mid > 0 and adx_val < _dm_settings.scalp_dead_market_adx:
             # Compute BB width percentile from recent_bars
             bb_width_now = (bb_upper - bb_lower) / bb_mid if bb_mid > 0 else 0
             bb_pctile = 50.0  # default: assume mid-range
-            if ("bb_upper" in recent_bars.columns
-                    and "bb_lower" in recent_bars.columns
-                    and "bb_middle" in recent_bars.columns
-                    and len(recent_bars) > 10):
+            if (
+                "bb_upper" in recent_bars.columns
+                and "bb_lower" in recent_bars.columns
+                and "bb_middle" in recent_bars.columns
+                and len(recent_bars) > 10
+            ):
                 widths = (
-                    (recent_bars["bb_upper"] - recent_bars["bb_lower"])
-                    / recent_bars["bb_middle"]
-                ).drop_nulls().to_list()
+                    ((recent_bars["bb_upper"] - recent_bars["bb_lower"]) / recent_bars["bb_middle"])
+                    .drop_nulls()
+                    .to_list()
+                )
                 if widths:
                     count_below = sum(1 for w in widths if w <= bb_width_now)
                     bb_pctile = count_below / len(widths) * 100
             if bb_pctile < _dm_settings.scalp_dead_market_bb_pctile:
                 logger.debug(
-                    f"[{epic}] Dead market gate: ADX={adx_val:.1f} "
-                    f"BB_pctile={bb_pctile:.0f}%"
+                    f"[{epic}] Dead market gate: ADX={adx_val:.1f} " f"BB_pctile={bb_pctile:.0f}%"
                 )
                 return self._hold(epic, price)
 
@@ -315,7 +322,7 @@ class ScalpScoreStrategy(BaseStrategy):
         vwap = float(current_bar.get("vwap", 0))
         if vwap > 0:
             if price < vwap:
-                buy_count = 0   # Cannot buy below VWAP
+                buy_count = 0  # Cannot buy below VWAP
             elif price > vwap:
                 sell_count = 0  # Cannot sell above VWAP
 
@@ -333,8 +340,9 @@ class ScalpScoreStrategy(BaseStrategy):
         if session_mult >= 1.0:
             # Inside kill zone — lowest bar
             effective_min = KILLZONE_MIN_CONFLUENCE
-        elif (_strat_settings.scalp_chop_zone_start
-              <= utc_hour < _strat_settings.scalp_chop_zone_end):
+        elif (
+            _strat_settings.scalp_chop_zone_start <= utc_hour < _strat_settings.scalp_chop_zone_end
+        ):
             # Chop zone (e.g. 16-20 UTC) — highest bar
             effective_min = _strat_settings.scalp_chop_zone_min_confluence
         else:
@@ -406,8 +414,7 @@ class ScalpScoreStrategy(BaseStrategy):
 
         # Assemble audit metadata
         zone = "kill_zone" if session_mult >= 1.0 else "off_killzone"
-        if (_strat_settings.scalp_chop_zone_start
-                <= utc_hour < _strat_settings.scalp_chop_zone_end):
+        if _strat_settings.scalp_chop_zone_start <= utc_hour < _strat_settings.scalp_chop_zone_end:
             zone = "chop_zone"
         audit_metadata = {
             "votes": votes_data,
@@ -484,11 +491,16 @@ class ScalpScoreStrategy(BaseStrategy):
         session_mult = SessionFilter.get_session_multiplier(epic, utc_hour)
         if session_mult == 0.0:
             return {
-                "agreeing_votes": 0, "opposing_votes": 0, "neutral_votes": 7,
+                "agreeing_votes": 0,
+                "opposing_votes": 0,
+                "neutral_votes": 7,
                 "quality_score": 0.0,
-                "vwap_aligned": False, "htf_aligned": None,
-                "session_blocked": True, "dead_market_blocked": False,
-                "votes_detail": {}, "session_mult": 0.0,
+                "vwap_aligned": False,
+                "htf_aligned": None,
+                "session_blocked": True,
+                "dead_market_blocked": False,
+                "votes_detail": {},
+                "session_mult": 0.0,
             }
 
         # Dead market check
@@ -498,18 +510,20 @@ class ScalpScoreStrategy(BaseStrategy):
         bb_lower = float(current_bar.get("bb_lower", 0))
         bb_mid = float(current_bar.get("bb_middle", 0))
         dead_market = False
-        if (adx_val > 0 and bb_mid > 0
-                and adx_val < _dm_settings.scalp_dead_market_adx):
+        if adx_val > 0 and bb_mid > 0 and adx_val < _dm_settings.scalp_dead_market_adx:
             bb_width_now = (bb_upper - bb_lower) / bb_mid if bb_mid > 0 else 0
             bb_pctile = 50.0
-            if ("bb_upper" in recent_bars.columns
-                    and "bb_lower" in recent_bars.columns
-                    and "bb_middle" in recent_bars.columns
-                    and len(recent_bars) > 10):
+            if (
+                "bb_upper" in recent_bars.columns
+                and "bb_lower" in recent_bars.columns
+                and "bb_middle" in recent_bars.columns
+                and len(recent_bars) > 10
+            ):
                 widths = (
-                    (recent_bars["bb_upper"] - recent_bars["bb_lower"])
-                    / recent_bars["bb_middle"]
-                ).drop_nulls().to_list()
+                    ((recent_bars["bb_upper"] - recent_bars["bb_lower"]) / recent_bars["bb_middle"])
+                    .drop_nulls()
+                    .to_list()
+                )
                 if widths:
                     count_below = sum(1 for w in widths if w <= bb_width_now)
                     bb_pctile = count_below / len(widths) * 100
@@ -518,11 +532,16 @@ class ScalpScoreStrategy(BaseStrategy):
 
         if dead_market:
             return {
-                "agreeing_votes": 0, "opposing_votes": 0, "neutral_votes": 7,
+                "agreeing_votes": 0,
+                "opposing_votes": 0,
+                "neutral_votes": 7,
                 "quality_score": 0.0,
-                "vwap_aligned": False, "htf_aligned": None,
-                "session_blocked": False, "dead_market_blocked": True,
-                "votes_detail": {}, "session_mult": session_mult,
+                "vwap_aligned": False,
+                "htf_aligned": None,
+                "session_blocked": False,
+                "dead_market_blocked": True,
+                "votes_detail": {},
+                "session_mult": session_mult,
             }
 
         # Collect all 7 votes (same as generate_signal)
@@ -542,7 +561,8 @@ class ScalpScoreStrategy(BaseStrategy):
         )
         adx_vote, _ = self._vote_adx(float(current_bar.get("adx_14", 0)))
         bb_vote, _ = self._vote_bb_squeeze(
-            bb_upper, bb_lower,
+            bb_upper,
+            bb_lower,
             float(current_bar.get("keltner_upper", 0)),
             float(current_bar.get("keltner_lower", 0)),
             price,
@@ -572,9 +592,8 @@ class ScalpScoreStrategy(BaseStrategy):
         # VWAP alignment (soft — reported, not gated)
         vwap = float(current_bar.get("vwap", 0))
         if vwap > 0:
-            vwap_aligned = (
-                (ml_direction == SignalDirection.BUY and price >= vwap)
-                or (ml_direction == SignalDirection.SELL and price <= vwap)
+            vwap_aligned = (ml_direction == SignalDirection.BUY and price >= vwap) or (
+                ml_direction == SignalDirection.SELL and price <= vwap
             )
         else:
             vwap_aligned = True  # no VWAP data → assume aligned
@@ -589,8 +608,12 @@ class ScalpScoreStrategy(BaseStrategy):
             htf_aligned = None  # no HTF data
 
         votes_detail = {
-            "ema": ema_vote, "rsi": rsi_vote, "macd": macd_vote,
-            "bb": bb_vote, "vol": vol_vote, "adx": adx_vote,
+            "ema": ema_vote,
+            "rsi": rsi_vote,
+            "macd": macd_vote,
+            "bb": bb_vote,
+            "vol": vol_vote,
+            "adx": adx_vote,
             "sentiment": sentiment_vote,
         }
 
@@ -632,12 +655,14 @@ class ScalpScoreStrategy(BaseStrategy):
             directions.append(dir_val)
             confidences.append(sig.confidence)
 
-        return ohlc_df.with_columns([
-            pl.Series("signal_direction", directions),
-            pl.Series("signal_confidence", confidences),
-            pl.lit(None).alias("signal_stop"),
-            pl.lit(None).alias("signal_tp"),
-        ])
+        return ohlc_df.with_columns(
+            [
+                pl.Series("signal_direction", directions),
+                pl.Series("signal_confidence", confidences),
+                pl.lit(None).alias("signal_stop"),
+                pl.lit(None).alias("signal_tp"),
+            ]
+        )
 
     @staticmethod
     def _hold(epic: str, price: float) -> TradingSignal:

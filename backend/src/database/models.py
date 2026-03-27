@@ -7,7 +7,17 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import ARRAY, BigInteger, Column, ForeignKey, MetaData, Numeric, String, UniqueConstraint, text
+from sqlalchemy import (
+    ARRAY,
+    BigInteger,
+    Column,
+    ForeignKey,
+    MetaData,
+    Numeric,
+    String,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
@@ -457,9 +467,7 @@ class MarketSpec(SQLModel, table=True):
     """
 
     __tablename__ = "market_specs"
-    __table_args__ = (
-        UniqueConstraint("epic", "environment", name="uq_market_spec_epic_env"),
-    )
+    __table_args__ = (UniqueConstraint("epic", "environment", name="uq_market_spec_epic_env"),)
 
     id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     epic: str = Field(max_length=50, nullable=False, index=True)

@@ -6,13 +6,13 @@ Reinforcement Learning system.
 These schemas are the single source of truth for all RL agent I/O — no
 raw dicts allowed across RL module boundaries.
 """
+
 from __future__ import annotations
 
 from enum import IntEnum
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
-
 
 # ---------------------------------------------------------------------------
 # Actions

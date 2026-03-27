@@ -66,14 +66,13 @@ class TraderAgent:
             )
 
         # 2. Determine direction from technical + sentiment
-        tech_direction = self._direction_score(technical)   # -1 (bearish) to +1 (bullish)
-        sent_direction = self._sentiment_score(sentiment)   # -1 to +1
+        tech_direction = self._direction_score(technical)  # -1 (bearish) to +1 (bullish)
+        sent_direction = self._sentiment_score(sentiment)  # -1 to +1
 
         combined_weight = self.technical_weight + self.sentiment_weight
         if combined_weight > 0:
             direction_score = (
-                tech_direction * self.technical_weight
-                + sent_direction * self.sentiment_weight
+                tech_direction * self.technical_weight + sent_direction * self.sentiment_weight
             ) / combined_weight
         else:
             direction_score = 0.0
@@ -100,9 +99,7 @@ class TraderAgent:
         if confidences:
             total_weight = sum(w for _, w in confidences)
             confidence = (
-                sum(c * w for c, w in confidences) / total_weight
-                if total_weight > 0
-                else 0.5
+                sum(c * w for c, w in confidences) / total_weight if total_weight > 0 else 0.5
             )
         else:
             confidence = 0.0

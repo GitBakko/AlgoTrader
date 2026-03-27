@@ -44,7 +44,10 @@ class FeatureNormalizer:
             safe_std = pl.when(rolling_std.abs() < 1e-10).then(None).otherwise(rolling_std)
             df = df.with_columns(
                 (
-                    (pl.col(col) - pl.col(col).rolling_mean(window_size=window, min_samples=min_periods))
+                    (
+                        pl.col(col)
+                        - pl.col(col).rolling_mean(window_size=window, min_samples=min_periods)
+                    )
                     / safe_std
                 )
                 .fill_nan(0.0)
@@ -71,9 +74,7 @@ class FeatureNormalizer:
                 continue
 
             log_col = f"{col}_log"
-            df = df.with_columns(
-                pl.col(col).abs().log1p().alias(log_col)
-            )
+            df = df.with_columns(pl.col(col).abs().log1p().alias(log_col))
 
         return df
 
@@ -206,8 +207,7 @@ class FeatureNormalizer:
                 df = norm.log_transform(df, existing_log_cols)
                 # Replace feature columns with log versions for normalization
                 feature_columns = [
-                    f"{c}_log" if c in existing_log_cols else c
-                    for c in feature_columns
+                    f"{c}_log" if c in existing_log_cols else c for c in feature_columns
                 ]
 
         # Step 2: Fused clip + z-score (single pass over rolling stats)

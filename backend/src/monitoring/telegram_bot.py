@@ -201,6 +201,21 @@ class TelegramBotPoller:
                 cb_lines = [f"  {k}: {v}" for k, v in cb_tripped.items()]
                 cb_text = "\n\n*CB attivi:*\n" + "\n".join(cb_lines)
 
+            # Epic SL cooldowns
+            sl_cooldowns = status.get("epic_sl_cooldowns", {})
+            sl_text = ""
+            if sl_cooldowns:
+                sl_lines = [
+                    f"  {epic}: {count}/{loop._epic_sl_max_strikes} SL"
+                    + (" BLOCCATO" if count >= loop._epic_sl_max_strikes else "")
+                    for epic, count in sorted(sl_cooldowns.items(), key=lambda x: -x[1])
+                ]
+                sl_text = "\n\n*SL Cooldown (2h):*\n" + "\n".join(sl_lines)
+
+            # Consecutive losses from CB
+            consec = loop.risk_manager.circuit_breakers._consecutive_losses
+            max_consec = loop.risk_manager.circuit_breakers.config.max_consecutive_losses
+
             pnl_sign = "+" if broker_pnl >= 0 else ""
 
             msg = (
@@ -210,9 +225,10 @@ class TelegramBotPoller:
                 f"*Disponibile:* ${available:,.2f}\n\n"
                 f"*Posizioni ({pos_count}):*\n{pos_text}\n\n"
                 f"*Win Rate:* {wr_text}\n"
+                f"*Consec. losses:* {consec}/{max_consec}\n"
                 f"*Sessione:* {trades} trade, {iterations} iter, {errors} err\n"
                 f"*Equity < SMA:* {'Si' if eq_below else 'No'}"
-                f"{cb_text}"
+                f"{cb_text}{sl_text}"
             )
             await self.send_message(msg, chat_id)
         except Exception as e:
@@ -230,9 +246,8 @@ class TelegramBotPoller:
             loop._per_asset_losses.clear()
 
             if reset_list:
-                msg = (
-                    f"Circuit breakers resettati ({len(reset_list)}):\n"
-                    + "\n".join(f"  {b}" for b in reset_list)
+                msg = f"Circuit breakers resettati ({len(reset_list)}):\n" + "\n".join(
+                    f"  {b}" for b in reset_list
                 )
             else:
                 msg = "Nessun circuit breaker attivo da resettare."
@@ -248,7 +263,8 @@ class TelegramBotPoller:
             return
 
         await self.send_message(
-            "EMERGENCY STOP in corso...", chat_id,
+            "EMERGENCY STOP in corso...",
+            chat_id,
         )
 
         try:
@@ -256,9 +272,7 @@ class TelegramBotPoller:
             closed = result.get("positions_closed", 0)
             errors = result.get("errors", 0)
             await self.send_message(
-                f"EMERGENCY STOP completato.\n"
-                f"Posizioni chiuse: {closed}\n"
-                f"Errori: {errors}",
+                f"EMERGENCY STOP completato.\n" f"Posizioni chiuse: {closed}\n" f"Errori: {errors}",
                 chat_id,
             )
         except Exception as e:

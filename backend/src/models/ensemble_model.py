@@ -253,9 +253,7 @@ class EnsembleClassifier(BaseMLModel):
         self.meta_learner.load(meta_dir)
         logger.debug("Loaded meta-learner")
 
-        logger.success(
-            f"Ensemble loaded from {path} ({len(self.base_models)} base models + meta)"
-        )
+        logger.success(f"Ensemble loaded from {path} ({len(self.base_models)} base models + meta)")
 
     def get_feature_importance(self) -> dict[str, float]:
         """

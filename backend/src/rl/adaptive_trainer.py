@@ -1,5 +1,6 @@
 # MANTIS-EVOLUTION: Adaptive RL Trainer
 """Background RL model trainer with sliding window and hot-swap."""
+
 from __future__ import annotations
 
 import threading
@@ -79,9 +80,7 @@ class MantisAdaptiveTrainer:
         """Thread-safe model hot-swap."""
         with self._model_lock:
             self._current_model = model
-            self._current_version = version or datetime.now(timezone.utc).strftime(
-                "%Y%m%d_%H%M%S"
-            )
+            self._current_version = version or datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
             logger.info(f"Model swapped to version {self._current_version}")
 
     # ------------------------------------------------------------------

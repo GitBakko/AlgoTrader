@@ -5,6 +5,7 @@ Pydantic schema contracts for the Vision AI subsystem.
 Defines the data structures flowing through chart generation,
 vision analysis, and the orchestrator integration layer.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone

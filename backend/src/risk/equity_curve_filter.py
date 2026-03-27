@@ -30,9 +30,7 @@ class EquityCurveFilter:
 
     def __init__(self, config: EquityCurveConfig | None = None):
         self.config = config or EquityCurveConfig()
-        self._equity_points: deque[float] = deque(
-            maxlen=self.config.sma_window * 3
-        )
+        self._equity_points: deque[float] = deque(maxlen=self.config.sma_window * 3)
 
     def record_trade_close(self, equity_after_close: float) -> None:
         """

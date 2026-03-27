@@ -69,7 +69,7 @@ class SlippageTracker:
         )
         # Trim oldest records if over limit
         if len(self._records) > self.MAX_RECORDS:
-            self._records = self._records[-self.MAX_RECORDS:]
+            self._records = self._records[-self.MAX_RECORDS :]
 
     def get_average_slippage(self, epic: str | None = None) -> float:
         """

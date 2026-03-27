@@ -130,9 +130,7 @@ class FundManagerAgent:
             return FinalDecision(
                 **proposal.model_dump(),
                 approved=True,
-                debate_summary=(
-                    f"Consensus: {debate.consensus}" if debate else None
-                ),
+                debate_summary=(f"Consensus: {debate.consensus}" if debate else None),
                 agent_audit_trail=audit_trail,
             )
 

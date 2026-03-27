@@ -74,8 +74,8 @@ class HealthChecker:
             self.check_capital_com(),
             self.check_data_freshness(),
             self.check_system_resources(),  # NEW
-            self.check_websocket(),         # NEW
-            self.check_ml_models(),          # NEW
+            self.check_websocket(),  # NEW
+            self.check_ml_models(),  # NEW
             return_exceptions=True,
         )
 
@@ -87,8 +87,8 @@ class HealthChecker:
             "capital_com_api": api_check,
             "data_freshness": data_check,
             "system_resources": system_check,  # NEW
-            "websocket": ws_check,             # NEW
-            "ml_models": ml_check,              # NEW
+            "websocket": ws_check,  # NEW
+            "ml_models": ml_check,  # NEW
         }
 
         # Determine overall status

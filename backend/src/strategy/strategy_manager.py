@@ -52,9 +52,11 @@ class StrategyManager:
         self.orb_fvg_epics: set[str] = orb_fvg_epics if orb_fvg_epics is not None else {"US500"}
         if scalp_mode or ml_primary_enabled:
             from src.strategy.scalp_score_strategy import ScalpScoreStrategy
+
             self._scalp_strategy = ScalpScoreStrategy()
         if self.orb_fvg_epics:
             from src.strategy.orb_fvg_strategy import OrbFvgStrategy
+
             self._orb_fvg_strategy = OrbFvgStrategy()
 
     @classmethod
@@ -126,9 +128,7 @@ class StrategyManager:
         current_price = market_data.get("current_price")
         atr = market_data.get("atr")
         if current_price is None or atr is None:
-            raise ValueError(
-                "market_data must contain 'current_price' and 'atr' keys"
-            )
+            raise ValueError("market_data must contain 'current_price' and 'atr' keys")
         if not (isinstance(current_price, (int, float)) and current_price > 0):
             raise ValueError(f"Invalid current_price: {current_price}")
         if not (isinstance(atr, (int, float)) and atr > 0):
@@ -200,14 +200,11 @@ class StrategyManager:
 
         current_bar = {"close": current_price, "atr_14": atr}
 
-        signal = self._orb_fvg_strategy.generate_signal(
-            epic, current_bar, m1_bars, config
-        )
+        signal = self._orb_fvg_strategy.generate_signal(epic, current_bar, m1_bars, config)
 
         if signal.direction.value != "HOLD":
             logger.info(
-                f"ORB+FVG [{epic}]: {signal.direction.value} "
-                f"conf={signal.confidence:.2f}"
+                f"ORB+FVG [{epic}]: {signal.direction.value} " f"conf={signal.confidence:.2f}"
             )
 
         return signal
@@ -314,7 +311,9 @@ class StrategyManager:
             "confidence_after": round(signal.confidence, 4),
         }
         updated_metadata = {**signal.metadata, "ml": ml_audit}
-        signal = signal.model_copy(update={"strategy_name": "scalp_score", "metadata": updated_metadata})
+        signal = signal.model_copy(
+            update={"strategy_name": "scalp_score", "metadata": updated_metadata}
+        )
         return signal
 
     def _process_ml_primary(
@@ -378,13 +377,14 @@ class StrategyManager:
             "htf_bias": market_data.get("htf_bias"),
             "sil_composite_score": market_data.get("sil_composite_score", 0.0),
         }
-        recent_bars = market_data.get(
-            "recent_bars", pl.DataFrame({"close": [current_price]})
-        )
+        recent_bars = market_data.get("recent_bars", pl.DataFrame({"close": [current_price]}))
 
         # Step 5: Evaluate technical quality
         quality = self._scalp_strategy.evaluate_technical_quality(
-            ml_direction, epic, current_bar, recent_bars,
+            ml_direction,
+            epic,
+            current_bar,
+            recent_bars,
         )
 
         # Step 6: Hard gates (session, dead market)
@@ -418,7 +418,9 @@ class StrategyManager:
 
         # Step 9: SL/TP
         config = StrategyConfig(
-            epic=epic, stop_multiplier=1.0, risk_reward_ratio=2.0,
+            epic=epic,
+            stop_multiplier=1.0,
+            risk_reward_ratio=2.0,
         )
         sl_mult = config.stop_multiplier
         rr = config.risk_reward_ratio
@@ -491,6 +493,7 @@ class StrategyManager:
         """Create a HOLD signal."""
         from src.strategy.schemas import SignalDirection
         from src.models.schemas import SignalClass
+
         return TradingSignal(
             epic=epic,
             direction=SignalDirection.HOLD,

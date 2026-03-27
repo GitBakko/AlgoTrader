@@ -6,21 +6,25 @@ human-readable format with Italian localization.
 import re
 from dataclasses import dataclass, asdict
 
-
 # Day name mapping: English → Italian abbreviation
 _DAY_IT = {
-    "Mon": "Lun", "Tue": "Mar", "Wed": "Mer",
-    "Thu": "Gio", "Fri": "Ven", "Sat": "Sab", "Sun": "Dom",
+    "Mon": "Lun",
+    "Tue": "Mar",
+    "Wed": "Mer",
+    "Thu": "Gio",
+    "Fri": "Ven",
+    "Sat": "Sab",
+    "Sun": "Dom",
 }
 
 
 @dataclass
 class ParsedBrokerError:
-    error_type: str          # "market_closed", "insufficient_funds", "rate_limit", etc.
-    summary: str             # Short message in Italian
-    details: str | None      # Extra details (e.g. timetable)
+    error_type: str  # "market_closed", "insufficient_funds", "rate_limit", etc.
+    summary: str  # Short message in Italian
+    details: str | None  # Extra details (e.g. timetable)
     market_hours: dict | None  # {"Mon": "09:00-01:00", ...} if available
-    raw: str                 # Original error message
+    raw: str  # Original error message
 
     def to_dict(self) -> dict:
         return asdict(self)

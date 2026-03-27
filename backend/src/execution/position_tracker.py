@@ -70,7 +70,9 @@ class PositionTracker:
 
         # DEMO and LIVE: broker is the source of truth
         if self._broker is None:
-            logger.warning(f"Broker not available in {self._mode.value} mode, using local positions")
+            logger.warning(
+                f"Broker not available in {self._mode.value} mode, using local positions"
+            )
             with self._lock:
                 return list(self._paper_positions.values())
 
@@ -185,8 +187,7 @@ class PositionTracker:
             if profit_level is not None:
                 position["profit_level"] = profit_level
             logger.debug(
-                f"Local stops updated for {deal_id}: "
-                f"SL={stop_level}, TP={profit_level}"
+                f"Local stops updated for {deal_id}: " f"SL={stop_level}, TP={profit_level}"
             )
 
     @staticmethod
@@ -208,8 +209,7 @@ class PositionTracker:
             else:
                 pos_dict["stop_level"] = round(entry * 1.03, 6)
             logger.warning(
-                f"[{pos_dict.get('epic')}] EMERGENCY SL at 3%: "
-                f"SL={pos_dict['stop_level']}"
+                f"[{pos_dict.get('epic')}] EMERGENCY SL at 3%: " f"SL={pos_dict['stop_level']}"
             )
 
         # Emergency TP: R:R 2.0 from SL distance
@@ -232,9 +232,7 @@ class PositionTracker:
                 return pos
         return None
 
-    def open_paper_position(
-        self, order: ExecutionOrder, fill_price: float, deal_id: str
-    ) -> dict:
+    def open_paper_position(self, order: ExecutionOrder, fill_price: float, deal_id: str) -> dict:
         """
         Record a paper trading position opening (thread-safe).
 

@@ -42,9 +42,7 @@ async def prefetch_market_specs(
 
     async def _fetch_one(epic: str) -> tuple[str, dict | None]:
         try:
-            info = await asyncio.wait_for(
-                broker.get_market_details(epic), timeout=10.0
-            )
+            info = await asyncio.wait_for(broker.get_market_details(epic), timeout=10.0)
             return epic, info
         except Exception as e:
             logger.warning(f"[{epic}] Market spec fetch failed: {e}")
@@ -72,17 +70,17 @@ async def prefetch_market_specs(
 
         if value is not None:
             min_sizes[epic] = float(value)
-            db_records.append({
-                "epic": epic,
-                "min_deal_size": float(value),
-                "min_deal_size_unit": min_deal.get("unit", "UNITS"),
-                "max_deal_size": (
-                    float(max_deal["value"])
-                    if max_deal.get("value") is not None
-                    else None
-                ),
-                "market_name": info.get("instrument", {}).get("name"),
-            })
+            db_records.append(
+                {
+                    "epic": epic,
+                    "min_deal_size": float(value),
+                    "min_deal_size_unit": min_deal.get("unit", "UNITS"),
+                    "max_deal_size": (
+                        float(max_deal["value"]) if max_deal.get("value") is not None else None
+                    ),
+                    "market_name": info.get("instrument", {}).get("name"),
+                }
+            )
 
     # Persist to DB if available
     if db_session_factory and db_records:

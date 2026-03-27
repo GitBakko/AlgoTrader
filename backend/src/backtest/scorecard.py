@@ -20,14 +20,14 @@ class WalkForwardResult:
     n_folds: int
     sharpe: float
     sortino: float
-    max_drawdown: float          # as positive fraction (e.g. 0.15 = 15%)
-    win_rate: float              # 0.0 - 1.0
+    max_drawdown: float  # as positive fraction (e.g. 0.15 = 15%)
+    win_rate: float  # 0.0 - 1.0
     profit_factor: float
     total_trades: int
-    total_return_pct: float      # e.g. 12.5 for +12.5%
+    total_return_pct: float  # e.g. 12.5 for +12.5%
     best_confidence_threshold: float
-    avg_oos_f1: float            # average F1 across OOS folds
-    mc_p_value: float = 0.0     # Monte Carlo sign-flip test
+    avg_oos_f1: float  # average F1 across OOS folds
+    mc_p_value: float = 0.0  # Monte Carlo sign-flip test
     mc_risk_of_ruin: float = 0.0  # Monte Carlo permutation
 
 
@@ -65,7 +65,7 @@ class AssetScorecard:
     """Per-asset decision after walk-forward evaluation."""
 
     result: WalkForwardResult
-    decision: str = ""           # KEEP | REVIEW | EXCLUDE
+    decision: str = ""  # KEEP | REVIEW | EXCLUDE
     failed_criteria: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:

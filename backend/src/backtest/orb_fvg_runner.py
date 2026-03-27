@@ -184,9 +184,7 @@ def _calculate_metrics(
     # Profit factor
     gross_profit = sum(wins) if wins else 0.0
     gross_loss = abs(sum(losses)) if losses else 0.0
-    result.profit_factor = (
-        gross_profit / gross_loss if gross_loss > 0 else float("inf")
-    )
+    result.profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
 
     # Average R:R achieved
     rr_values: list[float] = []
@@ -194,9 +192,7 @@ def _calculate_metrics(
         risk = abs(t.entry_price - t.stop_loss)
         if risk > 0:
             rr_values.append(t.pnl / risk)
-    result.avg_rr_achieved = (
-        statistics.mean(rr_values) if rr_values else 0.0
-    )
+    result.avg_rr_achieved = statistics.mean(rr_values) if rr_values else 0.0
 
     # Max consecutive losses
     max_cl = 0
@@ -225,9 +221,7 @@ def _calculate_metrics(
     if len(pnls) >= 2:
         mean_pnl = statistics.mean(pnls)
         std_pnl = statistics.stdev(pnls)
-        result.sharpe_ratio = (
-            (mean_pnl / std_pnl) * sqrt(252) if std_pnl > 0 else 0.0
-        )
+        result.sharpe_ratio = (mean_pnl / std_pnl) * sqrt(252) if std_pnl > 0 else 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -295,10 +289,9 @@ def run_backtest(
         # Entry is at C4.open — find the bar index in day_bars
         entry_idx = None
         for i, bar in enumerate(day_bars):
-            if (
-                abs(bar["open"] - fvg.entry_price) < 1e-9
-                and _minutes_utc(bar["timestamp"]) > _minutes_utc(fvg.c2_bar["timestamp"])
-            ):
+            if abs(bar["open"] - fvg.entry_price) < 1e-9 and _minutes_utc(
+                bar["timestamp"]
+            ) > _minutes_utc(fvg.c2_bar["timestamp"]):
                 entry_idx = i
                 break
 
@@ -306,7 +299,7 @@ def run_backtest(
             # Fallback: approximate as ORB(5) + FVG(3) = bar 8 after ORB start
             entry_idx = min(8, len(day_bars) - 1)
 
-        bars_after = day_bars[entry_idx + 1:]
+        bars_after = day_bars[entry_idx + 1 :]
 
         # Position sizing: risk-based
         risk_per_unit = abs(fvg.entry_price - fvg.stop_loss)
@@ -319,12 +312,8 @@ def run_backtest(
         date_str = str(d)
 
         trade = _simulate_trade(fvg, bars_after, epic, date_str)
-        trade.orb_high = max(
-            (b["high"] for b in day_bars[:5]), default=0.0
-        )
-        trade.orb_low = min(
-            (b["low"] for b in day_bars[:5]), default=0.0
-        )
+        trade.orb_high = max((b["high"] for b in day_bars[:5]), default=0.0)
+        trade.orb_low = min((b["low"] for b in day_bars[:5]), default=0.0)
 
         # Scale P&L by position size
         trade.pnl = trade.pnl * position_size

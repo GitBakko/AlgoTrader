@@ -11,9 +11,27 @@ from fastapi import APIRouter, Query
 router = APIRouter()
 
 EPICS = [
-    "XAUUSD", "BTCUSD", "US500", "WTIUSD", "EURUSD", "NVDA", "TSLA",
-    "XAGUSD", "DE40", "SOLUSD", "ETHUSD", "BNBUSD", "DOGUSD", "DASHUSD",
-    "ICPUSD", "NATGAS", "COPPER", "PLATINUM", "GBPUSD", "USDJPY", "NAS100",
+    "XAUUSD",
+    "BTCUSD",
+    "US500",
+    "WTIUSD",
+    "EURUSD",
+    "NVDA",
+    "TSLA",
+    "XAGUSD",
+    "DE40",
+    "SOLUSD",
+    "ETHUSD",
+    "BNBUSD",
+    "DOGUSD",
+    "DASHUSD",
+    "ICPUSD",
+    "NATGAS",
+    "COPPER",
+    "PLATINUM",
+    "GBPUSD",
+    "USDJPY",
+    "NAS100",
 ]
 
 

@@ -22,7 +22,6 @@ from src.data.utils import (
 )
 from src.utils.config import get_settings
 
-
 # PyArrow schema for OHLC data
 OHLC_SCHEMA = pa.schema(
     [
@@ -175,8 +174,8 @@ class ParquetStorageManager:
 
                 # Deduplicate by timestamp (keep 'historical' source over 'realtime')
                 # Sort by timestamp DESC, then by source (alphabetical: 'historical' < 'realtime')
-                df_deduplicated = (
-                    df_combined.sort(["timestamp", "source"]).unique(subset=["timestamp"], keep="first")
+                df_deduplicated = df_combined.sort(["timestamp", "source"]).unique(
+                    subset=["timestamp"], keep="first"
                 )
 
                 added = len(df_deduplicated) - len(df_existing)
@@ -275,9 +274,7 @@ class ParquetStorageManager:
 
         return df_all
 
-    def get_latest_timestamp(
-        self, epic: str, timeframe: str
-    ) -> datetime | None:
+    def get_latest_timestamp(self, epic: str, timeframe: str) -> datetime | None:
         """
         Get the latest candle timestamp without reading full data.
         Reads only the timestamp column from the most recent Parquet file.
@@ -467,28 +464,23 @@ class DuckDBInterface:
 
         # View 1: All OHLC data (use forward slashes for DuckDB glob on all OSes)
         data_dir_posix = self.data_dir.replace("\\", "/")
-        conn.execute(
-            f"""
+        conn.execute(f"""
             CREATE OR REPLACE VIEW ohlc_all AS
             SELECT * FROM read_parquet('{data_dir_posix}/**/*.parquet')
-        """
-        )
+        """)
         logger.info("Created view: ohlc_all")
 
         # View 2: Per-asset views (XAUUSD, BTCUSD, US500)
         for epic in ["XAUUSD", "BTCUSD", "US500"]:
             view_name = f"ohlc_{epic.lower()}"
-            conn.execute(
-                f"""
+            conn.execute(f"""
                 CREATE OR REPLACE VIEW {view_name} AS
                 SELECT * FROM ohlc_all WHERE epic = '{epic}'
-            """
-            )
+            """)
             logger.info(f"Created view: {view_name}")
 
         # View 3: Latest timestamps
-        conn.execute(
-            """
+        conn.execute("""
             CREATE OR REPLACE VIEW ohlc_latest AS
             SELECT
                 epic,
@@ -497,8 +489,7 @@ class DuckDBInterface:
                 COUNT(*) as total_candles
             FROM ohlc_all
             GROUP BY epic, timeframe
-        """
-        )
+        """)
         logger.info("Created view: ohlc_latest")
 
     def execute_query(self, sql: str) -> pl.DataFrame:

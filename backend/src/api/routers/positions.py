@@ -84,45 +84,58 @@ async def list_closed_positions(
 ):
     """List closed positions with filters, pagination, and aggregates."""
     if position_repo is None:
-        return success_response({
-            "positions": [], "total": 0, "page": 1,
-            "page_size": page_size, "aggregates": {},
-        })
+        return success_response(
+            {
+                "positions": [],
+                "total": 0,
+                "page": 1,
+                "page_size": page_size,
+                "aggregates": {},
+            }
+        )
 
     from_dt = datetime.fromisoformat(date_from) if date_from else None
     to_dt = datetime.fromisoformat(date_to) if date_to else None
 
     offset = (page - 1) * page_size
     positions, total = await position_repo.get_closed_positions(
-        limit=page_size, offset=offset,
-        date_from=from_dt, date_to=to_dt,
-        close_reason=close_reason, epic=epic,
+        limit=page_size,
+        offset=offset,
+        date_from=from_dt,
+        date_to=to_dt,
+        close_reason=close_reason,
+        epic=epic,
     )
 
     # Compute aggregates from ALL matching positions (not just current page)
     all_positions, _ = await position_repo.get_closed_positions(
-        limit=10000, offset=0,
-        date_from=from_dt, date_to=to_dt,
-        close_reason=close_reason, epic=epic,
+        limit=10000,
+        offset=0,
+        date_from=from_dt,
+        date_to=to_dt,
+        close_reason=close_reason,
+        epic=epic,
     )
     pnl_values = [float(p.profit_loss) for p in all_positions if p.profit_loss is not None]
     wins = [v for v in pnl_values if v > 0]
     losses = [v for v in pnl_values if v <= 0]
 
-    return success_response({
-        "positions": [_closed_position_from_db(p) for p in positions],
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "aggregates": {
-            "total_pnl": round(sum(pnl_values), 2) if pnl_values else 0,
-            "win_count": len(wins),
-            "loss_count": len(losses),
-            "win_rate": round(len(wins) / len(pnl_values), 4) if pnl_values else 0,
-            "avg_win": round(sum(wins) / len(wins), 2) if wins else 0,
-            "avg_loss": round(sum(losses) / len(losses), 2) if losses else 0,
-        },
-    })
+    return success_response(
+        {
+            "positions": [_closed_position_from_db(p) for p in positions],
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "aggregates": {
+                "total_pnl": round(sum(pnl_values), 2) if pnl_values else 0,
+                "win_count": len(wins),
+                "loss_count": len(losses),
+                "win_rate": round(len(wins) / len(pnl_values), 4) if pnl_values else 0,
+                "avg_win": round(sum(wins) / len(wins), 2) if wins else 0,
+                "avg_loss": round(sum(losses) / len(losses), 2) if losses else 0,
+            },
+        }
+    )
 
 
 @router.get("/")
@@ -180,11 +193,13 @@ async def close_position(
     if not result.success:
         return error_response(result.error or "Failed to close position")
 
-    return success_response({
-        "deal_id": result.deal_id,
-        "success": True,
-        "execution_time_ms": result.execution_time_ms,
-    })
+    return success_response(
+        {
+            "deal_id": result.deal_id,
+            "success": True,
+            "execution_time_ms": result.execution_time_ms,
+        }
+    )
 
 
 @router.put("/{deal_id}/stops")
@@ -202,9 +217,11 @@ async def modify_stops(
     if not result.success:
         return error_response(result.error or "Failed to modify stops")
 
-    return success_response({
-        "deal_id": deal_id,
-        "stop_loss": body.stop_loss,
-        "take_profit": body.take_profit,
-        "success": True,
-    })
+    return success_response(
+        {
+            "deal_id": deal_id,
+            "stop_loss": body.stop_loss,
+            "take_profit": body.take_profit,
+            "success": True,
+        }
+    )

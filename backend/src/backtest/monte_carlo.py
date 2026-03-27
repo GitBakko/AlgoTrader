@@ -98,9 +98,7 @@ class MonteCarloSimulator:
             MonteCarloResult with confidence intervals and p-values
         """
         # Extract P&L array
-        pnls = np.array([
-            t.get("pnl", t.get("net_pnl", 0.0)) for t in trades
-        ], dtype=np.float64)
+        pnls = np.array([t.get("pnl", t.get("net_pnl", 0.0)) for t in trades], dtype=np.float64)
 
         n_trades = len(pnls)
         if n_trades < 5:

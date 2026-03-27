@@ -181,15 +181,11 @@ class ConfidenceCalibrator:
             "ece_improvement": float(ece_before - ece_after),
             "avg_raw_confidence": float(raw_max),
             "avg_calibrated_confidence": float(cal_max),
-            "method": "isotonic" if isinstance(
-                calibrated_proba, np.ndarray
-            ) else "sigmoid",
+            "method": "isotonic" if isinstance(calibrated_proba, np.ndarray) else "sigmoid",
         }
 
 
-def _expected_calibration_error(
-    y_true: np.ndarray, y_proba: np.ndarray, n_bins: int = 10
-) -> float:
+def _expected_calibration_error(y_true: np.ndarray, y_proba: np.ndarray, n_bins: int = 10) -> float:
     """
     Compute multi-class Expected Calibration Error (ECE).
 

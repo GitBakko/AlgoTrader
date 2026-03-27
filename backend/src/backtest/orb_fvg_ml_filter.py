@@ -56,6 +56,7 @@ FEATURE_NAMES = [
 @dataclass
 class TradeFeatures:
     """Features extracted from a single ORB+FVG trade setup."""
+
     orb_range_pct: float
     orb_body_ratio: float
     fvg_gap_pct: float
@@ -187,17 +188,16 @@ def build_training_data(
         # Find entry bar
         entry_idx = None
         for i, bar in enumerate(day_bars):
-            if (
-                abs(bar["open"] - fvg.entry_price) < 1e-9
-                and _minutes_utc(bar["timestamp"]) > _minutes_utc(fvg.c2_bar["timestamp"])
-            ):
+            if abs(bar["open"] - fvg.entry_price) < 1e-9 and _minutes_utc(
+                bar["timestamp"]
+            ) > _minutes_utc(fvg.c2_bar["timestamp"]):
                 entry_idx = i
                 break
 
         if entry_idx is None:
             entry_idx = min(8, len(day_bars) - 1)
 
-        bars_after = day_bars[entry_idx + 1:]
+        bars_after = day_bars[entry_idx + 1 :]
         trade = _simulate_trade(fvg, bars_after, epic, str(d))
 
         feat = extract_features(day_bars, fvg, trade.pnl, trade.exit_reason)
@@ -370,17 +370,16 @@ def run_walkforward_backtest(
         # Find entry bar
         entry_idx = None
         for i, bar in enumerate(day_bars):
-            if (
-                abs(bar["open"] - fvg.entry_price) < 1e-9
-                and _minutes_utc(bar["timestamp"]) > _minutes_utc(fvg.c2_bar["timestamp"])
-            ):
+            if abs(bar["open"] - fvg.entry_price) < 1e-9 and _minutes_utc(
+                bar["timestamp"]
+            ) > _minutes_utc(fvg.c2_bar["timestamp"]):
                 entry_idx = i
                 break
 
         if entry_idx is None:
             entry_idx = min(8, len(day_bars) - 1)
 
-        bars_after = day_bars[entry_idx + 1:]
+        bars_after = day_bars[entry_idx + 1 :]
         risk_per_unit = abs(fvg.entry_price - fvg.stop_loss)
         if risk_per_unit <= 0:
             result_all.sessions_skipped += 1
@@ -500,9 +499,7 @@ def train_and_save_model(
     )
     model.fit(X, y)
 
-    save_dir = Path(output_dir) if output_dir else (
-        Path(data_dir).parent / "models" / "orb_fvg"
-    )
+    save_dir = Path(output_dir) if output_dir else (Path(data_dir).parent / "models" / "orb_fvg")
     save_dir.mkdir(parents=True, exist_ok=True)
     model_path = save_dir / "filter_model.json"
     model.save_model(str(model_path))

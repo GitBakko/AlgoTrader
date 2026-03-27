@@ -210,10 +210,7 @@ class RealtimeStreamer:
             try:
                 new_count = self.storage.append_candles(candles, epic, timeframe)
                 self._flushed_count += new_count
-                logger.debug(
-                    f"Flushed {len(candles)} candles for {key} "
-                    f"({new_count} new)"
-                )
+                logger.debug(f"Flushed {len(candles)} candles for {key} " f"({new_count} new)")
             except Exception as e:
                 logger.error(f"Failed to flush {key}: {e}")
                 # Put candles back in buffer

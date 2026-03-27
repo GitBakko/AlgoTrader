@@ -19,110 +19,236 @@ router = APIRouter()
 # Static fallback registry (used when no ModelVersioning or no saved models)
 _MODEL_REGISTRY = [
     {
-        "id": "xgboost-xauusd-v1", "name": "XGBoost Gold", "type": "xgboost",
-        "epic": "XAUUSD", "status": "active",
-        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+        "id": "xgboost-xauusd-v1",
+        "name": "XGBoost Gold",
+        "type": "xgboost",
+        "epic": "XAUUSD",
+        "status": "active",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "last_trained": None,
+        "version": "1.0.0",
     },
     {
-        "id": "xgboost-btcusd-v1", "name": "XGBoost Bitcoin", "type": "xgboost",
-        "epic": "BTCUSD", "status": "untrained",
-        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+        "id": "xgboost-btcusd-v1",
+        "name": "XGBoost Bitcoin",
+        "type": "xgboost",
+        "epic": "BTCUSD",
+        "status": "untrained",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "last_trained": None,
+        "version": "1.0.0",
     },
     {
-        "id": "xgboost-us500-v1", "name": "XGBoost S&P 500", "type": "xgboost",
-        "epic": "US500", "status": "untrained",
-        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+        "id": "xgboost-us500-v1",
+        "name": "XGBoost S&P 500",
+        "type": "xgboost",
+        "epic": "US500",
+        "status": "untrained",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "last_trained": None,
+        "version": "1.0.0",
     },
     {
-        "id": "xgboost-wtiusd-v1", "name": "XGBoost Crude Oil", "type": "xgboost",
-        "epic": "WTIUSD", "status": "untrained",
-        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+        "id": "xgboost-wtiusd-v1",
+        "name": "XGBoost Crude Oil",
+        "type": "xgboost",
+        "epic": "WTIUSD",
+        "status": "untrained",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "last_trained": None,
+        "version": "1.0.0",
     },
     {
-        "id": "xgboost-eurusd-v1", "name": "XGBoost EUR/USD", "type": "xgboost",
-        "epic": "EURUSD", "status": "untrained",
-        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+        "id": "xgboost-eurusd-v1",
+        "name": "XGBoost EUR/USD",
+        "type": "xgboost",
+        "epic": "EURUSD",
+        "status": "untrained",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "last_trained": None,
+        "version": "1.0.0",
     },
     {
-        "id": "xgboost-nvda-v1", "name": "XGBoost NVIDIA", "type": "xgboost",
-        "epic": "NVDA", "status": "untrained",
-        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+        "id": "xgboost-nvda-v1",
+        "name": "XGBoost NVIDIA",
+        "type": "xgboost",
+        "epic": "NVDA",
+        "status": "untrained",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "last_trained": None,
+        "version": "1.0.0",
     },
     {
-        "id": "xgboost-tsla-v1", "name": "XGBoost Tesla", "type": "xgboost",
-        "epic": "TSLA", "status": "untrained",
-        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+        "id": "xgboost-tsla-v1",
+        "name": "XGBoost Tesla",
+        "type": "xgboost",
+        "epic": "TSLA",
+        "status": "untrained",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "last_trained": None,
+        "version": "1.0.0",
     },
     {
-        "id": "xgboost-xagusd-v1", "name": "XGBoost Silver", "type": "xgboost",
-        "epic": "XAGUSD", "status": "untrained",
-        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+        "id": "xgboost-xagusd-v1",
+        "name": "XGBoost Silver",
+        "type": "xgboost",
+        "epic": "XAGUSD",
+        "status": "untrained",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "last_trained": None,
+        "version": "1.0.0",
     },
     {
-        "id": "xgboost-de40-v1", "name": "XGBoost DAX", "type": "xgboost",
-        "epic": "DE40", "status": "untrained",
-        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+        "id": "xgboost-de40-v1",
+        "name": "XGBoost DAX",
+        "type": "xgboost",
+        "epic": "DE40",
+        "status": "untrained",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "last_trained": None,
+        "version": "1.0.0",
     },
     # New 12 assets - Phase 12: Portfolio Expansion
     {
-        "id": "xgboost-solusd-v1", "name": "XGBoost Solana", "type": "xgboost",
-        "epic": "SOLUSD", "status": "untrained",
-        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+        "id": "xgboost-solusd-v1",
+        "name": "XGBoost Solana",
+        "type": "xgboost",
+        "epic": "SOLUSD",
+        "status": "untrained",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "last_trained": None,
+        "version": "1.0.0",
     },
     {
-        "id": "xgboost-ethusd-v1", "name": "XGBoost Ethereum", "type": "xgboost",
-        "epic": "ETHUSD", "status": "untrained",
-        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+        "id": "xgboost-ethusd-v1",
+        "name": "XGBoost Ethereum",
+        "type": "xgboost",
+        "epic": "ETHUSD",
+        "status": "untrained",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "last_trained": None,
+        "version": "1.0.0",
     },
     {
-        "id": "xgboost-bnbusd-v1", "name": "XGBoost Binance Coin", "type": "xgboost",
-        "epic": "BNBUSD", "status": "untrained",
-        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+        "id": "xgboost-bnbusd-v1",
+        "name": "XGBoost Binance Coin",
+        "type": "xgboost",
+        "epic": "BNBUSD",
+        "status": "untrained",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "last_trained": None,
+        "version": "1.0.0",
     },
     {
-        "id": "xgboost-dogusd-v1", "name": "XGBoost Dogecoin", "type": "xgboost",
-        "epic": "DOGUSD", "status": "untrained",
-        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+        "id": "xgboost-dogusd-v1",
+        "name": "XGBoost Dogecoin",
+        "type": "xgboost",
+        "epic": "DOGUSD",
+        "status": "untrained",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "last_trained": None,
+        "version": "1.0.0",
     },
     {
-        "id": "xgboost-dashusd-v1", "name": "XGBoost Dash", "type": "xgboost",
-        "epic": "DASHUSD", "status": "untrained",
-        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+        "id": "xgboost-dashusd-v1",
+        "name": "XGBoost Dash",
+        "type": "xgboost",
+        "epic": "DASHUSD",
+        "status": "untrained",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "last_trained": None,
+        "version": "1.0.0",
     },
     {
-        "id": "xgboost-icpusd-v1", "name": "XGBoost Internet Computer", "type": "xgboost",
-        "epic": "ICPUSD", "status": "untrained",
-        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+        "id": "xgboost-icpusd-v1",
+        "name": "XGBoost Internet Computer",
+        "type": "xgboost",
+        "epic": "ICPUSD",
+        "status": "untrained",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "last_trained": None,
+        "version": "1.0.0",
     },
     {
-        "id": "xgboost-natgas-v1", "name": "XGBoost Natural Gas", "type": "xgboost",
-        "epic": "NATGAS", "status": "untrained",
-        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+        "id": "xgboost-natgas-v1",
+        "name": "XGBoost Natural Gas",
+        "type": "xgboost",
+        "epic": "NATGAS",
+        "status": "untrained",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "last_trained": None,
+        "version": "1.0.0",
     },
     {
-        "id": "xgboost-copper-v1", "name": "XGBoost Copper", "type": "xgboost",
-        "epic": "COPPER", "status": "untrained",
-        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+        "id": "xgboost-copper-v1",
+        "name": "XGBoost Copper",
+        "type": "xgboost",
+        "epic": "COPPER",
+        "status": "untrained",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "last_trained": None,
+        "version": "1.0.0",
     },
     {
-        "id": "xgboost-platinum-v1", "name": "XGBoost Platinum", "type": "xgboost",
-        "epic": "PLATINUM", "status": "untrained",
-        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+        "id": "xgboost-platinum-v1",
+        "name": "XGBoost Platinum",
+        "type": "xgboost",
+        "epic": "PLATINUM",
+        "status": "untrained",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "last_trained": None,
+        "version": "1.0.0",
     },
     {
-        "id": "xgboost-gbpusd-v1", "name": "XGBoost GBP/USD", "type": "xgboost",
-        "epic": "GBPUSD", "status": "untrained",
-        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+        "id": "xgboost-gbpusd-v1",
+        "name": "XGBoost GBP/USD",
+        "type": "xgboost",
+        "epic": "GBPUSD",
+        "status": "untrained",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "last_trained": None,
+        "version": "1.0.0",
     },
     {
-        "id": "xgboost-usdjpy-v1", "name": "XGBoost USD/JPY", "type": "xgboost",
-        "epic": "USDJPY", "status": "untrained",
-        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+        "id": "xgboost-usdjpy-v1",
+        "name": "XGBoost USD/JPY",
+        "type": "xgboost",
+        "epic": "USDJPY",
+        "status": "untrained",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "last_trained": None,
+        "version": "1.0.0",
     },
     {
-        "id": "xgboost-nas100-v1", "name": "XGBoost Nasdaq 100", "type": "xgboost",
-        "epic": "NAS100", "status": "untrained",
-        "accuracy": 0.0, "f1_score": 0.0, "last_trained": None, "version": "1.0.0",
+        "id": "xgboost-nas100-v1",
+        "name": "XGBoost Nasdaq 100",
+        "type": "xgboost",
+        "epic": "NAS100",
+        "status": "untrained",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "last_trained": None,
+        "version": "1.0.0",
     },
 ]
 
@@ -163,9 +289,9 @@ async def list_models(
     if model_versioning is not None:
         all_metadata = model_versioning.list_models()
         if all_metadata:
-            return success_response([
-                _metadata_to_dict(m, prediction_service) for m in all_metadata
-            ])
+            return success_response(
+                [_metadata_to_dict(m, prediction_service) for m in all_metadata]
+            )
 
     return success_response(_MODEL_REGISTRY)
 
@@ -180,9 +306,15 @@ async def get_model_metrics(
         all_metadata = model_versioning.list_models()
         meta = next((m for m in all_metadata if m.model_id == model_id), None)
         if meta is not None:
-            metrics = {"model_id": model_id, "accuracy": 0.0, "f1_score": 0.0,
-                       "precision": 0.0, "recall": 0.0,
-                       "confusion_matrix": None, "class_report": None}
+            metrics = {
+                "model_id": model_id,
+                "accuracy": 0.0,
+                "f1_score": 0.0,
+                "precision": 0.0,
+                "recall": 0.0,
+                "confusion_matrix": None,
+                "class_report": None,
+            }
             if meta.training_result and meta.training_result.avg_test_metrics:
                 tm = meta.training_result.avg_test_metrics
                 metrics["accuracy"] = tm.get("accuracy", 0.0)
@@ -224,12 +356,16 @@ async def get_model_versions(
                 tm = meta.training_result.avg_test_metrics
                 metrics["accuracy"] = tm.get("accuracy", 0.0)
                 metrics["f1_score"] = tm.get("f1_macro", 0.0)
-            return success_response([{
-                "version": str(meta.version),
-                "created_at": meta.created_at.isoformat() if meta.created_at else None,
-                "status": "trained",
-                "metrics": metrics,
-            }])
+            return success_response(
+                [
+                    {
+                        "version": str(meta.version),
+                        "created_at": meta.created_at.isoformat() if meta.created_at else None,
+                        "status": "trained",
+                        "metrics": metrics,
+                    }
+                ]
+            )
 
     # Fallback: static registry
     model = _MODEL_MAP.get(model_id)
@@ -257,7 +393,9 @@ async def train_model(epic: str = Path(...)):
     if epic not in _VALID_EPICS:
         return error_response(f"Unknown epic: {epic}", 400)
 
-    script = FilePath(__file__).resolve().parent.parent.parent.parent / "scripts" / "train_models.py"
+    script = (
+        FilePath(__file__).resolve().parent.parent.parent.parent / "scripts" / "train_models.py"
+    )
     if not script.exists():
         return error_response("Training script not found", 500)
 

@@ -42,8 +42,7 @@ class StrategyRouter:
         """Register a strategy for routing."""
         self._strategies[strategy.name] = strategy
         logger.debug(
-            f"Strategy registered: {strategy.name} "
-            f"(regimes: {strategy.applicable_regimes})"
+            f"Strategy registered: {strategy.name} " f"(regimes: {strategy.applicable_regimes})"
         )
 
     def get_strategy(self, name: str) -> BaseStrategy | None:
@@ -130,14 +129,11 @@ class StrategyRouter:
                     return signal
 
                 logger.debug(
-                    f"{epic}: Strategy '{strategy.name}' returned HOLD, "
-                    f"trying next..."
+                    f"{epic}: Strategy '{strategy.name}' returned HOLD, " f"trying next..."
                 )
 
             except Exception as e:
-                logger.error(
-                    f"{epic}: Strategy '{strategy.name}' failed: {e}"
-                )
+                logger.error(f"{epic}: Strategy '{strategy.name}' failed: {e}")
                 continue
 
         # All strategies returned HOLD
@@ -175,10 +171,12 @@ class StrategyRouter:
         """
         strategies = self.select_strategy(regime, epic)
         if not strategies:
-            return ohlc_df.with_columns([
-                pl.lit(0).alias("signal_direction"),
-                pl.lit(0.0).alias("signal_confidence"),
-            ])
+            return ohlc_df.with_columns(
+                [
+                    pl.lit(0).alias("signal_direction"),
+                    pl.lit(0.0).alias("signal_confidence"),
+                ]
+            )
 
         # Use first (highest priority) strategy for batch backtest
         return strategies[0].generate_backtest_signals(ohlc_df, epic, timeframe)

@@ -1,5 +1,6 @@
 # MANTIS-EVOLUTION: Long Term Memory
 """Long-term memory: persistent pattern store backed by SQLite."""
+
 from __future__ import annotations
 
 import json

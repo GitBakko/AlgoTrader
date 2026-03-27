@@ -77,18 +77,16 @@ async def fetch_sentiment_data(
                 finnhub.get_insider_sentiment(epic, insider_start, _end),
                 finnhub.get_analyst_recommendations(epic),
                 finnhub.get_price_target(epic),
-                finnhub.get_earnings_calendar(
-                    epic, _end, _end + timedelta(days=30)
-                ),
-                marketaux.get_news_sentiment(
-                    news_query or epic, limit=100, days=30
-                ),
+                finnhub.get_earnings_calendar(epic, _end, _end + timedelta(days=30)),
+                marketaux.get_news_sentiment(news_query or epic, limit=100, days=30),
                 return_exceptions=True,
             )
 
             result["insider"] = insider if not isinstance(insider, Exception) else None
             result["analyst"] = analyst if not isinstance(analyst, Exception) else None
-            result["price_target"] = price_target if not isinstance(price_target, Exception) else None
+            result["price_target"] = (
+                price_target if not isinstance(price_target, Exception) else None
+            )
             result["earnings"] = earnings if isinstance(earnings, list) else []
             result["news"] = news if isinstance(news, list) else []
 
@@ -99,9 +97,7 @@ async def fetch_sentiment_data(
             # Tier 2: non-equity assets — news sentiment only
             marketaux = MarketauxClient()
             try:
-                news = await marketaux.get_news_sentiment(
-                    news_query, limit=50, days=30
-                )
+                news = await marketaux.get_news_sentiment(news_query, limit=50, days=30)
                 result["news"] = news if isinstance(news, list) else []
             except Exception:
                 pass
@@ -217,6 +213,7 @@ class FeatureBuilder:
 
         # Step 5: SIL features (Signal Intelligence Layer)
         from src.features.sil_features import compute_sil_features
+
         df = compute_sil_features(df, sil_data)
 
         # Step 6: Multi-timeframe alignment (optional)
@@ -246,8 +243,17 @@ class FeatureBuilder:
             )
 
         # Collect final feature names (all non-OHLCV, non-metadata columns)
-        metadata_cols = {"timestamp", "open", "high", "low", "close", "volume",
-                         "epic", "timeframe", "source"}
+        metadata_cols = {
+            "timestamp",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "epic",
+            "timeframe",
+            "source",
+        }
         all_feature_names = [c for c in df.columns if c not in metadata_cols]
 
         # Build metadata
@@ -313,6 +319,7 @@ class FeatureBuilder:
 
         # SIL features (sentiment/macro from Signal Intelligence Layer)
         from src.features.sil_features import compute_sil_features
+
         df = compute_sil_features(df, sil_data)
 
         # Normalize
@@ -327,8 +334,17 @@ class FeatureBuilder:
                 log_columns=volume_cols if volume_cols else None,
             )
 
-        metadata_cols = {"timestamp", "open", "high", "low", "close", "volume",
-                         "epic", "timeframe", "source"}
+        metadata_cols = {
+            "timestamp",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "epic",
+            "timeframe",
+            "source",
+        }
         all_feature_names = [c for c in df.columns if c not in metadata_cols]
 
         matrix_meta = FeatureMatrix(
@@ -344,9 +360,7 @@ class FeatureBuilder:
 
         return df, matrix_meta
 
-    def _add_technical_indicators(
-        self, df: pl.DataFrame, params: dict
-    ) -> pl.DataFrame:
+    def _add_technical_indicators(self, df: pl.DataFrame, params: dict) -> pl.DataFrame:
         """Add all technical indicators based on params."""
         ti = TechnicalIndicators
 
@@ -429,11 +443,13 @@ class FeatureBuilder:
         if "regime" not in df.columns:
             return df
 
-        df = df.with_columns([
-            (pl.col("regime") == "trending_up").cast(pl.Int32).alias("regime_trending_up"),
-            (pl.col("regime") == "trending_down").cast(pl.Int32).alias("regime_trending_down"),
-            (pl.col("regime") == "ranging").cast(pl.Int32).alias("regime_ranging"),
-        ])
+        df = df.with_columns(
+            [
+                (pl.col("regime") == "trending_up").cast(pl.Int32).alias("regime_trending_up"),
+                (pl.col("regime") == "trending_down").cast(pl.Int32).alias("regime_trending_down"),
+                (pl.col("regime") == "ranging").cast(pl.Int32).alias("regime_ranging"),
+            ]
+        )
         return df
 
     def _add_multi_timeframe_features(
@@ -496,13 +512,15 @@ class FeatureBuilder:
 
         if sentiment_data is None:
             # No data fetched: add 5 placeholder columns
-            return df.with_columns([
-                pl.lit(None).alias("insider_mspr").cast(pl.Float64),
-                pl.lit(0).alias("analyst_consensus"),
-                pl.lit(0.0).alias("price_target_upside"),
-                pl.lit(0).alias("earnings_flag"),
-                pl.lit(0.0).alias("news_sentiment_avg"),
-            ])
+            return df.with_columns(
+                [
+                    pl.lit(None).alias("insider_mspr").cast(pl.Float64),
+                    pl.lit(0).alias("analyst_consensus"),
+                    pl.lit(0.0).alias("price_target_upside"),
+                    pl.lit(0).alias("earnings_flag"),
+                    pl.lit(0.0).alias("news_sentiment_avg"),
+                ]
+            )
 
         try:
             news = sentiment_data.get("news", [])
@@ -514,9 +532,7 @@ class FeatureBuilder:
                 price_target = sentiment_data.get("price_target")
                 earnings = sentiment_data.get("earnings", [])
 
-                df = SentimentFeatures.add_insider_mspr(
-                    df, [insider] if insider else []
-                )
+                df = SentimentFeatures.add_insider_mspr(df, [insider] if insider else [])
                 df = SentimentFeatures.add_analyst_consensus(df, analyst)
                 df = SentimentFeatures.add_price_target_upside(df, price_target)
                 df = SentimentFeatures.add_earnings_flag(df, earnings)
@@ -524,12 +540,14 @@ class FeatureBuilder:
                 logger.info(f"Added 5 sentiment features for {epic} (Tier 1)")
             else:
                 # Tier 2: non-equity → news_sentiment_avg only, 4 placeholders
-                df = df.with_columns([
-                    pl.lit(None).alias("insider_mspr").cast(pl.Float64),
-                    pl.lit(0).alias("analyst_consensus"),
-                    pl.lit(0.0).alias("price_target_upside"),
-                    pl.lit(0).alias("earnings_flag"),
-                ])
+                df = df.with_columns(
+                    [
+                        pl.lit(None).alias("insider_mspr").cast(pl.Float64),
+                        pl.lit(0).alias("analyst_consensus"),
+                        pl.lit(0.0).alias("price_target_upside"),
+                        pl.lit(0).alias("earnings_flag"),
+                    ]
+                )
                 df = SentimentFeatures.add_news_sentiment(df, news, window_days=7)
                 logger.info(f"Added news sentiment for {epic} (Tier 2)")
 
@@ -537,18 +555,23 @@ class FeatureBuilder:
 
         except Exception as e:
             logger.warning(f"Sentiment feature apply failed for {epic}: {e}")
-            return df.with_columns([
-                pl.lit(None).alias("insider_mspr").cast(pl.Float64),
-                pl.lit(0).alias("analyst_consensus"),
-                pl.lit(0.0).alias("price_target_upside"),
-                pl.lit(0).alias("earnings_flag"),
-                pl.lit(0.0).alias("news_sentiment_avg"),
-            ])
+            return df.with_columns(
+                [
+                    pl.lit(None).alias("insider_mspr").cast(pl.Float64),
+                    pl.lit(0).alias("analyst_consensus"),
+                    pl.lit(0.0).alias("price_target_upside"),
+                    pl.lit(0).alias("earnings_flag"),
+                    pl.lit(0.0).alias("news_sentiment_avg"),
+                ]
+            )
 
     _MACRO_FEATURE_COLS = [
-        "vix_close", "vix_change_5d",
-        "dxy_close", "dxy_change_5d",
-        "yield_10y_close", "yield_10y_change_5d",
+        "vix_close",
+        "vix_change_5d",
+        "dxy_close",
+        "dxy_change_5d",
+        "yield_10y_close",
+        "yield_10y_change_5d",
     ]
 
     def _add_macro_features(
@@ -572,6 +595,7 @@ class FeatureBuilder:
         if macro_df is None:
             try:
                 from src.external.macro_client import MacroDataClient
+
                 client = MacroDataClient()
                 macro_df = client.get_macro_data()
             except Exception as e:
@@ -579,23 +603,17 @@ class FeatureBuilder:
 
         if macro_df is None or macro_df.is_empty():
             logger.info("No macro data available, adding placeholder columns")
-            return df.with_columns(
-                [pl.lit(0.0).alias(c) for c in self._MACRO_FEATURE_COLS]
-            )
+            return df.with_columns([pl.lit(0.0).alias(c) for c in self._MACRO_FEATURE_COLS])
 
         try:
             # Extract date from timestamp for the asof join
-            df = df.with_columns(
-                pl.col("timestamp").cast(pl.Date).alias("_macro_date")
-            )
+            df = df.with_columns(pl.col("timestamp").cast(pl.Date).alias("_macro_date"))
 
             # Ensure macro_df is sorted by date
             macro_df = macro_df.sort("date")
 
             # Keep only the columns we need from macro_df
-            macro_cols = ["date"] + [
-                c for c in self._MACRO_FEATURE_COLS if c in macro_df.columns
-            ]
+            macro_cols = ["date"] + [c for c in self._MACRO_FEATURE_COLS if c in macro_df.columns]
             macro_subset = macro_df.select(macro_cols)
 
             # Asof join: each bar gets the most recent macro row <= its date
@@ -625,6 +643,4 @@ class FeatureBuilder:
 
         except Exception as e:
             logger.warning(f"Macro feature join failed: {e}")
-            return df.with_columns(
-                [pl.lit(0.0).alias(c) for c in self._MACRO_FEATURE_COLS]
-            )
+            return df.with_columns([pl.lit(0.0).alias(c) for c in self._MACRO_FEATURE_COLS])

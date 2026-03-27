@@ -73,6 +73,31 @@ export class SignalAuditService {
     this.open(signalId);
   }
 
+  openLatestByEpic(epic: string): void {
+    this.loading.set(true);
+    this.isOpen.set(true);
+
+    this.api.get<{ items: SignalHistoryItem[] }>(
+      `/api/signals/audit/history/${epic}`, { limit: 1 }
+    ).subscribe({
+      next: (data) => {
+        const latest = data?.items?.[0];
+        if (latest?.id) {
+          this.open(latest.id);
+        } else {
+          this.loading.set(false);
+          this.toast.warning('Nessun audit disponibile per ' + epic);
+          this.close();
+        }
+      },
+      error: () => {
+        this.loading.set(false);
+        this.toast.warning('Audit non disponibile per ' + epic);
+        this.close();
+      },
+    });
+  }
+
   private _loadHistory(epic: string): void {
     this.api.get<{ items: SignalHistoryItem[] }>(
       `/api/signals/audit/history/${epic}`, { limit: 10 }

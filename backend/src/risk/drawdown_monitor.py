@@ -57,8 +57,8 @@ class DrawdownMonitor:
         # Calculate current drawdown from peak
         if self._state.peak_equity > 0:
             self._state.current_drawdown_pct = (
-                (self._state.peak_equity - current_equity) / self._state.peak_equity
-            )
+                self._state.peak_equity - current_equity
+            ) / self._state.peak_equity
         else:
             self._state.current_drawdown_pct = 0.0
 
@@ -89,9 +89,7 @@ class DrawdownMonitor:
         if self._state.daily_start_equity > 0:
             daily_dd = -self._state.daily_pnl / self._state.daily_start_equity
             if daily_dd >= limits.max_daily_drawdown:
-                reason = (
-                    f"Daily drawdown {daily_dd:.1%} >= limit {limits.max_daily_drawdown:.1%}"
-                )
+                reason = f"Daily drawdown {daily_dd:.1%} >= limit {limits.max_daily_drawdown:.1%}"
                 return False, reason
 
         return True, None
@@ -101,9 +99,7 @@ class DrawdownMonitor:
         self._state.daily_start_equity = self._state.current_equity
         self._state.daily_pnl = 0.0
         self._state.last_reset = datetime.now(timezone.utc)
-        logger.info(
-            f"Daily drawdown reset. Start equity: {self._state.daily_start_equity:.2f}"
-        )
+        logger.info(f"Daily drawdown reset. Start equity: {self._state.daily_start_equity:.2f}")
 
     def is_circuit_breaker_active(self) -> bool:
         """Check if circuit breaker is currently active."""

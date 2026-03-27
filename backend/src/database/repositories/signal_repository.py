@@ -94,11 +94,7 @@ class SignalRepository(BaseRepository[Signal]):
         since = datetime.now(timezone.utc).replace(microsecond=0)
         since = since.replace(hour=since.hour - hours)
 
-        query = (
-            select(Signal)
-            .where(Signal.epic == epic)
-            .where(Signal.generated_at >= since)
-        )
+        query = select(Signal).where(Signal.epic == epic).where(Signal.generated_at >= since)
         if direction:
             query = query.where(Signal.direction == direction)
         query = query.order_by(Signal.generated_at.desc())
@@ -161,6 +157,7 @@ class SignalRepository(BaseRepository[Signal]):
     ) -> int | None:
         """Create a signal record with full audit trail JSONB."""
         from decimal import Decimal
+
         now = datetime.now(timezone.utc).replace(tzinfo=None)
 
         signal = Signal(
@@ -228,9 +225,7 @@ class SignalRepository(BaseRepository[Signal]):
         )
         return result.scalars().first()
 
-    async def get_history_by_epic(
-        self, epic: str, limit: int = 10, offset: int = 0
-    ) -> list[dict]:
+    async def get_history_by_epic(self, epic: str, limit: int = 10, offset: int = 0) -> list[dict]:
         """Get lightweight signal history for an epic (no JSONB features)."""
         from src.database.models import Position
         from sqlalchemy import case
@@ -278,6 +273,7 @@ class SignalRepository(BaseRepository[Signal]):
     async def count_by_epic(self, epic: str) -> int:
         """Count total signals for an epic."""
         from sqlalchemy import func
+
         result = await self.session.execute(
             select(func.count(Signal.id))
             .where(Signal.epic == epic)
@@ -289,9 +285,7 @@ class SignalRepository(BaseRepository[Signal]):
         """Expire pending signals past their expiration date."""
         now = datetime.now(timezone.utc)
         result = await self.session.execute(
-            select(Signal)
-            .where(Signal.status == "PENDING")
-            .where(Signal.expires_at <= now)
+            select(Signal).where(Signal.status == "PENDING").where(Signal.expires_at <= now)
         )
         signals = list(result.scalars().all())
 

@@ -57,25 +57,29 @@ async def list_notifications(
                         emoji = "\U0001f53b"  # 🔻 red triangle down
                 except (ValueError, TypeError):
                     pass
-        notifications.append({
-            "id": n.id,
-            "alert_type": n.alert_type,
-            "severity": n.severity,
-            "title": n.title,
-            "message": n.message,
-            "epic": n.epic,
-            "emoji": emoji,
-            "details": n.details,
-            "is_read": n.is_read,
-            "created_at": n.created_at.isoformat() if n.created_at else None,
-        })
+        notifications.append(
+            {
+                "id": n.id,
+                "alert_type": n.alert_type,
+                "severity": n.severity,
+                "title": n.title,
+                "message": n.message,
+                "epic": n.epic,
+                "emoji": emoji,
+                "details": n.details,
+                "is_read": n.is_read,
+                "created_at": n.created_at.isoformat() if n.created_at else None,
+            }
+        )
 
-    return success_response({
-        "notifications": notifications,
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-    })
+    return success_response(
+        {
+            "notifications": notifications,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+        }
+    )
 
 
 @router.get("/unread-count")

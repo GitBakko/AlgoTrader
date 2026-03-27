@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 class NewsItem(BaseModel):
     """A single news article/item."""
+
     title: str = ""
     source: str = ""
     url: str = ""
@@ -18,6 +19,7 @@ class NewsItem(BaseModel):
 
 class RAGContext(BaseModel):
     """Combined RAG context ready for agent consumption."""
+
     news_section: str = ""
     macro_section: str = ""
     memory_section: str = ""
@@ -27,6 +29,7 @@ class RAGContext(BaseModel):
 
 class SearchResult(BaseModel):
     """A result from the vector store."""
+
     text: str = ""
     metadata: dict = Field(default_factory=dict)
     similarity: float = 0.0

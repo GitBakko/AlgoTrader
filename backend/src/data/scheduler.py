@@ -50,6 +50,7 @@ class DataScheduler:
 
         # Include scalp timeframe if scalp mode is enabled
         from src.utils.config import get_settings
+
         settings = get_settings()
         self._scalp_mode = settings.scalp_mode_enabled
         if self._scalp_mode:
@@ -162,7 +163,9 @@ class DataScheduler:
 
         # Invalidate cache so trading loop sees fresh data
         self.data_access.invalidate_cache()
-        logger.info(f"Hourly refresh complete: {downloaded} candles across {len(self._assets)} assets")
+        logger.info(
+            f"Hourly refresh complete: {downloaded} candles across {len(self._assets)} assets"
+        )
 
     async def job_scalp_refresh(self) -> None:
         """
@@ -186,7 +189,9 @@ class DataScheduler:
                 logger.error(f"Scalp refresh failed for {epic}: {e}")
 
         self.data_access.invalidate_cache()
-        logger.info(f"Scalp refresh complete: {downloaded} candles across {len(self._assets)} assets")
+        logger.info(
+            f"Scalp refresh complete: {downloaded} candles across {len(self._assets)} assets"
+        )
 
     async def job_eod_download(self) -> None:
         """
@@ -262,9 +267,7 @@ class DataScheduler:
                         continue
 
                     ranges = self.quality_checker.get_gap_fill_ranges(gaps)
-                    logger.info(
-                        f"Found {len(ranges)} gaps for {epic}/{timeframe}, backfilling..."
-                    )
+                    logger.info(f"Found {len(ranges)} gaps for {epic}/{timeframe}, backfilling...")
 
                     for start, end in ranges:
                         await self.downloader.download(
@@ -318,9 +321,7 @@ class DataScheduler:
 
                     if optimized_count < original_count:
                         # Convert back to OHLCBar list and rewrite
-                        bars = [
-                            OHLCBar(**row) for row in df.iter_rows(named=True)
-                        ]
+                        bars = [OHLCBar(**row) for row in df.iter_rows(named=True)]
                         self.storage.write_candles(bars, epic, timeframe)
                         logger.info(
                             f"Optimized {epic}/{timeframe}: "

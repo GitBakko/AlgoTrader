@@ -20,7 +20,9 @@ class TechnicalIndicators:
     # ===== Trend Indicators =====
 
     @staticmethod
-    def add_ema(df: pl.DataFrame, column: str = "close", periods: list[int] | None = None) -> pl.DataFrame:
+    def add_ema(
+        df: pl.DataFrame, column: str = "close", periods: list[int] | None = None
+    ) -> pl.DataFrame:
         """
         Add Exponential Moving Averages.
 
@@ -115,9 +117,7 @@ class TechnicalIndicators:
         )
 
         # True Range = max of the three
-        df = df.with_columns(
-            pl.max_horizontal("_tr1", "_tr2", "_tr3").alias("_true_range")
-        )
+        df = df.with_columns(pl.max_horizontal("_tr1", "_tr2", "_tr3").alias("_true_range"))
 
         # +DM and -DM
         df = df.with_columns(
@@ -220,12 +220,8 @@ class TechnicalIndicators:
         # Wilder's smoothing (EWM with alpha=1/period)
         df = df.with_columns(
             [
-                pl.col("_gain")
-                .ewm_mean(alpha=1.0 / period, ignore_nulls=True)
-                .alias("_avg_gain"),
-                pl.col("_loss")
-                .ewm_mean(alpha=1.0 / period, ignore_nulls=True)
-                .alias("_avg_loss"),
+                pl.col("_gain").ewm_mean(alpha=1.0 / period, ignore_nulls=True).alias("_avg_gain"),
+                pl.col("_loss").ewm_mean(alpha=1.0 / period, ignore_nulls=True).alias("_avg_loss"),
             ]
         )
 
@@ -255,14 +251,10 @@ class TechnicalIndicators:
         Adds columns: bb_upper, bb_lower, bb_middle, bb_width, bb_pctb
         """
         # Middle band (SMA)
-        df = df.with_columns(
-            pl.col(column).rolling_mean(window_size=period).alias("bb_middle")
-        )
+        df = df.with_columns(pl.col(column).rolling_mean(window_size=period).alias("bb_middle"))
 
         # Standard deviation
-        df = df.with_columns(
-            pl.col(column).rolling_std(window_size=period).alias("_bb_std")
-        )
+        df = df.with_columns(pl.col(column).rolling_std(window_size=period).alias("_bb_std"))
 
         # Upper and lower bands
         df = df.with_columns(
@@ -281,10 +273,7 @@ class TechnicalIndicators:
 
         # %B = (close - lower) / (upper - lower)
         df = df.with_columns(
-            (
-                (pl.col(column) - pl.col("bb_lower"))
-                / (pl.col("bb_upper") - pl.col("bb_lower"))
-            )
+            ((pl.col(column) - pl.col("bb_lower")) / (pl.col("bb_upper") - pl.col("bb_lower")))
             .fill_nan(0.5)
             .alias("bb_pctb")
         )
@@ -313,23 +302,15 @@ class TechnicalIndicators:
             ]
         )
 
-        df = df.with_columns(
-            pl.max_horizontal("_tr1", "_tr2", "_tr3").alias("_true_range")
-        )
+        df = df.with_columns(pl.max_horizontal("_tr1", "_tr2", "_tr3").alias("_true_range"))
 
         # ATR using Wilder's smoothing
         df = df.with_columns(
-            pl.col("_true_range")
-            .ewm_mean(alpha=1.0 / period, ignore_nulls=True)
-            .alias(col_name)
+            pl.col("_true_range").ewm_mean(alpha=1.0 / period, ignore_nulls=True).alias(col_name)
         )
 
         # ATR ratio (normalized volatility, guard against close=0)
-        df = df.with_columns(
-            (pl.col(col_name) / pl.col("close"))
-            .fill_nan(0.0)
-            .alias("atr_ratio")
-        )
+        df = df.with_columns((pl.col(col_name) / pl.col("close")).fill_nan(0.0).alias("atr_ratio"))
 
         df = df.drop(["_tr1", "_tr2", "_tr3", "_true_range"])
 
@@ -347,9 +328,7 @@ class TechnicalIndicators:
         col_name = f"hvol_{period}"
 
         # Log returns
-        df = df.with_columns(
-            (pl.col(column) / pl.col(column).shift(1)).log().alias("_log_return")
-        )
+        df = df.with_columns((pl.col(column) / pl.col(column).shift(1)).log().alias("_log_return"))
 
         # Rolling standard deviation of log returns, annualized
         df = df.with_columns(
@@ -436,10 +415,7 @@ class TechnicalIndicators:
 
         # Where close is in the high-low range (0=low, 1=high)
         df = df.with_columns(
-            (
-                (pl.col("close") - pl.col("low"))
-                / (pl.col("high") - pl.col("low"))
-            )
+            ((pl.col("close") - pl.col("low")) / (pl.col("high") - pl.col("low")))
             .fill_nan(0.5)
             .alias("close_position")
         )
@@ -479,26 +455,19 @@ class TechnicalIndicators:
         )
 
         df = df.with_columns(
-            (
-                (pl.col(rsi_col) - pl.col("_rsi_min"))
-                / (pl.col("_rsi_max") - pl.col("_rsi_min"))
-            )
+            ((pl.col(rsi_col) - pl.col("_rsi_min")) / (pl.col("_rsi_max") - pl.col("_rsi_min")))
             .fill_nan(0.5)
             .alias("_stoch_rsi_raw")
         )
 
         # %K = SMA of raw StochRSI
         df = df.with_columns(
-            pl.col("_stoch_rsi_raw")
-            .rolling_mean(window_size=smooth_k)
-            .alias("stoch_rsi_k")
+            pl.col("_stoch_rsi_raw").rolling_mean(window_size=smooth_k).alias("stoch_rsi_k")
         )
 
         # %D = SMA of %K
         df = df.with_columns(
-            pl.col("stoch_rsi_k")
-            .rolling_mean(window_size=smooth_d)
-            .alias("stoch_rsi_d")
+            pl.col("stoch_rsi_k").rolling_mean(window_size=smooth_d).alias("stoch_rsi_d")
         )
 
         df = df.drop(["_rsi_min", "_rsi_max", "_stoch_rsi_raw"])
@@ -522,10 +491,7 @@ class TechnicalIndicators:
 
         # Squeeze detection
         df = df.with_columns(
-            pl.when(pl.col("bb_width") < squeeze_threshold)
-            .then(1)
-            .otherwise(0)
-            .alias("bb_squeeze")
+            pl.when(pl.col("bb_width") < squeeze_threshold).then(1).otherwise(0).alias("bb_squeeze")
         )
 
         # Squeeze duration (consecutive bars in squeeze)
@@ -539,9 +505,7 @@ class TechnicalIndicators:
                 count = 0
             duration[i] = count
 
-        df = df.with_columns(
-            pl.Series("bb_squeeze_duration", duration)
-        )
+        df = df.with_columns(pl.Series("bb_squeeze_duration", duration))
 
         return df
 
@@ -601,8 +565,10 @@ class TechnicalIndicators:
         )
 
         temp_cols = [
-            c for c in df.columns
-            if c.startswith("_price_vs") or c.startswith("_rsi_v")
+            c
+            for c in df.columns
+            if c.startswith("_price_vs")
+            or c.startswith("_rsi_v")
             or c in ("_price_min", "_price_max", "_rsi_min", "_rsi_max")
         ]
         df = df.drop(temp_cols)
@@ -637,9 +603,7 @@ class TechnicalIndicators:
         )
 
         df = df.with_columns(
-            (pl.col("_tp_vol_sum") / pl.col("_vol_sum"))
-            .fill_nan(pl.col("close"))
-            .alias("vwap")
+            (pl.col("_tp_vol_sum") / pl.col("_vol_sum")).fill_nan(pl.col("close")).alias("vwap")
         )
 
         # Distance from VWAP (normalized)
@@ -714,16 +678,18 @@ class TechnicalIndicators:
 
         # 1. Hammer: small body at top, long lower wick
         df = df.with_columns(
-            pl.when(
-                (body_pct < 0.3) & (lower_wick > body * 2) & (upper_wick < body)
-            ).then(1).otherwise(0).alias("candle_hammer")
+            pl.when((body_pct < 0.3) & (lower_wick > body * 2) & (upper_wick < body))
+            .then(1)
+            .otherwise(0)
+            .alias("candle_hammer")
         )
 
         # 2. Inverted hammer: small body at bottom, long upper wick
         df = df.with_columns(
-            pl.when(
-                (body_pct < 0.3) & (upper_wick > body * 2) & (lower_wick < body)
-            ).then(1).otherwise(0).alias("candle_inv_hammer")
+            pl.when((body_pct < 0.3) & (upper_wick > body * 2) & (lower_wick < body))
+            .then(1)
+            .otherwise(0)
+            .alias("candle_inv_hammer")
         )
 
         # 3. Bullish engulfing: current bullish body engulfs previous bearish body
@@ -735,7 +701,10 @@ class TechnicalIndicators:
                 & (prev_c < prev_o)  # Previous is bearish
                 & (o <= prev_c)  # Current open <= prev close
                 & (c >= prev_o)  # Current close >= prev open
-            ).then(1).otherwise(0).alias("candle_engulf_bull")
+            )
+            .then(1)
+            .otherwise(0)
+            .alias("candle_engulf_bull")
         )
 
         # 4. Bearish engulfing: current bearish body engulfs previous bullish body
@@ -745,27 +714,31 @@ class TechnicalIndicators:
                 & (prev_c > prev_o)  # Previous is bullish
                 & (o >= prev_c)  # Current open >= prev close
                 & (c <= prev_o)  # Current close <= prev open
-            ).then(1).otherwise(0).alias("candle_engulf_bear")
+            )
+            .then(1)
+            .otherwise(0)
+            .alias("candle_engulf_bear")
         )
 
         # 5. Doji: very small body relative to range
-        df = df.with_columns(
-            pl.when(body_pct < 0.1).then(1).otherwise(0).alias("candle_doji")
-        )
+        df = df.with_columns(pl.when(body_pct < 0.1).then(1).otherwise(0).alias("candle_doji"))
 
         # 6. Morning star: bearish + small body + bullish (3-bar pattern)
         prev2_o = o.shift(2)
         prev2_c = c.shift(2)
-        prev_body_pct = (prev_c - prev_o).abs() / pl.when(
-            (h.shift(1) - l.shift(1)) > 0
-        ).then(h.shift(1) - l.shift(1)).otherwise(1.0)
+        prev_body_pct = (prev_c - prev_o).abs() / pl.when((h.shift(1) - l.shift(1)) > 0).then(
+            h.shift(1) - l.shift(1)
+        ).otherwise(1.0)
         df = df.with_columns(
             pl.when(
                 (prev2_c < prev2_o)  # Bar -2 is bearish
                 & (prev_body_pct < 0.3)  # Bar -1 is small body
                 & (c > o)  # Current is bullish
                 & (c > (prev2_o + prev2_c) / 2)  # Close above midpoint of bar -2
-            ).then(1).otherwise(0).alias("candle_morning_star")
+            )
+            .then(1)
+            .otherwise(0)
+            .alias("candle_morning_star")
         )
 
         # 7. Evening star: bullish + small body + bearish (3-bar pattern)
@@ -775,15 +748,16 @@ class TechnicalIndicators:
                 & (prev_body_pct < 0.3)  # Bar -1 is small body
                 & (c < o)  # Current is bearish
                 & (c < (prev2_o + prev2_c) / 2)  # Close below midpoint of bar -2
-            ).then(1).otherwise(0).alias("candle_evening_star")
+            )
+            .then(1)
+            .otherwise(0)
+            .alias("candle_evening_star")
         )
 
         # 8. Pin bar: longest wick > 3x body
         max_wick = pl.max_horizontal(upper_wick, lower_wick)
         df = df.with_columns(
-            pl.when(
-                (max_wick > body * 3) & (body > 0)
-            ).then(1).otherwise(0).alias("candle_pin_bar")
+            pl.when((max_wick > body * 3) & (body > 0)).then(1).otherwise(0).alias("candle_pin_bar")
         )
 
         return df
@@ -806,10 +780,12 @@ class TechnicalIndicators:
         fib_dist_786, fib_nearest_level, fib_cluster_strength
         """
         # Swing high/low detection via rolling window
-        df = df.with_columns([
-            pl.col("high").rolling_max(window_size=swing_lookback).alias("_swing_high"),
-            pl.col("low").rolling_min(window_size=swing_lookback).alias("_swing_low"),
-        ])
+        df = df.with_columns(
+            [
+                pl.col("high").rolling_max(window_size=swing_lookback).alias("_swing_high"),
+                pl.col("low").rolling_min(window_size=swing_lookback).alias("_swing_low"),
+            ]
+        )
 
         # Ensure ATR exists
         atr_col = f"atr_{atr_period}"
@@ -829,27 +805,18 @@ class TechnicalIndicators:
             col_name = f"fib_dist_{str(level).replace('.', '')}"
             fib_dist_cols.append(col_name)
             fib_exprs.append(
-                ((pl.col("close") - fib_price) / safe_atr)
-                .fill_nan(0.0)
-                .alias(col_name)
+                ((pl.col("close") - fib_price) / safe_atr).fill_nan(0.0).alias(col_name)
             )
 
         df = df.with_columns(fib_exprs)
 
         # Nearest Fibonacci level (min absolute distance)
         abs_dists = [pl.col(c).abs() for c in fib_dist_cols]
-        df = df.with_columns(
-            pl.min_horizontal(*abs_dists).alias("fib_nearest_level")
-        )
+        df = df.with_columns(pl.min_horizontal(*abs_dists).alias("fib_nearest_level"))
 
         # Cluster strength: how many Fib levels are within 0.5 ATR of close
-        cluster_exprs = [
-            pl.when(pl.col(c).abs() < 0.5).then(1).otherwise(0)
-            for c in fib_dist_cols
-        ]
-        df = df.with_columns(
-            pl.sum_horizontal(*cluster_exprs).alias("fib_cluster_strength")
-        )
+        cluster_exprs = [pl.when(pl.col(c).abs() < 0.5).then(1).otherwise(0) for c in fib_dist_cols]
+        df = df.with_columns(pl.sum_horizontal(*cluster_exprs).alias("fib_cluster_strength"))
 
         # Cleanup
         df = df.drop(["_swing_high", "_swing_low"])

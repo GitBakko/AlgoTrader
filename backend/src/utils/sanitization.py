@@ -5,7 +5,6 @@ Prevents leaking of passwords, API keys, tokens, and other credentials.
 
 from typing import Any
 
-
 # Sensitive field names to redact (case-insensitive)
 SENSITIVE_FIELDS = {
     "password",

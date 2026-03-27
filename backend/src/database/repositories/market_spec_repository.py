@@ -65,9 +65,7 @@ class MarketSpecRepository:
             environment=environment,
             min_deal_size=Decimal(str(min_deal_size)),
             min_deal_size_unit=min_deal_size_unit,
-            max_deal_size=(
-                Decimal(str(max_deal_size)) if max_deal_size is not None else None
-            ),
+            max_deal_size=(Decimal(str(max_deal_size)) if max_deal_size is not None else None),
             market_name=market_name,
             fetched_at=now,
         )

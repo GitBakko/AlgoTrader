@@ -46,11 +46,13 @@ class MarketStructureDetector:
         if len(df) < self.pivot_lookback * 3:
             # Not enough data for meaningful structure detection
             n = len(df)
-            df = df.with_columns([
-                pl.lit(0).alias("bos_signal"),
-                pl.lit(0).alias("choch_signal"),
-                pl.lit(0).alias("structure_trend"),
-            ])
+            df = df.with_columns(
+                [
+                    pl.lit(0).alias("bos_signal"),
+                    pl.lit(0).alias("choch_signal"),
+                    pl.lit(0).alias("structure_trend"),
+                ]
+            )
             return df
 
         high = df["high"].to_numpy().astype(np.float64)
@@ -59,11 +61,13 @@ class MarketStructureDetector:
 
         bos, choch, trend = self._detect_structure(high, low, close)
 
-        df = df.with_columns([
-            pl.Series("bos_signal", bos),
-            pl.Series("choch_signal", choch),
-            pl.Series("structure_trend", trend),
-        ])
+        df = df.with_columns(
+            [
+                pl.Series("bos_signal", bos),
+                pl.Series("choch_signal", choch),
+                pl.Series("structure_trend", trend),
+            ]
+        )
 
         return df
 
@@ -171,13 +175,19 @@ class MarketStructureDetector:
         lb2 = lookback * 2
 
         for i in range(lookback, n - lookback):
-            window = high[i - lookback: i + lookback + 1]
+            window = high[i - lookback : i + lookback + 1]
             if high[i] == window.max():
                 # Min of surrounding region (avoid np.concatenate per iteration)
-                left = high[max(0, i - lb2): i]
-                right = high[i + 1: min(n, i + lb2 + 1)]
-                local_low = min(left.min(), right.min()) if len(left) > 0 and len(right) > 0 else (
-                    left.min() if len(left) > 0 else (right.min() if len(right) > 0 else high[i])
+                left = high[max(0, i - lb2) : i]
+                right = high[i + 1 : min(n, i + lb2 + 1)]
+                local_low = (
+                    min(left.min(), right.min())
+                    if len(left) > 0 and len(right) > 0
+                    else (
+                        left.min()
+                        if len(left) > 0
+                        else (right.min() if len(right) > 0 else high[i])
+                    )
                 )
                 if high[i] - local_low >= min_size:
                     result[i] = True
@@ -196,13 +206,17 @@ class MarketStructureDetector:
         lb2 = lookback * 2
 
         for i in range(lookback, n - lookback):
-            window = low[i - lookback: i + lookback + 1]
+            window = low[i - lookback : i + lookback + 1]
             if low[i] == window.min():
                 # Max of surrounding region (avoid np.concatenate per iteration)
-                left = low[max(0, i - lb2): i]
-                right = low[i + 1: min(n, i + lb2 + 1)]
-                local_high = max(left.max(), right.max()) if len(left) > 0 and len(right) > 0 else (
-                    left.max() if len(left) > 0 else (right.max() if len(right) > 0 else low[i])
+                left = low[max(0, i - lb2) : i]
+                right = low[i + 1 : min(n, i + lb2 + 1)]
+                local_high = (
+                    max(left.max(), right.max())
+                    if len(left) > 0 and len(right) > 0
+                    else (
+                        left.max() if len(left) > 0 else (right.max() if len(right) > 0 else low[i])
+                    )
                 )
                 if local_high - low[i] >= min_size:
                     result[i] = True

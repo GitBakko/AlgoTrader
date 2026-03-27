@@ -120,17 +120,14 @@ class OrderManager:
 
             # CRITICAL FIX (CRIT-6): Add 10-second timeout to prevent infinite hang
             try:
-                await asyncio.wait_for(
-                    self._broker.modify_position(deal_id, request),
-                    timeout=10.0
-                )
+                await asyncio.wait_for(self._broker.modify_position(deal_id, request), timeout=10.0)
             except asyncio.TimeoutError:
                 logger.error(f"Broker API timeout (10s) modifying position {deal_id}")
                 return ExecutionResult(
                     success=False,
                     deal_id=deal_id,
                     error="Broker API timeout (10 seconds)",
-                    error_detail={"timeout_seconds": 10.0}
+                    error_detail={"timeout_seconds": 10.0},
                 )
 
             return ExecutionResult(success=True, deal_id=deal_id)
@@ -171,7 +168,7 @@ class OrderManager:
                 return ExecutionResult(
                     success=False,
                     error="Broker API timeout (10 seconds)",
-                    error_detail={"timeout_seconds": 10.0, "epic": order.epic}
+                    error_detail={"timeout_seconds": 10.0, "epic": order.epic},
                 )
 
             # Check if broker rejected due to invalid SL/TP — retry without them
@@ -192,7 +189,7 @@ class OrderManager:
                         return ExecutionResult(
                             success=False,
                             error="Broker API timeout on retry (10 seconds)",
-                            error_detail={"timeout_seconds": 10.0, "epic": order.epic}
+                            error_detail={"timeout_seconds": 10.0, "epic": order.epic},
                         )
                     opened_without_stops = True
 
@@ -249,25 +246,33 @@ class OrderManager:
             logger.info(f"Market closed for {order.epic}: {e}")
             parsed = parse_broker_error(str(e), epic=order.epic)
             return ExecutionResult(
-                success=False, error=parsed.summary, error_detail=parsed.to_dict(),
+                success=False,
+                error=parsed.summary,
+                error_detail=parsed.to_dict(),
             )
         except InsufficientFundsError as e:
             logger.error(f"Insufficient funds for {order.epic}: {e}")
             parsed = parse_broker_error(str(e), epic=order.epic)
             return ExecutionResult(
-                success=False, error=parsed.summary, error_detail=parsed.to_dict(),
+                success=False,
+                error=parsed.summary,
+                error_detail=parsed.to_dict(),
             )
         except OrderRejectedError as e:
             logger.error(f"Order rejected for {order.epic}: {e}")
             parsed = parse_broker_error(str(e), epic=order.epic)
             return ExecutionResult(
-                success=False, error=parsed.summary, error_detail=parsed.to_dict(),
+                success=False,
+                error=parsed.summary,
+                error_detail=parsed.to_dict(),
             )
         except RateLimitError as e:
             logger.warning(f"Rate limited on {order.epic}: {e}")
             parsed = parse_broker_error(str(e), epic=order.epic)
             return ExecutionResult(
-                success=False, error=parsed.summary, error_detail=parsed.to_dict(),
+                success=False,
+                error=parsed.summary,
+                error_detail=parsed.to_dict(),
             )
         except CapitalComError as e:
             # Check if it's a SL/TP error — retry with corrected levels or without
@@ -275,6 +280,7 @@ class OrderManager:
             if "stoploss" in error_str or "takeprofit" in error_str:
                 # Extract broker's minimum/maximum from error message
                 import re as _re
+
                 val_match = _re.search(r":\s*([\d.]+)", str(e))
                 broker_limit = float(val_match.group(1)) if val_match else None
 
@@ -312,7 +318,8 @@ class OrderManager:
                             profit_level=corrected_tp,
                         )
                         confirmation = await self._send_position_request(
-                            request_corrected, order,
+                            request_corrected,
+                            order,
                         )
                         if confirmation and confirmation.deal_status != "REJECTED":
                             slippage = abs(confirmation.level - order.entry_price)
@@ -372,16 +379,15 @@ class OrderManager:
             logger.error(f"Broker error for {order.epic}: {e}")
             parsed = parse_broker_error(str(e), epic=order.epic)
             return ExecutionResult(
-                success=False, error=parsed.summary, error_detail=parsed.to_dict(),
+                success=False,
+                error=parsed.summary,
+                error_detail=parsed.to_dict(),
             )
 
     async def _send_position_request(self, request: CreatePositionRequest, order: ExecutionOrder):
         """Send position request to broker with timeout. Returns None on timeout."""
         try:
-            return await asyncio.wait_for(
-                self._broker.create_position(request),
-                timeout=10.0
-            )
+            return await asyncio.wait_for(self._broker.create_position(request), timeout=10.0)
         except asyncio.TimeoutError:
             logger.error(f"Broker API timeout (10s) for {order.epic} {order.direction}")
             return None
@@ -470,7 +476,9 @@ class OrderManager:
                     profit_level=adjusted_tp,
                 )
                 if result.success:
-                    logger.info(f"[{epic}] ✅ SL/TP set on broker: SL={adjusted_sl}, TP={adjusted_tp}")
+                    logger.info(
+                        f"[{epic}] ✅ SL/TP set on broker: SL={adjusted_sl}, TP={adjusted_tp}"
+                    )
                     return  # Success
                 elif "not-found" in (result.error or ""):
                     logger.debug(f"[{epic}] Deal not yet available (attempt {attempt + 1})")
@@ -507,8 +515,7 @@ class OrderManager:
             # CRITICAL FIX (CRIT-6): Add 10-second timeout to prevent infinite hang
             try:
                 confirmation = await asyncio.wait_for(
-                    self._broker.close_position(deal_id),
-                    timeout=10.0
+                    self._broker.close_position(deal_id), timeout=10.0
                 )
             except asyncio.TimeoutError:
                 logger.error(f"Broker API timeout (10s) closing position {deal_id}")
@@ -516,7 +523,7 @@ class OrderManager:
                     success=False,
                     deal_id=deal_id,
                     error="Broker API timeout (10 seconds)",
-                    error_detail={"timeout_seconds": 10.0}
+                    error_detail={"timeout_seconds": 10.0},
                 )
 
             return ExecutionResult(

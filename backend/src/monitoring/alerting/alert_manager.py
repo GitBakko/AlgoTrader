@@ -9,7 +9,11 @@ from typing import Any
 from loguru import logger
 
 from src.monitoring.alerting.channels import (
-    AlertChannel, EmailChannel, SlackChannel, TelegramChannel, WebhookChannel,
+    AlertChannel,
+    EmailChannel,
+    SlackChannel,
+    TelegramChannel,
+    WebhookChannel,
 )
 from src.monitoring.alerting.in_app_channel import InAppChannel
 from src.monitoring.alerting.schemas import Alert, AlertSeverity, AlertType

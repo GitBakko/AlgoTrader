@@ -5,13 +5,12 @@ Models spread, slippage, and overnight fees for Capital.com CFDs.
 
 from datetime import datetime, timedelta
 
-
 # Capital.com typical FULL bid-ask spreads (in price units)
 # These represent the full spread (ask - bid), not the half-spread.
 ASSET_SPREADS = {
-    "XAUUSD": 0.40,   # ~0.40 USD full spread on Gold
-    "BTCUSD": 50.0,   # ~50 USD full spread on Bitcoin
-    "US500": 0.50,     # ~0.50 points full spread on S&P 500
+    "XAUUSD": 0.40,  # ~0.40 USD full spread on Gold
+    "BTCUSD": 50.0,  # ~50 USD full spread on Bitcoin
+    "US500": 0.50,  # ~0.50 points full spread on S&P 500
 }
 
 # Typical overnight swap rates (daily, as fraction of position value)
@@ -192,7 +191,8 @@ class CostSimulator:
             position_value = abs(entry_price * size)
 
             weekday_nights, weekend_nights = self._count_weekend_nights(
-                entry_time, total_nights,
+                entry_time,
+                total_nights,
             )
 
             # Weekend nights charged at 3x (Capital.com triple swap)
@@ -200,7 +200,10 @@ class CostSimulator:
 
             if effective_nights > 0:
                 cost += self.calculate_overnight_fee(
-                    epic, position_value, direction, effective_nights,
+                    epic,
+                    position_value,
+                    direction,
+                    effective_nights,
                 )
 
         return cost

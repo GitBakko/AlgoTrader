@@ -8,6 +8,7 @@ headless server environments. Does NOT depend on mplfinance.
 If matplotlib is unavailable a minimal valid 1×1 PNG is returned as a
 safe fallback so callers never receive None or an exception.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -182,9 +183,7 @@ class MantisChartGenerator:
                 width=0.6,
                 alpha=0.9,
             )
-            ax_price.vlines(
-                x[up], lows_arr[up], highs_arr[up], color="#39FF14", linewidth=0.5
-            )
+            ax_price.vlines(x[up], lows_arr[up], highs_arr[up], color="#39FF14", linewidth=0.5)
 
         # Down candles — MANTIS loss red
         if down.any():
@@ -248,9 +247,7 @@ class MantisChartGenerator:
                     alpha=0.05,
                 )
 
-        ax_price.set_title(
-            title or "MANTIS Chart", color="#e6edf3", fontsize=10, pad=6
-        )
+        ax_price.set_title(title or "MANTIS Chart", color="#e6edf3", fontsize=10, pad=6)
         handles, labels = ax_price.get_legend_handles_labels()
         if handles:
             ax_price.legend(
@@ -271,10 +268,7 @@ class MantisChartGenerator:
             for spine in ax_vol.spines.values():
                 spine.set_edgecolor("#21262d")
             vols = np.asarray(volumes, dtype=float)
-            bar_colors = [
-                "#39FF14" if c >= o else "#FF3D57"
-                for c, o in zip(closes_arr, opens_arr)
-            ]
+            bar_colors = ["#39FF14" if c >= o else "#FF3D57" for c, o in zip(closes_arr, opens_arr)]
             ax_vol.bar(x, vols, color=bar_colors, alpha=0.5, width=0.6)
             ax_vol.set_ylabel("Volume", color="#8B949E", fontsize=8)
             subplot_idx += 1

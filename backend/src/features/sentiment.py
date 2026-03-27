@@ -31,9 +31,7 @@ class SentimentFeatures:
     """
 
     @staticmethod
-    def add_insider_mspr(
-        df: pl.DataFrame, insider_data: list[InsiderSentiment]
-    ) -> pl.DataFrame:
+    def add_insider_mspr(df: pl.DataFrame, insider_data: list[InsiderSentiment]) -> pl.DataFrame:
         """
         Add insider MSPR feature (Monthly Share Purchase Ratio).
 
@@ -69,9 +67,7 @@ class SentimentFeatures:
         return df
 
     @staticmethod
-    def add_analyst_consensus(
-        df: pl.DataFrame, analyst: AnalystConsensus | None
-    ) -> pl.DataFrame:
+    def add_analyst_consensus(df: pl.DataFrame, analyst: AnalystConsensus | None) -> pl.DataFrame:
         """
         Add analyst consensus as categorical feature.
 
@@ -97,13 +93,13 @@ class SentimentFeatures:
             value = 0
 
         df = df.with_columns(pl.lit(value).alias("analyst_consensus"))
-        logger.debug(f"Added analyst_consensus: {value} ({analyst.consensus if analyst else 'HOLD'})")
+        logger.debug(
+            f"Added analyst_consensus: {value} ({analyst.consensus if analyst else 'HOLD'})"
+        )
         return df
 
     @staticmethod
-    def add_price_target_upside(
-        df: pl.DataFrame, price_target: PriceTarget | None
-    ) -> pl.DataFrame:
+    def add_price_target_upside(df: pl.DataFrame, price_target: PriceTarget | None) -> pl.DataFrame:
         """
         Add analyst price target upside percentage.
 
@@ -215,7 +211,5 @@ class SentimentFeatures:
             .alias("news_sentiment_avg")
         )
 
-        logger.debug(
-            f"Added news_sentiment_avg ({len(news)} articles, {window_days}d window)"
-        )
+        logger.debug(f"Added news_sentiment_avg ({len(news)} articles, {window_days}d window)")
         return df

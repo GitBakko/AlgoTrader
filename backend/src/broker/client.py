@@ -31,7 +31,6 @@ from src.broker.session import SessionManager
 from src.utils.config import get_settings
 from src.utils.sanitization import sanitize_dict
 
-
 # Map internal epic names → Capital.com API epic codes
 # Internal names (XAUUSD, BTCUSD, US500) are used throughout the codebase.
 # Capital.com uses different codes for some assets.
@@ -39,9 +38,9 @@ EPIC_TO_BROKER: dict[str, str] = {
     "XAUUSD": "GOLD",
     "XAGUSD": "SILVER",
     "WTIUSD": "OIL_CRUDE",
-    "DOGUSD": "DOGEUSD",      # Dogecoin
-    "NATGAS": "NATURALGAS",   # Natural Gas
-    "NAS100": "QTEC",         # Nasdaq 100
+    "DOGUSD": "DOGEUSD",  # Dogecoin
+    "NATGAS": "NATURALGAS",  # Natural Gas
+    "NAS100": "QTEC",  # Nasdaq 100
 }
 BROKER_TO_EPIC: dict[str, str] = {v: k for k, v in EPIC_TO_BROKER.items()}
 
@@ -171,7 +170,9 @@ class CapitalComClient:
                 headers = {"CST": tokens.cst, "X-SECURITY-TOKEN": tokens.security_token}
 
                 start_time = datetime.now()
-                response = await client.request(method, url, headers=headers, json=json, params=params)
+                response = await client.request(
+                    method, url, headers=headers, json=json, params=params
+                )
                 duration = (datetime.now() - start_time).total_seconds()
 
                 # Sanitize JSON for logging (remove sensitive fields)
@@ -187,7 +188,7 @@ class CapitalComClient:
                     error_msg = error_data.get("errorMessage", f"HTTP {response.status_code}")
 
                     if attempt < self._retry_attempts - 1:
-                        retry_delay = self._retry_base_delay * (2 ** attempt)  # Exponential backoff
+                        retry_delay = self._retry_base_delay * (2**attempt)  # Exponential backoff
                         logger.warning(
                             f"5xx error from broker ({response.status_code}): {error_msg} - "
                             f"Retry {attempt + 1}/{self._retry_attempts} after {retry_delay:.2f}s"
@@ -196,7 +197,9 @@ class CapitalComClient:
                         continue  # Retry
                     else:
                         # Final attempt failed
-                        raise CapitalComError(f"Broker 5xx error (after {self._retry_attempts} retries): {error_msg}")
+                        raise CapitalComError(
+                            f"Broker 5xx error (after {self._retry_attempts} retries): {error_msg}"
+                        )
 
                 # Handle 4xx errors (client errors - don't retry)
                 if response.status_code >= 400:
@@ -218,12 +221,16 @@ class CapitalComClient:
             except httpx.HTTPError as e:
                 last_error = e
                 if attempt < self._retry_attempts - 1:
-                    retry_delay = self._retry_base_delay * (2 ** attempt)
-                    logger.warning(f"HTTP error for {method} {endpoint}: {e} - Retry {attempt + 1}/{self._retry_attempts} after {retry_delay:.2f}s")
+                    retry_delay = self._retry_base_delay * (2**attempt)
+                    logger.warning(
+                        f"HTTP error for {method} {endpoint}: {e} - Retry {attempt + 1}/{self._retry_attempts} after {retry_delay:.2f}s"
+                    )
                     await asyncio.sleep(retry_delay)
                     continue
                 else:
-                    logger.error(f"HTTP error for {method} {endpoint}: {e} (after {self._retry_attempts} retries)")
+                    logger.error(
+                        f"HTTP error for {method} {endpoint}: {e} (after {self._retry_attempts} retries)"
+                    )
                     raise CapitalComError(f"HTTP error: {e}")
             except CapitalComError:
                 # Don't retry on CapitalComError (4xx client errors) - these are not transient
@@ -341,6 +348,7 @@ class CapitalComClient:
         if deal_ref:
             # Two-step flow: fetch full confirmation
             import asyncio
+
             # HIGH-3 FIX: Use configurable delay instead of hardcoded 300ms
             await asyncio.sleep(self._deal_confirmation_delay)
             confirmation = await self.get_deal_confirmation(deal_ref)
@@ -370,6 +378,7 @@ class CapitalComClient:
         deal_ref = response.get("dealReference")
         if deal_ref:
             import asyncio
+
             # HIGH-3 FIX: Use configurable delay instead of hardcoded 300ms
             await asyncio.sleep(self._deal_confirmation_delay)
             return await self.get_deal_confirmation(deal_ref)
@@ -389,7 +398,9 @@ class CapitalComClient:
         Returns:
             Deal confirmation
         """
-        response = await self._request("PUT", f"/api/v1/positions/{deal_id}", json=request.model_dump(by_alias=True))
+        response = await self._request(
+            "PUT", f"/api/v1/positions/{deal_id}", json=request.model_dump(by_alias=True)
+        )
         return DealConfirmation(**response)
 
     async def list_positions(self) -> list[Position]:
@@ -437,7 +448,9 @@ class CapitalComClient:
         Returns:
             Deal confirmation
         """
-        response = await self._request("POST", "/api/v1/workingorders", json=request.model_dump(by_alias=True))
+        response = await self._request(
+            "POST", "/api/v1/workingorders", json=request.model_dump(by_alias=True)
+        )
         return DealConfirmation(**response)
 
     async def cancel_working_order(self, deal_id: str) -> DealConfirmation:

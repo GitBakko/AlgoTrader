@@ -1,5 +1,6 @@
 # MANTIS-EVOLUTION: DRL Ensemble schema contracts
 """Pydantic models for the DRL Ensemble (Sprint 5)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone

@@ -11,7 +11,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.12+-blue?logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/angular-21-dd0031?logo=angular&logoColor=white" alt="Angular">
-  <img src="https://img.shields.io/badge/tests-1136_passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-2300+_passing-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/assets-21_instruments-blueviolet" alt="Assets">
   <img src="https://img.shields.io/badge/features-220+-9cf" alt="Features">
   <img src="https://img.shields.io/badge/broker-Capital.com-orange" alt="Broker">
@@ -61,14 +61,19 @@ MANTIS AI is a full-stack algorithmic trading system that combines **XGBoost ML 
 ### Risk Management (TRADING MAGNA AI)
 
 - **6 Circuit Breakers**: daily loss, consecutive losses, max positions, slippage anomaly, heartbeat timeout, volatility spike
+- **Epic SL Cooldown**: progressive penalty after repeated SL hits on same asset (1 SL=0.70x, 2 SL=0.40x, 3 SL=blocked for 2h)
 - **4-Phase Trailing Stop**: Initial -> Breakeven -> TP1 Lock -> ATR Trailing
 - **Multi-Target Exit**: TP1 (1xR) with 50% partial close, TP2 (2xR) full exit
 - **Adaptive Kelly Position Sizing**: half-Kelly with 30-trade minimum, fixed-fractional fallback
 - **Equity Curve Filter**: SMA(20 trades), 50% size reduction when underperforming
 - **Correlation Guard**: prevents over-exposure to correlated assets
+- **Smart SL/TP retry**: auto-corrects broker-rejected stop levels, fallback to post-fill stop setting
 
 ### Strategy Engine
 
+- **ML-Primary Mode** (feature-flagged): ML XGBoost decides direction, ScalpScore 7-vote system acts as quality gate
+- **ScalpScore Quality Gate**: evaluates technical quality relative to ML direction (soft VWAP/HTF penalties, technical floor)
+- **Composite Confidence**: ML confidence x technical quality multiplier x gate penalties
 - **Regime-based Strategy Router**: trending -> ML, ranging -> [Squeeze, VWAP, ML]
 - **Volatility Squeeze Breakout**: BB-inside-KC detection with momentum/volume confirmation
 - **VWAP Reversion**: mean-reversion at +/-2 SD bands in ranging markets
@@ -95,6 +100,8 @@ MANTIS AI is a full-stack algorithmic trading system that combines **XGBoost ML 
 - **Mobile responsive**: Bottom nav, scroll strips, 44px touch targets
 - **Auth**: JWT + RBAC (3 roles, 30+ permissions), avatar upload
 - **Alerting**: Email, Slack, Telegram, Webhook channels (configurable, off by default)
+- **Telegram Bot**: interactive commands (/status, /reset, /stop) with live broker data
+- **Header P&L**: real-time live P&L + daily realized P&L pills with neon glow
 
 ---
 

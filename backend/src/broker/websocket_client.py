@@ -166,7 +166,7 @@ class CapitalComWebSocketClient:
 
                 if attempt < self.max_reconnect_attempts - 1:
                     delay = min(
-                        self.reconnect_delay_seconds * (2 ** attempt),
+                        self.reconnect_delay_seconds * (2**attempt),
                         120,  # Cap at 2 minutes
                     )
                     logger.info(f"Retrying in {delay} seconds...")

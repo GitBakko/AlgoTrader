@@ -83,11 +83,7 @@ class WalkForwardSplitter:
     def min_samples(self) -> int:
         """Minimum number of samples needed for at least one fold."""
         return (
-            self.train_window
-            + self.purge_gap
-            + self.val_window
-            + self.embargo
-            + self.test_window
+            self.train_window + self.purge_gap + self.val_window + self.embargo + self.test_window
         )
 
     def split(self, n_samples: int) -> Iterator[WalkForwardSplit]:

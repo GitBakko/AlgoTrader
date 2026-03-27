@@ -46,9 +46,7 @@ def validate_avatar_file(file: UploadFile) -> None:
     ext = Path(file.filename).suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
         allowed = ", ".join(ALLOWED_EXTENSIONS)
-        raise AvatarValidationError(
-            f"Tipo di file non supportato. Usa uno di questi: {allowed}"
-        )
+        raise AvatarValidationError(f"Tipo di file non supportato. Usa uno di questi: {allowed}")
 
     # Check content type
     if file.content_type and not file.content_type.startswith("image/"):
@@ -172,9 +170,7 @@ async def save_avatar(
         return avatar_url, storage_path
 
     except AvatarValidationError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
-        ) from e
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Failed to save avatar for user {user_id}: {e}")
         raise HTTPException(

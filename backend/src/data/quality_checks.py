@@ -134,9 +134,7 @@ class DataQualityChecker:
             | (pl.col("high") < pl.col("low"))
         )
         if len(bad_high) > 0:
-            errors.append(
-                f"Found {len(bad_high)} candles where high < open/close/low"
-            )
+            errors.append(f"Found {len(bad_high)} candles where high < open/close/low")
 
         # Low must be <= all other prices
         bad_low = df.filter(
@@ -145,9 +143,7 @@ class DataQualityChecker:
             | (pl.col("low") > pl.col("high"))
         )
         if len(bad_low) > 0:
-            errors.append(
-                f"Found {len(bad_low)} candles where low > open/close/high"
-            )
+            errors.append(f"Found {len(bad_low)} candles where low > open/close/high")
 
         # All prices must be positive
         bad_prices = df.filter(
@@ -161,13 +157,9 @@ class DataQualityChecker:
 
         # Volume must be non-negative (if column exists and has non-null values)
         if "volume" in df.columns:
-            bad_volume = df.filter(
-                pl.col("volume").is_not_null() & (pl.col("volume") < 0)
-            )
+            bad_volume = df.filter(pl.col("volume").is_not_null() & (pl.col("volume") < 0))
             if len(bad_volume) > 0:
-                errors.append(
-                    f"Found {len(bad_volume)} candles with negative volume"
-                )
+                errors.append(f"Found {len(bad_volume)} candles with negative volume")
 
         return errors
 
@@ -270,9 +262,12 @@ class DataQualityChecker:
         upper = mean + threshold * std
 
         outliers = df.filter(
-            (pl.col("close") < lower) | (pl.col("close") > upper)
-            | (pl.col("high") < lower) | (pl.col("high") > upper)
-            | (pl.col("low") < lower) | (pl.col("low") > upper)
+            (pl.col("close") < lower)
+            | (pl.col("close") > upper)
+            | (pl.col("high") < lower)
+            | (pl.col("high") > upper)
+            | (pl.col("low") < lower)
+            | (pl.col("low") > upper)
         )
 
         if len(outliers) > 0:

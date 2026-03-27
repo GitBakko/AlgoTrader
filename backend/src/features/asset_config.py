@@ -5,7 +5,6 @@ Defines which features, indicator periods, and timeframes to use per asset.
 
 from src.features.schemas import AssetFeatureConfig, FeatureConfig, FeatureType
 
-
 # Default technical indicator parameters
 DEFAULT_TECHNICAL_PARAMS = {
     "ema_periods": [8, 21, 50, 200],
@@ -562,7 +561,6 @@ def get_asset_config(epic: str) -> AssetFeatureConfig:
     """
     if epic not in ASSET_FEATURE_CONFIGS:
         raise ValueError(
-            f"No feature config for '{epic}'. "
-            f"Available: {list(ASSET_FEATURE_CONFIGS.keys())}"
+            f"No feature config for '{epic}'. " f"Available: {list(ASSET_FEATURE_CONFIGS.keys())}"
         )
     return ASSET_FEATURE_CONFIGS[epic]

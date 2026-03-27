@@ -188,7 +188,9 @@ class BackupManager:
                     logger.info(f"Deleted old backup: {backup_file.name}")
 
             if deleted_count > 0:
-                logger.info(f"Cleaned up {deleted_count} old backups (retention: {self.retention_days}d)")
+                logger.info(
+                    f"Cleaned up {deleted_count} old backups (retention: {self.retention_days}d)"
+                )
 
             return deleted_count
 
@@ -206,9 +208,7 @@ class BackupManager:
         backups = []
 
         try:
-            for backup_file in sorted(
-                self.backup_dir.glob("mantis_backup_*.sql.gz"), reverse=True
-            ):
+            for backup_file in sorted(self.backup_dir.glob("mantis_backup_*.sql.gz"), reverse=True):
                 stat = backup_file.stat()
                 backups.append(
                     {

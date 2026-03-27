@@ -6,6 +6,7 @@ building into a single VisionSignal for the multi-agent pipeline.
 This agent is OPTIONAL and feature-flag gated (VISION_ENABLED).
 When disabled or on failure, returns a low-confidence default signal.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -100,8 +101,14 @@ class VisionAgent:
             noise = np.random.randn(n) * context.atr * 0.01
             closes = list(context.current_price + np.cumsum(noise))
             opens = [c - np.random.rand() * context.atr * 0.005 for c in closes]
-            highs = [max(o, c) + abs(np.random.randn()) * context.atr * 0.003 for o, c in zip(opens, closes)]
-            lows = [min(o, c) - abs(np.random.randn()) * context.atr * 0.003 for o, c in zip(opens, closes)]
+            highs = [
+                max(o, c) + abs(np.random.randn()) * context.atr * 0.003
+                for o, c in zip(opens, closes)
+            ]
+            lows = [
+                min(o, c) - abs(np.random.randn()) * context.atr * 0.003
+                for o, c in zip(opens, closes)
+            ]
 
         indicators = {}
         for key in ("ema_9", "ema_21", "bb_upper", "bb_lower", "rsi_14"):

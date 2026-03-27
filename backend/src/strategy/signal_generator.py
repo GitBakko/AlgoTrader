@@ -10,7 +10,6 @@ from src.risk.stop_manager import StopManager
 from src.strategy.regime_adapter import RegimeAdapter
 from src.strategy.schemas import SignalDirection, StrategyConfig, TradingSignal
 
-
 # Map SignalClass to direction (direct 1:1 mapping with 3-class system)
 _SIGNAL_TO_DIRECTION: dict[int, SignalDirection] = {
     SignalClass.BUY: SignalDirection.BUY,
@@ -140,8 +139,7 @@ class SignalGenerator:
             if adx < cfg.adx_ranging_threshold:
                 # Choppy market: reject directional signals
                 logger.debug(
-                    f"{epic}: ADX={adx:.1f} < {cfg.adx_ranging_threshold} "
-                    f"(choppy) -> HOLD"
+                    f"{epic}: ADX={adx:.1f} < {cfg.adx_ranging_threshold} " f"(choppy) -> HOLD"
                 )
                 return _make_hold_signal(epic, current_price, regime)
             elif adx >= cfg.adx_trending_threshold:

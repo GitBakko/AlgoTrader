@@ -94,9 +94,7 @@ class AuditLogger:
         await self.session.commit()
         await self.session.refresh(event)
 
-        logger.info(
-            f"Audit event logged: {event_type} | User: {user_id} | {message}"
-        )
+        logger.info(f"Audit event logged: {event_type} | User: {user_id} | {message}")
 
         return event
 

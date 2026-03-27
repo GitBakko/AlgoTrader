@@ -1,5 +1,6 @@
 # MANTIS-EVOLUTION: Vector Store for RAG pipeline
 """Simple numpy-based vector store for RAG similarity search."""
+
 from __future__ import annotations
 
 import json
@@ -38,9 +39,7 @@ class MantisVectorStore:
         """
         vec = np.asarray(vector, dtype=np.float32)
         if vec.shape != (self.dimension,):
-            raise ValueError(
-                f"Expected vector of dimension {self.dimension}, got {vec.shape}"
-            )
+            raise ValueError(f"Expected vector of dimension {self.dimension}, got {vec.shape}")
 
         # Normalize for cosine similarity
         norm = np.linalg.norm(vec)

@@ -36,7 +36,8 @@ class Settings(BaseSettings):
     api_port: int = Field(default=8000, alias="API_PORT")
     api_reload: bool = Field(default=True, alias="API_RELOAD")
     cors_origins_str: str = Field(
-        default="http://localhost:4200,http://localhost:4321,http://localhost:8000", alias="CORS_ORIGINS"
+        default="http://localhost:4200,http://localhost:4321,http://localhost:8000",
+        alias="CORS_ORIGINS",
     )
 
     @property
@@ -84,9 +85,7 @@ class Settings(BaseSettings):
     session_timeout_minutes: int = Field(default=10, alias="SESSION_TIMEOUT_MINUTES")
     max_reconnect_attempts: int = Field(default=5, alias="MAX_RECONNECT_ATTEMPTS")
     reconnect_delay_seconds: int = Field(default=5, alias="RECONNECT_DELAY_SECONDS")
-    rate_limit_requests_per_second: int = Field(
-        default=10, alias="RATE_LIMIT_REQUESTS_PER_SECOND"
-    )
+    rate_limit_requests_per_second: int = Field(default=10, alias="RATE_LIMIT_REQUESTS_PER_SECOND")
     # HIGH-2 FIX: Broker retry configuration for transient 5xx errors
     broker_retry_attempts: int = Field(default=3, alias="BROKER_RETRY_ATTEMPTS")
     broker_retry_base_delay: float = Field(default=0.5, alias="BROKER_RETRY_BASE_DELAY")  # seconds
@@ -237,8 +236,12 @@ class Settings(BaseSettings):
     scalp_dead_market_adx: float = Field(default=20.0, alias="SCALP_DEAD_MARKET_ADX")
     scalp_dead_market_bb_pctile: float = Field(default=20.0, alias="SCALP_DEAD_MARKET_BB_PCTILE")
     scalp_asset_exclusion_enabled: bool = Field(default=True, alias="SCALP_ASSET_EXCLUSION_ENABLED")
-    scalp_asset_exclusion_lookback_days: int = Field(default=14, alias="SCALP_ASSET_EXCLUSION_LOOKBACK_DAYS")
-    scalp_asset_exclusion_min_trades: int = Field(default=5, alias="SCALP_ASSET_EXCLUSION_MIN_TRADES")
+    scalp_asset_exclusion_lookback_days: int = Field(
+        default=14, alias="SCALP_ASSET_EXCLUSION_LOOKBACK_DAYS"
+    )
+    scalp_asset_exclusion_min_trades: int = Field(
+        default=5, alias="SCALP_ASSET_EXCLUSION_MIN_TRADES"
+    )
     scalp_asset_exclusion_sharpe_threshold: float = Field(
         default=-0.5, alias="SCALP_ASSET_EXCLUSION_SHARPE_THRESHOLD"
     )
@@ -310,7 +313,9 @@ class Settings(BaseSettings):
     rag_enabled: bool = Field(default=False, alias="RAG_ENABLED")
     rag_max_context_tokens: int = Field(default=2000, alias="RAG_MAX_CONTEXT_TOKENS")
     rag_news_lookback_hours: int = Field(default=4, alias="RAG_NEWS_LOOKBACK_HOURS")
-    rag_vector_store_path: str = Field(default="data/rag/vector_store", alias="RAG_VECTOR_STORE_PATH")
+    rag_vector_store_path: str = Field(
+        default="data/rag/vector_store", alias="RAG_VECTOR_STORE_PATH"
+    )
 
     # ===== DRL Ensemble (Sprint 5) =====
     drl_enabled: bool = Field(default=False, alias="DRL_ENABLED")
@@ -328,12 +333,8 @@ class Settings(BaseSettings):
     # ===== Security =====
     secret_key: str = Field(default="dev_secret_key_change_in_production", alias="SECRET_KEY")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
-    access_token_expire_minutes: int = Field(
-        default=60, alias="ACCESS_TOKEN_EXPIRE_MINUTES"
-    )
-    refresh_token_expire_days: int = Field(
-        default=7, alias="REFRESH_TOKEN_EXPIRE_DAYS"
-    )
+    access_token_expire_minutes: int = Field(default=60, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
+    refresh_token_expire_days: int = Field(default=7, alias="REFRESH_TOKEN_EXPIRE_DAYS")
 
     @field_validator("secret_key")
     @classmethod
@@ -341,12 +342,14 @@ class Settings(BaseSettings):
         """Warn if using default secret key."""
         if v == "dev_secret_key_change_in_production":
             import warnings
+
             warnings.warn(
                 "Using default SECRET_KEY — set a strong key in .env for production!",
                 UserWarning,
                 stacklevel=2,
             )
         return v
+
     encryption_key: str = Field(
         default="", alias="ENCRYPTION_KEY", description="Fernet encryption key (32 bytes base64)"
     )
@@ -378,7 +381,9 @@ class Settings(BaseSettings):
     # ===== Database Backups =====
     backup_enabled: bool = Field(default=False, alias="BACKUP_ENABLED")
     backup_dir: str = Field(default="data/backups", alias="BACKUP_DIR")
-    backup_schedule_cron: str = Field(default="0 2 * * *", alias="BACKUP_SCHEDULE_CRON")  # 2 AM daily
+    backup_schedule_cron: str = Field(
+        default="0 2 * * *", alias="BACKUP_SCHEDULE_CRON"
+    )  # 2 AM daily
     backup_retention_days: int = Field(default=30, alias="BACKUP_RETENTION_DAYS")
 
     # ===== Rate Limiting =====

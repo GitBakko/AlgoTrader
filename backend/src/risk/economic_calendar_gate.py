@@ -16,13 +16,23 @@ from src.utils.config import get_settings
 
 # High-impact event keywords to match
 HIGH_IMPACT_EVENTS = {
-    "CPI", "Core CPI", "Consumer Price Index",
-    "NFP", "Non-Farm Payrolls", "Nonfarm Payrolls",
-    "FOMC", "Fed Rate Decision", "Federal Funds Rate",
-    "GDP", "Gross Domestic Product",
-    "PPI", "Producer Price Index",
-    "ECB Rate Decision", "ECB Interest Rate",
-    "BOE Rate Decision", "BOE Interest Rate",
+    "CPI",
+    "Core CPI",
+    "Consumer Price Index",
+    "NFP",
+    "Non-Farm Payrolls",
+    "Nonfarm Payrolls",
+    "FOMC",
+    "Fed Rate Decision",
+    "Federal Funds Rate",
+    "GDP",
+    "Gross Domestic Product",
+    "PPI",
+    "Producer Price Index",
+    "ECB Rate Decision",
+    "ECB Interest Rate",
+    "BOE Rate Decision",
+    "BOE Interest Rate",
     "BOJ Rate Decision",
     "Initial Jobless Claims",
     "Retail Sales",
@@ -63,8 +73,12 @@ EPIC_CURRENCIES: dict[str, list[str]] = {
 
 # USD_MAJOR events (reduced set for crypto)
 USD_MAJOR_EVENTS = {
-    "Fed Rate Decision", "Federal Funds Rate", "FOMC",
-    "CPI", "Core CPI", "Consumer Price Index",
+    "Fed Rate Decision",
+    "Federal Funds Rate",
+    "FOMC",
+    "CPI",
+    "Core CPI",
+    "Consumer Price Index",
 }
 
 # Currency → country code mapping for Finnhub
@@ -98,7 +112,9 @@ class EconomicCalendarGate:
         return self._client
 
     async def is_blackout(
-        self, epic: str, now: datetime | None = None,
+        self,
+        epic: str,
+        now: datetime | None = None,
     ) -> tuple[bool, str]:
         """
         Check if epic is in economic event blackout window.
@@ -196,22 +212,28 @@ class EconomicCalendarGate:
                 event_time = None
                 if time_str:
                     try:
-                        event_time = datetime.fromisoformat(
-                            time_str.replace("Z", "+00:00")
-                        )
+                        event_time = datetime.fromisoformat(time_str.replace("Z", "+00:00"))
                     except ValueError:
                         pass
 
-                events.append(CalendarEvent(
-                    event=raw.get("event", ""),
-                    country=raw.get("country", ""),
-                    currency=raw.get("currency", ""),
-                    impact=raw.get("impact", "low"),
-                    event_time=event_time,
-                    actual=str(raw.get("actual", "")) if raw.get("actual") is not None else None,
-                    forecast=str(raw.get("estimate", "")) if raw.get("estimate") is not None else None,
-                    previous=str(raw.get("prev", "")) if raw.get("prev") is not None else None,
-                ))
+                events.append(
+                    CalendarEvent(
+                        event=raw.get("event", ""),
+                        country=raw.get("country", ""),
+                        currency=raw.get("currency", ""),
+                        impact=raw.get("impact", "low"),
+                        event_time=event_time,
+                        actual=(
+                            str(raw.get("actual", "")) if raw.get("actual") is not None else None
+                        ),
+                        forecast=(
+                            str(raw.get("estimate", ""))
+                            if raw.get("estimate") is not None
+                            else None
+                        ),
+                        previous=str(raw.get("prev", "")) if raw.get("prev") is not None else None,
+                    )
+                )
             except Exception:
                 pass  # Skip malformed events
 
@@ -235,8 +257,7 @@ class EconomicCalendarGate:
             if currency == "USD_MAJOR":
                 # Only Fed Rate + CPI for crypto
                 if event_country == "US" and any(
-                    kw.lower() in event.event.lower()
-                    for kw in USD_MAJOR_EVENTS
+                    kw.lower() in event.event.lower() for kw in USD_MAJOR_EVENTS
                 ):
                     return True
             else:

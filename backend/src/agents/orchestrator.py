@@ -98,9 +98,7 @@ class MantisAgentOrchestrator:
         self.drl_enabled = drl_enabled
         # DRL ensemble agent: start with an empty ensemble (agents are loaded/trained separately)
         self.drl_agent = (
-            MantisDRLEnsembleAgent(ensemble=MantisDRLEnsemble(agents={}))
-            if drl_enabled
-            else None
+            MantisDRLEnsembleAgent(ensemble=MantisDRLEnsemble(agents={})) if drl_enabled else None
         )
 
     # ------------------------------------------------------------------
@@ -122,19 +120,13 @@ class MantisAgentOrchestrator:
         audit_trail: list[dict] = []
 
         # Step 1: Technical Analysis
-        technical = await self._safe_analyze(
-            self.technical, context, audit_trail, "technical"
-        )
+        technical = await self._safe_analyze(self.technical, context, audit_trail, "technical")
 
         # Step 2: Sentiment Analysis
-        sentiment = await self._safe_analyze(
-            self.sentiment, context, audit_trail, "sentiment"
-        )
+        sentiment = await self._safe_analyze(self.sentiment, context, audit_trail, "sentiment")
 
         # Step 3: Risk Assessment
-        risk_report = await self._safe_analyze(
-            self.risk, context, audit_trail, "risk"
-        )
+        risk_report = await self._safe_analyze(self.risk, context, audit_trail, "risk")
 
         # Step 3b: Vision + RAG (optional)
         if self.vision_enabled and self.vision_agent is not None:
@@ -142,17 +134,31 @@ class MantisAgentOrchestrator:
                 vision_signal = await self.vision_agent.analyze(context)
                 # Inject vision data into context for downstream agents
                 context.vision_data = {
-                    "trend": vision_signal.vision_report.trend_direction if vision_signal.vision_report else "NEUTRAL",
+                    "trend": (
+                        vision_signal.vision_report.trend_direction
+                        if vision_signal.vision_report
+                        else "NEUTRAL"
+                    ),
                     "confidence": vision_signal.chart_confidence,
-                    "patterns": vision_signal.vision_report.key_patterns if vision_signal.vision_report else [],
-                    "insight": vision_signal.vision_report.actionable_insight if vision_signal.vision_report else "",
+                    "patterns": (
+                        vision_signal.vision_report.key_patterns
+                        if vision_signal.vision_report
+                        else []
+                    ),
+                    "insight": (
+                        vision_signal.vision_report.actionable_insight
+                        if vision_signal.vision_report
+                        else ""
+                    ),
                 }
                 context.rag_context = vision_signal.rag_context_summary
-                audit_trail.append({
-                    "agent": "vision",
-                    "status": "success",
-                    "summary": f"{vision_signal.vision_report.trend_direction if vision_signal.vision_report else 'N/A'} (conf={vision_signal.chart_confidence:.2f})",
-                })
+                audit_trail.append(
+                    {
+                        "agent": "vision",
+                        "status": "success",
+                        "summary": f"{vision_signal.vision_report.trend_direction if vision_signal.vision_report else 'N/A'} (conf={vision_signal.chart_confidence:.2f})",
+                    }
+                )
             except Exception as e:
                 logger.warning(f"Vision agent failed: {e!r}")
                 audit_trail.append({"agent": "vision", "status": "error", "error": str(e)})
@@ -168,26 +174,30 @@ class MantisAgentOrchestrator:
                     "voting_mode": drl_signal.voting_mode,
                     "contributing_agents": drl_signal.contributing_agents,
                 }
-                audit_trail.append({
-                    "agent": "drl",
-                    "status": "success",
-                    "summary": (
-                        f"action={drl_signal.action} "
-                        f"(conf={drl_signal.confidence:.2f}, "
-                        f"mode={drl_signal.voting_mode})"
-                    ),
-                })
+                audit_trail.append(
+                    {
+                        "agent": "drl",
+                        "status": "success",
+                        "summary": (
+                            f"action={drl_signal.action} "
+                            f"(conf={drl_signal.confidence:.2f}, "
+                            f"mode={drl_signal.voting_mode})"
+                        ),
+                    }
+                )
             except Exception as e:
                 logger.warning(f"DRL ensemble agent failed: {e!r}")
                 audit_trail.append({"agent": "drl", "status": "error", "error": str(e)})
 
         # Step 4: Trade Proposal
         proposal = self.trader.propose(technical, sentiment, risk_report, context)
-        audit_trail.append({
-            "agent": "trader",
-            "action": proposal.action,
-            "confidence": proposal.confidence,
-        })
+        audit_trail.append(
+            {
+                "agent": "trader",
+                "action": proposal.action,
+                "confidence": proposal.confidence,
+            }
+        )
 
         # Step 5: Debate (optional)
         debate_summary = None
@@ -196,11 +206,13 @@ class MantisAgentOrchestrator:
                 debate_summary = await self.debate.debate(
                     proposal, technical, sentiment, risk_report
                 )
-                audit_trail.append({
-                    "agent": "debate",
-                    "consensus": debate_summary.consensus,
-                    "confidence": debate_summary.consensus_confidence,
-                })
+                audit_trail.append(
+                    {
+                        "agent": "debate",
+                        "consensus": debate_summary.consensus,
+                        "confidence": debate_summary.consensus_confidence,
+                    }
+                )
             except Exception as e:
                 logger.warning(f"Debate failed: {e!r}")
                 audit_trail.append({"agent": "debate", "error": str(e)})
@@ -221,21 +233,25 @@ class MantisAgentOrchestrator:
         try:
             result = await agent.analyze(context)
             if result:
-                audit_trail.append({
-                    "agent": name,
-                    "status": "success",
-                    "summary": self._summarize(result, name),
-                })
+                audit_trail.append(
+                    {
+                        "agent": name,
+                        "status": "success",
+                        "summary": self._summarize(result, name),
+                    }
+                )
             else:
                 audit_trail.append({"agent": name, "status": "no_result"})
             return result
         except Exception as e:
             logger.warning(f"[{name}] Agent failed: {e!r}")
-            audit_trail.append({
-                "agent": name,
-                "status": "error",
-                "error": str(e),
-            })
+            audit_trail.append(
+                {
+                    "agent": name,
+                    "status": "error",
+                    "error": str(e),
+                }
+            )
             return None
 
     def _summarize(self, result, name: str) -> str:

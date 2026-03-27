@@ -15,9 +15,7 @@ class TradeJournalNoteRepository(BaseRepository[TradeJournalNote]):
     def __init__(self, session: AsyncSession):
         super().__init__(TradeJournalNote, session)
 
-    async def get_by_signal(
-        self, epic: str, signal_timestamp: str
-    ) -> TradeJournalNote | None:
+    async def get_by_signal(self, epic: str, signal_timestamp: str) -> TradeJournalNote | None:
         """Get note for a specific signal."""
         result = await self.session.execute(
             select(TradeJournalNote)
@@ -26,9 +24,7 @@ class TradeJournalNoteRepository(BaseRepository[TradeJournalNote]):
         )
         return result.scalar_one_or_none()
 
-    async def upsert_note(
-        self, epic: str, signal_timestamp: str, notes: str
-    ) -> TradeJournalNote:
+    async def upsert_note(self, epic: str, signal_timestamp: str, notes: str) -> TradeJournalNote:
         """Create or update a note for a signal."""
         existing = await self.get_by_signal(epic, signal_timestamp)
         if existing:
@@ -36,9 +32,7 @@ class TradeJournalNoteRepository(BaseRepository[TradeJournalNote]):
             await self.session.flush()
             await self.session.refresh(existing)
             return existing
-        note = TradeJournalNote(
-            epic=epic, signal_timestamp=signal_timestamp, notes=notes
-        )
+        note = TradeJournalNote(epic=epic, signal_timestamp=signal_timestamp, notes=notes)
         return await self.create(note)
 
     async def delete_note(self, epic: str, signal_timestamp: str) -> bool:

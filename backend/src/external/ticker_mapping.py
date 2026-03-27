@@ -106,4 +106,6 @@ def get_news_query(epic: str) -> str | None:
 
 def get_all_news_queries() -> dict[str, str]:
     """Get news queries for all tradable assets."""
-    return {epic: EPIC_TO_NEWS_QUERY[epic] for epic in TRADABLE_ASSETS if epic in EPIC_TO_NEWS_QUERY}
+    return {
+        epic: EPIC_TO_NEWS_QUERY[epic] for epic in TRADABLE_ASSETS if epic in EPIC_TO_NEWS_QUERY
+    }

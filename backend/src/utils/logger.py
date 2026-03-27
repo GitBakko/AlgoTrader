@@ -43,8 +43,7 @@ def setup_logger() -> None:
         log_dir / "algotrader_{time:YYYY-MM-DD}.log",
         level="DEBUG",  # Always log DEBUG to file
         format=(
-            "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | "
-            "{name}:{function}:{line} | {message}"
+            "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | " "{name}:{function}:{line} | {message}"
         ),
         rotation="00:00",  # Rotate at midnight
         retention="30 days",  # Keep logs for 30 days

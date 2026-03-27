@@ -1,5 +1,6 @@
 # MANTIS-EVOLUTION: DRL Base Agent ABC
 """Abstract base class for all DRL agents in the ensemble."""
+
 from __future__ import annotations
 
 import json
@@ -16,6 +17,7 @@ from src.drl.schemas import DRLConfig, PerformanceMetrics, PerformanceSnapshot, 
 try:
     import gymnasium as gym  # noqa: F401
     from stable_baselines3.common.base_class import BaseAlgorithm  # noqa: F401
+
     HAS_SB3 = True
 except ImportError:
     HAS_SB3 = False

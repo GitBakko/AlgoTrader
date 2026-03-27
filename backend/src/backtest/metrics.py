@@ -105,8 +105,7 @@ class MetricsCalculator:
         # Sharpe Ratio = mean(daily_returns) / std(daily_returns) * sqrt(252)
         if len(daily_returns) > 0 and np.std(daily_returns) > 0:
             metrics["sharpe_ratio"] = float(
-                np.mean(daily_returns) / np.std(daily_returns)
-                * math.sqrt(mc.TRADING_DAYS_PER_YEAR)
+                np.mean(daily_returns) / np.std(daily_returns) * math.sqrt(mc.TRADING_DAYS_PER_YEAR)
             )
         else:
             metrics["sharpe_ratio"] = 0.0
@@ -115,26 +114,20 @@ class MetricsCalculator:
         if len(daily_returns) > 0:
             downside = daily_returns[daily_returns < 0]
             if len(downside) > 0:
-                downside_std = float(
-                    np.std(downside) * math.sqrt(mc.TRADING_DAYS_PER_YEAR)
-                )
+                downside_std = float(np.std(downside) * math.sqrt(mc.TRADING_DAYS_PER_YEAR))
                 if downside_std > 0:
                     ann_mean = float(np.mean(daily_returns)) * mc.TRADING_DAYS_PER_YEAR
                     metrics["sortino_ratio"] = float(ann_mean / downside_std)
                 else:
                     metrics["sortino_ratio"] = 0.0
             else:
-                metrics["sortino_ratio"] = (
-                    float("inf") if metrics["total_return"] > 0 else 0.0
-                )
+                metrics["sortino_ratio"] = float("inf") if metrics["total_return"] > 0 else 0.0
         else:
             metrics["sortino_ratio"] = 0.0
 
         # Calmar Ratio (annualized return / max drawdown)
         if metrics["max_drawdown"] > 0:
-            metrics["calmar_ratio"] = float(
-                metrics["annualized_return"] / metrics["max_drawdown"]
-            )
+            metrics["calmar_ratio"] = float(metrics["annualized_return"] / metrics["max_drawdown"])
         else:
             metrics["calmar_ratio"] = float("inf") if metrics["annualized_return"] > 0 else 0.0
 

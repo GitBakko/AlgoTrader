@@ -51,15 +51,11 @@ class ModelEvaluator:
             "precision_macro": float(
                 precision_score(y_true, y_pred, average="macro", zero_division=0)
             ),
-            "recall_macro": float(
-                recall_score(y_true, y_pred, average="macro", zero_division=0)
-            ),
+            "recall_macro": float(recall_score(y_true, y_pred, average="macro", zero_division=0)),
         }
 
         # Per-class F1
-        f1_per_class = f1_score(
-            y_true, y_pred, average=None, labels=labels, zero_division=0
-        )
+        f1_per_class = f1_score(y_true, y_pred, average=None, labels=labels, zero_division=0)
         for i, f1 in enumerate(f1_per_class):
             metrics[f"f1_{target_names[i]}"] = float(f1)
 
@@ -69,8 +65,12 @@ class ModelEvaluator:
 
         # Classification report (as dict)
         report = classification_report(
-            y_true, y_pred, labels=labels, target_names=target_names,
-            output_dict=True, zero_division=0,
+            y_true,
+            y_pred,
+            labels=labels,
+            target_names=target_names,
+            output_dict=True,
+            zero_division=0,
         )
         metrics["classification_report"] = report
 
@@ -79,9 +79,7 @@ class ModelEvaluator:
             from sklearn.metrics import log_loss
 
             try:
-                metrics["log_loss"] = float(
-                    log_loss(y_true, y_proba, labels=labels)
-                )
+                metrics["log_loss"] = float(log_loss(y_true, y_proba, labels=labels))
             except ValueError as e:
                 logger.warning(f"Log loss computation failed: {e}")
 

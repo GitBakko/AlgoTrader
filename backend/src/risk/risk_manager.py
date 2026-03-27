@@ -229,7 +229,9 @@ class RiskManager:
         audit["stop_loss"] = {
             "dynamic_multiplier": round(stop_mult, 4),
             "base_multiplier": base_sl,
-            "baseline_atr": round(baseline_atr, 5) if isinstance(baseline_atr, (int, float)) else None,
+            "baseline_atr": (
+                round(baseline_atr, 5) if isinstance(baseline_atr, (int, float)) else None
+            ),
             "stop_loss": round(stop_loss, 5),
             "take_profit": round(take_profit, 5),
         }
@@ -286,18 +288,14 @@ class RiskManager:
             "multiplier": conf_mult,
         }
         if conf_mult < 1.0:
-            adjustments.append(
-                f"Confidence tier: {conf_mult:.0%} (conf={signal.confidence:.2f})"
-            )
+            adjustments.append(f"Confidence tier: {conf_mult:.0%} (conf={signal.confidence:.2f})")
             position_size *= conf_mult
 
         # 7. Apply equity curve filter
         eq_multiplier = self.equity_curve_filter.get_size_multiplier()
         if eq_multiplier < 1.0:
             position_size *= eq_multiplier
-            adjustments.append(
-                f"Equity curve filter: size reduced {eq_multiplier:.0%}"
-            )
+            adjustments.append(f"Equity curve filter: size reduced {eq_multiplier:.0%}")
 
         audit["sizing"] = {
             "method": sizing_method,
@@ -315,8 +313,8 @@ class RiskManager:
         # 8. Calculate multi-target TP1/TP2
         risk_distance = abs(signal.entry_price - stop_loss)
         if signal.direction.value == "BUY":
-            tp1 = signal.entry_price + risk_distance * 1.0   # 1:1 R:R
-            tp2 = signal.entry_price + risk_distance * 2.0   # 2:1 R:R
+            tp1 = signal.entry_price + risk_distance * 1.0  # 1:1 R:R
+            tp2 = signal.entry_price + risk_distance * 2.0  # 2:1 R:R
         else:
             tp1 = signal.entry_price - risk_distance * 1.0
             tp2 = signal.entry_price - risk_distance * 2.0

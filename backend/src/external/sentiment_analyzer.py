@@ -82,14 +82,10 @@ class SentimentAnalyzer:
             try:
                 logger.info(f"Loading FinBERT model: {self.model_name}")
                 self._tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-                self._model = AutoModelForSequenceClassification.from_pretrained(
-                    self.model_name
-                )
+                self._model = AutoModelForSequenceClassification.from_pretrained(self.model_name)
                 self._model.to(self.device)
                 self._model.eval()  # Inference mode
-                logger.success(
-                    f"FinBERT model loaded successfully (device={self.device})"
-                )
+                logger.success(f"FinBERT model loaded successfully (device={self.device})")
             except Exception as e:
                 logger.error(f"Failed to load FinBERT model: {e}")
                 self._model = None
@@ -136,9 +132,7 @@ class SentimentAnalyzer:
         # LRU eviction if cache too large
         if len(self._cache) > self.MAX_CACHE_SIZE:
             # Remove oldest entry
-            oldest_key = min(
-                self._cache.keys(), key=lambda k: self._cache[k][0]
-            )
+            oldest_key = min(self._cache.keys(), key=lambda k: self._cache[k][0])
             del self._cache[oldest_key]
             logger.debug(f"Cache evicted oldest entry (size={len(self._cache)})")
 
@@ -218,9 +212,7 @@ class SentimentAnalyzer:
                 sentiments = sentiments.cpu().numpy()
 
             # Cache and collect results
-            for i, (text_idx, sentiment) in enumerate(
-                zip(uncached_indices, sentiments)
-            ):
+            for i, (text_idx, sentiment) in enumerate(zip(uncached_indices, sentiments)):
                 score = float(sentiment)
                 self._cache_put(uncached_texts[i], score)
                 results.append((text_idx, score))
@@ -228,9 +220,7 @@ class SentimentAnalyzer:
         except Exception as e:
             logger.error(f"FinBERT inference failed: {e}, using VADER fallback")
             vader_scores = self.predict_vader(uncached_texts)
-            for i, (text_idx, vader_score) in enumerate(
-                zip(uncached_indices, vader_scores)
-            ):
+            for i, (text_idx, vader_score) in enumerate(zip(uncached_indices, vader_scores)):
                 results.append((text_idx, vader_score))
 
         # Sort results by original index

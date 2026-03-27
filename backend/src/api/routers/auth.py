@@ -99,6 +99,7 @@ async def login(
 
     # Get role permissions
     from src.auth.models import role_permissions, Permission
+
     stmt_perms = (
         select(Permission)
         .join(role_permissions, role_permissions.c.permission_id == Permission.id)
@@ -251,6 +252,7 @@ async def get_current_user_profile(
 
     # Get role permissions (same as login endpoint)
     from src.auth.models import role_permissions, Permission
+
     stmt_perms = (
         select(Permission)
         .join(role_permissions, role_permissions.c.permission_id == Permission.id)
@@ -506,16 +508,12 @@ async def get_avatar(
     user = result.scalar_one_or_none()
 
     if not user or not user.avatar_storage_path:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Avatar non trovato"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Avatar non trovato")
 
     # Get file path
     file_path = get_avatar_file_path(user_id, user.avatar_storage_path)
     if not file_path:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="File avatar non trovato"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File avatar non trovato")
 
     # Return file with caching headers (24h cache)
     return FileResponse(

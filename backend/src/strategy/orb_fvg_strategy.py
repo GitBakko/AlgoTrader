@@ -57,6 +57,7 @@ def _nyse_utc_minutes(date: datetime, local_time: time) -> int:
     utc_dt = et_dt.astimezone(timezone.utc)
     return utc_dt.hour * 60 + utc_dt.minute
 
+
 # Minimum ORB range as fraction of mid-price
 MIN_ORB_RANGE_PCT = 0.001  # 0.1%
 
@@ -72,11 +73,11 @@ class FVGSignal:
     """Result of FVG detection + ORB breakout confirmation."""
 
     direction: SignalDirection
-    fvg_type: str           # "bullish" or "bearish"
-    entry_price: float      # C4.open (filled by process_session)
+    fvg_type: str  # "bullish" or "bearish"
+    entry_price: float  # C4.open (filled by process_session)
     stop_loss: float
     take_profit: float
-    c2_bar: dict            # the breakout candle
+    c2_bar: dict  # the breakout candle
 
 
 # ---------------------------------------------------------------------------
@@ -187,7 +188,9 @@ def process_session(bars: list[dict]) -> FVGSignal | None:
     if mid_price > 0 and orb_range / mid_price < MIN_ORB_RANGE_PCT:
         logger.debug(
             "ORB: range too tight ({:.5f} / {:.2f} = {:.4%})",
-            orb_range, mid_price, orb_range / mid_price,
+            orb_range,
+            mid_price,
+            orb_range / mid_price,
         )
         return None
 
@@ -297,6 +300,7 @@ class OrbFvgStrategy(BaseStrategy):
 
         try:
             import xgboost as xgb
+
             self._ml_model = xgb.XGBClassifier()
             self._ml_model.load_model(str(model_path))
             logger.info(f"ORB+FVG: loaded ML filter from {model_path}")
@@ -309,9 +313,7 @@ class OrbFvgStrategy(BaseStrategy):
             self._sessions[epic] = _SessionState()
         return self._sessions[epic]
 
-    def _apply_ml_filter(
-        self, fvg: FVGSignal, day_bars: list[dict]
-    ) -> float | None:
+    def _apply_ml_filter(self, fvg: FVGSignal, day_bars: list[dict]) -> float | None:
         """
         Run ML filter on an FVG signal. Returns predicted probability
         of win, or None if no model loaded.
@@ -395,9 +397,7 @@ class OrbFvgStrategy(BaseStrategy):
                     f"(prob={ml_prob:.3f} < {self._ml_threshold})"
                 )
                 return hold
-            logger.info(
-                f"ORB+FVG [{epic}]: ML filter approves (prob={ml_prob:.3f})"
-            )
+            logger.info(f"ORB+FVG [{epic}]: ML filter approves (prob={ml_prob:.3f})")
 
         # Mark as traded for today
         sess.traded_today = True

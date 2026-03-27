@@ -4,6 +4,7 @@ Trade Logger - Structured logging for signals, executions, and risk decisions.
 Logs all trading activity to PostgreSQL for analysis without stopping the backend.
 Gracefully degrades to file logging if PostgreSQL unavailable.
 """
+
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
@@ -19,6 +20,7 @@ from ..database.session import DatabaseManager
 
 class SignalType(str, Enum):
     """Signal direction types."""
+
     LONG = "LONG"
     SHORT = "SHORT"
     HOLD = "HOLD"
@@ -26,6 +28,7 @@ class SignalType(str, Enum):
 
 class ExecutionStatus(str, Enum):
     """Trade execution status."""
+
     EXECUTED = "executed"
     REJECTED = "rejected"
     EXEC_FAILED = "exec_failed"
@@ -35,6 +38,7 @@ class ExecutionStatus(str, Enum):
 
 class RiskEventType(str, Enum):
     """Risk management event types."""
+
     CIRCUIT_BREAKER = "circuit_breaker"
     POSITION_LIMIT = "position_limit"
     DRAWDOWN_LIMIT = "drawdown_limit"
@@ -50,8 +54,11 @@ class RiskEventType(str, Enum):
 
 class SignalLog(BaseModel):
     """Signal generation log entry."""
+
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    source: str = Field(default="unknown", description="Origin: paper_trading, demo_trading, live_trading, api_test")
+    source: str = Field(
+        default="unknown", description="Origin: paper_trading, demo_trading, live_trading, api_test"
+    )
     epic: str
     direction: SignalType
     confidence: float = Field(ge=0.0, le=1.0)
@@ -63,39 +70,43 @@ class SignalLog(BaseModel):
     # ML model details
     model_version: str | None = None
     model_proba: dict[str, float] | None = Field(
-        default=None,
-        description="Class probabilities {LONG: 0.4, SHORT: 0.3, HOLD: 0.3}"
+        default=None, description="Class probabilities {LONG: 0.4, SHORT: 0.3, HOLD: 0.3}"
     )
 
     # Execution outcome (filled after trade attempt)
     execution_status: ExecutionStatus | None = None
     rejection_reason: str | None = None
 
-    model_config = ConfigDict(json_schema_extra={
-        "example": {
-            "timestamp": "2026-02-14T10:30:00Z",
-            "epic": "XAUUSD",
-            "direction": "LONG",
-            "confidence": 0.72,
-            "strategy": "ml_strategy",
-            "features": {
-                "rsi_14": 45.2,
-                "macd_signal": 0.8,
-                "bb_position": 0.3,
-                "regime": "trending"
-            },
-            "model_version": "xgb_v1.2.0",
-            "model_proba": {"LONG": 0.72, "SHORT": 0.15, "HOLD": 0.13},
-            "execution_status": "executed",
-            "rejection_reason": None
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "timestamp": "2026-02-14T10:30:00Z",
+                "epic": "XAUUSD",
+                "direction": "LONG",
+                "confidence": 0.72,
+                "strategy": "ml_strategy",
+                "features": {
+                    "rsi_14": 45.2,
+                    "macd_signal": 0.8,
+                    "bb_position": 0.3,
+                    "regime": "trending",
+                },
+                "model_version": "xgb_v1.2.0",
+                "model_proba": {"LONG": 0.72, "SHORT": 0.15, "HOLD": 0.13},
+                "execution_status": "executed",
+                "rejection_reason": None,
+            }
         }
-    })
+    )
 
 
 class ExecutionLog(BaseModel):
     """Trade execution log entry."""
+
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    source: str = Field(default="unknown", description="Origin: paper_trading, demo_trading, live_trading, api_test")
+    source: str = Field(
+        default="unknown", description="Origin: paper_trading, demo_trading, live_trading, api_test"
+    )
     deal_id: str | None = None
     epic: str
     direction: str  # "BUY" or "SELL"
@@ -118,32 +129,37 @@ class ExecutionLog(BaseModel):
     exit_timestamp: datetime | None = None
     realized_pnl: float | None = None
 
-    model_config = ConfigDict(json_schema_extra={
-        "example": {
-            "timestamp": "2026-02-14T10:30:05Z",
-            "deal_id": "DEAL123456",
-            "epic": "XAUUSD",
-            "direction": "BUY",
-            "size": 0.5,
-            "entry_price": 2050.25,
-            "stop_loss": 2045.00,
-            "take_profit": 2060.00,
-            "status": "executed",
-            "error_message": None,
-            "kelly_fraction": 0.15,
-            "risk_pct": 2.0,
-            "equity_at_entry": 10000.0,
-            "exit_price": None,
-            "exit_timestamp": None,
-            "realized_pnl": None
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "timestamp": "2026-02-14T10:30:05Z",
+                "deal_id": "DEAL123456",
+                "epic": "XAUUSD",
+                "direction": "BUY",
+                "size": 0.5,
+                "entry_price": 2050.25,
+                "stop_loss": 2045.00,
+                "take_profit": 2060.00,
+                "status": "executed",
+                "error_message": None,
+                "kelly_fraction": 0.15,
+                "risk_pct": 2.0,
+                "equity_at_entry": 10000.0,
+                "exit_price": None,
+                "exit_timestamp": None,
+                "realized_pnl": None,
+            }
         }
-    })
+    )
 
 
 class RiskEventLog(BaseModel):
     """Risk management decision log."""
+
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    source: str = Field(default="unknown", description="Origin: paper_trading, demo_trading, live_trading, api_test")
+    source: str = Field(
+        default="unknown", description="Origin: paper_trading, demo_trading, live_trading, api_test"
+    )
     event_type: RiskEventType
     epic: str | None = None
     description: str
@@ -157,23 +173,27 @@ class RiskEventLog(BaseModel):
     consecutive_losses: int | None = None
 
     # Action taken
-    action: str = Field(description="Action taken (e.g., 'rejected_trade', 'halved_size', 'stopped_trading')")
+    action: str = Field(
+        description="Action taken (e.g., 'rejected_trade', 'halved_size', 'stopped_trading')"
+    )
 
-    model_config = ConfigDict(json_schema_extra={
-        "example": {
-            "timestamp": "2026-02-14T10:30:10Z",
-            "event_type": "circuit_breaker",
-            "epic": "BTCUSD",
-            "description": "Daily loss limit exceeded (-5.2%)",
-            "current_equity": 9480.0,
-            "peak_equity": 10000.0,
-            "current_drawdown_pct": 5.2,
-            "daily_pnl": -520.0,
-            "open_positions": 2,
-            "consecutive_losses": 4,
-            "action": "stopped_trading"
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "timestamp": "2026-02-14T10:30:10Z",
+                "event_type": "circuit_breaker",
+                "epic": "BTCUSD",
+                "description": "Daily loss limit exceeded (-5.2%)",
+                "current_equity": 9480.0,
+                "peak_equity": 10000.0,
+                "current_drawdown_pct": 5.2,
+                "daily_pnl": -520.0,
+                "open_positions": 2,
+                "consecutive_losses": 4,
+                "action": "stopped_trading",
+            }
         }
-    })
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -311,6 +331,7 @@ class TradeLogger:
             try:
                 from src.monitoring.alerting.alert_manager import get_alert_manager
                 from src.utils.config import get_settings
+
                 if getattr(get_settings(), "alerts_enabled", False):
                     am = get_alert_manager()
                     await am.alert_trade_opened(
@@ -370,15 +391,14 @@ class TradeLogger:
         )
 
         await self._write_log("risk_event_log", risk_event)
-        logger.warning(
-            f"[RISK] {event_type.value} - {description} → {action}"
-        )
+        logger.warning(f"[RISK] {event_type.value} - {description} → {action}")
 
         # Fire alert for circuit breaker events
         if event_type == RiskEventType.CIRCUIT_BREAKER:
             try:
                 from src.monitoring.alerting.alert_manager import get_alert_manager
                 from src.utils.config import get_settings
+
                 if getattr(get_settings(), "alerts_enabled", False):
                     am = get_alert_manager()
                     await am.alert_circuit_breaker(
@@ -390,9 +410,7 @@ class TradeLogger:
                 logger.debug(f"Circuit breaker alert failed (non-critical): {alert_err}")
 
     async def _write_log(
-        self,
-        table_name: str,
-        log_entry: SignalLog | ExecutionLog | RiskEventLog
+        self, table_name: str, log_entry: SignalLog | ExecutionLog | RiskEventLog
     ) -> None:
         """
         Write log entry to PostgreSQL or fallback to JSON file.
@@ -430,9 +448,7 @@ class TradeLogger:
             await self._write_to_file(table_name, log_entry)
 
     async def _write_to_file(
-        self,
-        table_name: str,
-        log_entry: SignalLog | ExecutionLog | RiskEventLog
+        self, table_name: str, log_entry: SignalLog | ExecutionLog | RiskEventLog
     ) -> None:
         """
         Write log entry to JSONL file (fallback).

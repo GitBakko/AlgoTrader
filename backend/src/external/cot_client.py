@@ -18,17 +18,17 @@ from src.utils.config import get_settings
 # MANTIS epic → CFTC contract code for Nasdaq Data Link
 # Format: CFTC/{code}_FO_L_ALL for Futures-Only, Legacy, All
 EPIC_TO_CONTRACT: dict[str, str] = {
-    "XAUUSD": "088691",     # Gold - COMEX
-    "XAGUSD": "084691",     # Silver - COMEX
-    "WTIUSD": "067651",     # Crude Oil - NYMEX
-    "EURUSD": "099741",     # Euro FX - CME
-    "GBPUSD": "096742",     # British Pound - CME
-    "USDJPY": "097741",     # Japanese Yen - CME
-    "BTCUSD": "133741",     # Bitcoin - CME
-    "US500": "13874A",      # E-mini S&P 500 - CME
-    "NAS100": "209742",     # E-mini Nasdaq 100 - CME
-    "NATGAS": "023651",     # Natural Gas - NYMEX
-    "COPPER": "085692",     # Copper - COMEX
+    "XAUUSD": "088691",  # Gold - COMEX
+    "XAGUSD": "084691",  # Silver - COMEX
+    "WTIUSD": "067651",  # Crude Oil - NYMEX
+    "EURUSD": "099741",  # Euro FX - CME
+    "GBPUSD": "096742",  # British Pound - CME
+    "USDJPY": "097741",  # Japanese Yen - CME
+    "BTCUSD": "133741",  # Bitcoin - CME
+    "US500": "13874A",  # E-mini S&P 500 - CME
+    "NAS100": "209742",  # E-mini Nasdaq 100 - CME
+    "NATGAS": "023651",  # Natural Gas - NYMEX
+    "COPPER": "085692",  # Copper - COMEX
 }
 
 # Column indices in Nasdaq Data Link CFTC dataset
@@ -98,9 +98,7 @@ class COTClient(SILBaseClient):
             logger.warning(f"[COTClient] Fetch failed for {epic}: {e}")
             return COTData()
 
-    def _parse_rows(
-        self, rows: list[list], epic: str, cache_key: str
-    ) -> COTData:
+    def _parse_rows(self, rows: list[list], epic: str, cache_key: str) -> COTData:
         """Parse COT data rows into COTData with z-score."""
         # Latest row: [date, noncomm_long, noncomm_short]
         latest = rows[0]
@@ -159,7 +157,7 @@ class COTClient(SILBaseClient):
         variance = sum((v - mean) ** 2 for v in values) / len(values)
         if variance <= 0:
             return 0.0
-        std = variance ** 0.5
+        std = variance**0.5
         return (current - mean) / std
 
     @staticmethod

@@ -10,7 +10,6 @@ Provides two mechanisms:
 import numpy as np
 from loguru import logger
 
-
 # Features to always exclude (known problematic)
 EXCLUDE_FEATURES = {
     # Regime one-hot: perfectly collinear (3 binary = 2 are redundant)
@@ -59,7 +58,7 @@ def select_top_features(
             f"(dropped {dropped} low-importance)"
         )
         # Log bottom 10 dropped
-        bottom = sorted_features[max_features:max_features + 10]
+        bottom = sorted_features[max_features : max_features + 10]
         for name, imp in bottom:
             logger.debug(f"  Dropped: {name} (importance={imp:.6f})")
 

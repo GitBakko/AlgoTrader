@@ -74,6 +74,7 @@ export class DefaultHeaderComponent extends HeaderComponent {
     }, 0);
   });
   readonly openPositionCount = computed(() => this.#trading.paperPositions().length);
+  readonly dailyPnl = computed(() => this.#trading.overview()?.today_realized_pnl ?? null);
 
   readonly colorModes = [
     { name: 'light', text: 'Light', icon: 'cilSun' },
@@ -89,6 +90,11 @@ export class DefaultHeaderComponent extends HeaderComponent {
   constructor() {
     super();
     this.#notifCenter.init();
+
+    // Load overview immediately + refresh every 60s for daily P&L
+    this.#trading.loadOverview();
+    const interval = setInterval(() => this.#trading.loadOverview(), 60_000);
+    this.#destroyRef.onDestroy(() => clearInterval(interval));
   }
 
   sidebarId = input('sidebar1');

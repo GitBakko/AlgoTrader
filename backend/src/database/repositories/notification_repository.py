@@ -74,16 +74,16 @@ class NotificationRepository:
     async def get_unread_count(self) -> int:
         """Get count of unread notifications."""
         result = await self.session.execute(
-            select(func.count()).select_from(Notification).where(Notification.is_read == False)  # noqa: E712
+            select(func.count())
+            .select_from(Notification)
+            .where(Notification.is_read == False)  # noqa: E712
         )
         return result.scalar() or 0
 
     async def mark_as_read(self, notification_id: int) -> bool:
         """Mark a single notification as read. Returns True if found."""
         result = await self.session.execute(
-            update(Notification)
-            .where(Notification.id == notification_id)
-            .values(is_read=True)
+            update(Notification).where(Notification.id == notification_id).values(is_read=True)
         )
         return result.rowcount > 0
 

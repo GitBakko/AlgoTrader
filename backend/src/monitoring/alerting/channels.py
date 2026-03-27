@@ -111,7 +111,9 @@ class EmailChannel(AlertChannel):
 class SlackChannel(AlertChannel):
     """Slack alert channel using Incoming Webhooks."""
 
-    def __init__(self, webhook_url: str, username: str = "MANTIS AI", icon_emoji: str = ":robot_face:"):
+    def __init__(
+        self, webhook_url: str, username: str = "MANTIS AI", icon_emoji: str = ":robot_face:"
+    ):
         """
         Initialize Slack channel.
 

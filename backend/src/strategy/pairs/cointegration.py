@@ -83,7 +83,7 @@ class CointegrationAnalyzer:
 
         # Standard error of gamma
         residuals = dy - x_mat @ coeffs
-        sse = np.sum(residuals ** 2)
+        sse = np.sum(residuals**2)
         mse = sse / (n_dy - len(coeffs))
 
         try:
@@ -224,7 +224,7 @@ class CointegrationAnalyzer:
 
         # Vectorized rolling mean/std via cumsum trick
         cumsum = np.cumsum(spread)
-        cumsum2 = np.cumsum(spread ** 2)
+        cumsum2 = np.cumsum(spread**2)
 
         # Prepend 0 for correct window sums
         cumsum = np.concatenate([[0.0], cumsum])
@@ -265,8 +265,8 @@ class CointegrationAnalyzer:
         ratios = np.full(n, np.nan)
 
         for i in range(window - 1, n):
-            a_win = prices_a[i - window + 1: i + 1]
-            b_win = prices_b[i - window + 1: i + 1]
+            a_win = prices_a[i - window + 1 : i + 1]
+            b_win = prices_b[i - window + 1 : i + 1]
 
             x_mat = np.column_stack([np.ones(window), b_win])
             try:

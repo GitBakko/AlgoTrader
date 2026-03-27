@@ -98,7 +98,9 @@ class SqueezeBreakoutStrategy(BaseStrategy):
         has_volume = vol_ratio >= self.volume_confirm if vol_ratio > 0 else True
 
         if not has_volume:
-            logger.debug(f"{epic}: Squeeze release but volume ratio {vol_ratio:.2f} < {self.volume_confirm}")
+            logger.debug(
+                f"{epic}: Squeeze release but volume ratio {vol_ratio:.2f} < {self.volume_confirm}"
+            )
             return hold
 
         # MACD momentum trend (check last N bars trending same direction)
@@ -179,6 +181,7 @@ class SqueezeBreakoutStrategy(BaseStrategy):
         # Compute squeeze duration
         squeeze_vals = df["squeeze_on"].to_numpy()
         import numpy as np
+
         duration = np.zeros(len(squeeze_vals), dtype=np.int32)
         count = 0
         for i in range(len(squeeze_vals)):
@@ -191,15 +194,12 @@ class SqueezeBreakoutStrategy(BaseStrategy):
         df = df.with_columns(pl.Series("_sq_duration", duration))
 
         # Previous squeeze duration at release point
-        df = df.with_columns(
-            pl.col("_sq_duration").shift(1).alias("_prev_sq_duration")
-        )
+        df = df.with_columns(pl.col("_sq_duration").shift(1).alias("_prev_sq_duration"))
 
         # Signal generation vectorized
         # Valid squeeze release: squeeze_off == 1 AND prev duration >= min_squeeze_bars
-        valid_release = (
-            (pl.col("squeeze_off") == 1)
-            & (pl.col("_prev_sq_duration") >= self.min_squeeze_bars)
+        valid_release = (pl.col("squeeze_off") == 1) & (
+            pl.col("_prev_sq_duration") >= self.min_squeeze_bars
         )
 
         # Volume confirmation
@@ -213,60 +213,67 @@ class SqueezeBreakoutStrategy(BaseStrategy):
         macd_negative = pl.col("macd_histogram") < 0
 
         # Generate signals
-        df = df.with_columns([
-            pl.when(valid_release & vol_ok & macd_positive)
-            .then(1)
-            .when(valid_release & vol_ok & macd_negative)
-            .then(-1)
-            .otherwise(0)
-            .alias("signal_direction"),
-
-            pl.when(valid_release & vol_ok & (macd_positive | macd_negative))
-            .then(0.60)
-            .otherwise(0.0)
-            .alias("signal_confidence"),
-        ])
+        df = df.with_columns(
+            [
+                pl.when(valid_release & vol_ok & macd_positive)
+                .then(1)
+                .when(valid_release & vol_ok & macd_negative)
+                .then(-1)
+                .otherwise(0)
+                .alias("signal_direction"),
+                pl.when(valid_release & vol_ok & (macd_positive | macd_negative))
+                .then(0.60)
+                .otherwise(0.0)
+                .alias("signal_confidence"),
+            ]
+        )
 
         # SL/TP calculations
         atr_col = "atr_14"
-        df = df.with_columns([
-            # BUY: stop = low of squeeze range - 0.5 ATR
-            pl.when(pl.col("signal_direction") == 1)
-            .then(
-                pl.col("low").rolling_min(window_size=self.min_squeeze_bars)
-                - 0.5 * pl.col(atr_col)
-            )
-            # SELL: stop = high of squeeze range + 0.5 ATR
-            .when(pl.col("signal_direction") == -1)
-            .then(
-                pl.col("high").rolling_max(window_size=self.min_squeeze_bars)
-                + 0.5 * pl.col(atr_col)
-            )
-            .otherwise(None)
-            .alias("signal_stop"),
-
-            # TP = 2x risk from stop
-            pl.when(pl.col("signal_direction") == 1)
-            .then(
-                pl.col("close") + 2.0 * (
-                    pl.col("close") - (
-                        pl.col("low").rolling_min(window_size=self.min_squeeze_bars)
-                        - 0.5 * pl.col(atr_col)
+        df = df.with_columns(
+            [
+                # BUY: stop = low of squeeze range - 0.5 ATR
+                pl.when(pl.col("signal_direction") == 1).then(
+                    pl.col("low").rolling_min(window_size=self.min_squeeze_bars)
+                    - 0.5 * pl.col(atr_col)
+                )
+                # SELL: stop = high of squeeze range + 0.5 ATR
+                .when(pl.col("signal_direction") == -1)
+                .then(
+                    pl.col("high").rolling_max(window_size=self.min_squeeze_bars)
+                    + 0.5 * pl.col(atr_col)
+                )
+                .otherwise(None)
+                .alias("signal_stop"),
+                # TP = 2x risk from stop
+                pl.when(pl.col("signal_direction") == 1)
+                .then(
+                    pl.col("close")
+                    + 2.0
+                    * (
+                        pl.col("close")
+                        - (
+                            pl.col("low").rolling_min(window_size=self.min_squeeze_bars)
+                            - 0.5 * pl.col(atr_col)
+                        )
                     )
                 )
-            )
-            .when(pl.col("signal_direction") == -1)
-            .then(
-                pl.col("close") - 2.0 * (
-                    (
-                        pl.col("high").rolling_max(window_size=self.min_squeeze_bars)
-                        + 0.5 * pl.col(atr_col)
-                    ) - pl.col("close")
+                .when(pl.col("signal_direction") == -1)
+                .then(
+                    pl.col("close")
+                    - 2.0
+                    * (
+                        (
+                            pl.col("high").rolling_max(window_size=self.min_squeeze_bars)
+                            + 0.5 * pl.col(atr_col)
+                        )
+                        - pl.col("close")
+                    )
                 )
-            )
-            .otherwise(None)
-            .alias("signal_tp"),
-        ])
+                .otherwise(None)
+                .alias("signal_tp"),
+            ]
+        )
 
         # Cleanup temp columns
         df = df.drop(["_sq_duration", "_prev_sq_duration"])

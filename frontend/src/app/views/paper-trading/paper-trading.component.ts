@@ -463,7 +463,7 @@ interface GroupedPosition {
                     @for (s of signalEntries(); track s.epic) {
                       <tr>
                         <td class="fw-semibold">
-                          <div class="d-flex align-items-center gap-2 epic-link" (click)="onEpicClick(s.epic)">
+                          <div class="d-flex align-items-center gap-2 epic-link" (click)="auditService.openLatestByEpic(s.epic)">
                             <app-epic-logo [epic]="s.epic" [size]="24"></app-epic-logo>
                             <span>{{ s.epic }}</span>
                           </div>
@@ -601,10 +601,12 @@ interface GroupedPosition {
                 <tbody>
                   @for (sig of recentSignals(); track sig.timestamp + sig.epic) {
                     <tr [class.table-danger]="sig.status === 'rejected' || sig.status === 'exec_failed'"
-                        [class.table-secondary]="sig.status === 'market_closed'">
+                        [class.table-secondary]="sig.status === 'market_closed'"
+                        (click)="auditService.openLatestByEpic(sig.epic)"
+                        style="cursor:pointer;">
                       <td class="small text-body-secondary text-nowrap">{{ formatTime(sig.timestamp) }}</td>
                       <td class="fw-semibold">
-                        <div class="d-flex align-items-center gap-2 epic-link" (click)="onEpicClick(sig.epic)">
+                        <div class="d-flex align-items-center gap-2 epic-link">
                           <app-epic-logo [epic]="sig.epic" [size]="20"></app-epic-logo>
                           <span>{{ sig.epic }}</span>
                         </div>
@@ -632,6 +634,14 @@ interface GroupedPosition {
                           <span class="signal-status__dot"></span>
                           {{ statusLabel(sig.status) }}
                         </span>
+                        @if (sig.sl_cooldown) {
+                          <span class="sl-cooldown-badge"
+                                [class.sl-cooldown-badge--blocked]="sig.sl_cooldown.blocked"
+                                [class.sl-cooldown-badge--warning]="!sig.sl_cooldown.blocked"
+                                [cTooltip]="'SL Cooldown: ' + sig.sl_cooldown.sl_count + '/' + sig.sl_cooldown.max_strikes + ' SL in ' + sig.sl_cooldown.window_hours + 'h (penalty ' + (sig.sl_cooldown.penalty * 100).toFixed(0) + '%)'">
+                            {{ sig.sl_cooldown.sl_count }}/{{ sig.sl_cooldown.max_strikes }} SL
+                          </span>
+                        }
                       </td>
                       <td class="small detail-cell d-mobile-none">
                         @if (sig.error_detail) {
@@ -979,11 +989,8 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   }
 
   onGroupClick(group: GroupedPosition): void {
-    if (group.positions.length === 1) {
-      this.auditService.openByDealId(group.positions[0].deal_id, group.epic);
-    } else {
-      this.toggleGroup(group.epic);
-    }
+    // Always expand/collapse — audit is accessible from detail rows
+    this.toggleGroup(group.epic);
   }
 
   directionColor(direction: string): string {

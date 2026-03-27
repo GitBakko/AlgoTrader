@@ -53,9 +53,7 @@ class TargetBuilder:
 
         # Future return: close[t+horizon] - close[t]
         df = df.with_columns(
-            (
-                (pl.col("close").shift(-self.horizon_bars) - pl.col("close"))
-            ).alias("_future_change")
+            ((pl.col("close").shift(-self.horizon_bars) - pl.col("close"))).alias("_future_change")
         )
 
         # ATR-relative return

@@ -44,8 +44,15 @@ class TimeframeAligner:
 
             # Get feature columns (everything except OHLCV and metadata)
             exclude_cols = {
-                timestamp_col, "open", "high", "low", "close", "volume",
-                "epic", "timeframe", "source",
+                timestamp_col,
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "epic",
+                "timeframe",
+                "source",
             }
             feature_cols = [c for c in tf_df.columns if c not in exclude_cols]
 

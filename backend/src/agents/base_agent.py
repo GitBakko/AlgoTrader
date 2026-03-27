@@ -86,9 +86,7 @@ class MantisBaseAgent(ABC):
         try:
             return await self._call_llm(context)
         except Exception as exc:  # noqa: BLE001
-            logger.warning(
-                f"[{self.role.value}] Agent analysis failed: {exc!r}"
-            )
+            logger.warning(f"[{self.role.value}] Agent analysis failed: {exc!r}")
             return None
 
     # ------------------------------------------------------------------

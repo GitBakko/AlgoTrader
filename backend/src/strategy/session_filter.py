@@ -13,7 +13,6 @@ Kill zones (highest probability windows):
 
 from loguru import logger
 
-
 # Asset → asset class mapping
 _ASSET_CLASS: dict[str, str] = {
     # Forex majors

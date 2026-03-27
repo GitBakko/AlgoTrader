@@ -110,9 +110,7 @@ class LSTMClassifier(BaseMLModel):
         n_sequences = n_samples - self.seq_len + 1
 
         if n_sequences <= 0:
-            raise ValueError(
-                f"Not enough samples ({n_samples}) for seq_len={self.seq_len}"
-            )
+            raise ValueError(f"Not enough samples ({n_samples}) for seq_len={self.seq_len}")
 
         X_seq = np.zeros((n_sequences, self.seq_len, n_features), dtype=np.float32)
         for i in range(n_sequences):
@@ -155,9 +153,9 @@ class LSTMClassifier(BaseMLModel):
         # Class weights for imbalanced data
         unique, counts = np.unique(y_train_seq, return_counts=True)
         total = counts.sum()
-        weights = torch.tensor(
-            [total / (len(unique) * c) for c in counts], dtype=torch.float32
-        ).to(self._device)
+        weights = torch.tensor([total / (len(unique) * c) for c in counts], dtype=torch.float32).to(
+            self._device
+        )
 
         criterion = nn.CrossEntropyLoss(weight=weights)
         optimizer = torch.optim.AdamW(
@@ -172,9 +170,7 @@ class LSTMClassifier(BaseMLModel):
             torch.tensor(X_train_seq, dtype=torch.float32),
             torch.tensor(y_train_seq, dtype=torch.long),
         )
-        train_loader = DataLoader(
-            train_dataset, batch_size=self.batch_size, shuffle=True
-        )
+        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
 
         # Training loop with early stopping
         best_val_loss = float("inf")
@@ -234,9 +230,7 @@ class LSTMClassifier(BaseMLModel):
             "final_train_loss": train_losses[-1] if train_losses else None,
         }
 
-    def _evaluate_loss(
-        self, X_seq: np.ndarray, y_seq: np.ndarray, criterion: nn.Module
-    ) -> float:
+    def _evaluate_loss(self, X_seq: np.ndarray, y_seq: np.ndarray, criterion: nn.Module) -> float:
         """Evaluate loss on a dataset."""
         self._model.eval()
         with torch.no_grad():

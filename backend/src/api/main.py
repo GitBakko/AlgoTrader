@@ -57,6 +57,7 @@ setup_logger()
 _redis_uri = f"redis://{settings.redis_host}:{settings.redis_port}/{settings.redis_db}"
 try:
     import redis as _redis_lib
+
     _r = _redis_lib.Redis.from_url(_redis_uri, socket_connect_timeout=1)
     _r.ping()
     _r.close()
@@ -122,7 +123,8 @@ async def lifespan(app: FastAPI):
             if use_demo or use_live:
                 mode = ExecutionMode.DEMO if use_demo else ExecutionMode.LIVE
                 app.state.execution_engine = ExecutionEngine(
-                    broker=broker, mode=mode,
+                    broker=broker,
+                    mode=mode,
                     db_session_factory=getattr(app.state, "db_session_factory", None),
                 )
                 logger.info(f"Execution engine upgraded to {mode.value} mode (broker-connected)")
@@ -154,7 +156,9 @@ async def lifespan(app: FastAPI):
                         if broker_equity > 0:
                             app.state.risk_manager.initial_equity = broker_equity
                             app.state.risk_manager.drawdown_monitor = DrawdownMonitor(broker_equity)
-                            logger.info(f"Risk manager synced with broker equity: {broker_equity:.2f}")
+                            logger.info(
+                                f"Risk manager synced with broker equity: {broker_equity:.2f}"
+                            )
                         else:
                             logger.warning(f"Broker equity is {broker_equity:.2f}, keeping default")
                 except Exception as e:
@@ -209,7 +213,7 @@ async def lifespan(app: FastAPI):
         risk_manager=app.state.risk_manager,
         trailing_stop_manager=temp_trailing_stop_manager,
         broker=app.state.broker_client,
-        db_session_factory=getattr(app.state, 'db_session_factory', None),
+        db_session_factory=getattr(app.state, "db_session_factory", None),
     )
 
     recovery_report = await recovery_service.recover_all_state()
@@ -302,6 +306,7 @@ async def lifespan(app: FastAPI):
         trade_history = await recovery_service._restore_trade_history_list()
         app.state.paper_loop._trade_history = trade_history
         from src.risk.circuit_breakers import CircuitBreakerType
+
         cb = app.state.paper_loop.risk_manager.circuit_breakers
         # Save snapshot value — if manually reset to 0, we honour it
         snapshot_consecutive = cb._consecutive_losses
@@ -314,11 +319,15 @@ async def lifespan(app: FastAPI):
             cb.record_trade_result(is_win=(pnl > 0))
         # If snapshot was manually reset to 0, honour the manual reset
         if snapshot_consecutive == 0 and cb._consecutive_losses > 0:
-            logger.info(f"CB snapshot was manually reset to 0, overriding replay value ({cb._consecutive_losses})")
+            logger.info(
+                f"CB snapshot was manually reset to 0, overriding replay value ({cb._consecutive_losses})"
+            )
             cb._consecutive_losses = 0
             cb._tripped.pop(CircuitBreakerType.CONSECUTIVE_LOSSES, None)
             cb._tripped_at.pop(CircuitBreakerType.CONSECUTIVE_LOSSES, None)
-        logger.info(f"Injected {len(trade_history)} trades into Kelly history + circuit breaker (consecutive_losses={cb._consecutive_losses})")
+        logger.info(
+            f"Injected {len(trade_history)} trades into Kelly history + circuit breaker (consecutive_losses={cb._consecutive_losses})"
+        )
 
     # ══════════════════════════════════════════════════════════
     # 📦 PRE-FETCH MARKET SPECS (minDealSize cache)
@@ -342,19 +351,16 @@ async def lifespan(app: FastAPI):
 
     # 2. Background pre-fetch from broker (updates DB + memory)
     if app.state.broker_client:
+
         async def _prefetch_and_seed():
             try:
-                fresh = await prefetch_market_specs(
-                    app.state.broker_client, db_sf, environment
-                )
+                fresh = await prefetch_market_specs(app.state.broker_client, db_sf, environment)
                 if fresh:
                     app.state.paper_loop.seed_min_deal_sizes(fresh)
             except Exception as e:
                 logger.warning(f"Background market spec pre-fetch failed: {e}")
 
-        prefetch_task = asyncio.create_task(
-            _prefetch_and_seed(), name="market_spec_prefetch"
-        )
+        prefetch_task = asyncio.create_task(_prefetch_and_seed(), name="market_spec_prefetch")
         prefetch_task.add_done_callback(_bg_task_done)
 
     logger.info(
@@ -364,8 +370,9 @@ async def lifespan(app: FastAPI):
 
     # Inject DB factory into InAppChannel for notification persistence
     from src.monitoring.alerting.alert_manager import get_alert_manager
+
     alert_mgr = get_alert_manager()
-    if hasattr(alert_mgr, 'in_app_channel') and app.state.db_session_factory:
+    if hasattr(alert_mgr, "in_app_channel") and app.state.db_session_factory:
         alert_mgr.in_app_channel.set_db_session_factory(app.state.db_session_factory)
         logger.info("InAppChannel DB session factory injected")
 
@@ -377,6 +384,7 @@ async def lifespan(app: FastAPI):
 
     # Start Telegram bot poller (if configured)
     from src.monitoring.telegram_bot import init_telegram_bot
+
     tg_bot = init_telegram_bot()
     if tg_bot:
         tg_bot._get_loop = lambda: getattr(app.state, "paper_loop", None)
@@ -424,6 +432,7 @@ async def lifespan(app: FastAPI):
     if getattr(app.state, "event_bus", None):
         try:
             from src.utils.event_bus import event_bus
+
             await event_bus.close()
         except Exception as e:
             logger.warning(f"Redis close error: {e}")

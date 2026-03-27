@@ -39,7 +39,7 @@ class LoginResponse(BaseModel):
     expires_in: int  # seconds
     refresh_token: str
     refresh_expires_in: int  # seconds
-    user: 'UserResponse'  # Include user object for frontend
+    user: "UserResponse"  # Include user object for frontend
 
 
 class RefreshRequest(BaseModel):
@@ -69,7 +69,7 @@ class UserResponse(BaseModel):
     is_active: bool
     last_login: datetime | None
     avatar_url: str | None = None
-    permissions: list['PermissionResponse'] = []  # User's role permissions
+    permissions: list["PermissionResponse"] = []  # User's role permissions
 
     model_config = {"from_attributes": True}
 

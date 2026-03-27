@@ -1,5 +1,6 @@
 # MANTIS-EVOLUTION: DRL Ensemble Agent for orchestrator integration
 """Integrates DRL ensemble into the multi-agent pipeline."""
+
 from __future__ import annotations
 
 import numpy as np

@@ -35,15 +35,17 @@ def _error(msg: str, status: int = 400):
 async def vision_status():
     """Get Vision AI and RAG pipeline status."""
     settings = get_settings()
-    return _success({
-        "vision_enabled": settings.vision_enabled,
-        "rag_enabled": settings.rag_enabled,
-        "vision_model": settings.vision_llm_model,
-        "chart_width": settings.vision_chart_width,
-        "chart_height": settings.vision_chart_height,
-        "rag_max_tokens": settings.rag_max_context_tokens,
-        "rag_news_lookback_hours": settings.rag_news_lookback_hours,
-    })
+    return _success(
+        {
+            "vision_enabled": settings.vision_enabled,
+            "rag_enabled": settings.rag_enabled,
+            "vision_model": settings.vision_llm_model,
+            "chart_width": settings.vision_chart_width,
+            "chart_height": settings.vision_chart_height,
+            "rag_max_tokens": settings.rag_max_context_tokens,
+            "rag_news_lookback_hours": settings.rag_news_lookback_hours,
+        }
+    )
 
 
 @router.post("/chart")
@@ -90,6 +92,7 @@ async def generate_chart(
     if not closes:
         # Fallback: generate synthetic chart
         import numpy as np
+
         n = 50
         np.random.seed(hash(epic) % 2**31)
         noise = np.random.randn(n) * 0.5
@@ -145,12 +148,16 @@ async def analyze_chart(
         )
 
         result = await agent.analyze(context)
-        return _success({
-            "epic": epic,
-            "vision_report": result.vision_report.model_dump() if result.vision_report else None,
-            "rag_context_summary": result.rag_context_summary,
-            "chart_confidence": result.chart_confidence,
-        })
+        return _success(
+            {
+                "epic": epic,
+                "vision_report": (
+                    result.vision_report.model_dump() if result.vision_report else None
+                ),
+                "rag_context_summary": result.rag_context_summary,
+                "chart_confidence": result.chart_confidence,
+            }
+        )
     except Exception as e:
         logger.error(f"Vision analysis failed: {e!r}")
         return _error(f"Vision analysis failed: {e}")
@@ -187,14 +194,16 @@ async def get_rag_context(
         builder = MantisRAGContextBuilder(max_tokens=settings.rag_max_context_tokens)
         rag = builder.build(news=news_items, sil_data=sil_data.get("macro"))
 
-        return _success({
-            "epic": epic,
-            "news_section": rag.news_section,
-            "macro_section": rag.macro_section,
-            "memory_section": rag.memory_section,
-            "total_tokens_estimate": rag.total_tokens_estimate,
-            "sources_count": rag.sources_count,
-        })
+        return _success(
+            {
+                "epic": epic,
+                "news_section": rag.news_section,
+                "macro_section": rag.macro_section,
+                "memory_section": rag.memory_section,
+                "total_tokens_estimate": rag.total_tokens_estimate,
+                "sources_count": rag.sources_count,
+            }
+        )
     except Exception as e:
         logger.error(f"RAG context build failed: {e!r}")
         return _error(f"RAG context build failed: {e}")

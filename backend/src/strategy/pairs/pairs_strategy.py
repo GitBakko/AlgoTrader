@@ -166,8 +166,7 @@ class PairsTradingStrategy:
             self._current_position = signal
             self._bars_in_trade = 0
             logger.info(
-                f"Pairs LONG_SPREAD: z={z_score:.2f} "
-                f"A_size={size_a:.4f} B_size={size_b:.4f}"
+                f"Pairs LONG_SPREAD: z={z_score:.2f} " f"A_size={size_a:.4f} B_size={size_b:.4f}"
             )
             return signal
 
@@ -188,8 +187,7 @@ class PairsTradingStrategy:
             self._current_position = signal
             self._bars_in_trade = 0
             logger.info(
-                f"Pairs SHORT_SPREAD: z={z_score:.2f} "
-                f"A_size={size_a:.4f} B_size={size_b:.4f}"
+                f"Pairs SHORT_SPREAD: z={z_score:.2f} " f"A_size={size_a:.4f} B_size={size_b:.4f}"
             )
             return signal
 

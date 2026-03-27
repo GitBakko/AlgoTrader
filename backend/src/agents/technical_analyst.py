@@ -73,19 +73,23 @@ class TechnicalAnalystAgent(MantisBaseAgent):
         if features:
             # Group features for readability
             trend_indicators = {
-                k: v for k, v in features.items()
+                k: v
+                for k, v in features.items()
                 if any(k.startswith(p) for p in ("ema_", "sma_", "dema_", "tema_"))
             }
             momentum_indicators = {
-                k: v for k, v in features.items()
+                k: v
+                for k, v in features.items()
                 if any(k.startswith(p) for p in ("rsi", "macd", "stoch", "cci", "mfi"))
             }
             volatility_indicators = {
-                k: v for k, v in features.items()
+                k: v
+                for k, v in features.items()
                 if any(k.startswith(p) for p in ("bb_", "atr", "keltner", "adx"))
             }
             volume_indicators = {
-                k: v for k, v in features.items()
+                k: v
+                for k, v in features.items()
                 if any(k.startswith(p) for p in ("volume", "obv", "vwap"))
             }
 
@@ -103,7 +107,9 @@ class TechnicalAnalystAgent(MantisBaseAgent):
                     return []
                 out = [f"**{title}**:"]
                 for k, v in d.items():
-                    formatted_v = f"{v:.6g}" if isinstance(v, (int, float)) and v is not None else str(v)
+                    formatted_v = (
+                        f"{v:.6g}" if isinstance(v, (int, float)) and v is not None else str(v)
+                    )
                     out.append(f"  - {k}: {formatted_v}")
                 return out
 
@@ -142,8 +148,7 @@ class TechnicalAnalystAgent(MantisBaseAgent):
         if result is not None:
             return result
         logger.info(
-            f"[TECHNICAL] LLM path unavailable for {context.epic}, "
-            "using heuristic fallback."
+            f"[TECHNICAL] LLM path unavailable for {context.epic}, " "using heuristic fallback."
         )
         return self._heuristic_analyze(context)
 
@@ -281,8 +286,6 @@ class TechnicalAnalystAgent(MantisBaseAgent):
                 f"EMA spread: {(ema_9-ema_21)/ema_21*100:.3f}% "
                 if ema_21 > 0 and ema_9 > 0
                 else "Heuristic analysis based on EMA/RSI/MACD/ADX. "
-            ) + (
-                f"RSI: {rsi_14:.1f}, ADX: {adx_14:.1f}, "
-                f"MACD hist: {macd_hist:.4f}."
-            ),
+            )
+            + (f"RSI: {rsi_14:.1f}, ADX: {adx_14:.1f}, " f"MACD hist: {macd_hist:.4f}."),
         )

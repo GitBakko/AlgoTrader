@@ -9,6 +9,7 @@ export interface ApiResponse<T> {
 export interface DashboardOverview {
   equity: number;
   daily_pnl: number;
+  today_realized_pnl: number;
   total_pnl: number;
   open_positions_count: number;
   win_rate: number;
@@ -298,6 +299,14 @@ export interface BrokerErrorDetail {
 }
 
 // Paper Trading Signal History (GET /api/trading/signals)
+export interface SlCooldownInfo {
+  sl_count: number;
+  max_strikes: number;
+  penalty: number;       // 1.0, 0.70, 0.40, 0.0
+  blocked: boolean;
+  window_hours: number;
+}
+
 export interface PaperSignal {
   epic: string;
   direction: string;
@@ -311,6 +320,7 @@ export interface PaperSignal {
   rejection_reason?: string;
   error_detail?: BrokerErrorDetail;
   strategy_name?: string;  // "ml_ensemble", "squeeze_breakout", "vwap_reversion"
+  sl_cooldown?: SlCooldownInfo | null;
   _showRaw?: boolean;  // UI-only: toggle for raw error display
 }
 

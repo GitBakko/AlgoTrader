@@ -102,25 +102,27 @@ class MLStrategy(BaseStrategy):
 
         if "signal_class" not in df.columns or "confidence" not in df.columns:
             logger.warning(
-                f"{epic}: ML backtest requires pre-computed signal_class "
-                "and confidence columns"
+                f"{epic}: ML backtest requires pre-computed signal_class " "and confidence columns"
             )
-            df = df.with_columns([
-                pl.lit(0).alias("signal_direction"),
-                pl.lit(0.0).alias("signal_confidence"),
-            ])
+            df = df.with_columns(
+                [
+                    pl.lit(0).alias("signal_direction"),
+                    pl.lit(0.0).alias("signal_confidence"),
+                ]
+            )
             return df
 
         # Map signal_class to direction
-        df = df.with_columns([
-            pl.when(pl.col("signal_class") == SignalClass.BUY)
-            .then(1)
-            .when(pl.col("signal_class") == SignalClass.SELL)
-            .then(-1)
-            .otherwise(0)
-            .alias("signal_direction"),
-
-            pl.col("confidence").alias("signal_confidence"),
-        ])
+        df = df.with_columns(
+            [
+                pl.when(pl.col("signal_class") == SignalClass.BUY)
+                .then(1)
+                .when(pl.col("signal_class") == SignalClass.SELL)
+                .then(-1)
+                .otherwise(0)
+                .alias("signal_direction"),
+                pl.col("confidence").alias("signal_confidence"),
+            ]
+        )
 
         return df

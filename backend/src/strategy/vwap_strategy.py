@@ -182,37 +182,39 @@ class VWAPReversionStrategy(BaseStrategy):
             rsi_sell_ok = pl.col("rsi_14") >= self.rsi_overbought
 
         # Signals
-        df = df.with_columns([
-            pl.when((z <= -self.entry_sd) & adx_ok & vol_ok & rsi_buy_ok)
-            .then(1)
-            .when((z >= self.entry_sd) & adx_ok & vol_ok & rsi_sell_ok)
-            .then(-1)
-            .otherwise(0)
-            .alias("signal_direction"),
-
-            pl.when(
-                ((z <= -self.entry_sd) & adx_ok & vol_ok & rsi_buy_ok)
-                | ((z >= self.entry_sd) & adx_ok & vol_ok & rsi_sell_ok)
-            )
-            .then(0.55)
-            .otherwise(0.0)
-            .alias("signal_confidence"),
-        ])
+        df = df.with_columns(
+            [
+                pl.when((z <= -self.entry_sd) & adx_ok & vol_ok & rsi_buy_ok)
+                .then(1)
+                .when((z >= self.entry_sd) & adx_ok & vol_ok & rsi_sell_ok)
+                .then(-1)
+                .otherwise(0)
+                .alias("signal_direction"),
+                pl.when(
+                    ((z <= -self.entry_sd) & adx_ok & vol_ok & rsi_buy_ok)
+                    | ((z >= self.entry_sd) & adx_ok & vol_ok & rsi_sell_ok)
+                )
+                .then(0.55)
+                .otherwise(0.0)
+                .alias("signal_confidence"),
+            ]
+        )
 
         # SL/TP
         if "vwap_sd" in df.columns and "vwap_rolling" in df.columns:
-            df = df.with_columns([
-                pl.when(pl.col("signal_direction") == 1)
-                .then(pl.col("vwap_rolling") - self.stop_sd * pl.col("vwap_sd"))
-                .when(pl.col("signal_direction") == -1)
-                .then(pl.col("vwap_rolling") + self.stop_sd * pl.col("vwap_sd"))
-                .otherwise(None)
-                .alias("signal_stop"),
-
-                pl.when(pl.col("signal_direction").abs() == 1)
-                .then(pl.col("vwap_rolling"))
-                .otherwise(None)
-                .alias("signal_tp"),
-            ])
+            df = df.with_columns(
+                [
+                    pl.when(pl.col("signal_direction") == 1)
+                    .then(pl.col("vwap_rolling") - self.stop_sd * pl.col("vwap_sd"))
+                    .when(pl.col("signal_direction") == -1)
+                    .then(pl.col("vwap_rolling") + self.stop_sd * pl.col("vwap_sd"))
+                    .otherwise(None)
+                    .alias("signal_stop"),
+                    pl.when(pl.col("signal_direction").abs() == 1)
+                    .then(pl.col("vwap_rolling"))
+                    .otherwise(None)
+                    .alias("signal_tp"),
+                ]
+            )
 
         return df

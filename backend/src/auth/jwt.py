@@ -12,9 +12,7 @@ from loguru import logger
 from src.utils.config import get_settings
 
 
-def create_access_token(
-    data: dict[str, Any], expires_delta: timedelta | None = None
-) -> str:
+def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = None) -> str:
     """
     Create a JWT access token.
 
@@ -46,9 +44,7 @@ def create_access_token(
 
     # Encode token
     try:
-        encoded_jwt = jwt.encode(
-            to_encode, settings.secret_key, algorithm=settings.jwt_algorithm
-        )
+        encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=settings.jwt_algorithm)
         return encoded_jwt
     except Exception as e:
         logger.error(f"Failed to create access token: {e}")
@@ -76,9 +72,7 @@ def decode_access_token(token: str) -> dict[str, Any]:
     settings = get_settings()
 
     try:
-        payload = jwt.decode(
-            token, settings.secret_key, algorithms=[settings.jwt_algorithm]
-        )
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
         return payload
     except jwt.ExpiredSignatureError:
         logger.warning("Expired JWT token")

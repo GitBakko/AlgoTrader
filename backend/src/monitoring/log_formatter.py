@@ -64,11 +64,11 @@ def json_formatter(record: dict[str, Any]) -> str:
         log_dict["exception"] = {
             "type": exc_type.__name__ if exc_type else None,
             "value": str(exc_value) if exc_value else None,
-            "traceback": "".join(
-                traceback.format_exception(exc_type, exc_value, exc_traceback)
-            )
-            if exc_traceback
-            else None,
+            "traceback": (
+                "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+                if exc_traceback
+                else None
+            ),
         }
 
     # Convert to JSON string

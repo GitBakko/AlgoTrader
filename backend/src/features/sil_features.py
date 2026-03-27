@@ -33,7 +33,8 @@ _W_SOCIAL = 0.10
 
 
 def compute_sil_features(
-    df: pl.DataFrame, sil_data: SILData | None,
+    df: pl.DataFrame,
+    sil_data: SILData | None,
 ) -> pl.DataFrame:
     """
     Add 12 SIL feature columns to DataFrame.
@@ -76,29 +77,29 @@ def compute_sil_features(
         social_bullish=social_bullish,
     )
 
-    df = df.with_columns([
-        pl.lit(fear_greed_value).alias("sil_fear_greed_value"),
-        pl.lit(fear_greed_gold_bias).alias("sil_fear_greed_gold_bias"),
-        pl.lit(real_yield).alias("sil_real_yield_10y"),
-        pl.lit(breakeven).alias("sil_breakeven_inflation"),
-        pl.lit(gold_bullish_yield).alias("sil_gold_bullish_yield"),
-        pl.lit(alpha_sentiment).alias("sil_alpha_sentiment_score"),
-        pl.lit(alpha_bullish).alias("sil_alpha_bullish_ratio"),
-        pl.lit(cot_net_norm).alias("sil_cot_net_position_norm"),
-        pl.lit(cot_z).alias("sil_cot_z_score"),
-        pl.lit(cot_bull).alias("sil_cot_institutional_bull"),
-        pl.lit(social_bullish).alias("sil_social_bullish_ratio"),
-        pl.lit(composite).alias("sil_composite_score"),
-    ])
+    df = df.with_columns(
+        [
+            pl.lit(fear_greed_value).alias("sil_fear_greed_value"),
+            pl.lit(fear_greed_gold_bias).alias("sil_fear_greed_gold_bias"),
+            pl.lit(real_yield).alias("sil_real_yield_10y"),
+            pl.lit(breakeven).alias("sil_breakeven_inflation"),
+            pl.lit(gold_bullish_yield).alias("sil_gold_bullish_yield"),
+            pl.lit(alpha_sentiment).alias("sil_alpha_sentiment_score"),
+            pl.lit(alpha_bullish).alias("sil_alpha_bullish_ratio"),
+            pl.lit(cot_net_norm).alias("sil_cot_net_position_norm"),
+            pl.lit(cot_z).alias("sil_cot_z_score"),
+            pl.lit(cot_bull).alias("sil_cot_institutional_bull"),
+            pl.lit(social_bullish).alias("sil_social_bullish_ratio"),
+            pl.lit(composite).alias("sil_composite_score"),
+        ]
+    )
 
     return df
 
 
 def _add_zero_columns(df: pl.DataFrame) -> pl.DataFrame:
     """Add all 12 SIL columns with 0.0 values."""
-    return df.with_columns([
-        pl.lit(0.0).alias(col) for col in SIL_FEATURE_COLS
-    ])
+    return df.with_columns([pl.lit(0.0).alias(col) for col in SIL_FEATURE_COLS])
 
 
 def _compute_composite(

@@ -5,22 +5,21 @@ Modifies strategy config based on detected market regime.
 
 from src.strategy.schemas import StrategyConfig
 
-
 # Regime-specific parameter overrides (calibrated for 3-class system)
 _REGIME_PARAMS: dict[str, dict[str, float]] = {
     "trending_up": {
-        "min_confidence": 0.50,     # was 0.48; aligned with tiering floor
-        "stop_multiplier": 2.5,     # was 3.5
+        "min_confidence": 0.50,  # was 0.48; aligned with tiering floor
+        "stop_multiplier": 2.5,  # was 3.5
         "counter_trend_penalty": 0.5,  # was 0.4 (less harsh)
     },
     "trending_down": {
-        "min_confidence": 0.50,     # was 0.45
-        "stop_multiplier": 2.0,     # was 2.5
+        "min_confidence": 0.50,  # was 0.45
+        "stop_multiplier": 2.0,  # was 2.5
         "counter_trend_penalty": 0.4,  # was 0.3 (less harsh)
     },
     "ranging": {
-        "min_confidence": 0.50,     # was 0.52 (aligned with trending)
-        "stop_multiplier": 2.0,     # was 2.5
+        "min_confidence": 0.50,  # was 0.52 (aligned with trending)
+        "stop_multiplier": 2.0,  # was 2.5
         "counter_trend_penalty": 0.7,  # unchanged
     },
 }

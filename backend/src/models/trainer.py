@@ -79,7 +79,9 @@ class ModelTrainer:
         start_time = time.time()
 
         # Step 1: Build features
-        logger.info(f"Building features for {epic}/{timeframe} (multi_tf={multi_timeframe}, sentiment={include_sentiment})...")
+        logger.info(
+            f"Building features for {epic}/{timeframe} (multi_tf={multi_timeframe}, sentiment={include_sentiment})..."
+        )
         df, feature_meta = self.feature_builder.build_features(
             epic=epic,
             timeframe=timeframe,
@@ -179,7 +181,8 @@ class ModelTrainer:
         # Identify feature columns (normalized z-score columns preferred, fallback to raw)
         zscore_features = [c for c in feature_meta.feature_names if c.endswith("_zscore")]
         raw_features = [
-            c for c in feature_meta.feature_names
+            c
+            for c in feature_meta.feature_names
             if not c.endswith("_zscore") and c != "regime" and f"{c}_zscore" not in df.columns
         ]
 
@@ -207,7 +210,9 @@ class ModelTrainer:
                     f"Feature matrix has {nan_pct:.1f}% NaN values ({nan_count} total). "
                     "This likely indicates a data pipeline issue. Threshold: 5%."
                 )
-            logger.warning(f"Found {nan_count} NaN values ({nan_pct:.1f}% of feature matrix). Filling with 0.")
+            logger.warning(
+                f"Found {nan_count} NaN values ({nan_pct:.1f}% of feature matrix). Filling with 0."
+            )
         X = np.nan_to_num(X, nan=0.0)
 
         n_samples = len(X)
@@ -255,7 +260,7 @@ class ModelTrainer:
             y_val_proba = model.predict_proba(X_val)
             # Sequence models (LSTM) may return fewer predictions than input samples;
             # align y by trimming from the front (sequences use last element's label)
-            y_val_aligned = y_val[-len(y_val_pred):]
+            y_val_aligned = y_val[-len(y_val_pred) :]
             if len(y_val_aligned) != len(y_val_pred):
                 raise ValueError(
                     f"Val alignment mismatch: {len(y_val_aligned)} vs {len(y_val_pred)}"
@@ -265,7 +270,7 @@ class ModelTrainer:
             # Evaluate on test
             y_test_pred = model.predict(X_test)
             y_test_proba = model.predict_proba(X_test)
-            y_test_aligned = y_test[-len(y_test_pred):]
+            y_test_aligned = y_test[-len(y_test_pred) :]
             if len(y_test_aligned) != len(y_test_pred):
                 raise ValueError(
                     f"Test alignment mismatch: {len(y_test_aligned)} vs {len(y_test_pred)}"
@@ -283,10 +288,8 @@ class ModelTrainer:
                 val_end=timestamps[split.val_end - 1] if timestamps else None,
                 test_start=timestamps[split.test_start] if timestamps else None,
                 test_end=timestamps[split.test_end - 1] if timestamps else None,
-                val_metrics={k: v for k, v in val_metrics.items()
-                             if isinstance(v, (int, float))},
-                test_metrics={k: v for k, v in test_metrics.items()
-                              if isinstance(v, (int, float))},
+                val_metrics={k: v for k, v in val_metrics.items() if isinstance(v, (int, float))},
+                test_metrics={k: v for k, v in test_metrics.items() if isinstance(v, (int, float))},
             )
             fold_results.append(fold_result)
 
@@ -321,7 +324,7 @@ class ModelTrainer:
         if len(X_cal) >= 30:
             try:
                 cal_proba = model.predict_proba(X_cal)
-                y_cal_aligned = y_cal[-len(cal_proba):]
+                y_cal_aligned = y_cal[-len(cal_proba) :]
                 calibrator = ConfidenceCalibrator(n_classes=len(np.unique(y)))
                 cal_stats = calibrator.fit(y_cal_aligned, cal_proba)
                 logger.info(
@@ -352,9 +355,9 @@ class ModelTrainer:
             feature_names=feature_cols,
             num_features=len(feature_cols),
             total_train_samples=n_samples,
-            hyperparameters=model.get_hyperparameters()
-            if hasattr(model, "get_hyperparameters")
-            else {},
+            hyperparameters=(
+                model.get_hyperparameters() if hasattr(model, "get_hyperparameters") else {}
+            ),
         )
 
         # Save best model + calibrator

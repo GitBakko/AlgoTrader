@@ -161,7 +161,7 @@ class CircuitBreakerManager:
 
         # 7. Slippage anomaly (checked internally via recorded slippage)
         if len(self._slippage_history) >= self.config.slippage_window:
-            recent = self._slippage_history[-self.config.slippage_window:]
+            recent = self._slippage_history[-self.config.slippage_window :]
             avg_slippage = sum(recent) / len(recent)
             if avg_slippage > self.config.slippage_threshold_pct:
                 reason = (
@@ -188,6 +188,7 @@ class CircuitBreakerManager:
             current_date: Date string (YYYY-MM-DD). Auto-detected if None.
         """
         from datetime import datetime, timezone
+
         if current_date is None:
             current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         with self._lock:
@@ -308,6 +309,7 @@ class CircuitBreakerManager:
                 logger.warning(f"CIRCUIT BREAKER [{cb_type.value}]: {reason}")
                 try:
                     from src.monitoring.metrics import MetricsCollector
+
                     MetricsCollector.record_circuit_breaker(epic=epic, reason=cb_type.value)
                 except Exception:
                     pass

@@ -4,6 +4,7 @@ Log Analyzer - Analysis tools for trading logs.
 Provides statistical analysis and performance metrics from logged trading data.
 Works with both PostgreSQL tables and fallback JSONL files.
 """
+
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -16,7 +17,6 @@ from sqlalchemy import text as sa_text
 
 from ..database.session import DatabaseManager
 
-
 # ═══════════════════════════════════════════════════════════════════════════
 # Analysis Result Data Classes
 # ═══════════════════════════════════════════════════════════════════════════
@@ -25,6 +25,7 @@ from ..database.session import DatabaseManager
 @dataclass
 class SignalStats:
     """Signal statistics."""
+
     total_signals: int
     executed: int
     rejected: int
@@ -38,6 +39,7 @@ class SignalStats:
 @dataclass
 class ExecutionStats:
     """Execution statistics."""
+
     total_trades: int
     open_positions: int
     closed_trades: int
@@ -56,6 +58,7 @@ class ExecutionStats:
 @dataclass
 class RiskStats:
     """Risk management statistics."""
+
     total_events: int
     circuit_breaker_triggers: int
     position_limit_hits: int
@@ -136,29 +139,16 @@ class LogAnalyzer:
         hold = len(df.filter(pl.col("direction") == "HOLD"))
 
         # Group by epic
-        by_epic = (
-            df.group_by("epic")
-            .agg(pl.len())
-            .select(["epic", "len"])
-            .to_dicts()
-        )
+        by_epic = df.group_by("epic").agg(pl.len()).select(["epic", "len"]).to_dicts()
         by_epic_dict = {row["epic"]: row["len"] for row in by_epic}
 
         # Group by strategy
-        by_strategy = (
-            df.group_by("strategy")
-            .agg(pl.len())
-            .select(["strategy", "len"])
-            .to_dicts()
-        )
+        by_strategy = df.group_by("strategy").agg(pl.len()).select(["strategy", "len"]).to_dicts()
         by_strategy_dict = {row["strategy"]: row["len"] for row in by_strategy}
 
         # Group by direction
         by_direction = (
-            df.group_by("direction")
-            .agg(pl.len())
-            .select(["direction", "len"])
-            .to_dicts()
+            df.group_by("direction").agg(pl.len()).select(["direction", "len"]).to_dicts()
         )
         by_direction_dict = {row["direction"]: row["len"] for row in by_direction}
 
@@ -258,7 +248,9 @@ class LogAnalyzer:
             duration_series = (
                 pl.col("exit_timestamp").cast(pl.Datetime) - pl.col("timestamp").cast(pl.Datetime)
             ).dt.total_seconds() / 3600
-            avg_duration = closed_df.select(duration_series.alias("duration")).get_column("duration").mean()
+            avg_duration = (
+                closed_df.select(duration_series.alias("duration")).get_column("duration").mean()
+            )
 
         # Group by epic
         by_epic_dict = {}
@@ -343,12 +335,7 @@ class LogAnalyzer:
         avg_pnl = df["daily_pnl"].mean() if "daily_pnl" in df.columns else 0.0
 
         # Group by event type
-        by_type = (
-            df.group_by("event_type")
-            .agg(pl.len())
-            .select(["event_type", "len"])
-            .to_dicts()
-        )
+        by_type = df.group_by("event_type").agg(pl.len()).select(["event_type", "len"]).to_dicts()
         by_type_dict = {row["event_type"]: row["len"] for row in by_type}
 
         last_event = df.select(pl.col("timestamp").max()).item()
@@ -376,7 +363,9 @@ class LogAnalyzer:
                 WHERE timestamp >= :start_date AND timestamp <= :end_date
                 ORDER BY timestamp DESC
             """
-            result = await session.execute(sa_text(query), {"start_date": start_date, "end_date": end_date})
+            result = await session.execute(
+                sa_text(query), {"start_date": start_date, "end_date": end_date}
+            )
             rows = result.fetchall()
 
             if not rows:
@@ -394,7 +383,9 @@ class LogAnalyzer:
                 AND status = 'executed'
                 ORDER BY timestamp DESC
             """
-            result = await session.execute(sa_text(query), {"start_date": start_date, "end_date": end_date})
+            result = await session.execute(
+                sa_text(query), {"start_date": start_date, "end_date": end_date}
+            )
             rows = result.fetchall()
 
             if not rows:
@@ -410,7 +401,9 @@ class LogAnalyzer:
                 WHERE timestamp >= :start_date AND timestamp <= :end_date
                 ORDER BY timestamp DESC
             """
-            result = await session.execute(sa_text(query), {"start_date": start_date, "end_date": end_date})
+            result = await session.execute(
+                sa_text(query), {"start_date": start_date, "end_date": end_date}
+            )
             rows = result.fetchall()
 
             if not rows:
@@ -434,7 +427,8 @@ class LogAnalyzer:
             logger.warning(f"Failed to read signals file: {e}")
             return pl.DataFrame()
         df = df.with_columns(
-            pl.col("timestamp").str.replace("Z$", "")
+            pl.col("timestamp")
+            .str.replace("Z$", "")
             .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S%.f")
             .dt.replace_time_zone("UTC")
         )
@@ -443,9 +437,7 @@ class LogAnalyzer:
             start_date = start_date.replace(tzinfo=timezone.utc)
         if end_date.tzinfo is None:
             end_date = end_date.replace(tzinfo=timezone.utc)
-        return df.filter(
-            (pl.col("timestamp") >= start_date) & (pl.col("timestamp") <= end_date)
-        )
+        return df.filter((pl.col("timestamp") >= start_date) & (pl.col("timestamp") <= end_date))
 
     def _read_executions_file(self, start_date: datetime, end_date: datetime) -> pl.DataFrame:
         """Read executions from JSONL file."""
@@ -463,7 +455,8 @@ class LogAnalyzer:
         if "timestamp" in df.columns:
             try:
                 df = df.with_columns(
-                    pl.col("timestamp").str.replace("Z$", "")
+                    pl.col("timestamp")
+                    .str.replace("Z$", "")
                     .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S%.f")
                     .dt.replace_time_zone("UTC")
                 )
@@ -478,10 +471,13 @@ class LogAnalyzer:
                 df = df.with_columns(pl.col("exit_timestamp").cast(pl.Utf8).alias("exit_timestamp"))
                 # Then parse non-null values
                 df = df.with_columns(
-                    pl.when(pl.col("exit_timestamp").is_null() | (pl.col("exit_timestamp") == "null"))
+                    pl.when(
+                        pl.col("exit_timestamp").is_null() | (pl.col("exit_timestamp") == "null")
+                    )
                     .then(None)
                     .otherwise(
-                        pl.col("exit_timestamp").str.replace("Z$", "")
+                        pl.col("exit_timestamp")
+                        .str.replace("Z$", "")
                         .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S%.f")
                         .dt.replace_time_zone("UTC")
                     )
@@ -493,17 +489,16 @@ class LogAnalyzer:
 
         # Filter by date and status
         filters = [pl.col("status") == "executed"]
-        ts_is_datetime = "timestamp" in df.columns and str(df["timestamp"].dtype).startswith("Datetime")
+        ts_is_datetime = "timestamp" in df.columns and str(df["timestamp"].dtype).startswith(
+            "Datetime"
+        )
         if ts_is_datetime:
             # Ensure filter dates are timezone-aware
             if start_date.tzinfo is None:
                 start_date = start_date.replace(tzinfo=timezone.utc)
             if end_date.tzinfo is None:
                 end_date = end_date.replace(tzinfo=timezone.utc)
-            filters.extend([
-                pl.col("timestamp") >= start_date,
-                pl.col("timestamp") <= end_date
-            ])
+            filters.extend([pl.col("timestamp") >= start_date, pl.col("timestamp") <= end_date])
 
         return df.filter(pl.all_horizontal(filters))
 
@@ -519,7 +514,8 @@ class LogAnalyzer:
             logger.warning(f"Failed to read risk events file: {e}")
             return pl.DataFrame()
         df = df.with_columns(
-            pl.col("timestamp").str.replace("Z$", "")
+            pl.col("timestamp")
+            .str.replace("Z$", "")
             .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S%.f")
             .dt.replace_time_zone("UTC")
         )
@@ -528,6 +524,4 @@ class LogAnalyzer:
             start_date = start_date.replace(tzinfo=timezone.utc)
         if end_date.tzinfo is None:
             end_date = end_date.replace(tzinfo=timezone.utc)
-        return df.filter(
-            (pl.col("timestamp") >= start_date) & (pl.col("timestamp") <= end_date)
-        )
+        return df.filter((pl.col("timestamp") >= start_date) & (pl.col("timestamp") <= end_date))

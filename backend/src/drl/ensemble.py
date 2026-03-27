@@ -1,5 +1,6 @@
 # MANTIS-EVOLUTION: DRL Ensemble with regime-based routing
 """Ensemble of DRL agents with dynamic voting based on market regime."""
+
 from __future__ import annotations
 
 from typing import Literal
@@ -27,7 +28,9 @@ class MantisDRLEnsemble:
     def __init__(
         self,
         agents: dict[str, MantisDRLAgent],
-        voting_mode: Literal["REGIME_ROUTING", "WEIGHTED_VOTE", "CONFIDENCE_GATE"] = "REGIME_ROUTING",
+        voting_mode: Literal[
+            "REGIME_ROUTING", "WEIGHTED_VOTE", "CONFIDENCE_GATE"
+        ] = "REGIME_ROUTING",
         confidence_threshold: float = 0.6,
     ) -> None:
         self.agents = agents
@@ -69,7 +72,9 @@ class MantisDRLEnsemble:
                 action, _info = agent.predict(observation)
                 votes[name] = int(action)
             except Exception as exc:
-                logger.warning(f"[DRLEnsemble] Agent '{name}' predict failed: {exc!r} — voting HOLD")
+                logger.warning(
+                    f"[DRLEnsemble] Agent '{name}' predict failed: {exc!r} — voting HOLD"
+                )
                 votes[name] = 0  # HOLD on failure
 
         if self.voting_mode == "REGIME_ROUTING":
@@ -83,9 +88,7 @@ class MantisDRLEnsemble:
     # Voting strategies
     # ------------------------------------------------------------------
 
-    def _regime_routing(
-        self, votes: dict[str, int], current_regime: str
-    ) -> DRLEnsembleSignal:
+    def _regime_routing(self, votes: dict[str, int], current_regime: str) -> DRLEnsembleSignal:
         """Route to agents whose best_regime includes current_regime."""
         regime_upper = current_regime.upper()
         matching_votes = {

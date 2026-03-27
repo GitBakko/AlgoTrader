@@ -87,9 +87,7 @@ class BaseRepository(Generic[ModelType]):
         Returns:
             Updated model instance or None if not found
         """
-        await self.session.execute(
-            update(self.model).where(self.model.id == id).values(**values)
-        )
+        await self.session.execute(update(self.model).where(self.model.id == id).values(**values))
         logger.debug(f"Updated {self.model.__name__} ID {id}")
         return await self.get_by_id(id)
 

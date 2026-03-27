@@ -12,10 +12,10 @@ from pydantic import BaseModel, Field
 class TrailingPhase(IntEnum):
     """Stop-loss management phases."""
 
-    INITIAL = 0       # SL at initial level
-    BREAKEVEN = 1     # SL moved to entry (price reached TP1)
-    TP1_LOCK = 2      # SL moved to TP1 (price reached TP2)
-    TRAILING = 3      # Trailing ATR from highest/lowest (after TP2)
+    INITIAL = 0  # SL at initial level
+    BREAKEVEN = 1  # SL moved to entry (price reached TP1)
+    TP1_LOCK = 2  # SL moved to TP1 (price reached TP2)
+    TRAILING = 3  # Trailing ATR from highest/lowest (after TP2)
 
 
 class TrailingStopConfig(BaseModel):

@@ -46,26 +46,69 @@ SUBREDDITS: dict[str, list[str]] = {
 }
 
 EPIC_ASSET_CLASS: dict[str, str] = {
-    "XAUUSD": "commodities", "XAGUSD": "commodities",
-    "BTCUSD": "crypto", "ETHUSD": "crypto", "SOLUSD": "crypto",
-    "BNBUSD": "crypto", "DOGUSD": "crypto", "DASHUSD": "crypto", "ICPUSD": "crypto",
-    "EURUSD": "forex", "GBPUSD": "forex", "USDJPY": "forex",
-    "US500": "stocks", "NAS100": "stocks", "DE40": "stocks",
-    "NVDA": "stocks", "TSLA": "stocks",
-    "WTIUSD": "commodities", "NATGAS": "commodities",
-    "COPPER": "commodities", "PLATINUM": "commodities",
+    "XAUUSD": "commodities",
+    "XAGUSD": "commodities",
+    "BTCUSD": "crypto",
+    "ETHUSD": "crypto",
+    "SOLUSD": "crypto",
+    "BNBUSD": "crypto",
+    "DOGUSD": "crypto",
+    "DASHUSD": "crypto",
+    "ICPUSD": "crypto",
+    "EURUSD": "forex",
+    "GBPUSD": "forex",
+    "USDJPY": "forex",
+    "US500": "stocks",
+    "NAS100": "stocks",
+    "DE40": "stocks",
+    "NVDA": "stocks",
+    "TSLA": "stocks",
+    "WTIUSD": "commodities",
+    "NATGAS": "commodities",
+    "COPPER": "commodities",
+    "PLATINUM": "commodities",
 }
 
 # Simple keyword-based sentiment
 BULLISH_WORDS = {
-    "bull", "bullish", "buy", "long", "moon", "pump", "rocket",
-    "breakout", "higher", "rally", "surge", "soar", "green",
-    "calls", "upside", "ATH", "outperform", "strong",
+    "bull",
+    "bullish",
+    "buy",
+    "long",
+    "moon",
+    "pump",
+    "rocket",
+    "breakout",
+    "higher",
+    "rally",
+    "surge",
+    "soar",
+    "green",
+    "calls",
+    "upside",
+    "ATH",
+    "outperform",
+    "strong",
 }
 BEARISH_WORDS = {
-    "bear", "bearish", "sell", "short", "dump", "crash", "plunge",
-    "breakdown", "lower", "drop", "tank", "red", "puts",
-    "downside", "recession", "weak", "overvalued", "bubble",
+    "bear",
+    "bearish",
+    "sell",
+    "short",
+    "dump",
+    "crash",
+    "plunge",
+    "breakdown",
+    "lower",
+    "drop",
+    "tank",
+    "red",
+    "puts",
+    "downside",
+    "recession",
+    "weak",
+    "overvalued",
+    "bubble",
 }
 
 
@@ -144,13 +187,15 @@ class SocialSentimentClient(SILBaseClient):
         try:
             client = await self._get_client()
             for subreddit in subreddits[:2]:  # Limit to 2 subreddits
-                for keyword in keywords[:2]:   # Limit to 2 keywords
+                for keyword in keywords[:2]:  # Limit to 2 keywords
                     try:
                         resp = await client.get(
                             self.REDDIT_SEARCH_URL.format(subreddit=subreddit),
                             params={
-                                "q": keyword, "sort": "new",
-                                "limit": 10, "t": "day",
+                                "q": keyword,
+                                "sort": "new",
+                                "limit": 10,
+                                "t": "day",
                             },
                             headers={"User-Agent": "MANTIS-AI/1.0"},
                         )

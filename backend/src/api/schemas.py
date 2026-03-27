@@ -8,7 +8,6 @@ from datetime import datetime
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-
 # ── Response helpers ──
 
 
@@ -43,6 +42,7 @@ class DashboardOverview(BaseModel):
 
     equity: float = 0.0
     daily_pnl: float = 0.0
+    today_realized_pnl: float = 0.0
     total_pnl: float = 0.0
     open_positions_count: int = 0
     win_rate: float = 0.0

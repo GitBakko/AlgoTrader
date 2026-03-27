@@ -64,9 +64,7 @@ class RBACManager:
 
         return [f"{p.resource}:{p.action}" for p in permissions]
 
-    async def has_permission(
-        self, user_id: int, resource: str, action: str
-    ) -> bool:
+    async def has_permission(self, user_id: int, resource: str, action: str) -> bool:
         """
         Check if user has a specific permission.
 

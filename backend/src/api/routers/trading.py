@@ -32,9 +32,7 @@ async def start_trading(request: Request):
     """Start the trading loop (idempotent: returns success if already running)."""
     # Check if shutting down
     if getattr(request.app.state, "is_shutting_down", False):
-        return error_response(
-            "Service is shutting down, not accepting new commands", 503
-        )
+        return error_response("Service is shutting down, not accepting new commands", 503)
 
     loop = _get_loop(request)
     if loop is None:
@@ -47,16 +45,20 @@ async def start_trading(request: Request):
 
     mode = loop.execution_engine.mode.value
     if loop.is_running:
-        return success_response({
-            "message": f"Trading già attivo in modalità {mode}",
-            **loop.get_status(),
-        })
+        return success_response(
+            {
+                "message": f"Trading già attivo in modalità {mode}",
+                **loop.get_status(),
+            }
+        )
 
     loop.start()
-    return success_response({
-        "message": f"Trading avviato in modalità {mode}",
-        **loop.get_status(),
-    })
+    return success_response(
+        {
+            "message": f"Trading avviato in modalità {mode}",
+            **loop.get_status(),
+        }
+    )
 
 
 @router.post("/stop")
@@ -68,10 +70,12 @@ async def stop_trading(request: Request):
         return error_response("Trading loop not initialized", 503)
 
     if not loop.is_running:
-        return success_response({
-            "message": "Trading già fermo",
-            **loop.get_status(),
-        })
+        return success_response(
+            {
+                "message": "Trading già fermo",
+                **loop.get_status(),
+            }
+        )
 
     loop.stop()
     return success_response({"message": "Trading fermato", **loop.get_status()})
@@ -82,11 +86,13 @@ async def trading_status(request: Request):
     """Get current status of the trading loop."""
     loop = _get_loop(request)
     if loop is None:
-        return success_response({
-            "running": False,
-            "execution_mode": "PAPER",
-            "message": "Trading loop not initialized",
-        })
+        return success_response(
+            {
+                "running": False,
+                "execution_mode": "PAPER",
+                "message": "Trading loop not initialized",
+            }
+        )
 
     try:
         status = await asyncio.wait_for(loop.get_status_async(), timeout=_BROKER_TIMEOUT)
@@ -96,6 +102,7 @@ async def trading_status(request: Request):
 
     # Inject WS price status
     from src.api.websocket import ws_price_status
+
     status["ws_price_status"] = dict(ws_price_status)
 
     return success_response(status)
@@ -138,7 +145,8 @@ async def trading_performance(
         try:
             date_from = datetime.now(timezone.utc) - timedelta(days=days)
             stats = await position_repo.get_performance_stats(
-                date_from=date_from, epic=epic,
+                date_from=date_from,
+                epic=epic,
             )
             stats["source"] = "database"
             return success_response(stats)
@@ -155,23 +163,25 @@ async def trading_performance(
     wins = [v for v in pnls if v > 0]
     losses = [v for v in pnls if v <= 0]
 
-    return success_response({
-        "trade_count": len(pnls),
-        "win_count": len(wins),
-        "loss_count": len(losses),
-        "win_rate": round(len(wins) / len(pnls), 4) if pnls else 0,
-        "total_pnl": round(sum(pnls), 2),
-        "avg_win": round(sum(wins) / len(wins), 2) if wins else 0,
-        "avg_loss": round(sum(losses) / len(losses), 2) if losses else 0,
-        "profit_factor": 0,
-        "max_consecutive_wins": 0,
-        "max_consecutive_losses": 0,
-        "best_trade": round(max(pnls), 2) if pnls else 0,
-        "worst_trade": round(min(pnls), 2) if pnls else 0,
-        "pnl_by_epic": {},
-        "equity_curve": [],
-        "source": "in_memory",
-    })
+    return success_response(
+        {
+            "trade_count": len(pnls),
+            "win_count": len(wins),
+            "loss_count": len(losses),
+            "win_rate": round(len(wins) / len(pnls), 4) if pnls else 0,
+            "total_pnl": round(sum(pnls), 2),
+            "avg_win": round(sum(wins) / len(wins), 2) if wins else 0,
+            "avg_loss": round(sum(losses) / len(losses), 2) if losses else 0,
+            "profit_factor": 0,
+            "max_consecutive_wins": 0,
+            "max_consecutive_losses": 0,
+            "best_trade": round(max(pnls), 2) if pnls else 0,
+            "worst_trade": round(min(pnls), 2) if pnls else 0,
+            "pnl_by_epic": {},
+            "equity_curve": [],
+            "source": "in_memory",
+        }
+    )
 
 
 @router.post("/emergency-stop")
@@ -200,9 +210,7 @@ async def emergency_stop(request: Request):
 
     # 2. Fetch open positions
     try:
-        positions = await asyncio.wait_for(
-            loop.get_positions_async(), timeout=_BROKER_TIMEOUT
-        )
+        positions = await asyncio.wait_for(loop.get_positions_async(), timeout=_BROKER_TIMEOUT)
     except (asyncio.TimeoutError, Exception) as e:
         logger.warning(f"[EMERGENCY STOP] Async positions failed ({e}), trying sync")
         positions = loop.get_paper_positions()
@@ -220,22 +228,19 @@ async def emergency_stop(request: Request):
             if close_result.success:
                 result["positions_closed"].append(deal_id)
             else:
-                result["errors"].append(
-                    f"{deal_id}: {close_result.error or 'close failed'}"
-                )
+                result["errors"].append(f"{deal_id}: {close_result.error or 'close failed'}")
         except Exception as e:
             result["errors"].append(f"{deal_id}: {e}")
 
     closed = len(result["positions_closed"])
     errors = len(result["errors"])
-    logger.warning(
-        f"[EMERGENCY STOP] Complete: {closed} closed, {errors} errors"
-    )
+    logger.warning(f"[EMERGENCY STOP] Complete: {closed} closed, {errors} errors")
 
     # 4. Fire alert (non-critical)
     try:
         from src.monitoring.alerting.alert_manager import get_alert_manager
         from src.utils.config import get_settings
+
         if getattr(get_settings(), "alerts_enabled", False):
             am = get_alert_manager()
             await am.alert_circuit_breaker(
@@ -246,11 +251,13 @@ async def emergency_stop(request: Request):
     except Exception:
         pass
 
-    return success_response({
-        "message": f"Emergency stop eseguito: {closed} posizioni chiuse"
-                   + (f", {errors} errori" if errors else ""),
-        **result,
-    })
+    return success_response(
+        {
+            "message": f"Emergency stop eseguito: {closed} posizioni chiuse"
+            + (f", {errors} errori" if errors else ""),
+            **result,
+        }
+    )
 
 
 @router.post("/reset-circuit-breakers")
@@ -269,11 +276,13 @@ async def reset_circuit_breakers(request: Request):
     else:
         logger.info("[CB RESET] Manual reset requested (no breakers were active)")
 
-    return success_response({
-        "message": f"Circuit breakers resettati: {len(reset_list)} breaker"
-                   + (f" ({', '.join(reset_list)})" if reset_list else ""),
-        "reset_breakers": reset_list,
-    })
+    return success_response(
+        {
+            "message": f"Circuit breakers resettati: {len(reset_list)} breaker"
+            + (f" ({', '.join(reset_list)})" if reset_list else ""),
+            "reset_breakers": reset_list,
+        }
+    )
 
 
 @router.post("/reset-risk-state")
@@ -306,12 +315,14 @@ async def reset_risk_state(request: Request):
         f"cb={len(reset_list)}"
     )
 
-    return success_response({
-        "message": "Risk state resettato completamente",
-        "kelly_trades_cleared": old_kelly_size,
-        "equity_points_cleared": old_eq_points,
-        "circuit_breakers_reset": len(reset_list),
-    })
+    return success_response(
+        {
+            "message": "Risk state resettato completamente",
+            "kelly_trades_cleared": old_kelly_size,
+            "equity_points_cleared": old_eq_points,
+            "circuit_breakers_reset": len(reset_list),
+        }
+    )
 
 
 # ── Signal Notes (Trade Journal annotations) ──
@@ -352,9 +363,11 @@ async def upsert_signal_note(
         signal_timestamp=body.signal_timestamp,
         notes=body.notes.strip(),
     )
-    return success_response({
-        "epic": note.epic,
-        "signal_timestamp": note.signal_timestamp,
-        "notes": note.notes,
-        "updated_at": note.updated_at.isoformat() if note.updated_at else None,
-    })
+    return success_response(
+        {
+            "epic": note.epic,
+            "signal_timestamp": note.signal_timestamp,
+            "notes": note.notes,
+            "updated_at": note.updated_at.isoformat() if note.updated_at else None,
+        }
+    )

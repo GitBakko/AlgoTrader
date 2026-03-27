@@ -129,6 +129,7 @@ async def get_position_repo(
     if session is None:
         return None
     from src.database.repositories import PositionRepository
+
     return PositionRepository(session)
 
 
@@ -139,6 +140,7 @@ async def get_signal_repo(
     if session is None:
         return None
     from src.database.repositories import SignalRepository
+
     return SignalRepository(session)
 
 
@@ -149,6 +151,7 @@ async def get_trade_repo(
     if session is None:
         return None
     from src.database.repositories import TradeRepository
+
     return TradeRepository(session)
 
 
@@ -159,6 +162,7 @@ async def get_strategy_repo(
     if session is None:
         return None
     from src.database.repositories import StrategyRepository
+
     return StrategyRepository(session)
 
 
@@ -169,6 +173,7 @@ async def get_journal_note_repo(
     if session is None:
         return None
     from src.database.repositories import TradeJournalNoteRepository
+
     return TradeJournalNoteRepository(session)
 
 
@@ -191,6 +196,7 @@ def init_services(app) -> None:
 
     # Core trading services
     from src.risk.circuit_breakers import CircuitBreakerConfig
+
     cb_config = CircuitBreakerConfig(daily_loss_limit=settings.cb_daily_loss_limit)
 
     app.state.execution_engine = ExecutionEngine(mode=ExecutionMode.PAPER)
@@ -205,6 +211,7 @@ def init_services(app) -> None:
     # Enable scalp mode if configured
     if settings.scalp_mode_enabled:
         from src.strategy.scalp_score_strategy import ScalpScoreStrategy
+
         app.state.strategy_manager.scalp_mode = True
         app.state.strategy_manager._scalp_strategy = ScalpScoreStrategy()
         # Stricter circuit breaker for scalp (4 consecutive losses)
@@ -217,12 +224,11 @@ def init_services(app) -> None:
     # Enable ML-Primary mode (takes precedence over scalp when both enabled)
     if settings.ml_primary_enabled:
         from src.strategy.scalp_score_strategy import ScalpScoreStrategy
+
         app.state.strategy_manager._ml_primary_enabled = True
         if app.state.strategy_manager._scalp_strategy is None:
             app.state.strategy_manager._scalp_strategy = ScalpScoreStrategy()
-        logger.info(
-            "ML-Primary mode ENABLED — ML direction + ScalpScore quality gate"
-        )
+        logger.info("ML-Primary mode ENABLED — ML direction + ScalpScore quality gate")
 
     # In-memory stores (fallback when DB not available)
     app.state.signal_history = []
@@ -303,6 +309,7 @@ def init_services(app) -> None:
     # Try to set up DB session factory (graceful if DB not available)
     try:
         from src.database.session import DatabaseManager
+
         factory = DatabaseManager.get_session_factory()
         app.state.db_session_factory = factory
         logger.info("Database session factory configured")

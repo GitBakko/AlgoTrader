@@ -1,5 +1,6 @@
 # MANTIS-EVOLUTION: RL Feature Pipeline
 """Feature normalization for RL observation vectors."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -7,15 +8,23 @@ from loguru import logger
 
 from src.agents.schemas import MarketContext
 
-
 # Top features used for RL observation (subset of MANTIS 220+ features)
 RL_FEATURE_KEYS = [
-    "ema_9", "ema_21", "rsi_14", "adx_14", "macd_histogram",
-    "bb_upper", "bb_lower", "bb_middle", "atr",
-    "volume", "volume_sma", "vwap",
-    "ema_spread",       # computed: (ema_9 - ema_21) / ema_21
-    "rsi_normalized",   # computed: (rsi - 50) / 50
-    "adx_normalized",   # computed: adx / 50
+    "ema_9",
+    "ema_21",
+    "rsi_14",
+    "adx_14",
+    "macd_histogram",
+    "bb_upper",
+    "bb_lower",
+    "bb_middle",
+    "atr",
+    "volume",
+    "volume_sma",
+    "vwap",
+    "ema_spread",  # computed: (ema_9 - ema_21) / ema_21
+    "rsi_normalized",  # computed: (rsi - 50) / 50
+    "adx_normalized",  # computed: adx / 50
 ]
 
 
@@ -60,9 +69,7 @@ class RLFeaturePipeline:
 
         return np.array(result, dtype=np.float32)
 
-    def normalize_rolling(
-        self, features_2d: np.ndarray, window: int = 200
-    ) -> np.ndarray:
+    def normalize_rolling(self, features_2d: np.ndarray, window: int = 200) -> np.ndarray:
         """
         Rolling z-score normalization on a 2D feature array.
 

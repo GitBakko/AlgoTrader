@@ -1,5 +1,6 @@
 # MANTIS-EVOLUTION: DRL Backtester
 """Backtester for validating DRL ensemble before deploy."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -57,7 +58,7 @@ class MantisDRLBacktester:
             regimes = ["UNKNOWN"] * n
 
         balance = self.config.initial_balance
-        position = 0        # 0=flat, 1=long, -1=short
+        position = 0  # 0=flat, 1=long, -1=short
         entry_price = 0.0
         equity_curve: list[float] = [balance]
         trades: list[dict] = []
@@ -95,11 +96,13 @@ class MantisDRLBacktester:
         # ---- Close any open position at end of data ----
         if position != 0:
             final_pnl = self._close_position(position, entry_price, prices[-1])
-            trades.append({
-                "type": f"CLOSE_{'LONG' if position == 1 else 'SHORT'}",
-                "price": float(prices[-1]),
-                "pnl": final_pnl,
-            })
+            trades.append(
+                {
+                    "type": f"CLOSE_{'LONG' if position == 1 else 'SHORT'}",
+                    "price": float(prices[-1]),
+                    "pnl": final_pnl,
+                }
+            )
 
         # ---- Metrics ----
         equity_arr = np.array(equity_curve, dtype=np.float64)
@@ -110,9 +113,7 @@ class MantisDRLBacktester:
 
         metrics = self.analyzer.generate_report(returns, equity_arr, pnl_values)
 
-        benchmark_return = (
-            float((prices[-1] / prices[0]) - 1) if prices[0] != 0 else 0.0
-        )
+        benchmark_return = float((prices[-1] / prices[0]) - 1) if prices[0] != 0 else 0.0
 
         logger.debug(
             f"[MantisDRLBacktester] Completed: {len(trades)} trades, "
@@ -186,9 +187,7 @@ class MantisDRLBacktester:
         last_return = float(returns[-1]) if len(returns) > 0 else 0.0
         mean_return = float(np.mean(returns))
         vol = float(np.std(returns, ddof=1)) if len(returns) > 1 else 0.0
-        momentum_5 = (
-            float(prices[idx] / prices[max(0, idx - 5)] - 1) if idx >= 5 else 0.0
-        )
+        momentum_5 = float(prices[idx] / prices[max(0, idx - 5)] - 1) if idx >= 5 else 0.0
         time_progress = min(idx / max(len(prices), 1), 1.0)
 
         return np.array(

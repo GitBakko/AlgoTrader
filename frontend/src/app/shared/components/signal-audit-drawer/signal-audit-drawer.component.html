@@ -45,6 +45,49 @@
         <span class="mantis-mono">Conf: {{ (audit.confidence * 100).toFixed(1) }}%</span>
       </div>
 
+      <!-- SECTION: Live Position (from broker, not audit) -->
+      @if (livePosition(); as pos) {
+        <div class="audit-section">
+          <div class="audit-section__title">
+            <span class="audit-section__icon">◆</span> Posizione Live (Broker)
+          </div>
+          <div class="ml-grid">
+            <div class="ml-item">
+              <span class="small text-body-secondary">Entry</span>
+              <span class="mantis-mono fw-bold">{{ pos.level }}</span>
+            </div>
+            <div class="ml-item">
+              <span class="small text-body-secondary">Stop Loss</span>
+              <span class="mantis-mono" [class.text-danger]="true">{{ pos.stop_level ?? '-' }}</span>
+            </div>
+            <div class="ml-item">
+              <span class="small text-body-secondary">Take Profit</span>
+              <span class="mantis-mono" [class.text-success]="true">{{ pos.profit_level ?? '-' }}</span>
+            </div>
+            <div class="ml-item">
+              <span class="small text-body-secondary">Size</span>
+              <span class="mantis-mono">{{ pos.size }}</span>
+            </div>
+            <div class="ml-item">
+              <span class="small text-body-secondary">P&L Live</span>
+              @if (livePnl() !== null) {
+                <span class="mantis-mono fw-bold"
+                      [class.text-success]="livePnl()! >= 0"
+                      [class.text-danger]="livePnl()! < 0">
+                  ${{ livePnl()! >= 0 ? '+' : '' }}{{ livePnl()! | number:'1.2-2' }}
+                </span>
+              } @else {
+                <span class="text-body-secondary">-</span>
+              }
+            </div>
+            <div class="ml-item">
+              <span class="small text-body-secondary">Stato</span>
+              <c-badge color="primary">APERTA</c-badge>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- Rejection reason -->
       @if (audit.features?.rejection_reason) {
         <div class="alert alert-warning py-2 px-3 small mb-3">
@@ -119,14 +162,16 @@
               <span class="small text-body-secondary">Conf. ML</span>
               <span class="mantis-mono">{{ (ml.confidence * 100).toFixed(1) }}%</span>
             </div>
-            <div class="ml-item">
-              <span class="small text-body-secondary">Prima → Dopo</span>
-              <span class="mantis-mono">
-                {{ (ml.confidence_before * 100).toFixed(1) }}%
-                →
-                {{ (ml.confidence_after * 100).toFixed(1) }}%
-              </span>
-            </div>
+            @if (ml.confidence_before != null && ml.confidence_after != null) {
+              <div class="ml-item">
+                <span class="small text-body-secondary">Prima → Dopo</span>
+                <span class="mantis-mono">
+                  {{ (ml.confidence_before * 100).toFixed(1) }}%
+                  →
+                  {{ (ml.confidence_after * 100).toFixed(1) }}%
+                </span>
+              </div>
+            }
           </div>
         </div>
       }
@@ -178,6 +223,44 @@
                 <span class="mantis-mono">{{ risk.stop_loss['take_profit'] ?? '-' }}</span>
               </div>
             }
+          </div>
+        </div>
+      }
+
+      <!-- SECTION: SL Cooldown -->
+      @if (epicCooldown(); as cd) {
+        <div class="audit-section">
+          <div class="audit-section__title">
+            <span class="audit-section__icon">◆</span> SL Cooldown
+          </div>
+          <div class="ml-grid">
+            <div class="ml-item">
+              <span class="small text-body-secondary">SL in {{ cd.window_hours }}h</span>
+              <span class="mantis-mono fw-bold"
+                    [class.text-danger]="cd.blocked"
+                    [class.text-warning]="cd.sl_count > 0 && !cd.blocked">
+                {{ cd.sl_count }}/{{ cd.max_strikes }}
+              </span>
+            </div>
+            <div class="ml-item">
+              <span class="small text-body-secondary">Penalty</span>
+              <span class="mantis-mono"
+                    [class.text-danger]="cd.penalty === 0"
+                    [class.text-warning]="cd.penalty > 0 && cd.penalty < 1"
+                    [class.text-success]="cd.penalty === 1">
+                {{ (cd.penalty * 100).toFixed(0) }}%
+              </span>
+            </div>
+            <div class="ml-item">
+              <span class="small text-body-secondary">Stato</span>
+              @if (cd.blocked) {
+                <c-badge color="danger">BLOCCATO</c-badge>
+              } @else if (cd.sl_count > 0) {
+                <c-badge color="warning">Penalizzato</c-badge>
+              } @else {
+                <c-badge color="success">OK</c-badge>
+              }
+            </div>
           </div>
         </div>
       }

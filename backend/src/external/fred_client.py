@@ -91,9 +91,7 @@ class FREDClient(SILBaseClient):
             timestamp=datetime.now(timezone.utc),
         )
         self._set_cache("fred", data)
-        logger.info(
-            f"[FREDClient] Fetched {len(results)}/{len(SERIES_IDS)} series"
-        )
+        logger.info(f"[FREDClient] Fetched {len(results)}/{len(SERIES_IDS)} series")
         return data
 
     async def fetch_single(self, series_id: str) -> float | None:

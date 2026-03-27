@@ -5,7 +5,6 @@ Based on allocation strategy from docs/03-ML-STRATEGY.md.
 
 from src.strategy.schemas import AllocationConfig
 
-
 # Default allocation config
 _DEFAULT_CONFIG = AllocationConfig()
 

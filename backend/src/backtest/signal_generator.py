@@ -52,19 +52,18 @@ class BacktestSignalGenerator:
             DataFrame with columns: timestamp, signal (int), confidence (float), atr (float)
         """
         if ohlc_df.is_empty():
-            return pl.DataFrame(schema={
-                "timestamp": pl.Datetime,
-                "signal": pl.Int32,
-                "confidence": pl.Float64,
-                "atr": pl.Float64,
-            })
+            return pl.DataFrame(
+                schema={
+                    "timestamp": pl.Datetime,
+                    "signal": pl.Int32,
+                    "confidence": pl.Float64,
+                    "atr": pl.Float64,
+                }
+            )
 
         # Step 1: Build features from OHLC
         # Detect if model needs multi-timeframe features (4h_, 1d_ prefixed)
-        has_multi_tf = any(
-            f.startswith("4h_") or f.startswith("1d_")
-            for f in feature_names
-        )
+        has_multi_tf = any(f.startswith("4h_") or f.startswith("1d_") for f in feature_names)
 
         logger.info(
             f"Building features for backtest: {epic}/{timeframe}, "
@@ -76,23 +75,33 @@ class BacktestSignalGenerator:
             start_date = ohlc_df["timestamp"].min()
             end_date = ohlc_df["timestamp"].max()
             df_features, matrix = feature_builder.build_features(
-                epic=epic, timeframe=timeframe,
-                start_date=start_date, end_date=end_date,
-                normalize=True, include_regime=True, multi_timeframe=True,
+                epic=epic,
+                timeframe=timeframe,
+                start_date=start_date,
+                end_date=end_date,
+                normalize=True,
+                include_regime=True,
+                multi_timeframe=True,
             )
         else:
             df_features, matrix = feature_builder.build_features_from_df(
-                ohlc_df, epic, timeframe, normalize=True, include_regime=True,
+                ohlc_df,
+                epic,
+                timeframe,
+                normalize=True,
+                include_regime=True,
             )
 
         if df_features.is_empty():
             logger.warning(f"Feature building returned empty DataFrame for {epic}")
-            return pl.DataFrame(schema={
-                "timestamp": pl.Datetime,
-                "signal": pl.Int32,
-                "confidence": pl.Float64,
-                "atr": pl.Float64,
-            })
+            return pl.DataFrame(
+                schema={
+                    "timestamp": pl.Datetime,
+                    "signal": pl.Int32,
+                    "confidence": pl.Float64,
+                    "atr": pl.Float64,
+                }
+            )
 
         # Step 2: Ensure ATR is available
         if "atr_14" not in df_features.columns:
@@ -109,12 +118,14 @@ class BacktestSignalGenerator:
                 f"Feature mismatch: model expects {len(feature_names)}, "
                 f"only {len(available)} available. Aborting."
             )
-            return pl.DataFrame(schema={
-                "timestamp": pl.Datetime,
-                "signal": pl.Int32,
-                "confidence": pl.Float64,
-                "atr": pl.Float64,
-            })
+            return pl.DataFrame(
+                schema={
+                    "timestamp": pl.Datetime,
+                    "signal": pl.Int32,
+                    "confidence": pl.Float64,
+                    "atr": pl.Float64,
+                }
+            )
 
         missing = [c for c in feature_names if c not in df_features.columns]
         if missing:
@@ -144,14 +155,20 @@ class BacktestSignalGenerator:
 
         # Step 9: Build result DataFrame
         timestamps = df_features["timestamp"].to_list()
-        atr_values = df_features["atr_14"].to_list() if "atr_14" in df_features.columns else [0.0] * len(timestamps)
+        atr_values = (
+            df_features["atr_14"].to_list()
+            if "atr_14" in df_features.columns
+            else [0.0] * len(timestamps)
+        )
 
-        signals_df = pl.DataFrame({
-            "timestamp": timestamps,
-            "signal": predicted_classes.tolist(),
-            "confidence": confidences.tolist(),
-            "atr": atr_values,
-        })
+        signals_df = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "signal": predicted_classes.tolist(),
+                "confidence": confidences.tolist(),
+                "atr": atr_values,
+            }
+        )
 
         # Stats
         n_buy = int((predicted_classes == SignalClass.BUY).sum())

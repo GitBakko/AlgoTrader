@@ -214,18 +214,14 @@ class StateRecoveryService:
             try:
                 positions = await self.broker.list_positions()
                 if attempt > 0:
-                    logger.info(
-                        f"Broker position recovery succeeded on attempt {attempt + 1}/3"
-                    )
+                    logger.info(f"Broker position recovery succeeded on attempt {attempt + 1}/3")
                 logger.debug(f"Loaded {len(positions)} positions from broker")
                 return positions
 
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 # Retryable errors (connection, timeout)
                 if attempt == 2:  # Last attempt
-                    logger.error(
-                        f"Broker positions fetch failed after 3 attempts: {e}"
-                    )
+                    logger.error(f"Broker positions fetch failed after 3 attempts: {e}")
                     return []
 
                 wait_time = 2**attempt  # Exponential backoff: 1s, 2s, 4s
@@ -257,17 +253,19 @@ class StateRecoveryService:
                 # Convert ORM models to dicts matching broker format
                 positions = []
                 for pos in db_positions:
-                    positions.append({
-                        "deal_id": pos.deal_id,
-                        "epic": pos.epic,
-                        "direction": pos.direction,
-                        "size": float(pos.size),
-                        "level": float(pos.entry_price),
-                        "stop_loss": float(pos.stop_loss) if pos.stop_loss else None,
-                        "take_profit": float(pos.take_profit) if pos.take_profit else None,
-                        "unrealized_pnl": float(pos.profit_loss) if pos.profit_loss else 0.0,
-                        "created_at": pos.opened_at.isoformat(),
-                    })
+                    positions.append(
+                        {
+                            "deal_id": pos.deal_id,
+                            "epic": pos.epic,
+                            "direction": pos.direction,
+                            "size": float(pos.size),
+                            "level": float(pos.entry_price),
+                            "stop_loss": float(pos.stop_loss) if pos.stop_loss else None,
+                            "take_profit": float(pos.take_profit) if pos.take_profit else None,
+                            "unrealized_pnl": float(pos.profit_loss) if pos.profit_loss else 0.0,
+                            "created_at": pos.opened_at.isoformat(),
+                        }
+                    )
 
                 logger.debug(f"Loaded {len(positions)} positions from database")
                 return positions
@@ -320,9 +318,7 @@ class StateRecoveryService:
         # Positions in broker but not in DB (opened externally or recovery gap)
         new_ids = broker_ids - db_ids
         if new_ids:
-            logger.info(
-                f"Found {len(new_ids)} new positions in broker (not in DB): {new_ids}"
-            )
+            logger.info(f"Found {len(new_ids)} new positions in broker (not in DB): {new_ids}")
 
         # Check for size mismatches on shared positions and update DB
         db_by_id = {p["deal_id"]: p for p in db_positions}
@@ -421,7 +417,9 @@ class StateRecoveryService:
                             phase=state.phase,
                             tp1_level=float(state.tp1_level) if state.tp1_level else None,
                             tp2_level=float(state.tp2_level) if state.tp2_level else None,
-                            highest_price=float(state.highest_price) if state.highest_price else None,
+                            highest_price=(
+                                float(state.highest_price) if state.highest_price else None
+                            ),
                             lowest_price=float(state.lowest_price) if state.lowest_price else None,
                         )
                         restored_count += 1
@@ -504,7 +502,10 @@ class StateRecoveryService:
                 # FIX: If snapshot is from a previous day, reset daily_start to current equity
                 # to prevent stale daily P&L from tripping circuit breakers on restart
                 from datetime import datetime, timezone
-                snapshot_date = snapshot.snapshot_at.strftime("%Y-%m-%d") if snapshot.snapshot_at else ""
+
+                snapshot_date = (
+                    snapshot.snapshot_at.strftime("%Y-%m-%d") if snapshot.snapshot_at else ""
+                )
                 today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
                 if snapshot_date != today:
                     dm._state.daily_start_equity = float(snapshot.current_equity)
@@ -522,6 +523,7 @@ class StateRecoveryService:
                 # Restore tripped breakers: {breaker_type: reason_string}
                 import time as _time
                 from src.risk.circuit_breakers import CircuitBreakerType
+
                 for breaker_type_str, reason in snapshot.tripped_breakers.items():
                     try:
                         cb_type = CircuitBreakerType(breaker_type_str)

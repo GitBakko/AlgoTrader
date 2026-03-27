@@ -134,9 +134,7 @@ class TrendFollowingStrategy(BaseStrategy):
             direction=macro_direction,
             confidence=blended_confidence,
             signal_class=(
-                SignalClass.BUY
-                if macro_direction == SignalDirection.BUY
-                else SignalClass.SELL
+                SignalClass.BUY if macro_direction == SignalDirection.BUY else SignalClass.SELL
             ),
             entry_price=price,
             strategy_name="trend_following",
@@ -164,19 +162,21 @@ class TrendFollowingStrategy(BaseStrategy):
         required = ["close", "sma_50", "ema_8", "ema_21", "adx"]
         missing = [c for c in required if c not in df.columns]
         if missing:
-            logger.warning(
-                f"{epic}: Trend backtest missing columns: {missing}"
+            logger.warning(f"{epic}: Trend backtest missing columns: {missing}")
+            return df.with_columns(
+                [
+                    pl.lit(0).alias("signal_direction"),
+                    pl.lit(0.0).alias("signal_confidence"),
+                ]
             )
-            return df.with_columns([
-                pl.lit(0).alias("signal_direction"),
-                pl.lit(0.0).alias("signal_confidence"),
-            ])
 
         # Previous EMA values for crossover detection
-        df = df.with_columns([
-            pl.col("ema_8").shift(1).alias("_ema_8_prev"),
-            pl.col("ema_21").shift(1).alias("_ema_21_prev"),
-        ])
+        df = df.with_columns(
+            [
+                pl.col("ema_8").shift(1).alias("_ema_8_prev"),
+                pl.col("ema_21").shift(1).alias("_ema_21_prev"),
+            ]
+        )
 
         # Macro trend
         bullish_trend = pl.col("close") > pl.col("sma_50")
@@ -193,19 +193,22 @@ class TrendFollowingStrategy(BaseStrategy):
         adx_factor = (pl.col("adx") / 50.0).clip(0.0, 1.0)
         base_confidence = 0.4 * adx_factor + 0.6 * 0.60  # Use 0.60 as default ML proxy
 
-        df = df.with_columns([
-            pl.when(bullish_trend & ema_bullish & adx_ok)
-            .then(1)
-            .when(bearish_trend & ema_bearish & adx_ok)
-            .then(-1)
-            .otherwise(0)
-            .alias("signal_direction"),
-
-            pl.when((bullish_trend & ema_bullish & adx_ok) | (bearish_trend & ema_bearish & adx_ok))
-            .then(base_confidence)
-            .otherwise(0.0)
-            .alias("signal_confidence"),
-        ])
+        df = df.with_columns(
+            [
+                pl.when(bullish_trend & ema_bullish & adx_ok)
+                .then(1)
+                .when(bearish_trend & ema_bearish & adx_ok)
+                .then(-1)
+                .otherwise(0)
+                .alias("signal_direction"),
+                pl.when(
+                    (bullish_trend & ema_bullish & adx_ok) | (bearish_trend & ema_bearish & adx_ok)
+                )
+                .then(base_confidence)
+                .otherwise(0.0)
+                .alias("signal_confidence"),
+            ]
+        )
 
         # Cleanup temp columns
         df = df.drop(["_ema_8_prev", "_ema_21_prev"])

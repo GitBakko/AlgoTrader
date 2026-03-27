@@ -1,5 +1,6 @@
 # MANTIS-EVOLUTION: Vision Analyzer (Claude Vision API)
 """Analyzes trading charts using Claude's vision capabilities."""
+
 from __future__ import annotations
 
 import base64
@@ -13,6 +14,7 @@ from src.vision.schemas import VisionReport
 
 try:
     import anthropic
+
     HAS_ANTHROPIC = True
 except ImportError:
     HAS_ANTHROPIC = False

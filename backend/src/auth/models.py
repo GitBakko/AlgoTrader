@@ -12,7 +12,6 @@ from sqlmodel import Field, Relationship, SQLModel
 
 from src.database.models import metadata
 
-
 # Association table for many-to-many relationship between roles and permissions
 role_permissions = Table(
     "role_permissions",

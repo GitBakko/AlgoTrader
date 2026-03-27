@@ -102,8 +102,11 @@ class MacroDataClient:
         for name, ticker in MACRO_TICKERS.items():
             try:
                 data = yf.download(
-                    ticker, start=start_str, end=end_str,
-                    progress=False, auto_adjust=True,
+                    ticker,
+                    start=start_str,
+                    end=end_str,
+                    progress=False,
+                    auto_adjust=True,
                 )
                 if data is not None and not data.empty:
                     # yfinance returns pandas — convert to polars
@@ -143,9 +146,10 @@ class MacroDataClient:
             change_col = f"{name}_change_5d"
             if close_col in result.columns:
                 result = result.with_columns(
-                    ((pl.col(close_col) - pl.col(close_col).shift(5))
-                     / pl.col(close_col).shift(5))
-                    .alias(change_col)
+                    (
+                        (pl.col(close_col) - pl.col(close_col).shift(5))
+                        / pl.col(close_col).shift(5)
+                    ).alias(change_col)
                 )
 
         # Fill any remaining NaN with 0
@@ -155,7 +159,8 @@ class MacroDataClient:
         return result
 
     def _filter_dates(
-        self, df: pl.DataFrame,
+        self,
+        df: pl.DataFrame,
         start_date: datetime | None,
         end_date: datetime | None,
     ) -> pl.DataFrame:
@@ -170,12 +175,14 @@ class MacroDataClient:
 
     def _empty_macro_df(self) -> pl.DataFrame:
         """Return an empty DataFrame with the expected schema."""
-        return pl.DataFrame({
-            "date": pl.Series([], dtype=pl.Date),
-            "vix_close": pl.Series([], dtype=pl.Float64),
-            "vix_change_5d": pl.Series([], dtype=pl.Float64),
-            "dxy_close": pl.Series([], dtype=pl.Float64),
-            "dxy_change_5d": pl.Series([], dtype=pl.Float64),
-            "yield_10y_close": pl.Series([], dtype=pl.Float64),
-            "yield_10y_change_5d": pl.Series([], dtype=pl.Float64),
-        })
+        return pl.DataFrame(
+            {
+                "date": pl.Series([], dtype=pl.Date),
+                "vix_close": pl.Series([], dtype=pl.Float64),
+                "vix_change_5d": pl.Series([], dtype=pl.Float64),
+                "dxy_close": pl.Series([], dtype=pl.Float64),
+                "dxy_change_5d": pl.Series([], dtype=pl.Float64),
+                "yield_10y_close": pl.Series([], dtype=pl.Float64),
+                "yield_10y_change_5d": pl.Series([], dtype=pl.Float64),
+            }
+        )

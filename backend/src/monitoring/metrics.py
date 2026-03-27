@@ -209,14 +209,10 @@ class MetricsCollector:
             outcome: success, rejected, failed
             duration_seconds: Execution duration
         """
-        mantis_trades_executed_total.labels(
-            epic=epic, direction=direction, outcome=outcome
-        ).inc()
+        mantis_trades_executed_total.labels(epic=epic, direction=direction, outcome=outcome).inc()
 
         if duration_seconds is not None:
-            mantis_trade_execution_duration_seconds.labels(epic=epic).observe(
-                duration_seconds
-            )
+            mantis_trade_execution_duration_seconds.labels(epic=epic).observe(duration_seconds)
 
     @staticmethod
     def record_signal(epic: str, direction: str, strategy: str, confidence: float):

@@ -61,10 +61,7 @@ class FearGreedClient(SILBaseClient):
         # 1. VIX level (30%) — higher VIX = lower F&G (more fear)
         if vix is not None:
             vix_clamped = max(self.VIX_FLOOR, min(self.VIX_CEILING, vix))
-            vix_score = (
-                (self.VIX_CEILING - vix_clamped)
-                / (self.VIX_CEILING - self.VIX_FLOOR) * 100
-            )
+            vix_score = (self.VIX_CEILING - vix_clamped) / (self.VIX_CEILING - self.VIX_FLOOR) * 100
             components.append(vix_score)
             weights.append(0.30)
 

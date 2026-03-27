@@ -1,5 +1,6 @@
 # MANTIS-EVOLUTION: RL Agent Wrapper
 """RL agent that integrates with MantisAgentOrchestrator."""
+
 from __future__ import annotations
 
 import numpy as np

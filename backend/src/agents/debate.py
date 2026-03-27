@@ -77,9 +77,7 @@ class BullBearDebate:
             try:
                 return await self._llm_debate(proposal, technical, sentiment, risk)
             except Exception as exc:
-                logger.warning(
-                    f"[DEBATE] LLM path failed ({exc!r}), falling back to heuristic."
-                )
+                logger.warning(f"[DEBATE] LLM path failed ({exc!r}), falling back to heuristic.")
         return self._heuristic_debate(proposal, technical, sentiment, risk)
 
     # ------------------------------------------------------------------
@@ -186,10 +184,7 @@ class BullBearDebate:
                 )
 
             # Resistance proximity: only relevant for BUY proposals
-            if (
-                technical.key_resistance_levels
-                and proposal.action == "BUY"
-            ):
+            if technical.key_resistance_levels and proposal.action == "BUY":
                 nearest_resistance = min(technical.key_resistance_levels)
                 if nearest_resistance < proposal.entry_price * 1.01:
                     bear_args.append(
@@ -213,8 +208,7 @@ class BullBearDebate:
                     DebateArgument(
                         side="BULL",
                         argument=(
-                            f"Sentiment is bullish "
-                            f"(composite={sentiment.composite_score:.2f})"
+                            f"Sentiment is bullish " f"(composite={sentiment.composite_score:.2f})"
                         ),
                         confidence=sentiment.confidence,
                         evidence=[f"Narrative: {sentiment.dominant_narrative}"],
@@ -225,8 +219,7 @@ class BullBearDebate:
                     DebateArgument(
                         side="BEAR",
                         argument=(
-                            f"Sentiment is bearish "
-                            f"(composite={sentiment.composite_score:.2f})"
+                            f"Sentiment is bearish " f"(composite={sentiment.composite_score:.2f})"
                         ),
                         confidence=sentiment.confidence,
                         evidence=[f"Narrative: {sentiment.dominant_narrative}"],
@@ -262,10 +255,7 @@ class BullBearDebate:
                 bull_args.append(
                     DebateArgument(
                         side="BULL",
-                        argument=(
-                            f"Low risk environment "
-                            f"(score={risk.risk_score:.2f})"
-                        ),
+                        argument=(f"Low risk environment " f"(score={risk.risk_score:.2f})"),
                         confidence=1.0 - risk.risk_score,
                         evidence=[],
                     )

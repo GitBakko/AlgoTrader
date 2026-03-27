@@ -49,8 +49,8 @@ class StrategyConfig(BaseModel):
     stop_multiplier: float = Field(default=2.0, ge=0.5, le=5.0)
     risk_reward_ratio: float = Field(default=2.5, ge=0.5, le=5.0)
     adx_trending_threshold: float = Field(default=28.0, ge=10.0, le=50.0)  # was 25.0
-    adx_ranging_threshold: float = Field(default=15.0, ge=5.0, le=40.0)    # restored from 20.0
-    adx_confidence_boost: float = Field(default=0.08, ge=0.0, le=0.15)     # was 0.05
+    adx_ranging_threshold: float = Field(default=15.0, ge=5.0, le=40.0)  # restored from 20.0
+    adx_confidence_boost: float = Field(default=0.08, ge=0.0, le=0.15)  # was 0.05
 
     # Trend filter
     trend_sma_penalty: float = Field(default=0.70, ge=0.0, le=1.0)
@@ -77,19 +77,37 @@ class AllocationConfig(BaseModel):
     regime_adjustments: dict[str, dict[str, float]] = Field(
         default_factory=lambda: {
             "bull": {
-                "XAUUSD": 0.08, "BTCUSD": 0.12, "US500": 0.15,
-                "WTIUSD": 0.12, "EURUSD": 0.06, "NVDA": 0.14,
-                "TSLA": 0.11, "XAGUSD": 0.07, "DE40": 0.15,
+                "XAUUSD": 0.08,
+                "BTCUSD": 0.12,
+                "US500": 0.15,
+                "WTIUSD": 0.12,
+                "EURUSD": 0.06,
+                "NVDA": 0.14,
+                "TSLA": 0.11,
+                "XAGUSD": 0.07,
+                "DE40": 0.15,
             },
             "bear": {
-                "XAUUSD": 0.18, "BTCUSD": 0.06, "US500": 0.10,
-                "WTIUSD": 0.08, "EURUSD": 0.16, "NVDA": 0.06,
-                "TSLA": 0.04, "XAGUSD": 0.16, "DE40": 0.16,
+                "XAUUSD": 0.18,
+                "BTCUSD": 0.06,
+                "US500": 0.10,
+                "WTIUSD": 0.08,
+                "EURUSD": 0.16,
+                "NVDA": 0.06,
+                "TSLA": 0.04,
+                "XAGUSD": 0.16,
+                "DE40": 0.16,
             },
             "high_vol": {
-                "XAUUSD": 0.18, "BTCUSD": 0.05, "US500": 0.12,
-                "WTIUSD": 0.08, "EURUSD": 0.15, "NVDA": 0.06,
-                "TSLA": 0.04, "XAGUSD": 0.14, "DE40": 0.18,
+                "XAUUSD": 0.18,
+                "BTCUSD": 0.05,
+                "US500": 0.12,
+                "WTIUSD": 0.08,
+                "EURUSD": 0.15,
+                "NVDA": 0.06,
+                "TSLA": 0.04,
+                "XAGUSD": 0.14,
+                "DE40": 0.18,
             },
         }
     )

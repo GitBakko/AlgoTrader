@@ -64,9 +64,7 @@ class BacktestEngine:
         sig_vals = signals_df["signal"].to_list()
         signal_map = dict(zip(sig_ts, sig_vals))
         atr_map = (
-            dict(zip(sig_ts, signals_df["atr"].to_list()))
-            if "atr" in signals_df.columns
-            else {}
+            dict(zip(sig_ts, signals_df["atr"].to_list())) if "atr" in signals_df.columns else {}
         )
 
         total_bars = len(ohlc_df)
@@ -157,9 +155,7 @@ class BacktestEngine:
                 self.portfolio.close_position_by_signal(trade, current_price, bar_time)
 
         # Open new position if none in desired direction
-        has_position = any(
-            t.direction == desired_direction for t in self.portfolio.open_positions
-        )
+        has_position = any(t.direction == desired_direction for t in self.portfolio.open_positions)
 
         if not has_position:
             self.portfolio.open_position(

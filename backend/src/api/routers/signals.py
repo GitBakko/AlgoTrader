@@ -97,9 +97,7 @@ async def generate_test_signal(
 
     # Default market data for testing
     market_data = {
-        "current_price": {"XAUUSD": 2000.0, "BTCUSD": 50000.0, "US500": 5000.0}.get(
-            epic, 1000.0
-        ),
+        "current_price": {"XAUUSD": 2000.0, "BTCUSD": 50000.0, "US500": 5000.0}.get(epic, 1000.0),
         "atr": {"XAUUSD": 20.0, "BTCUSD": 1000.0, "US500": 50.0}.get(epic, 10.0),
     }
 
@@ -157,9 +155,7 @@ async def predict_and_execute(
         return error_response("Prediction service not available", 503)
 
     if not prediction_service.has_model_for(epic):
-        return error_response(
-            f"No model loaded for {epic}. Train a model first.", 503
-        )
+        return error_response(f"No model loaded for {epic}. Train a model first.", 503)
 
     # Step 1: ML Prediction
     prediction = prediction_service.predict(epic, timeframe)
@@ -264,19 +260,21 @@ async def get_signal_audit(
     if signal is None:
         return error_response(f"Signal {signal_id} not found", 404)
 
-    return success_response({
-        "id": signal.id,
-        "epic": signal.epic,
-        "direction": signal.direction,
-        "confidence": float(signal.confidence),
-        "status": signal.status,
-        "generated_at": signal.generated_at.isoformat() if signal.generated_at else None,
-        "entry_price": float(signal.predicted_price) if signal.predicted_price else None,
-        "stop_loss": float(signal.stop_loss_price) if signal.stop_loss_price else None,
-        "take_profit": float(signal.take_profit_price) if signal.take_profit_price else None,
-        "position_id": signal.position_id,
-        "features": signal.features or {},
-    })
+    return success_response(
+        {
+            "id": signal.id,
+            "epic": signal.epic,
+            "direction": signal.direction,
+            "confidence": float(signal.confidence),
+            "status": signal.status,
+            "generated_at": signal.generated_at.isoformat() if signal.generated_at else None,
+            "entry_price": float(signal.predicted_price) if signal.predicted_price else None,
+            "stop_loss": float(signal.stop_loss_price) if signal.stop_loss_price else None,
+            "take_profit": float(signal.take_profit_price) if signal.take_profit_price else None,
+            "position_id": signal.position_id,
+            "features": signal.features or {},
+        }
+    )
 
 
 @router.get("/audit/position/{deal_id}")
@@ -299,19 +297,21 @@ async def get_signal_by_position(
     if signal is None:
         return error_response(f"No signal found for position {deal_id}", 404)
 
-    return success_response({
-        "id": signal.id,
-        "epic": signal.epic,
-        "direction": signal.direction,
-        "confidence": float(signal.confidence),
-        "status": signal.status,
-        "generated_at": signal.generated_at.isoformat() if signal.generated_at else None,
-        "entry_price": float(signal.predicted_price) if signal.predicted_price else None,
-        "stop_loss": float(signal.stop_loss_price) if signal.stop_loss_price else None,
-        "take_profit": float(signal.take_profit_price) if signal.take_profit_price else None,
-        "position_id": signal.position_id,
-        "features": signal.features or {},
-    })
+    return success_response(
+        {
+            "id": signal.id,
+            "epic": signal.epic,
+            "direction": signal.direction,
+            "confidence": float(signal.confidence),
+            "status": signal.status,
+            "generated_at": signal.generated_at.isoformat() if signal.generated_at else None,
+            "entry_price": float(signal.predicted_price) if signal.predicted_price else None,
+            "stop_loss": float(signal.stop_loss_price) if signal.stop_loss_price else None,
+            "take_profit": float(signal.take_profit_price) if signal.take_profit_price else None,
+            "position_id": signal.position_id,
+            "features": signal.features or {},
+        }
+    )
 
 
 @router.get("/audit/history/{epic}")
@@ -328,9 +328,11 @@ async def get_signal_history(
     history = await signal_repo.get_history_by_epic(epic, limit=limit, offset=offset)
     total = await signal_repo.count_by_epic(epic)
 
-    return success_response({
-        "items": history,
-        "total": total,
-        "limit": limit,
-        "offset": offset,
-    })
+    return success_response(
+        {
+            "items": history,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }
+    )

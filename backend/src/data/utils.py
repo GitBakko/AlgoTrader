@@ -8,7 +8,6 @@ from pathlib import Path
 
 from src.broker.models import Resolution
 
-
 # ===== Timeframe Conversions =====
 
 TIMEFRAME_TO_RESOLUTION = {

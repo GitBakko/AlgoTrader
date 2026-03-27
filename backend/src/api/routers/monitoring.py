@@ -3,6 +3,7 @@ Monitoring API Router - Endpoints for trading logs and statistics.
 
 Provides access to structured logging data for analysis and debugging.
 """
+
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Query
@@ -55,23 +56,25 @@ async def get_signal_logs(
     try:
         stats: SignalStats = await analyzer.get_signal_stats(start_date, end_date)
 
-        return success_response({
-            "period": {
-                "start_date": start_date.isoformat(),
-                "end_date": end_date.isoformat(),
-                "days": days,
-            },
-            "summary": {
-                "total_signals": stats.total_signals,
-                "executed": stats.executed,
-                "rejected": stats.rejected,
-                "hold": stats.hold,
-                "execution_rate_pct": stats.execution_rate_pct,
-            },
-            "by_epic": stats.by_epic,
-            "by_strategy": stats.by_strategy,
-            "by_direction": stats.by_direction,
-        })
+        return success_response(
+            {
+                "period": {
+                    "start_date": start_date.isoformat(),
+                    "end_date": end_date.isoformat(),
+                    "days": days,
+                },
+                "summary": {
+                    "total_signals": stats.total_signals,
+                    "executed": stats.executed,
+                    "rejected": stats.rejected,
+                    "hold": stats.hold,
+                    "execution_rate_pct": stats.execution_rate_pct,
+                },
+                "by_epic": stats.by_epic,
+                "by_strategy": stats.by_strategy,
+                "by_direction": stats.by_direction,
+            }
+        )
 
     except Exception as e:
         logger.error(f"Failed to get signal logs: {e}")
@@ -109,28 +112,30 @@ async def get_execution_logs(
     try:
         stats: ExecutionStats = await analyzer.get_execution_stats(start_date, end_date)
 
-        return success_response({
-            "period": {
-                "start_date": start_date.isoformat(),
-                "end_date": end_date.isoformat(),
-                "days": days,
-            },
-            "summary": {
-                "total_trades": stats.total_trades,
-                "open_positions": stats.open_positions,
-                "closed_trades": stats.closed_trades,
-                "total_pnl": stats.total_pnl,
-                "avg_pnl": stats.avg_pnl,
-                "wins": stats.wins,
-                "losses": stats.losses,
-                "win_rate_pct": stats.win_rate_pct,
-                "avg_win": stats.avg_win,
-                "avg_loss": stats.avg_loss,
-                "profit_factor": stats.profit_factor,
-                "avg_duration_hours": stats.avg_duration_hours,
-            },
-            "by_epic": stats.by_epic,
-        })
+        return success_response(
+            {
+                "period": {
+                    "start_date": start_date.isoformat(),
+                    "end_date": end_date.isoformat(),
+                    "days": days,
+                },
+                "summary": {
+                    "total_trades": stats.total_trades,
+                    "open_positions": stats.open_positions,
+                    "closed_trades": stats.closed_trades,
+                    "total_pnl": stats.total_pnl,
+                    "avg_pnl": stats.avg_pnl,
+                    "wins": stats.wins,
+                    "losses": stats.losses,
+                    "win_rate_pct": stats.win_rate_pct,
+                    "avg_win": stats.avg_win,
+                    "avg_loss": stats.avg_loss,
+                    "profit_factor": stats.profit_factor,
+                    "avg_duration_hours": stats.avg_duration_hours,
+                },
+                "by_epic": stats.by_epic,
+            }
+        )
 
     except Exception as e:
         logger.error(f"Failed to get execution logs: {e}")
@@ -168,23 +173,29 @@ async def get_risk_event_logs(
     try:
         stats: RiskStats = await analyzer.get_risk_stats(start_date, end_date)
 
-        return success_response({
-            "period": {
-                "start_date": start_date.isoformat(),
-                "end_date": end_date.isoformat(),
-                "days": days,
-            },
-            "summary": {
-                "total_events": stats.total_events,
-                "circuit_breaker_triggers": stats.circuit_breaker_triggers,
-                "position_limit_hits": stats.position_limit_hits,
-                "drawdown_limit_hits": stats.drawdown_limit_hits,
-                "max_drawdown_pct": stats.max_drawdown_pct,
-                "avg_daily_pnl": stats.avg_daily_pnl,
-                "last_event": stats.last_event_timestamp.isoformat() if stats.last_event_timestamp else None,
-            },
-            "by_event_type": stats.by_event_type,
-        })
+        return success_response(
+            {
+                "period": {
+                    "start_date": start_date.isoformat(),
+                    "end_date": end_date.isoformat(),
+                    "days": days,
+                },
+                "summary": {
+                    "total_events": stats.total_events,
+                    "circuit_breaker_triggers": stats.circuit_breaker_triggers,
+                    "position_limit_hits": stats.position_limit_hits,
+                    "drawdown_limit_hits": stats.drawdown_limit_hits,
+                    "max_drawdown_pct": stats.max_drawdown_pct,
+                    "avg_daily_pnl": stats.avg_daily_pnl,
+                    "last_event": (
+                        stats.last_event_timestamp.isoformat()
+                        if stats.last_event_timestamp
+                        else None
+                    ),
+                },
+                "by_event_type": stats.by_event_type,
+            }
+        )
 
     except Exception as e:
         logger.error(f"Failed to get risk event logs: {e}")
@@ -228,31 +239,37 @@ async def get_performance_overview(
         # Calculate health score (0-100)
         health_score = _calculate_health_score(signal_stats, exec_stats, risk_stats)
 
-        return success_response({
-            "period": {
-                "start_date": start_date.isoformat(),
-                "end_date": end_date.isoformat(),
-                "days": days,
-            },
-            "health_score": health_score,
-            "signals": {
-                "total": signal_stats.total_signals,
-                "execution_rate_pct": signal_stats.execution_rate_pct,
-                "top_strategy": max(signal_stats.by_strategy.items(), key=lambda x: x[1])[0] if signal_stats.by_strategy else None,
-            },
-            "execution": {
-                "total_trades": exec_stats.total_trades,
-                "open_positions": exec_stats.open_positions,
-                "total_pnl": exec_stats.total_pnl,
-                "win_rate_pct": exec_stats.win_rate_pct,
-                "profit_factor": exec_stats.profit_factor,
-            },
-            "risk": {
-                "circuit_breaker_triggers": risk_stats.circuit_breaker_triggers,
-                "max_drawdown_pct": risk_stats.max_drawdown_pct,
-                "avg_daily_pnl": risk_stats.avg_daily_pnl,
-            },
-        })
+        return success_response(
+            {
+                "period": {
+                    "start_date": start_date.isoformat(),
+                    "end_date": end_date.isoformat(),
+                    "days": days,
+                },
+                "health_score": health_score,
+                "signals": {
+                    "total": signal_stats.total_signals,
+                    "execution_rate_pct": signal_stats.execution_rate_pct,
+                    "top_strategy": (
+                        max(signal_stats.by_strategy.items(), key=lambda x: x[1])[0]
+                        if signal_stats.by_strategy
+                        else None
+                    ),
+                },
+                "execution": {
+                    "total_trades": exec_stats.total_trades,
+                    "open_positions": exec_stats.open_positions,
+                    "total_pnl": exec_stats.total_pnl,
+                    "win_rate_pct": exec_stats.win_rate_pct,
+                    "profit_factor": exec_stats.profit_factor,
+                },
+                "risk": {
+                    "circuit_breaker_triggers": risk_stats.circuit_breaker_triggers,
+                    "max_drawdown_pct": risk_stats.max_drawdown_pct,
+                    "avg_daily_pnl": risk_stats.avg_daily_pnl,
+                },
+            }
+        )
 
     except Exception as e:
         logger.error(f"Failed to get performance overview: {e}")

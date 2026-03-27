@@ -60,13 +60,9 @@ class RegimeDetector:
 
         # Classify raw regime per bar
         df = df.with_columns(
-            pl.when(
-                (pl.col("adx") > self.adx_threshold) & (pl.col("_ema_slope") > 0)
-            )
+            pl.when((pl.col("adx") > self.adx_threshold) & (pl.col("_ema_slope") > 0))
             .then(pl.lit(MarketRegime.TRENDING_UP.value))
-            .when(
-                (pl.col("adx") > self.adx_threshold) & (pl.col("_ema_slope") <= 0)
-            )
+            .when((pl.col("adx") > self.adx_threshold) & (pl.col("_ema_slope") <= 0))
             .then(pl.lit(MarketRegime.TRENDING_DOWN.value))
             .otherwise(pl.lit(MarketRegime.RANGING.value))
             .alias("regime")

@@ -100,9 +100,7 @@ async def search_markets(
         results = SUPPORTED_MARKETS
     else:
         results = [
-            m
-            for m in SUPPORTED_MARKETS
-            if query in m.epic.lower() or query in m.name.lower()
+            m for m in SUPPORTED_MARKETS if query in m.epic.lower() or query in m.name.lower()
         ]
 
     return success_response([m.model_dump() for m in results])
@@ -158,7 +156,11 @@ async def get_market_prices(
         try:
             from src.broker.models import Resolution
 
-            res = Resolution(resolution.upper()) if resolution.upper() in _RESOLUTION_MAP else Resolution.HOUR
+            res = (
+                Resolution(resolution.upper())
+                if resolution.upper() in _RESOLUTION_MAP
+                else Resolution.HOUR
+            )
             candles_raw = await broker.get_historical_prices(
                 epic=epic.upper(), resolution=res, max_candles=max_candles
             )

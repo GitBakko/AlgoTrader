@@ -1,5 +1,6 @@
 # MANTIS-EVOLUTION: Short Term Memory
 """Short-term memory with exponential decay — stores recent signals and trades."""
+
 from __future__ import annotations
 
 import math
@@ -185,12 +186,8 @@ class MantisShortTermMemory:
                 return False
             with open(load_path, "rb") as f:
                 data = pickle.load(f)
-            self._signals = deque(
-                data.get("signals", []), maxlen=self.config.stm_max_signals
-            )
-            self._trades = deque(
-                data.get("trades", []), maxlen=self.config.stm_max_trades
-            )
+            self._signals = deque(data.get("signals", []), maxlen=self.config.stm_max_signals)
+            self._trades = deque(data.get("trades", []), maxlen=self.config.stm_max_trades)
             logger.debug(
                 f"STM snapshot loaded from {load_path}: "
                 f"{len(self._signals)} signals, {len(self._trades)} trades"

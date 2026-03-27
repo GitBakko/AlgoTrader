@@ -20,9 +20,7 @@ class TradeRepository(BaseRepository[Trade]):
     async def get_by_position(self, position_id: int) -> list[Trade]:
         """Get all trades for a position (audit trail)."""
         result = await self.session.execute(
-            select(Trade)
-            .where(Trade.position_id == position_id)
-            .order_by(Trade.executed_at.asc())
+            select(Trade).where(Trade.position_id == position_id).order_by(Trade.executed_at.asc())
         )
         return list(result.scalars().all())
 
@@ -32,15 +30,11 @@ class TradeRepository(BaseRepository[Trade]):
 
         cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
         result = await self.session.execute(
-            select(Trade)
-            .where(Trade.executed_at >= cutoff)
-            .order_by(Trade.executed_at.desc())
+            select(Trade).where(Trade.executed_at >= cutoff).order_by(Trade.executed_at.desc())
         )
         return list(result.scalars().all())
 
-    async def get_trades_for_audit(
-        self, start: datetime, end: datetime
-    ) -> list[Trade]:
+    async def get_trades_for_audit(self, start: datetime, end: datetime) -> list[Trade]:
         """Get trades in a date range for audit purposes."""
         result = await self.session.execute(
             select(Trade)

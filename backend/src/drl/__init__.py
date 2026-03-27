@@ -1,5 +1,6 @@
 # MANTIS-EVOLUTION: DRL Ensemble package
 """Deep Reinforcement Learning ensemble for MANTIS AI (Sprint 5)."""
+
 from src.drl.schemas import (
     DRLConfig,
     TrainingResult,
@@ -27,6 +28,7 @@ def __getattr__(name: str):
     """Lazy-load MantisDRLEnsembleAgent to break the circular import."""
     if name == "MantisDRLEnsembleAgent":
         from src.drl.drl_ensemble_agent import MantisDRLEnsembleAgent  # noqa: PLC0415
+
         return MantisDRLEnsembleAgent
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 

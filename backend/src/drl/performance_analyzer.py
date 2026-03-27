@@ -1,5 +1,6 @@
 # MANTIS-EVOLUTION: DRL Performance Analyzer
 """Professional performance metrics for DRL agents."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -18,9 +19,7 @@ class MantisPerformanceAnalyzer:
     ANNUALIZATION_FACTOR = 252  # Trading days per year
     RISK_FREE_RATE = 0.02  # 2% annual risk-free rate
 
-    def sharpe_ratio(
-        self, returns: np.ndarray, risk_free_rate: float | None = None
-    ) -> float:
+    def sharpe_ratio(self, returns: np.ndarray, risk_free_rate: float | None = None) -> float:
         """Annualized Sharpe ratio.
 
         Args:
@@ -40,9 +39,7 @@ class MantisPerformanceAnalyzer:
             return 0.0
         return float(np.mean(excess) / std * np.sqrt(self.ANNUALIZATION_FACTOR))
 
-    def sortino_ratio(
-        self, returns: np.ndarray, risk_free_rate: float | None = None
-    ) -> float:
+    def sortino_ratio(self, returns: np.ndarray, risk_free_rate: float | None = None) -> float:
         """Annualized Sortino ratio (penalises only downside volatility).
 
         Args:
@@ -66,9 +63,7 @@ class MantisPerformanceAnalyzer:
             return 0.0
         return float(np.mean(excess) / downside_std * np.sqrt(self.ANNUALIZATION_FACTOR))
 
-    def calmar_ratio(
-        self, returns: np.ndarray, period_years: float = 1.0
-    ) -> float:
+    def calmar_ratio(self, returns: np.ndarray, period_years: float = 1.0) -> float:
         """Calmar ratio = annualized return / maximum drawdown.
 
         Args:

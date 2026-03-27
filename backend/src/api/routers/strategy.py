@@ -78,9 +78,7 @@ async def get_allocation(
     """Get current portfolio allocation weights."""
     weights = manager.get_allocation(regime)
 
-    return success_response(
-        AllocationResponse(weights=weights, regime=regime).model_dump()
-    )
+    return success_response(AllocationResponse(weights=weights, regime=regime).model_dump())
 
 
 @router.get("/risk-limits")

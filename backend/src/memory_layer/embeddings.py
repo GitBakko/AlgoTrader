@@ -1,5 +1,6 @@
 # MANTIS-EVOLUTION: Embedding system for memory retrieval
 """Lightweight embeddings for semantic search in memory layers."""
+
 from __future__ import annotations
 
 import hashlib
@@ -10,6 +11,7 @@ from src.agents.schemas import MarketContext
 
 try:
     from sentence_transformers import SentenceTransformer
+
     HAS_SENTENCE_TRANSFORMERS = True
 except ImportError:
     HAS_SENTENCE_TRANSFORMERS = False
@@ -58,8 +60,16 @@ class MantisEmbedder:
         """
         # Extract key features as a numeric vector
         feature_keys = [
-            "ema_9", "ema_21", "rsi_14", "adx_14", "macd_histogram",
-            "bb_upper", "bb_lower", "atr", "volume", "vwap",
+            "ema_9",
+            "ema_21",
+            "rsi_14",
+            "adx_14",
+            "macd_histogram",
+            "bb_upper",
+            "bb_lower",
+            "atr",
+            "volume",
+            "vwap",
         ]
 
         values: list[float] = []
