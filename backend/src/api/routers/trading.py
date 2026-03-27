@@ -4,7 +4,7 @@ Controls the trading loop: start, stop, status, positions, signals.
 """
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query, Request
 from loguru import logger
@@ -96,7 +96,7 @@ async def trading_status(request: Request):
 
     try:
         status = await asyncio.wait_for(loop.get_status_async(), timeout=_BROKER_TIMEOUT)
-    except (asyncio.TimeoutError, Exception) as e:
+    except (TimeoutError, Exception) as e:
         logger.warning(f"Async status fetch failed ({e}), using sync fallback")
         status = loop.get_status()
 
@@ -117,7 +117,7 @@ async def trading_positions(request: Request):
 
     try:
         positions = await asyncio.wait_for(loop.get_positions_async(), timeout=_BROKER_TIMEOUT)
-    except (asyncio.TimeoutError, Exception) as e:
+    except (TimeoutError, Exception) as e:
         logger.warning(f"Async positions fetch failed ({e}), using sync fallback")
         positions = loop.get_paper_positions()
     return success_response(positions)
@@ -143,7 +143,7 @@ async def trading_performance(
     """Get trading performance statistics from closed positions."""
     if position_repo is not None:
         try:
-            date_from = datetime.now(timezone.utc) - timedelta(days=days)
+            date_from = datetime.now(UTC) - timedelta(days=days)
             stats = await position_repo.get_performance_stats(
                 date_from=date_from,
                 epic=epic,
@@ -211,7 +211,7 @@ async def emergency_stop(request: Request):
     # 2. Fetch open positions
     try:
         positions = await asyncio.wait_for(loop.get_positions_async(), timeout=_BROKER_TIMEOUT)
-    except (asyncio.TimeoutError, Exception) as e:
+    except (TimeoutError, Exception) as e:
         logger.warning(f"[EMERGENCY STOP] Async positions failed ({e}), trying sync")
         positions = loop.get_paper_positions()
 

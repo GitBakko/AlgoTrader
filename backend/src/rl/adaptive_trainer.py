@@ -5,15 +5,15 @@ from __future__ import annotations
 
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 from loguru import logger
 
-from src.rl.schemas import RLConfig
 from src.rl.environment import MantisRLEnvironment
+from src.rl.schemas import RLConfig
 
 try:
     from stable_baselines3 import PPO, SAC
@@ -80,7 +80,7 @@ class MantisAdaptiveTrainer:
         """Thread-safe model hot-swap."""
         with self._model_lock:
             self._current_model = model
-            self._current_version = version or datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            self._current_version = version or datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
             logger.info(f"Model swapped to version {self._current_version}")
 
     # ------------------------------------------------------------------
@@ -150,7 +150,7 @@ class MantisAdaptiveTrainer:
         logger.info(f"Starting training cycle (algo={self.config.algorithm})")
 
         # Extension point — subclass or inject data_provider for custom data
-        version = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        version = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         logger.info(f"Training cycle complete, version={version}")
 
     # ------------------------------------------------------------------
@@ -180,7 +180,7 @@ class MantisAdaptiveTrainer:
 
         model.learn(total_timesteps=self.config.total_timesteps)
 
-        version = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        version = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         self.set_model(model, version)
 
         # Save versioned model to disk

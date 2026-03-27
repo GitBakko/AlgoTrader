@@ -6,7 +6,6 @@ into PredictionService on completion.
 
 import asyncio
 import time
-from functools import partial
 
 from loguru import logger
 

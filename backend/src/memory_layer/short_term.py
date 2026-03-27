@@ -7,7 +7,7 @@ import math
 import pickle
 import uuid
 from collections import deque
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -113,7 +113,7 @@ class MantisShortTermMemory:
 
         Returns 0.5 (neutral) when there are no trades in the window.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         wins = 0
         total = 0
         for item in self._trades:
@@ -130,7 +130,7 @@ class MantisShortTermMemory:
 
     def _apply_decay(self) -> None:
         """Apply exponential decay to all items based on their age."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         lam = self.config.decay_lambda
         for item in self._signals:
             age_hours = (now - item.timestamp).total_seconds() / 3600
@@ -164,7 +164,7 @@ class MantisShortTermMemory:
             data = {
                 "signals": list(self._signals),
                 "trades": list(self._trades),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
             with open(save_path, "wb") as f:
                 pickle.dump(data, f)

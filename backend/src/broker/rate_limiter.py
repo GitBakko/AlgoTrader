@@ -5,7 +5,6 @@ Implements 10 requests/second limit with burst capacity.
 
 import asyncio
 import time
-from typing import Optional
 
 
 class TokenBucket:
@@ -28,7 +27,7 @@ class TokenBucket:
         self.last_update = time.monotonic()
         self._lock = asyncio.Lock()
 
-    async def acquire(self, tokens: int = 1, timeout: Optional[float] = None) -> bool:
+    async def acquire(self, tokens: int = 1, timeout: float | None = None) -> bool:
         """
         Acquire tokens from the bucket.
         Blocks until tokens are available or timeout is reached.

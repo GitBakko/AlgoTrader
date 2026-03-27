@@ -79,7 +79,6 @@ async def search_markets(
     # Try broker search first
     if broker and q:
         try:
-            from src.broker.models import Market
 
             broker_markets = await broker.search_markets(q)
             results = [
@@ -250,6 +249,7 @@ async def get_market_status(
 
     # Fallback: use simplified local logic
     from datetime import datetime
+
     from src.data.utils import is_market_hours
 
     now = datetime.now()

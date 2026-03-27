@@ -7,8 +7,7 @@ from typing import Any
 
 from loguru import logger
 
-from src.drl.base_drl_agent import MantisDRLAgent, HAS_SB3
-from src.drl.schemas import DRLConfig
+from src.drl.base_drl_agent import HAS_SB3, MantisDRLAgent
 
 if HAS_SB3:
     from stable_baselines3 import TD3  # noqa: F401

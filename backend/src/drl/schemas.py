@@ -3,12 +3,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Literal
-
-from pydantic import BaseModel, Field
+from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np  # noqa: F401 — allowed for future array fields
+from pydantic import BaseModel, Field
 
 
 class DRLConfig(BaseModel):
@@ -56,7 +55,7 @@ class PerformanceMetrics(BaseModel):
 class PerformanceSnapshot(BaseModel):
     """A point-in-time performance snapshot."""
 
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     metrics: PerformanceMetrics = Field(default_factory=PerformanceMetrics)
     regime: str = "UNKNOWN"
 
@@ -82,7 +81,7 @@ class ComparisonReport(BaseModel):
     agent_metrics: dict[str, PerformanceMetrics] = Field(default_factory=dict)
     best_by_regime: dict[str, str] = Field(default_factory=dict)  # regime -> best agent name
     overall_best: str = ""
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     model_config = {"arbitrary_types_allowed": True}
 

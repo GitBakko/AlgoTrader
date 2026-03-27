@@ -6,7 +6,7 @@ Uses Finnhub /calendar/economic endpoint.
 Configurable blackout window: ±N minutes around events.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import httpx
 from loguru import logger
@@ -129,7 +129,7 @@ class EconomicCalendarGate:
         if not self._settings.sil_calendar_gate_enabled:
             return False, ""
 
-        now = now or datetime.now(timezone.utc)
+        now = now or datetime.now(UTC)
         events = await self._get_todays_events(now)
 
         minutes_before = self._settings.sil_calendar_minutes_before

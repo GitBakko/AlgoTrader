@@ -276,7 +276,7 @@ class EnsembleClassifier(BaseMLModel):
         importance_by_model = {}
         model_names = list(self.base_models.keys())
 
-        for idx, (feat_name, score) in enumerate(meta_importance.items()):
+        for idx, (_feat_name, score) in enumerate(meta_importance.items()):
             model_idx = idx // 3  # Each model contributes 3 features (proba for 3 classes)
             if model_idx < len(model_names):
                 model_name = model_names[model_idx]

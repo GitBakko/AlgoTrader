@@ -3,7 +3,7 @@ Data pipeline scheduler.
 Uses APScheduler to run periodic data collection, quality checks, and maintenance.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -147,7 +147,7 @@ class DataScheduler:
         picks up fresh candles immediately.
         """
         logger.info("Running hourly candle refresh...")
-        start_date = datetime.now(timezone.utc) - timedelta(hours=3)
+        start_date = datetime.now(UTC) - timedelta(hours=3)
         downloaded = 0
 
         for epic in self._assets:
@@ -174,7 +174,7 @@ class DataScheduler:
         then invalidates cache so the trading loop detects new candles.
         """
         logger.info(f"Running scalp candle refresh ({self._scalp_timeframe})...")
-        start_date = datetime.now(timezone.utc) - timedelta(hours=2)
+        start_date = datetime.now(UTC) - timedelta(hours=2)
         downloaded = 0
 
         for epic in self._assets:
@@ -200,7 +200,7 @@ class DataScheduler:
         Uses append with deduplication to avoid duplicates.
         """
         logger.info("Running EOD download job...")
-        start_date = datetime.now(timezone.utc) - timedelta(days=2)
+        start_date = datetime.now(UTC) - timedelta(days=2)
 
         for epic in self._assets:
             for timeframe in self._timeframes:
@@ -225,7 +225,7 @@ class DataScheduler:
         Run quality checks on recent data (last 7 days).
         """
         logger.info("Running quality checks job...")
-        start_date = datetime.now(timezone.utc) - timedelta(days=7)
+        start_date = datetime.now(UTC) - timedelta(days=7)
 
         for epic in self._assets:
             for timeframe in self._timeframes:

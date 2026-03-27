@@ -17,9 +17,8 @@ Features per trade:
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -28,13 +27,11 @@ import polars as pl
 from loguru import logger
 
 from src.strategy.orb_fvg_strategy import (
+    _NYSE_ORB_END,
+    _NYSE_ORB_START,
     FVGSignal,
     _minutes_utc,
     _nyse_utc_minutes,
-    _NYSE_ORB_START,
-    _NYSE_ORB_END,
-    _NYSE_ENTRY_CUTOFF,
-    _NYSE_SESSION_END,
     process_session,
 )
 from src.strategy.schemas import SignalDirection
@@ -179,7 +176,7 @@ def build_training_data(
         for bar in day_bars:
             ts = bar["timestamp"]
             if isinstance(ts, datetime) and ts.tzinfo is None:
-                bar["timestamp"] = ts.replace(tzinfo=timezone.utc)
+                bar["timestamp"] = ts.replace(tzinfo=UTC)
 
         fvg = process_session(day_bars)
         if fvg is None:
@@ -224,14 +221,13 @@ def train_filter(
 
     Returns dict with 'model', 'cv_scores', 'feature_importance'.
     """
-    from xgboost import XGBClassifier
+    from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
     from sklearn.model_selection import TimeSeriesSplit
-    from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+    from xgboost import XGBClassifier
 
     tscv = TimeSeriesSplit(n_splits=n_splits)
 
     cv_metrics: list[dict] = []
-    best_model = None
     best_f1 = -1
 
     for fold, (train_idx, val_idx) in enumerate(tscv.split(X)):
@@ -267,7 +263,6 @@ def train_filter(
 
         if metrics["f1"] > best_f1:
             best_f1 = metrics["f1"]
-            best_model = model
 
         logger.info(
             f"  Fold {fold}: acc={metrics['accuracy']:.3f} prec={metrics['precision']:.3f} "
@@ -323,7 +318,8 @@ def run_walkforward_backtest(
     Returns comparison dict with filtered vs unfiltered metrics.
     """
     from xgboost import XGBClassifier
-    from src.backtest.orb_fvg_runner import _simulate_trade, _calculate_metrics, ORBBacktestResult
+
+    from src.backtest.orb_fvg_runner import ORBBacktestResult, _calculate_metrics, _simulate_trade
 
     parquet_dir = Path(data_dir) / epic / "1min"
     files = sorted(parquet_dir.glob("*.parquet"))
@@ -357,7 +353,7 @@ def run_walkforward_backtest(
         for bar in day_bars:
             ts = bar["timestamp"]
             if isinstance(ts, datetime) and ts.tzinfo is None:
-                bar["timestamp"] = ts.replace(tzinfo=timezone.utc)
+                bar["timestamp"] = ts.replace(tzinfo=UTC)
 
         fvg = process_session(day_bars)
         if fvg is None:

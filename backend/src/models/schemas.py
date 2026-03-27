@@ -3,8 +3,8 @@ Pydantic models for ML module.
 Defines schemas for predictions, training results, model metadata, and signal classes.
 """
 
-from datetime import datetime, timezone
-from enum import Enum, IntEnum
+from datetime import UTC, datetime
+from enum import IntEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -73,7 +73,7 @@ class TrainingResult(BaseModel):
     total_train_samples: int = 0
     hyperparameters: dict = Field(default_factory=dict)
     training_duration_seconds: float = 0.0
-    trained_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    trained_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class ModelMetadata(BaseModel):
@@ -91,5 +91,5 @@ class ModelMetadata(BaseModel):
     train_date_start: datetime | None = None
     train_date_end: datetime | None = None
     horizon_bars: int = 6
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     description: str = ""

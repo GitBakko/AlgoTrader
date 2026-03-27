@@ -3,6 +3,8 @@ Data pipeline module for AlgoTrader AI.
 Handles OHLC data collection, storage, and access.
 """
 
+from src.data.data_access import DataAccessLayer
+from src.data.historical_downloader import HistoricalDownloader
 from src.data.models import (
     DataQualityReport,
     DataSource,
@@ -12,6 +14,10 @@ from src.data.models import (
     OHLCBar,
     ParquetMetadata,
 )
+from src.data.quality_checks import DataQualityChecker
+from src.data.realtime_streamer import RealtimeStreamer
+from src.data.scheduler import DataScheduler
+from src.data.storage import DuckDBInterface, ParquetStorageManager
 from src.data.utils import (
     ensure_directory_exists,
     get_months_in_range,
@@ -24,12 +30,6 @@ from src.data.utils import (
     timeframe_to_minutes,
     timeframe_to_resolution,
 )
-from src.data.storage import DuckDBInterface, ParquetStorageManager
-from src.data.quality_checks import DataQualityChecker
-from src.data.historical_downloader import HistoricalDownloader
-from src.data.realtime_streamer import RealtimeStreamer
-from src.data.data_access import DataAccessLayer
-from src.data.scheduler import DataScheduler
 
 __all__ = [
     # Models

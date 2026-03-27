@@ -3,8 +3,6 @@ Background startup tasks for AlgoTrader AI.
 These run as asyncio tasks and do not block application startup.
 """
 
-import asyncio
-
 from loguru import logger
 
 from src.utils.constants import ALL_ASSETS
@@ -24,7 +22,6 @@ async def initial_data_download(app_state) -> None:
 
     # Check if we already have data
     try:
-        from src.data.data_access import DataAccessLayer
 
         data_access = app_state.data_access
         if data_access is None:

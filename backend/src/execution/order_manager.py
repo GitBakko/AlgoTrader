@@ -16,9 +16,9 @@ from src.broker.exceptions import (
     OrderRejectedError,
     RateLimitError,
 )
-from src.utils.broker_error_parser import parse_broker_error
 from src.broker.models import CreatePositionRequest, Direction, ModifyPositionRequest
 from src.execution.schemas import ExecutionMode, ExecutionOrder, ExecutionResult
+from src.utils.broker_error_parser import parse_broker_error
 
 
 class OrderManager:
@@ -121,7 +121,7 @@ class OrderManager:
             # CRITICAL FIX (CRIT-6): Add 10-second timeout to prevent infinite hang
             try:
                 await asyncio.wait_for(self._broker.modify_position(deal_id, request), timeout=10.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.error(f"Broker API timeout (10s) modifying position {deal_id}")
                 return ExecutionResult(
                     success=False,
@@ -388,7 +388,7 @@ class OrderManager:
         """Send position request to broker with timeout. Returns None on timeout."""
         try:
             return await asyncio.wait_for(self._broker.create_position(request), timeout=10.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Broker API timeout (10s) for {order.epic} {order.direction}")
             return None
 
@@ -517,7 +517,7 @@ class OrderManager:
                 confirmation = await asyncio.wait_for(
                     self._broker.close_position(deal_id), timeout=10.0
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.error(f"Broker API timeout (10s) closing position {deal_id}")
                 return ExecutionResult(
                     success=False,

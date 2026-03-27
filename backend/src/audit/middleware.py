@@ -3,7 +3,7 @@ FastAPI middleware for audit logging.
 Automatically logs all API requests and responses with user context.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import Request
 from loguru import logger
@@ -51,7 +51,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         method = request.method
         ip_address = self._get_client_ip(request)
         user_agent = request.headers.get("user-agent", "")
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.now(UTC)
 
         # Extract user ID from request state (set by auth dependencies)
         user_id = None
@@ -70,7 +70,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
             raise
         finally:
             # Log audit event asynchronously (non-blocking)
-            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
+            duration = (datetime.now(UTC) - start_time).total_seconds()
 
             # Only log non-GET requests or failed requests for audit trail
             if method != "GET" or not success:

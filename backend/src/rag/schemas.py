@@ -1,6 +1,8 @@
 # MANTIS-EVOLUTION: RAG schema contracts
 from __future__ import annotations
-from datetime import datetime, timezone
+
+from datetime import UTC, datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -10,7 +12,7 @@ class NewsItem(BaseModel):
     title: str = ""
     source: str = ""
     url: str = ""
-    published_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    published_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     lead_paragraph: str = ""  # extracted key content
     full_text: str = ""
     relevance_score: float = 0.0  # 0.0-1.0

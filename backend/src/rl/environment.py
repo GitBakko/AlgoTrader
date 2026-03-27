@@ -6,7 +6,7 @@ from __future__ import annotations
 import numpy as np
 from loguru import logger
 
-from src.rl.schemas import RLAction, RLConfig, EnvState
+from src.rl.schemas import EnvState, RLAction, RLConfig
 
 try:
     import gymnasium as gym

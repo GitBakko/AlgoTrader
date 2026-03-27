@@ -6,7 +6,7 @@ Formats logs as JSON for easy parsing and aggregation.
 import json
 import sys
 import traceback
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from loguru import logger
@@ -34,7 +34,7 @@ def json_formatter(record: dict[str, Any]) -> str:
     """
     # Build base log dict
     log_dict = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "level": record["level"].name,
         "logger": record["name"],
         "message": record["message"],

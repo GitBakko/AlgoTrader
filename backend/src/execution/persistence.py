@@ -4,7 +4,7 @@ Creates Position + Trade records in the database after successful execution.
 Graceful: if no DB session available, logs and skips.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from loguru import logger
@@ -47,7 +47,7 @@ class ExecutionPersistence:
         if not result.success or not result.deal_id:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Create Position record
         position = Position(
@@ -89,8 +89,8 @@ class ExecutionPersistence:
 
         # Publish trade event via Redis (fire-and-forget)
         try:
-            from src.utils.event_bus import event_bus
             from src.api.websocket import ws_manager
+            from src.utils.event_bus import event_bus
 
             trade_event = {
                 "type": "trade_opened",

@@ -9,17 +9,15 @@ When disabled or on failure, returns a low-confidence default signal.
 
 from __future__ import annotations
 
-from typing import Any
-
 import numpy as np
 from loguru import logger
 
 from src.agents.schemas import MarketContext
-from src.vision.schemas import ChartConfig, VisionReport, VisionSignal
-from src.vision.chart_generator import MantisChartGenerator
-from src.vision.vision_analyzer import MantisVisionAnalyzer
 from src.rag.context_builder import MantisRAGContextBuilder
 from src.rag.news_ingester import MantisNewsIngester
+from src.vision.chart_generator import MantisChartGenerator
+from src.vision.schemas import ChartConfig, VisionReport, VisionSignal
+from src.vision.vision_analyzer import MantisVisionAnalyzer
 
 
 class VisionAgent:

@@ -28,7 +28,7 @@ Live integration:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, time, timezone
+from datetime import UTC, date, datetime, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -54,7 +54,7 @@ _NYSE_SESSION_END = time(16, 0)
 def _nyse_utc_minutes(date: datetime, local_time: time) -> int:
     """Convert a NYSE local time to UTC minutes-from-midnight for a given date."""
     et_dt = datetime.combine(date.date(), local_time, tzinfo=_ET)
-    utc_dt = et_dt.astimezone(timezone.utc)
+    utc_dt = et_dt.astimezone(UTC)
     return utc_dt.hour * 60 + utc_dt.minute
 
 
@@ -322,7 +322,7 @@ class OrbFvgStrategy(BaseStrategy):
         if self._ml_model is None:
             return None
 
-        from src.backtest.orb_fvg_ml_filter import extract_features, FEATURE_NAMES
+        from src.backtest.orb_fvg_ml_filter import extract_features
 
         features = extract_features(day_bars, fvg, trade_pnl=0, exit_reason="")
         X = np.array([features.to_array()])
@@ -369,7 +369,7 @@ class OrbFvgStrategy(BaseStrategy):
         # Determine session date (NYSE date from first bar)
         first_ts = m1_bars[0]["timestamp"]
         if hasattr(first_ts, "date"):
-            et_dt = first_ts.replace(tzinfo=timezone.utc).astimezone(_ET)
+            et_dt = first_ts.replace(tzinfo=UTC).astimezone(_ET)
             session_day = et_dt.date()
         else:
             return hold

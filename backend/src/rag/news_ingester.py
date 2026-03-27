@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 from loguru import logger
 
@@ -80,7 +80,7 @@ class MantisNewsIngester:
         4. Score relevance for *symbol*.
         5. Return sorted by relevance_score descending.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         cutoff = now - timedelta(hours=self.lookback_hours)
 
         processed: list[NewsItem] = []
@@ -94,7 +94,7 @@ class MantisNewsIngester:
 
             # Ensure timezone-aware for comparison
             if pub_dt.tzinfo is None:
-                pub_dt = pub_dt.replace(tzinfo=timezone.utc)
+                pub_dt = pub_dt.replace(tzinfo=UTC)
 
             # --- Filter by recency ---
             if pub_dt < cutoff:
@@ -193,10 +193,10 @@ class MantisNewsIngester:
         score += keyword_score
 
         # 2. Recency (max 0.30) ----------------------------------------
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         pub = item.published_at
         if pub.tzinfo is None:
-            pub = pub.replace(tzinfo=timezone.utc)
+            pub = pub.replace(tzinfo=UTC)
 
         age_hours = (now - pub).total_seconds() / 3600
         if age_hours < 0:

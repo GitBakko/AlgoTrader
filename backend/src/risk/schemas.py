@@ -3,7 +3,7 @@ Pydantic models for risk management module.
 Defines schemas for risk checks, limits, and drawdown state.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
@@ -54,4 +54,4 @@ class DrawdownState(BaseModel):
     daily_start_equity: float = 0.0
     circuit_breaker_active: bool = False
     circuit_breaker_reason: str | None = None
-    last_reset: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_reset: datetime = Field(default_factory=lambda: datetime.now(UTC))

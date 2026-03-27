@@ -12,10 +12,9 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from loguru import logger
 
-from src.data.models import DataSource, DataStorageStats, OHLCBar, ParquetMetadata
+from src.data.models import DataStorageStats, OHLCBar, ParquetMetadata
 from src.data.utils import (
     ensure_directory_exists,
-    get_months_in_range,
     get_parquet_directory,
     get_parquet_file_for_month,
     list_parquet_files,
@@ -102,7 +101,7 @@ class ParquetStorageManager:
         total_written = 0
 
         # Write each month to separate file
-        for month, month_candles in candles_by_month.items():
+        for _month, month_candles in candles_by_month.items():
             file_path = get_parquet_file_for_month(
                 self.data_dir, epic, timeframe, month_candles[0].timestamp
             )
@@ -155,7 +154,7 @@ class ParquetStorageManager:
 
         total_added = 0
 
-        for month, month_candles in candles_by_month.items():
+        for _month, month_candles in candles_by_month.items():
             file_path = get_parquet_file_for_month(
                 self.data_dir, epic, timeframe, month_candles[0].timestamp
             )

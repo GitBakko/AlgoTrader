@@ -4,7 +4,7 @@ Monitors PostgreSQL, Redis, and Capital.com API connectivity.
 """
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -14,7 +14,6 @@ import psutil
 from loguru import logger
 from pydantic import BaseModel
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.session import DatabaseManager
 from src.utils.config import get_settings
@@ -114,7 +113,7 @@ class HealthChecker:
             overall_status = HealthStatus.HEALTHY
 
         return SystemHealth(
-            status=overall_status, timestamp=datetime.now(timezone.utc), components=components
+            status=overall_status, timestamp=datetime.now(UTC), components=components
         )
 
     async def check_database(self) -> ComponentHealth:
@@ -239,7 +238,7 @@ class HealthChecker:
             storage = ParquetStorageManager()
             details = {}
             stale_count = 0
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
 
             for epic in ["XAUUSD", "BTCUSD", "US500"]:
                 for tf in ["1h"]:
@@ -254,7 +253,7 @@ class HealthChecker:
                         last_ts = last_ts.to_pydatetime()
                     # Ensure timezone-aware for comparison with now(utc)
                     if last_ts.tzinfo is None:
-                        last_ts = last_ts.replace(tzinfo=timezone.utc)
+                        last_ts = last_ts.replace(tzinfo=UTC)
 
                     bar_count = storage.get_bar_count(epic=epic, timeframe=tf)
                     age_hours = (now - last_ts).total_seconds() / 3600

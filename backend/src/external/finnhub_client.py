@@ -4,7 +4,7 @@ API Documentation: https://finnhub.io/docs/api
 Rate limit: 60 requests/minute (free tier)
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 from loguru import logger
@@ -309,7 +309,7 @@ class FinnhubClient:
             articles = []
             for item in data:
                 # Finnhub news format: {category, datetime, headline, id, image, related, source, summary, url}
-                published_at = datetime.fromtimestamp(item["datetime"], tz=timezone.utc)
+                published_at = datetime.fromtimestamp(item["datetime"], tz=UTC)
 
                 # Concatenate title + description for sentiment analysis
                 text = f"{item['headline']} {item.get('summary', '')}"

@@ -8,7 +8,7 @@ import signal
 import sys
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -269,6 +269,7 @@ async def lifespan(app: FastAPI):
 
     # Start background tasks (data download, scheduler) - non-blocking
     import asyncio
+
     from src.api.startup_tasks import initial_data_download, start_data_scheduler
 
     def _bg_task_done(task: asyncio.Task) -> None:
@@ -604,12 +605,12 @@ async def log_requests(request: Request, call_next):
         response.headers["X-Request-ID"] = request_id
         return response
 
-    start_time = datetime.now(timezone.utc)
+    start_time = datetime.now(UTC)
 
     with logger.contextualize(request_id=request_id):
         try:
             response = await call_next(request)
-            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
+            duration = (datetime.now(UTC) - start_time).total_seconds()
             logger.info(
                 f"{request.method} {path} - "
                 f"Status: {response.status_code} - Duration: {duration:.3f}s"
@@ -617,7 +618,7 @@ async def log_requests(request: Request, call_next):
             response.headers["X-Request-ID"] = request_id
             return response
         except Exception as e:
-            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
+            duration = (datetime.now(UTC) - start_time).total_seconds()
             logger.error(f"{request.method} {path} - Error: {e} - Duration: {duration:.3f}s")
             raise
 

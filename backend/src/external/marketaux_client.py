@@ -9,7 +9,6 @@ from datetime import datetime, timedelta
 import httpx
 from loguru import logger
 
-from src.external.exceptions import MarketauxError
 from src.external.models import NewsArticle
 from src.utils.config import get_settings
 

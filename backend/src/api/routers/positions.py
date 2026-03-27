@@ -4,7 +4,7 @@ Manages open positions: list, close, modify stop-loss/take-profit.
 Dual-mode: uses DB when available, falls back to in-memory engine.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Path, Query
 

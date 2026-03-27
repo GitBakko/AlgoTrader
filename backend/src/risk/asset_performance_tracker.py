@@ -6,7 +6,7 @@ Assets with a Sharpe ratio below the threshold are excluded from trading.
 """
 
 from collections import deque
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import numpy as np
 from loguru import logger
@@ -34,7 +34,7 @@ class AssetPerformanceTracker:
 
     def record_trade(self, epic: str, pnl: float, timestamp: datetime | None = None) -> None:
         """Record a closed trade's P&L for the given asset."""
-        ts = timestamp or datetime.now(timezone.utc)
+        ts = timestamp or datetime.now(UTC)
         if epic not in self._trades:
             self._trades[epic] = deque(maxlen=500)
         self._trades[epic].append((ts, pnl))
@@ -50,7 +50,7 @@ class AssetPerformanceTracker:
         if epic not in self._trades:
             return False, 0.0
 
-        cutoff = datetime.now(timezone.utc) - timedelta(days=self.lookback_days)
+        cutoff = datetime.now(UTC) - timedelta(days=self.lookback_days)
         pnls = [pnl for ts, pnl in self._trades[epic] if ts >= cutoff]
 
         if len(pnls) < self.min_trades:
@@ -76,7 +76,7 @@ class AssetPerformanceTracker:
     def get_all_sharpes(self) -> dict[str, float]:
         """Get rolling Sharpe ratios for all tracked assets."""
         result = {}
-        cutoff = datetime.now(timezone.utc) - timedelta(days=self.lookback_days)
+        cutoff = datetime.now(UTC) - timedelta(days=self.lookback_days)
         for epic, trades in self._trades.items():
             pnls = [pnl for ts, pnl in trades if ts >= cutoff]
             if len(pnls) < self.min_trades:

@@ -6,6 +6,7 @@ slippage anomaly, heartbeat timeout, volatility spike.
 
 import threading
 import time as _time
+from datetime import UTC
 from enum import Enum
 
 from loguru import logger
@@ -173,7 +174,7 @@ class CircuitBreakerManager:
                 reasons.append(reason)
 
         # Also include already-tripped breakers
-        for cb_type, cb_reason in self._tripped.items():
+        for _cb_type, cb_reason in self._tripped.items():
             if cb_reason not in reasons:
                 reasons.append(cb_reason)
 
@@ -187,10 +188,10 @@ class CircuitBreakerManager:
         Args:
             current_date: Date string (YYYY-MM-DD). Auto-detected if None.
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         if current_date is None:
-            current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            current_date = datetime.now(UTC).strftime("%Y-%m-%d")
         with self._lock:
             if self._daily_trade_date != current_date:
                 self._daily_trade_count = 0

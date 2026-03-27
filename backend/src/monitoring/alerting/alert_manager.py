@@ -4,7 +4,6 @@ Manages multiple channels and alert rules.
 """
 
 import asyncio
-from typing import Any
 
 from loguru import logger
 
@@ -105,7 +104,7 @@ class AlertManager:
 
         # Build results dict
         channel_results = {}
-        for i, (channel, result) in enumerate(zip(self.channels, results)):
+        for _i, (channel, result) in enumerate(zip(self.channels, results)):
             channel_name = channel.__class__.__name__
             if isinstance(result, Exception):
                 logger.error(f"{channel_name} failed: {result}")

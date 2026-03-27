@@ -7,7 +7,7 @@ Sends initial price snapshot on connect so closed markets have prices too.
 
 import asyncio
 import random
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import WebSocket, WebSocketDisconnect
 from loguru import logger
@@ -53,7 +53,7 @@ class ConnectionManager:
                 dead.append(ws)
         # Clean up dead connections in a single pass
         if dead:
-            dead_set = set(id(ws) for ws in dead)
+            dead_set = {id(ws) for ws in dead}
             self._connections[channel] = [
                 ws for ws in self._connections[channel] if id(ws) not in dead_set
             ]
@@ -121,7 +121,7 @@ async def _mock_price_stream(websocket: WebSocket) -> None:
                     "epic": epic,
                     "bid": round(prices[epic], 2),
                     "offer": round(prices[epic] + spread, 2),
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                     "price_source": "mock",
                 }
                 await websocket.send_json(tick)
@@ -156,7 +156,7 @@ async def _mock_price_stream_with_reconnect(websocket: WebSocket, app_state) -> 
                     "epic": epic,
                     "bid": round(prices[epic], 2),
                     "offer": round(prices[epic] + spread, 2),
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                     "price_source": "mock",
                 }
                 await websocket.send_json(tick)
@@ -171,7 +171,7 @@ async def _mock_price_stream_with_reconnect(websocket: WebSocket, app_state) -> 
 
                 if ws_price_status["reconnect_attempts"] < max_attempts:
                     ws_price_status["reconnect_attempts"] += 1
-                    ws_price_status["last_reconnect_at"] = datetime.now(timezone.utc).isoformat()
+                    ws_price_status["last_reconnect_at"] = datetime.now(UTC).isoformat()
                     attempt = ws_price_status["reconnect_attempts"]
 
                     # Send status update to frontend
@@ -237,7 +237,7 @@ async def _broker_price_stream(websocket: WebSocket, broker_ws) -> None:
                     "timestamp": (
                         quote.timestamp.isoformat()
                         if quote.timestamp
-                        else datetime.now(timezone.utc).isoformat()
+                        else datetime.now(UTC).isoformat()
                     ),
                     "price_source": "broker",
                 }
@@ -283,7 +283,7 @@ async def _broker_price_stream(websocket: WebSocket, broker_ws) -> None:
                 tick = await asyncio.wait_for(quote_queue.get(), timeout=5.0)
                 await websocket.send_json(tick)
                 consecutive_heartbeats = 0  # Reset on real data
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 consecutive_heartbeats += 1
                 # Check if broker WS is still connected
                 if (
@@ -322,7 +322,7 @@ async def _send_initial_price_snapshot(websocket: WebSocket, app_state) -> None:
     sent = 0
     for epic in ALL_ASSETS:
         try:
-            broker_epic = EPIC_TO_BROKER.get(epic, epic)
+            EPIC_TO_BROKER.get(epic, epic)
             details = await broker.get_market_details(epic)
             if not isinstance(details, dict):
                 continue
@@ -335,7 +335,7 @@ async def _send_initial_price_snapshot(websocket: WebSocket, app_state) -> None:
                         "epic": epic,
                         "bid": bid,
                         "offer": offer,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "timestamp": datetime.now(UTC).isoformat(),
                         "price_source": "broker",
                     }
                 )

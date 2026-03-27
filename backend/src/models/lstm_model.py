@@ -372,7 +372,7 @@ class LSTMClassifier(BaseMLModel):
         """
         if self.feature_names:
             n = len(self.feature_names)
-            return {name: 1.0 / n for name in self.feature_names}
+            return dict.fromkeys(self.feature_names, 1.0 / n)
         return {}
 
     def get_hyperparameters(self) -> dict:

@@ -16,8 +16,8 @@ from src.database.models import (
     Trade,
     metadata,
 )
-from src.database.repository import BaseRepository
 from src.database.repositories import PositionRepository, SignalRepository, StrategyRepository
+from src.database.repository import BaseRepository
 from src.database.session import DatabaseManager, get_db_session
 
 __all__ = [

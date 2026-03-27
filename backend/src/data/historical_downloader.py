@@ -5,7 +5,7 @@ Downloads OHLC data in chunks with retry logic and progress tracking.
 
 import asyncio
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from loguru import logger
 
@@ -100,7 +100,7 @@ class HistoricalDownloader:
             DownloadProgress with final stats
         """
         if end_date is None:
-            end_date = datetime.now(timezone.utc)
+            end_date = datetime.now(UTC)
 
         resolution = timeframe_to_resolution(timeframe)
         chunk_days = CHUNK_DAYS.get(timeframe, 30)
@@ -113,7 +113,7 @@ class HistoricalDownloader:
             downloaded_days=0,
             total_candles=0,
             downloaded_candles=0,
-            start_time=datetime.now(timezone.utc),
+            start_time=datetime.now(UTC),
             status="in_progress",
         )
 
@@ -172,7 +172,7 @@ class HistoricalDownloader:
         logger.info(
             f"Download complete: {epic}/{timeframe} - "
             f"{total_downloaded} candles in "
-            f"{(datetime.now(timezone.utc) - progress.start_time).total_seconds():.1f}s"
+            f"{(datetime.now(UTC) - progress.start_time).total_seconds():.1f}s"
         )
 
         return progress
@@ -201,7 +201,7 @@ class HistoricalDownloader:
         if timeframes is None:
             timeframes = ["1h", "4h", "1d"]
 
-        end_date = datetime.now(timezone.utc)
+        end_date = datetime.now(UTC)
         start_date = end_date - timedelta(days=days_back)
         results = []
 
@@ -227,7 +227,7 @@ class HistoricalDownloader:
                             downloaded_days=0,
                             total_candles=0,
                             downloaded_candles=0,
-                            start_time=datetime.now(timezone.utc),
+                            start_time=datetime.now(UTC),
                             status="failed",
                             error_message=str(e),
                         )

@@ -15,8 +15,8 @@ clean JSON serialization and SQLite storage compatibility.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Literal, Optional
+from datetime import UTC, datetime
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -29,7 +29,7 @@ class MemoryItem(BaseModel):
     """Base item stored in any memory layer."""
 
     id: str = ""
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     epic: str = ""
     category: str = ""  # "signal", "trade", "pattern", "episode"
     data: dict[str, Any] = Field(default_factory=dict)
@@ -67,7 +67,7 @@ class MarketPattern(BaseModel):
     avg_outcome: float = 0.0  # avg P&L when this pattern appears
     confidence: float = 0.0
     feature_signature: list[float] = Field(default_factory=list)  # embedding vector
-    last_seen: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_seen: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class BlacklistCondition(BaseModel):
@@ -90,11 +90,11 @@ class Episode(BaseModel):
     """A high-impact memorable event stored in episodic memory."""
 
     episode_id: str = ""
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     epic: str = ""
     description: str = ""
     context_embedding: list[float] = Field(default_factory=list)
-    outcome: Optional[TradeOutcome] = None
+    outcome: TradeOutcome | None = None
     significance: float = 0.0  # 0.0-1.0
     lesson: str = ""  # what was learned
 

@@ -3,11 +3,10 @@ Signal Intelligence Layer (SIL) — Base client.
 Shared caching, HTTP client management, and graceful degradation.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
-from loguru import logger
 
 from src.utils.config import get_settings
 
@@ -36,7 +35,7 @@ class SILBaseClient:
         if key not in self._cache:
             return False
         cached_at, _ = self._cache[key]
-        age_minutes = (datetime.now(timezone.utc) - cached_at).total_seconds() / 60
+        age_minutes = (datetime.now(UTC) - cached_at).total_seconds() / 60
         return age_minutes < self._cache_ttl
 
     def _get_cached(self, key: str) -> Any | None:
@@ -48,7 +47,7 @@ class SILBaseClient:
 
     def _set_cache(self, key: str, data: Any) -> None:
         """Store data in cache with current timestamp."""
-        self._cache[key] = (datetime.now(timezone.utc), data)
+        self._cache[key] = (datetime.now(UTC), data)
 
     def _clear_cache(self, key: str | None = None) -> None:
         """Clear specific key or entire cache."""
@@ -62,7 +61,7 @@ class SILBaseClient:
         if key not in self._cache:
             return None
         cached_at, _ = self._cache[key]
-        return (datetime.now(timezone.utc) - cached_at).total_seconds() / 60
+        return (datetime.now(UTC) - cached_at).total_seconds() / 60
 
     async def close(self) -> None:
         """Close the HTTP client."""

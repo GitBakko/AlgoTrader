@@ -3,23 +3,20 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from loguru import logger
 
 from src.agents.schemas import MarketContext
+from src.memory_layer.embeddings import MantisEmbedder
+from src.memory_layer.episodic import MantisEpisodicMemory
+from src.memory_layer.long_term import MantisLongTermMemory
 from src.memory_layer.schemas import (
-    Episode,
     MemoryConfig,
     MemoryContext,
-    MemoryItem,
     TradeOutcome,
-    Warning,
 )
 from src.memory_layer.short_term import MantisShortTermMemory
-from src.memory_layer.long_term import MantisLongTermMemory
-from src.memory_layer.episodic import MantisEpisodicMemory
-from src.memory_layer.embeddings import MantisEmbedder
 
 
 class MantisMemoryStore:
@@ -111,7 +108,7 @@ class MantisMemoryStore:
         """
         stm_items = list(self.short_term._trades)  # all trade items
         count = self.long_term.consolidate(stm_items)
-        self._last_consolidation = datetime.now(timezone.utc)
+        self._last_consolidation = datetime.now(UTC)
         logger.info(f"Memory consolidation complete: {count} patterns updated")
         return count
 

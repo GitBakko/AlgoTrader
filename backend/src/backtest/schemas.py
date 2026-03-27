@@ -3,10 +3,9 @@ Pydantic models for backtesting module.
 Defines schemas for backtest configuration, trades, positions, and results.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
-import polars as pl
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -75,4 +74,4 @@ class BacktestResult(BaseModel):
     total_trades: int = 0
     start_equity: float = 0.0
     end_equity: float = 0.0
-    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

@@ -6,7 +6,7 @@ as a BaseStrategy for use in the StrategyRouter.
 import polars as pl
 from loguru import logger
 
-from src.models.schemas import PredictionResult, SignalClass
+from src.models.schemas import SignalClass
 from src.strategy.base_strategy import BaseStrategy
 from src.strategy.schemas import SignalDirection, StrategyConfig, TradingSignal
 from src.strategy.signal_generator import SignalGenerator

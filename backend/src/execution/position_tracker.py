@@ -3,13 +3,11 @@ Position tracking: syncs positions with broker and manages paper trading state.
 """
 
 import threading
-from datetime import datetime, timezone
-from uuid import uuid4
+from datetime import UTC, datetime
 
 from loguru import logger
 
 from src.broker.client import CapitalComClient
-from src.broker.models import Position as BrokerPosition
 from src.execution.schemas import ExecutionMode, ExecutionOrder
 
 
@@ -257,7 +255,7 @@ class PositionTracker:
                 "level": fill_price,
                 "stop_level": order.stop_loss,
                 "profit_level": order.take_profit,
-                "opened_at": datetime.now(timezone.utc).isoformat(),
+                "opened_at": datetime.now(UTC).isoformat(),
             }
             self._paper_positions[deal_id] = position
             logger.debug(f"Paper position opened: {deal_id} {order.epic} {order.direction}")
@@ -344,7 +342,7 @@ class PositionTracker:
                 "level": entry_price,
                 "stop_level": stop_loss,
                 "profit_level": take_profit,
-                "opened_at": datetime.now(timezone.utc).isoformat(),
+                "opened_at": datetime.now(UTC).isoformat(),
             }
             self._paper_positions[deal_id] = position
             logger.debug(f"Position injected for recovery: {deal_id} {epic} {direction}")

@@ -5,7 +5,7 @@ or with rule-based strategies (squeeze_breakout, vwap_reversion, auto).
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import polars as pl
 from fastapi import APIRouter, Path, Request
@@ -90,7 +90,7 @@ async def run_backtest(
         )
 
     run_id = uuid.uuid4().hex[:12]
-    now_str = datetime.now(timezone.utc).isoformat()
+    now_str = datetime.now(UTC).isoformat()
 
     # Get services from app state
     data_access = getattr(request.app.state, "data_access", None)

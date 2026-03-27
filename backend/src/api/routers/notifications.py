@@ -4,7 +4,6 @@ In-app notification center: list, read, mark-as-read, delete.
 """
 
 from fastapi import APIRouter, Depends, Query
-from loguru import logger
 
 from src.api.dependencies import get_db_session
 from src.api.schemas import error_response, success_response

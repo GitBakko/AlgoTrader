@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from loguru import logger
@@ -73,7 +73,7 @@ class MantisLongTermMemory:
         if not pattern.pattern_id:
             pattern.pattern_id = str(uuid.uuid4())[:8]
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         sig_json = json.dumps(pattern.feature_signature)
 
         with sqlite3.connect(str(self._db_path)) as conn:
@@ -148,7 +148,7 @@ class MantisLongTermMemory:
             condition.condition_id = str(uuid.uuid4())[:8]
 
         sig_json = json.dumps(condition.feature_signature)
-        now = datetime.now(timezone.utc).isoformat()
+        datetime.now(UTC).isoformat()
 
         with sqlite3.connect(str(self._db_path)) as conn:
             conn.execute(

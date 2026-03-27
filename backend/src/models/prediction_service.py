@@ -4,7 +4,7 @@ Pipeline: DataAccess -> FeatureBuilder -> XGBoost -> PredictionResult
 """
 
 import time as _time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import numpy as np
 import polars as pl
@@ -208,7 +208,7 @@ class PredictionService:
                 signal_name=SignalClass(predicted_class).name,
                 confidence=confidence,
                 probabilities={SignalClass(i).name: float(p) for i, p in enumerate(proba_row)},
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
             )
         except Exception as e:
             logger.error(f"Inference failed for {epic}: {e}")
@@ -362,7 +362,7 @@ class PredictionService:
     def get_loaded_models(self) -> dict[str, dict]:
         """Get info about currently loaded models."""
         result = {}
-        for epic, (model, meta) in self._loaded_models.items():
+        for epic, (_model, meta) in self._loaded_models.items():
             result[epic] = {
                 "model_id": meta.model_id,
                 "model_type": meta.model_type,

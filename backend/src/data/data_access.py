@@ -188,8 +188,9 @@ class DataAccessLayer:
         Get total number of candles for an asset/timeframe.
         Uses Parquet metadata to avoid loading all data into memory.
         """
-        from src.data.utils import list_parquet_files
         import pyarrow.parquet as pq
+
+        from src.data.utils import list_parquet_files
 
         files = list_parquet_files(self.storage.data_dir, epic, timeframe)
         total = 0

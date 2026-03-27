@@ -7,7 +7,7 @@ Both use simple keyword-based sentiment scoring.
 TTL: 15 minutes.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from loguru import logger
 
@@ -169,7 +169,7 @@ class SocialSentimentClient(SILBaseClient):
             x_post_count=x_result["post_count"],
             x_sentiment_score=round(x_result["sentiment_score"], 3),
             combined_bullish_ratio=round(combined, 3),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
         self._set_cache(cache_key, result)
         return result

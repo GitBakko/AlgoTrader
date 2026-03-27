@@ -18,12 +18,12 @@ from src.features.alignment import TimeframeAligner
 from src.features.asset_config import DEFAULT_TECHNICAL_PARAMS, get_asset_config
 from src.features.keltner import KeltnerChannel
 from src.features.market_structure import MarketStructureDetector
-from src.features.sentiment import SentimentFeatures
-from src.features.vwap_bands import VWAPBands
 from src.features.normalizer import FeatureNormalizer
 from src.features.regime import RegimeDetector
 from src.features.schemas import AssetFeatureConfig, FeatureMatrix
+from src.features.sentiment import SentimentFeatures
 from src.features.technical import TechnicalIndicators
+from src.features.vwap_bands import VWAPBands
 
 
 async def fetch_sentiment_data(

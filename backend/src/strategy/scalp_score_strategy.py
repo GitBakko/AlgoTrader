@@ -292,7 +292,6 @@ class ScalpScoreStrategy(BaseStrategy):
         MIN_DIRECTIONAL_FOR_CONFIRMATION = 3
 
         if buy_dir > sell_dir:
-            majority = 1  # BUY majority
             buy_count = buy_dir
             sell_count = sell_dir
             # Confirmation votes only add if directional consensus is strong enough
@@ -302,7 +301,6 @@ class ScalpScoreStrategy(BaseStrategy):
                 if adx_vote > 0:
                     buy_count += 1
         elif sell_dir > buy_dir:
-            majority = -1  # SELL majority
             buy_count = buy_dir
             sell_count = sell_dir
             if sell_dir >= MIN_DIRECTIONAL_FOR_CONFIRMATION:
@@ -312,7 +310,6 @@ class ScalpScoreStrategy(BaseStrategy):
                     sell_count += 1
         else:
             # Tied or all neutral — no trade
-            majority = 0
             buy_count = buy_dir
             sell_count = sell_dir
 
@@ -368,7 +365,7 @@ class ScalpScoreStrategy(BaseStrategy):
         else:
             vwap_tag = f" VWAP={vwap:.2f}" if vwap > 0 else ""
             htf_tag = f" HTF={htf_bias}" if htf_bias else ""
-            sess_tag = f" kz" if session_mult >= 1.0 else f" s={session_mult:.1f}"
+            sess_tag = " kz" if session_mult >= 1.0 else f" s={session_mult:.1f}"
             logger.info(
                 f"[{epic}] Confluence: BUY={buy_count} SELL={sell_count} "
                 f"< min={effective_min} [{votes_str}]{vwap_tag}{htf_tag}{sess_tag}"

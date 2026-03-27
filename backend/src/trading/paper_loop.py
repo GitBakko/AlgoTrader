@@ -13,7 +13,7 @@ Phase 8 integration:
 import asyncio
 import time as _time
 from collections import deque
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from loguru import logger
 
@@ -21,16 +21,16 @@ from src.broker.client import CapitalComClient
 from src.data.data_access import DataAccessLayer
 from src.execution.execution_engine import ExecutionEngine
 from src.execution.schemas import ExecutionMode
+from src.external.sil_schemas import SILData
 from src.models.prediction_service import PredictionService
+from src.monitoring.metrics import MetricsCollector
+from src.monitoring.trade_logger import ExecutionStatus, RiskEventType, SignalType, get_trade_logger
 from src.risk.asset_performance_tracker import AssetPerformanceTracker
 from src.risk.risk_manager import RiskManager
 from src.risk.stop_manager import StopManager
 from src.risk.trailing_stop_manager import TrailingPhase, TrailingStopConfig, TrailingStopManager
-from src.monitoring.metrics import MetricsCollector
-from src.monitoring.trade_logger import get_trade_logger, SignalType, ExecutionStatus, RiskEventType
 from src.strategy.schemas import SignalDirection
 from src.strategy.strategy_manager import StrategyManager
-from src.external.sil_schemas import SILData
 from src.utils.config import get_settings
 from src.utils.constants import TRADABLE_ASSETS
 
@@ -228,10 +228,10 @@ class PaperTradingLoop:
     def _init_sil_clients(self) -> None:
         """Initialize SIL external clients and calendar gate."""
         try:
-            from src.external.fear_greed_client import FearGreedClient
-            from src.external.fred_client import FREDClient
             from src.external.alpha_vantage_client import AlphaVantageClient
             from src.external.cot_client import COTClient
+            from src.external.fear_greed_client import FearGreedClient
+            from src.external.fred_client import FREDClient
             from src.external.social_sentiment_client import SocialSentimentClient
             from src.risk.economic_calendar_gate import EconomicCalendarGate
 
@@ -280,10 +280,10 @@ class PaperTradingLoop:
         fg_data, fred_data, av_data, cot_data, social_data = results
 
         from src.external.sil_schemas import (
-            FearGreedData,
-            FREDData,
             AlphaVantageData,
             COTData,
+            FearGreedData,
+            FREDData,
             SocialSentimentData,
         )
 
@@ -391,6 +391,7 @@ class PaperTradingLoop:
 
         try:
             from decimal import Decimal
+
             from src.database.models import Position, Trade
             from src.database.repositories import PositionRepository
 
@@ -413,7 +414,7 @@ class PaperTradingLoop:
                     stop_loss=Decimal(str(stop_loss)) if stop_loss else None,
                     take_profit=Decimal(str(take_profit)) if take_profit else None,
                     status="OPEN",
-                    opened_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                    opened_at=datetime.now(UTC).replace(tzinfo=None),
                 )
                 pos = await repo.create(pos)
 
@@ -426,7 +427,7 @@ class PaperTradingLoop:
                     direction=direction,
                     size=Decimal(str(size)),
                     price=Decimal(str(entry_price)),
-                    executed_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                    executed_at=datetime.now(UTC).replace(tzinfo=None),
                 )
                 session.add(trade)
                 await session.commit()
@@ -463,6 +464,7 @@ class PaperTradingLoop:
 
         try:
             from decimal import Decimal
+
             from src.database.models import Position, Trade
             from src.database.repositories import PositionRepository
 
@@ -472,19 +474,19 @@ class PaperTradingLoop:
 
                 if pos is None:
                     # Position was never persisted at open — create it as CLOSED
-                    now = datetime.now(timezone.utc).replace(tzinfo=None)
+                    now = datetime.now(UTC).replace(tzinfo=None)
                     actual_opened = opened_at or now
                     if isinstance(actual_opened, str):
                         try:
                             parsed = datetime.fromisoformat(actual_opened)
                             # Convert to UTC if timezone-aware, then strip tzinfo
                             if parsed.tzinfo is not None:
-                                parsed = parsed.astimezone(timezone.utc)
+                                parsed = parsed.astimezone(UTC)
                             actual_opened = parsed.replace(tzinfo=None)
                         except (ValueError, TypeError):
                             actual_opened = now
                     elif hasattr(actual_opened, "tzinfo") and actual_opened.tzinfo is not None:
-                        actual_opened = actual_opened.astimezone(timezone.utc).replace(tzinfo=None)
+                        actual_opened = actual_opened.astimezone(UTC).replace(tzinfo=None)
 
                     # Guard: opened_at must never be after closed_at
                     if actual_opened > now:
@@ -512,7 +514,7 @@ class PaperTradingLoop:
                     pos = await repo.create(pos)
                 else:
                     # Update existing
-                    now = datetime.now(timezone.utc).replace(tzinfo=None)
+                    now = datetime.now(UTC).replace(tzinfo=None)
                     pos.status = "CLOSED"
                     pos.current_price = Decimal(str(exit_price))
                     pos.profit_loss = Decimal(str(round(pnl, 2)))
@@ -538,7 +540,7 @@ class PaperTradingLoop:
                     size=Decimal(str(size)),
                     price=Decimal(str(exit_price)),
                     profit_loss=Decimal(str(round(pnl, 2))),
-                    executed_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                    executed_at=datetime.now(UTC).replace(tzinfo=None),
                 )
                 session.add(trade)
                 await session.commit()
@@ -702,7 +704,7 @@ class PaperTradingLoop:
                         "direction": direction,
                         "pnl": round(pnl, 2),
                         "close_reason": close_reason,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "timestamp": datetime.now(UTC).isoformat(),
                     },
                 )
             except Exception as e:
@@ -759,8 +761,8 @@ class PaperTradingLoop:
         try:
             from decimal import Decimal
 
-            from src.database.repositories import TrailingStopRepository
             from src.broker.models import Direction
+            from src.database.repositories import TrailingStopRepository
 
             state = self.trailing_stop_manager.get_state(deal_id)
             if state is None:
@@ -972,7 +974,7 @@ class PaperTradingLoop:
         self.risk_manager.circuit_breakers.heartbeat()
 
         # Daily reset: reset daily P&L tracking and daily circuit breakers at midnight UTC
-        today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today_utc = datetime.now(UTC).strftime("%Y-%m-%d")
         if not hasattr(self, "_last_daily_reset_date") or self._last_daily_reset_date != today_utc:
             self.risk_manager.drawdown_monitor.reset_daily()
             self.risk_manager.circuit_breakers.reset_daily()
@@ -982,7 +984,7 @@ class PaperTradingLoop:
         # Fetch positions once per iteration (avoid N+1)
         try:
             current_positions = await asyncio.wait_for(self.get_positions_async(), timeout=10.0)
-        except (asyncio.TimeoutError, Exception) as e:
+        except (TimeoutError, Exception) as e:
             logger.warning(f"Position fetch timed out/failed ({e}), using local cache")
             current_positions = self.get_paper_positions()
 
@@ -1024,7 +1026,7 @@ class PaperTradingLoop:
             return
 
         self._iteration_count += 1
-        self._last_run = datetime.now(timezone.utc)
+        self._last_run = datetime.now(UTC)
         logger.info(
             f"Paper trading iteration #{self._iteration_count} "
             f"(check #{self._check_count}, epics: {epics_to_process})"
@@ -1062,14 +1064,16 @@ class PaperTradingLoop:
             return None
 
         try:
-            import polars as pl
-            from src.broker.models import Resolution
             from zoneinfo import ZoneInfo
+
+            import polars as pl
+
+            from src.broker.models import Resolution
 
             _ET = ZoneInfo("America/New_York")
             _BROKER_TZ = ZoneInfo("Europe/Berlin")
 
-            now_utc = datetime.now(timezone.utc)
+            now_utc = datetime.now(UTC)
             now_et = now_utc.astimezone(_ET)
 
             # Only fetch during NYSE session (09:25 - 16:05 ET)
@@ -1080,7 +1084,7 @@ class PaperTradingLoop:
 
             # Fetch from 09:25 ET today to now
             from_dt = now_et.replace(hour=9, minute=25, second=0, microsecond=0)
-            from_utc = from_dt.astimezone(timezone.utc).replace(tzinfo=None)
+            from_utc = from_dt.astimezone(UTC).replace(tzinfo=None)
             to_utc = now_utc.replace(tzinfo=None)
 
             candles = await asyncio.wait_for(
@@ -1104,7 +1108,7 @@ class PaperTradingLoop:
                 if ts.tzinfo is None:
                     # Broker returns CET/CEST — convert to UTC
                     aware = ts.replace(tzinfo=_BROKER_TZ)
-                    ts = aware.astimezone(timezone.utc).replace(tzinfo=None)
+                    ts = aware.astimezone(UTC).replace(tzinfo=None)
                 rows.append(
                     {
                         "timestamp": ts,
@@ -1122,7 +1126,7 @@ class PaperTradingLoop:
             logger.debug(f"[{epic}] Fetched {len(df)} M1 bars for ORB+FVG")
             return df
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(f"[{epic}] M1 bar fetch timed out")
             return None
         except Exception as e:
@@ -1169,7 +1173,7 @@ class PaperTradingLoop:
                 "direction": "HOLD",
                 "confidence": 0.0,
                 "entry_price": 0.0,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "status": "market_closed",
                 "rejection_reason": closed_reason,
             }
@@ -1188,7 +1192,7 @@ class PaperTradingLoop:
                         "direction": "HOLD",
                         "confidence": 0.0,
                         "entry_price": 0.0,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "timestamp": datetime.now(UTC).isoformat(),
                         "status": "calendar_blackout",
                         "rejection_reason": blackout_reason,
                     }
@@ -1274,7 +1278,7 @@ class PaperTradingLoop:
         _ml_htf = market_data.get("htf_bias")
         _ml_features = {
             "ml_confluence": round(signal.confidence * 6, 1),
-            "ml_utc_hour": datetime.now(timezone.utc).hour,
+            "ml_utc_hour": datetime.now(UTC).hour,
             "ml_adx": round(float(market_data.get("adx", 0)), 1),
             "ml_rsi": round(float(market_data.get("rsi", 50)), 1),
             "ml_atr": round(float(market_data.get("atr", 0)), 5),
@@ -1299,7 +1303,7 @@ class PaperTradingLoop:
             "direction": signal.direction.value,
             "confidence": signal.confidence,
             "entry_price": signal.entry_price,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "status": "predicted",
             "strategy_name": signal.strategy_name,
             "sl_cooldown": _sl_cooldown_info,
@@ -1929,7 +1933,7 @@ class PaperTradingLoop:
 
         _loop_settings = get_settings()
         max_hold_hours = _loop_settings.scalp_max_hold_hours
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
 
         for position in current_positions:
             deal_id = position.get("deal_id")
@@ -1944,7 +1948,7 @@ class PaperTradingLoop:
                 try:
                     opened_at = datetime.fromisoformat(str(opened_at_str))
                     if opened_at.tzinfo is None:
-                        opened_at = opened_at.replace(tzinfo=timezone.utc)
+                        opened_at = opened_at.replace(tzinfo=UTC)
                     age_hours = (now_utc - opened_at).total_seconds() / 3600
                     if age_hours >= max_hold_hours:
                         logger.warning(
@@ -2091,7 +2095,7 @@ class PaperTradingLoop:
                                         "direction": direction,
                                         "pnl": round(pnl, 2),
                                         "close_reason": close_reason,
-                                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                                        "timestamp": datetime.now(UTC).isoformat(),
                                     },
                                 )
                             except Exception as e:
@@ -2114,7 +2118,7 @@ class PaperTradingLoop:
                             status = "sl_hit" if stop_violated else "tp_hit"
                             self._signal_history.append(
                                 {
-                                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                                    "timestamp": datetime.now(UTC).isoformat(),
                                     "epic": epic,
                                     "direction": direction,
                                     "confidence": 0.0,
@@ -2155,7 +2159,7 @@ class PaperTradingLoop:
 
         # Epic SL cooldown: track SL hits per epic
         if close_reason == "SL" and epic:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             self._epic_sl_hits.setdefault(epic, []).append(now)
             recent = self._get_recent_sl_count(epic)
             if recent >= self._epic_sl_max_strikes:
@@ -2177,7 +2181,7 @@ class PaperTradingLoop:
 
     def _get_recent_sl_count(self, epic: str) -> int:
         """Count SL hits for an epic within the cooldown window."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         cutoff = now - timedelta(hours=self._epic_sl_window_hours)
         hits = self._epic_sl_hits.get(epic, [])
         # Prune old entries
@@ -2197,7 +2201,7 @@ class PaperTradingLoop:
 
     def get_epic_sl_summary(self) -> dict[str, int]:
         """Get summary of recent SL hits per epic (for Telegram status)."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         cutoff = now - timedelta(hours=self._epic_sl_window_hours)
         result = {}
         for epic, hits in self._epic_sl_hits.items():
@@ -2210,7 +2214,7 @@ class PaperTradingLoop:
         """Fire Telegram alert when an epic enters cooldown."""
         try:
             from src.monitoring.alerting.alert_manager import get_alert_manager
-            from src.monitoring.alerting.schemas import Alert, AlertType, AlertSeverity
+            from src.monitoring.alerting.schemas import Alert, AlertSeverity, AlertType
 
             alert = Alert(
                 alert_type=AlertType.CIRCUIT_BREAKER,
@@ -2239,11 +2243,6 @@ class PaperTradingLoop:
         except RuntimeError:
             pass  # No event loop (called from tests)
 
-        logger.debug(
-            f"Position closed: deal={deal_id} epic={epic} pnl={pnl:.2f} "
-            f"(history={len(self._trade_history)} trades)"
-        )
-
     def _refresh_active_assets(self) -> None:
         """Refresh asset rotation weekly."""
         import time
@@ -2253,9 +2252,9 @@ class PaperTradingLoop:
             return  # Refresh weekly
 
         try:
-            from src.trading.asset_rotation import compute_momentum_scores, select_active_assets
-            from src.data.storage import ParquetStorageManager
             from src.data.data_access import DataAccessLayer
+            from src.data.storage import ParquetStorageManager
+            from src.trading.asset_rotation import compute_momentum_scores, select_active_assets
 
             storage = ParquetStorageManager()
             data_access = DataAccessLayer(storage=storage)

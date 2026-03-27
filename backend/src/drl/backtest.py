@@ -8,7 +8,7 @@ from loguru import logger
 
 from src.drl.ensemble import MantisDRLEnsemble
 from src.drl.performance_analyzer import MantisPerformanceAnalyzer
-from src.drl.schemas import BacktestConfig, BacktestResult, PerformanceMetrics
+from src.drl.schemas import BacktestConfig, BacktestResult
 
 
 class MantisDRLBacktester:

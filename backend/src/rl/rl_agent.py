@@ -7,9 +7,9 @@ import numpy as np
 from loguru import logger
 
 from src.agents.schemas import AgentRole, MarketContext
-from src.rl.schemas import RLAction, RLSignal
 from src.rl.adaptive_trainer import MantisAdaptiveTrainer
 from src.rl.feature_pipeline import RLFeaturePipeline
+from src.rl.schemas import RLAction, RLSignal
 
 
 class MantisRLAgent:

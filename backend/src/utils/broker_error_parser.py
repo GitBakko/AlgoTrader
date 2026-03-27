@@ -4,7 +4,7 @@ human-readable format with Italian localization.
 """
 
 import re
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 
 # Day name mapping: English → Italian abbreviation
 _DAY_IT = {

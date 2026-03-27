@@ -3,6 +3,7 @@ Strategy manager orchestrator.
 Coordinates regime adaptation, signal generation, and portfolio allocation.
 """
 
+from datetime import UTC
 from pathlib import Path
 
 from loguru import logger
@@ -186,7 +187,6 @@ class StrategyManager:
         market_data: dict,
     ) -> TradingSignal:
         """Route to ORB+FVG strategy using M1 bars from market_data."""
-        import polars as pl
 
         m1_bars = market_data["m1_bars"]
         current_price = float(market_data["current_price"])
@@ -216,14 +216,16 @@ class StrategyManager:
         market_data: dict,
     ) -> TradingSignal:
         """Scalp mode: technical score first, ML as boost layer."""
+        from datetime import datetime
+
         import polars as pl
-        from datetime import datetime, timezone
-        from src.strategy.schemas import SignalDirection
+
         from src.models.schemas import SignalClass
+        from src.strategy.schemas import SignalDirection
 
         current_price = float(market_data["current_price"])
         atr = float(market_data["atr"])
-        utc_hour = datetime.now(timezone.utc).hour
+        utc_hour = datetime.now(UTC).hour
 
         config = StrategyConfig(
             epic=epic,
@@ -323,16 +325,18 @@ class StrategyManager:
         market_data: dict,
     ) -> TradingSignal:
         """ML-Primary mode: ML decides direction, ScalpScore confirms quality."""
+        from datetime import datetime
+
         import polars as pl
-        from datetime import datetime, timezone
-        from src.strategy.schemas import SignalDirection
+
         from src.models.schemas import SignalClass
+        from src.strategy.schemas import SignalDirection
         from src.utils.config import get_settings
 
         settings = get_settings()
         current_price = float(market_data["current_price"])
         atr = float(market_data["atr"])
-        utc_hour = datetime.now(timezone.utc).hour
+        utc_hour = datetime.now(UTC).hour
 
         # Step 1: Map ML prediction to direction
         ml_direction = {
@@ -491,8 +495,8 @@ class StrategyManager:
     @staticmethod
     def _make_hold(epic: str, price: float) -> TradingSignal:
         """Create a HOLD signal."""
-        from src.strategy.schemas import SignalDirection
         from src.models.schemas import SignalClass
+        from src.strategy.schemas import SignalDirection
 
         return TradingSignal(
             epic=epic,

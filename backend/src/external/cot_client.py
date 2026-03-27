@@ -7,7 +7,7 @@ Data updates every Friday. TTL: 7 days.
 Free tier: 50 API calls/day. No auth required for basic datasets.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from loguru import logger
 
@@ -105,9 +105,7 @@ class COTClient(SILBaseClient):
         report_date_str = latest[0] if isinstance(latest[0], str) else str(latest[0])
 
         try:
-            report_date = datetime.strptime(report_date_str, "%Y-%m-%d").replace(
-                tzinfo=timezone.utc
-            )
+            report_date = datetime.strptime(report_date_str, "%Y-%m-%d").replace(tzinfo=UTC)
         except (ValueError, TypeError):
             report_date = None
 

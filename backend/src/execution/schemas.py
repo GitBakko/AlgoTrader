@@ -3,7 +3,7 @@ Pydantic models for execution module.
 Defines schemas for orders, execution results, and execution modes.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field
@@ -41,4 +41,4 @@ class ExecutionResult(BaseModel):
     error: str | None = None
     error_detail: dict | None = None
     execution_time_ms: float = 0.0
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))

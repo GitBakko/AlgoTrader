@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
@@ -76,7 +76,7 @@ class MantisEpisodicMemory:
             return None
 
         episode_id = str(uuid.uuid4())[:8]
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         outcome_json = outcome.model_dump_json() if outcome else None
         embedding_json = json.dumps(context_embedding or [])

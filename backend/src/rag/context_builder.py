@@ -3,10 +3,8 @@
 
 from __future__ import annotations
 
-from loguru import logger
-
-from src.rag.schemas import NewsItem, RAGContext
 from src.memory_layer.schemas import MemoryContext
+from src.rag.schemas import NewsItem, RAGContext
 
 
 class MantisRAGContextBuilder:

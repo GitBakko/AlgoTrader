@@ -4,7 +4,7 @@ Provides overview data, equity curve, and recent trade history.
 Dual-mode: uses DB when available, falls back to in-memory state.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query, Request
 from loguru import logger
@@ -22,7 +22,6 @@ from src.api.schemas import (
     success_response,
 )
 from src.execution.execution_engine import ExecutionEngine
-from src.execution.schemas import ExecutionMode
 from src.risk.risk_manager import RiskManager
 
 router = APIRouter()
@@ -57,7 +56,7 @@ async def get_overview(
     win_rate = 0.0
     if trade_repo is not None:
         try:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             summary = await trade_repo.get_pnl_summary(now - timedelta(days=30), now)
             if summary["trade_count"] > 0:
                 win_rate = summary.get("win_rate", 0.0)
@@ -69,8 +68,8 @@ async def get_overview(
     if position_repo is not None:
         try:
             closed = await position_repo.get_closed_in_period(
-                datetime(2020, 1, 1, tzinfo=timezone.utc),
-                datetime.now(timezone.utc),
+                datetime(2020, 1, 1, tzinfo=UTC),
+                datetime.now(UTC),
             )
             realized_pnl = sum(float(p.profit_loss) for p in closed if p.profit_loss is not None)
         except Exception as e:
@@ -86,7 +85,7 @@ async def get_overview(
     today_realized_pnl = 0.0
     if position_repo is not None:
         try:
-            today_start = datetime.now(timezone.utc).replace(
+            today_start = datetime.now(UTC).replace(
                 hour=0,
                 minute=0,
                 second=0,
@@ -94,7 +93,7 @@ async def get_overview(
             )
             closed_today = await position_repo.get_closed_in_period(
                 today_start,
-                datetime.now(timezone.utc),
+                datetime.now(UTC),
             )
             today_realized_pnl = sum(
                 float(p.profit_loss) for p in closed_today if p.profit_loss is not None
@@ -141,7 +140,7 @@ async def get_equity_curve(
     """
     if position_repo is not None:
         try:
-            date_from = datetime.now(timezone.utc) - timedelta(days=days)
+            date_from = datetime.now(UTC) - timedelta(days=days)
             stats = await position_repo.get_performance_stats(date_from=date_from)
             curve = stats.get("equity_curve", [])
             if curve:
@@ -163,7 +162,7 @@ async def get_equity_curve(
             logger.debug(f"Equity curve from DB failed: {e}")
 
     # Fallback: single placeholder point
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     points = [EquityCurvePoint(date=now, equity=10000.0, drawdown_pct=0.0).model_dump()]
 
     return success_response(points)

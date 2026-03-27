@@ -5,7 +5,7 @@ Provides daily macro indicators for feature engineering.
 Caches to Parquet for fast reload. Graceful degradation if yfinance unavailable.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import polars as pl
@@ -59,10 +59,8 @@ class MacroDataClient:
                 cached = pl.read_parquet(self._cache_file)
                 if not cached.is_empty():
                     # Check if cache is fresh enough (< 24h old)
-                    cache_mtime = datetime.fromtimestamp(
-                        self._cache_file.stat().st_mtime, tz=timezone.utc
-                    )
-                    if (datetime.now(timezone.utc) - cache_mtime).total_seconds() < 86400:
+                    cache_mtime = datetime.fromtimestamp(self._cache_file.stat().st_mtime, tz=UTC)
+                    if (datetime.now(UTC) - cache_mtime).total_seconds() < 86400:
                         return self._filter_dates(cached, start_date, end_date)
             except Exception as e:
                 logger.debug(f"Macro cache read failed: {e}")

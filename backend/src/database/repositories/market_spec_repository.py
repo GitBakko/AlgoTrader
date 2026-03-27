@@ -3,10 +3,9 @@ Repository for market specifications (dealing rules from Capital.com).
 Caches minDealSize per epic per environment (DEMO/LIVE).
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
-from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,7 +45,7 @@ class MarketSpecRepository:
     ) -> MarketSpec:
         """Create or update market spec for an epic."""
         existing = await self.get_by_epic(epic, environment)
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
 
         if existing:
             existing.min_deal_size = Decimal(str(min_deal_size))

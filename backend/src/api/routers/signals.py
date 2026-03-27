@@ -4,10 +4,9 @@ Lists recent trading signals, test signal generation, and real ML-based predicti
 Dual-mode: uses DB when available, falls back to in-memory list.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Path, Query, Request
-
 from loguru import logger
 
 from src.api.dependencies import (
@@ -106,7 +105,7 @@ async def generate_test_signal(
     except Exception as e:
         return error_response(f"Signal generation failed: {e}")
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     response = SignalResponse(
         epic=signal.epic,
         direction=signal.direction.value,
@@ -173,7 +172,7 @@ async def predict_and_execute(
     except Exception as e:
         return error_response(f"Strategy processing failed: {e}", 500)
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     response_data = SignalResponse(
         epic=signal.epic,
         direction=signal.direction.value,

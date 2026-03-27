@@ -2,7 +2,7 @@
 Account and per-strategy drawdown monitoring with circuit breaker.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from loguru import logger
 
@@ -22,7 +22,7 @@ class DrawdownMonitor:
         Args:
             initial_equity: Starting equity for tracking
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         self._state = DrawdownState(
             peak_equity=initial_equity,
             current_equity=initial_equity,
@@ -98,7 +98,7 @@ class DrawdownMonitor:
         """Reset daily P&L tracking. Call at start of trading day."""
         self._state.daily_start_equity = self._state.current_equity
         self._state.daily_pnl = 0.0
-        self._state.last_reset = datetime.now(timezone.utc)
+        self._state.last_reset = datetime.now(UTC)
         logger.info(f"Daily drawdown reset. Start equity: {self._state.daily_start_equity:.2f}")
 
     def is_circuit_breaker_active(self) -> bool:

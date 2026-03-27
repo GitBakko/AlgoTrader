@@ -8,8 +8,7 @@ Recovery Strategy:
 """
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from decimal import Decimal
+from datetime import UTC, datetime
 
 from loguru import logger
 
@@ -108,7 +107,7 @@ class StateRecoveryService:
             errors.append("CRITICAL: No positions recovered in DEMO/LIVE mode!")
 
         if len(positions) > 0 and trailing_stops_count == 0:
-            warnings.append(f"Open positions exist but no trailing stops recovered")
+            warnings.append("Open positions exist but no trailing stops recovered")
 
         if not risk_restored:
             warnings.append("Risk state not restored, using fresh state")
@@ -124,7 +123,7 @@ class StateRecoveryService:
             risk_state_restored=risk_restored,
             warnings=warnings,
             errors=errors,
-            recovered_at=datetime.now(timezone.utc),
+            recovered_at=datetime.now(UTC),
         )
 
         if errors:
@@ -218,7 +217,7 @@ class StateRecoveryService:
                 logger.debug(f"Loaded {len(positions)} positions from broker")
                 return positions
 
-            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            except (TimeoutError, aiohttp.ClientError) as e:
                 # Retryable errors (connection, timeout)
                 if attempt == 2:  # Last attempt
                     logger.error(f"Broker positions fetch failed after 3 attempts: {e}")
@@ -501,12 +500,12 @@ class StateRecoveryService:
 
                 # FIX: If snapshot is from a previous day, reset daily_start to current equity
                 # to prevent stale daily P&L from tripping circuit breakers on restart
-                from datetime import datetime, timezone
+                from datetime import datetime
 
                 snapshot_date = (
                     snapshot.snapshot_at.strftime("%Y-%m-%d") if snapshot.snapshot_at else ""
                 )
-                today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                today = datetime.now(UTC).strftime("%Y-%m-%d")
                 if snapshot_date != today:
                     dm._state.daily_start_equity = float(snapshot.current_equity)
                     logger.info(
@@ -522,6 +521,7 @@ class StateRecoveryService:
 
                 # Restore tripped breakers: {breaker_type: reason_string}
                 import time as _time
+
                 from src.risk.circuit_breakers import CircuitBreakerType
 
                 for breaker_type_str, reason in snapshot.tripped_breakers.items():

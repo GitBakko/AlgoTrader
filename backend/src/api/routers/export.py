@@ -5,7 +5,7 @@ Generates CSV downloads for positions.
 
 import csv
 import io
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
@@ -89,7 +89,7 @@ async def export_closed_positions_csv(
             ]
         )
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     filename = f"mantis_positions_{timestamp}.csv"
 
     output.seek(0)

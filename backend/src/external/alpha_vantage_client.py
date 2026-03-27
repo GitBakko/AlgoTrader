@@ -5,7 +5,7 @@ Fetches news sentiment via NEWS_SENTIMENT function.
 25 requests/day limit → TTL 23 hours (single daily call per topic).
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from loguru import logger
 
@@ -135,7 +135,7 @@ class AlphaVantageClient(SILBaseClient):
             bearish_count=bearish,
             neutral_count=neutral,
             bullish_ratio=round(bullish_ratio, 3),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
         self._set_cache(cache_key, result)
         logger.info(

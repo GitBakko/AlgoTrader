@@ -3,8 +3,7 @@ Model versioning and persistence.
 Handles saving/loading models with metadata, and model comparison.
 """
 
-import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
@@ -12,7 +11,7 @@ from loguru import logger
 
 from src.models.base_model import BaseMLModel
 from src.models.evaluator import ModelEvaluator
-from src.models.schemas import ModelMetadata, TrainingResult
+from src.models.schemas import ModelMetadata
 from src.utils.config import get_settings
 
 
@@ -183,5 +182,5 @@ class ModelVersioning:
     @staticmethod
     def generate_model_id(model_type: str, epic: str) -> str:
         """Generate a unique model ID based on type, asset, and timestamp."""
-        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         return f"{model_type}_{epic}_{ts}"

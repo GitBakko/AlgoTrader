@@ -60,14 +60,14 @@ class TechnicalAnalystAgent(MantisBaseAgent):
         features = context.features
         lines = [
             f"## Technical Analysis Request: {context.epic}",
-            f"",
+            "",
             f"**Asset**: {context.epic}",
             f"**Timeframe**: {context.timeframe}",
             f"**Current Price**: {context.current_price:.6g}",
             f"**ATR**: {context.atr:.6g}",
             f"**Regime**: {context.regime or 'UNKNOWN'}",
-            f"",
-            f"### Feature Data",
+            "",
+            "### Feature Data",
         ]
 
         if features:

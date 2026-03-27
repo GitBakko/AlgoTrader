@@ -4,7 +4,7 @@ Receives WebSocket OHLC data, buffers in Redis, flushes to Parquet periodically.
 """
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC
 
 import redis.asyncio as redis
 from loguru import logger
@@ -148,7 +148,7 @@ class RealtimeStreamer:
             return
 
         bar = OHLCBar(
-            timestamp=data.datetime.replace(tzinfo=timezone.utc),
+            timestamp=data.datetime.replace(tzinfo=UTC),
             open=data.open,
             high=data.high,
             low=data.low,

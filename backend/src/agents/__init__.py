@@ -1,23 +1,23 @@
 # MANTIS-EVOLUTION: Agent schema contracts + base agent + concrete agents + orchestrator
-from src.agents.schemas import (
-    AgentRole,
-    MarketContext,
-    TechnicalReport,
-    SentimentReport,
-    RiskReport,
-    TradeProposal,
-    DebateArgument,
-    DebateSummary,
-    FinalDecision,
-)
 from src.agents.base_agent import MantisBaseAgent
-from src.agents.technical_analyst import TechnicalAnalystAgent
-from src.agents.sentiment_analyst import SentimentAnalystAgent
-from src.agents.risk_manager_agent import RiskManagerAgent
-from src.agents.trader_agent import TraderAgent
 from src.agents.debate import BullBearDebate
 from src.agents.fund_manager import FundManagerAgent
 from src.agents.orchestrator import MantisAgentOrchestrator
+from src.agents.risk_manager_agent import RiskManagerAgent
+from src.agents.schemas import (
+    AgentRole,
+    DebateArgument,
+    DebateSummary,
+    FinalDecision,
+    MarketContext,
+    RiskReport,
+    SentimentReport,
+    TechnicalReport,
+    TradeProposal,
+)
+from src.agents.sentiment_analyst import SentimentAnalystAgent
+from src.agents.technical_analyst import TechnicalAnalystAgent
+from src.agents.trader_agent import TraderAgent
 from src.agents.vision_agent import VisionAgent
 from src.drl.drl_ensemble_agent import MantisDRLEnsembleAgent
 

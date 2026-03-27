@@ -2,7 +2,7 @@
 Signal repository for ML predictions and trading signals.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -91,7 +91,7 @@ class SignalRepository(BaseRepository[Signal]):
         Returns:
             List of recent signals
         """
-        since = datetime.now(timezone.utc).replace(microsecond=0)
+        since = datetime.now(UTC).replace(microsecond=0)
         since = since.replace(hour=since.hour - hours)
 
         query = select(Signal).where(Signal.epic == epic).where(Signal.generated_at >= since)
@@ -158,7 +158,7 @@ class SignalRepository(BaseRepository[Signal]):
         """Create a signal record with full audit trail JSONB."""
         from decimal import Decimal
 
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
 
         signal = Signal(
             epic=epic,
@@ -227,8 +227,9 @@ class SignalRepository(BaseRepository[Signal]):
 
     async def get_history_by_epic(self, epic: str, limit: int = 10, offset: int = 0) -> list[dict]:
         """Get lightweight signal history for an epic (no JSONB features)."""
-        from src.database.models import Position
         from sqlalchemy import case
+
+        from src.database.models import Position
 
         query = (
             select(
@@ -283,7 +284,7 @@ class SignalRepository(BaseRepository[Signal]):
 
     async def expire_old_signals(self) -> int:
         """Expire pending signals past their expiration date."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         result = await self.session.execute(
             select(Signal).where(Signal.status == "PENDING").where(Signal.expires_at <= now)
         )

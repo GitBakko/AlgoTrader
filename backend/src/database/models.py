@@ -3,9 +3,8 @@ SQLModel ORM models for AlgoTrader AI PostgreSQL database.
 Based on schema design in schema_design.md.
 """
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import Optional
 
 from sqlalchemy import (
     ARRAY,
@@ -14,7 +13,6 @@ from sqlalchemy import (
     ForeignKey,
     MetaData,
     Numeric,
-    String,
     UniqueConstraint,
     text,
 )
@@ -33,18 +31,18 @@ class Account(SQLModel, table=True):
 
     __tablename__ = "accounts"
 
-    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    id: int | None = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     account_id: str = Field(max_length=100, nullable=False, index=True)
     account_type: str = Field(max_length=50, nullable=False)  # DEMO, LIVE
     balance: Decimal = Field(max_digits=15, decimal_places=2, nullable=False)
     equity: Decimal = Field(max_digits=15, decimal_places=2, nullable=False)
     available: Decimal = Field(max_digits=15, decimal_places=2, nullable=False)
-    margin_used: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=2)
-    profit_loss: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=2)
+    margin_used: Decimal | None = Field(default=None, max_digits=15, decimal_places=2)
+    profit_loss: Decimal | None = Field(default=None, max_digits=15, decimal_places=2)
     currency: str = Field(default="USD", max_length=3, nullable=False)
     snapshot_at: datetime = Field(nullable=False, index=True)
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
@@ -58,33 +56,33 @@ class Position(SQLModel, table=True):
 
     __tablename__ = "positions"
 
-    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    id: int | None = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     deal_id: str = Field(max_length=100, nullable=False, unique=True, index=True)
     epic: str = Field(max_length=50, nullable=False, index=True)
     direction: str = Field(max_length=4, nullable=False)  # BUY, SELL
     size: Decimal = Field(max_digits=10, decimal_places=4, nullable=False)
     entry_price: Decimal = Field(max_digits=15, decimal_places=4, nullable=False)
-    current_price: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=4)
-    stop_loss: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=4)
-    take_profit: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=4)
-    profit_loss: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=2)
+    current_price: Decimal | None = Field(default=None, max_digits=15, decimal_places=4)
+    stop_loss: Decimal | None = Field(default=None, max_digits=15, decimal_places=4)
+    take_profit: Decimal | None = Field(default=None, max_digits=15, decimal_places=4)
+    profit_loss: Decimal | None = Field(default=None, max_digits=15, decimal_places=2)
     status: str = Field(max_length=20, nullable=False, index=True)  # OPEN, CLOSED, CANCELLED
     opened_at: datetime = Field(nullable=False, index=True)
-    closed_at: Optional[datetime] = None
-    close_reason: Optional[str] = Field(default=None, max_length=50)  # SL, TP, MANUAL, EXPIRED
-    strategy_id: Optional[int] = Field(
+    closed_at: datetime | None = None
+    close_reason: str | None = Field(default=None, max_length=50)  # SL, TP, MANUAL, EXPIRED
+    strategy_id: int | None = Field(
         default=None, sa_column=Column(BigInteger, ForeignKey("strategies.id"), index=True)
     )
-    signal_id: Optional[int] = Field(
+    signal_id: int | None = Field(
         default=None, sa_column=Column(BigInteger, ForeignKey("signals.id"))
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()"), "onupdate": text("NOW()")},
     )
@@ -97,35 +95,35 @@ class Order(SQLModel, table=True):
 
     __tablename__ = "orders"
 
-    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    id: int | None = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     deal_id: str = Field(max_length=100, nullable=False, unique=True, index=True)
     epic: str = Field(max_length=50, nullable=False, index=True)
     direction: str = Field(max_length=4, nullable=False)  # BUY, SELL
     order_type: str = Field(max_length=10, nullable=False)  # LIMIT, STOP
     size: Decimal = Field(max_digits=10, decimal_places=4, nullable=False)
     trigger_price: Decimal = Field(max_digits=15, decimal_places=4, nullable=False)
-    stop_loss: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=4)
-    take_profit: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=4)
+    stop_loss: Decimal | None = Field(default=None, max_digits=15, decimal_places=4)
+    take_profit: Decimal | None = Field(default=None, max_digits=15, decimal_places=4)
     status: str = Field(
         max_length=20, nullable=False, index=True
     )  # PENDING, FILLED, CANCELLED, EXPIRED
-    good_till_date: Optional[datetime] = None
-    filled_at: Optional[datetime] = None
-    cancelled_at: Optional[datetime] = None
-    strategy_id: Optional[int] = Field(
+    good_till_date: datetime | None = None
+    filled_at: datetime | None = None
+    cancelled_at: datetime | None = None
+    strategy_id: int | None = Field(
         default=None, sa_column=Column(BigInteger, ForeignKey("strategies.id"))
     )
-    signal_id: Optional[int] = Field(
+    signal_id: int | None = Field(
         default=None, sa_column=Column(BigInteger, ForeignKey("signals.id"))
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         index=True,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()"), "onupdate": text("NOW()")},
     )
@@ -139,21 +137,21 @@ class Trade(SQLModel, table=True):
 
     __tablename__ = "trades"
 
-    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    id: int | None = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     position_id: int = Field(
         sa_column=Column(BigInteger, ForeignKey("positions.id"), nullable=False, index=True)
     )
-    deal_reference: Optional[str] = Field(default=None, max_length=100)
+    deal_reference: str | None = Field(default=None, max_length=100)
     trade_type: str = Field(max_length=10, nullable=False)  # OPEN, CLOSE, MODIFY
     epic: str = Field(max_length=50, nullable=False)
     direction: str = Field(max_length=4, nullable=False)  # BUY, SELL
     size: Decimal = Field(max_digits=10, decimal_places=4, nullable=False)
     price: Decimal = Field(max_digits=15, decimal_places=4, nullable=False)
-    profit_loss: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=2)
-    commission: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=4)
+    profit_loss: Decimal | None = Field(default=None, max_digits=15, decimal_places=2)
+    commission: Decimal | None = Field(default=None, max_digits=10, decimal_places=4)
     executed_at: datetime = Field(nullable=False, index=True)
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
@@ -167,32 +165,32 @@ class Signal(SQLModel, table=True):
 
     __tablename__ = "signals"
 
-    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    id: int | None = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     epic: str = Field(max_length=50, nullable=False, index=True)
     timeframe: str = Field(max_length=10, nullable=False)  # 1h, 4h, 1d
     direction: str = Field(max_length=4, nullable=False)  # BUY, SELL, HOLD
     confidence: Decimal = Field(max_digits=5, decimal_places=4, nullable=False, index=True)
-    predicted_price: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=4)
-    stop_loss_price: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=4)
-    take_profit_price: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=4)
+    predicted_price: Decimal | None = Field(default=None, max_digits=15, decimal_places=4)
+    stop_loss_price: Decimal | None = Field(default=None, max_digits=15, decimal_places=4)
+    take_profit_price: Decimal | None = Field(default=None, max_digits=15, decimal_places=4)
     model_version: str = Field(max_length=50, nullable=False)
-    model_id: Optional[int] = Field(
+    model_id: int | None = Field(
         default=None, sa_column=Column(BigInteger, ForeignKey("models.id"))
     )
-    features: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
-    strategy_id: Optional[int] = Field(
+    features: dict | None = Field(default=None, sa_column=Column(JSONB))
+    strategy_id: int | None = Field(
         default=None, sa_column=Column(BigInteger, ForeignKey("strategies.id"))
     )
-    position_id: Optional[int] = Field(
+    position_id: int | None = Field(
         default=None, sa_column=Column(BigInteger, ForeignKey("positions.id"))
     )
     status: str = Field(
         max_length=20, nullable=False, index=True
     )  # PENDING, EXECUTED, REJECTED, EXPIRED
     generated_at: datetime = Field(nullable=False, index=True)
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
@@ -206,30 +204,30 @@ class Strategy(SQLModel, table=True):
 
     __tablename__ = "strategies"
 
-    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    id: int | None = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     name: str = Field(max_length=100, nullable=False, unique=True, index=True)
-    description: Optional[str] = None
+    description: str | None = None
     epic: str = Field(max_length=50, nullable=False, index=True)
     timeframe: str = Field(max_length=10, nullable=False)
     is_active: bool = Field(default=False, nullable=False, index=True)
-    model_ids: Optional[list[int]] = Field(
+    model_ids: list[int] | None = Field(
         default=None, sa_column=Column(ARRAY(BigInteger))
     )  # Array of model IDs
     parameters: dict = Field(sa_column=Column(JSONB, nullable=False))
     risk_params: dict = Field(sa_column=Column(JSONB, nullable=False))
-    performance_metrics: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
+    performance_metrics: dict | None = Field(default=None, sa_column=Column(JSONB))
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()"), "onupdate": text("NOW()")},
     )
-    activated_at: Optional[datetime] = None
-    deactivated_at: Optional[datetime] = None
+    activated_at: datetime | None = None
+    deactivated_at: datetime | None = None
 
 
 class Model(SQLModel, table=True):
@@ -240,22 +238,22 @@ class Model(SQLModel, table=True):
 
     __tablename__ = "models"
 
-    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    id: int | None = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     name: str = Field(max_length=100, nullable=False)  # lstm, transformer, xgboost, ensemble
     version: str = Field(max_length=50, nullable=False)
     epic: str = Field(max_length=50, nullable=False, index=True)
     model_type: str = Field(max_length=50, nullable=False)  # LSTM, TFT, XGBOOST, ENSEMBLE
     file_path: str = Field(max_length=255, nullable=False)
     hyperparameters: dict = Field(sa_column=Column(JSONB, nullable=False))
-    training_metrics: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
-    validation_metrics: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
-    feature_importance: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
+    training_metrics: dict | None = Field(default=None, sa_column=Column(JSONB))
+    validation_metrics: dict | None = Field(default=None, sa_column=Column(JSONB))
+    feature_importance: dict | None = Field(default=None, sa_column=Column(JSONB))
     trained_at: datetime = Field(nullable=False, index=True)
     train_start_date: date = Field(nullable=False)
     train_end_date: date = Field(nullable=False)
     is_active: bool = Field(default=False, nullable=False, index=True)
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
@@ -270,26 +268,26 @@ class MarketDataSnapshot(SQLModel, table=True):
 
     __tablename__ = "market_data_snapshots"
 
-    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    id: int | None = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     epic: str = Field(max_length=50, nullable=False, index=True)
     timeframe: str = Field(max_length=10, nullable=False)
     open: Decimal = Field(max_digits=15, decimal_places=4, nullable=False)
     high: Decimal = Field(max_digits=15, decimal_places=4, nullable=False)
     low: Decimal = Field(max_digits=15, decimal_places=4, nullable=False)
     close: Decimal = Field(max_digits=15, decimal_places=4, nullable=False)
-    volume: Optional[int] = Field(default=None, sa_column=Column(BigInteger))
-    bid: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=4)
-    ask: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=4)
-    spread: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=4)
-    client_sentiment_long: Optional[Decimal] = Field(
+    volume: int | None = Field(default=None, sa_column=Column(BigInteger))
+    bid: Decimal | None = Field(default=None, max_digits=15, decimal_places=4)
+    ask: Decimal | None = Field(default=None, max_digits=15, decimal_places=4)
+    spread: Decimal | None = Field(default=None, max_digits=10, decimal_places=4)
+    client_sentiment_long: Decimal | None = Field(
         default=None, max_digits=5, decimal_places=2
     )  # % long
-    client_sentiment_short: Optional[Decimal] = Field(
+    client_sentiment_short: Decimal | None = Field(
         default=None, max_digits=5, decimal_places=2
     )  # % short
     snapshot_at: datetime = Field(nullable=False, index=True)
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
@@ -303,23 +301,23 @@ class SystemEvent(SQLModel, table=True):
 
     __tablename__ = "system_events"
 
-    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    id: int | None = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     event_type: str = Field(
         max_length=50, nullable=False, index=True
     )  # ERROR, WARNING, INFO, TRADE, SIGNAL
     severity: str = Field(max_length=20, nullable=False, index=True)  # CRITICAL, HIGH, MEDIUM, LOW
     component: str = Field(max_length=100, nullable=False, index=True)
     message: str = Field(nullable=False)
-    details: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
-    related_position_id: Optional[int] = Field(
+    details: dict | None = Field(default=None, sa_column=Column(JSONB))
+    related_position_id: int | None = Field(
         default=None, sa_column=Column(BigInteger, ForeignKey("positions.id"))
     )
-    related_signal_id: Optional[int] = Field(
+    related_signal_id: int | None = Field(
         default=None, sa_column=Column(BigInteger, ForeignKey("signals.id"))
     )
     occurred_at: datetime = Field(nullable=False, index=True)
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
@@ -333,7 +331,7 @@ class BacktestRun(SQLModel, table=True):
 
     __tablename__ = "backtest_runs"
 
-    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    id: int | None = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     name: str = Field(max_length=200, nullable=False)
     strategy_id: int = Field(
         sa_column=Column(BigInteger, ForeignKey("strategies.id"), nullable=False, index=True)
@@ -342,22 +340,22 @@ class BacktestRun(SQLModel, table=True):
     start_date: date = Field(nullable=False)
     end_date: date = Field(nullable=False)
     initial_capital: Decimal = Field(max_digits=15, decimal_places=2, nullable=False)
-    final_capital: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=2)
-    total_trades: Optional[int] = None
-    winning_trades: Optional[int] = None
-    losing_trades: Optional[int] = None
-    win_rate: Optional[Decimal] = Field(default=None, max_digits=5, decimal_places=4)
-    sharpe_ratio: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=6)
-    sortino_ratio: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=6)
-    max_drawdown: Optional[Decimal] = Field(default=None, max_digits=5, decimal_places=4)
-    calmar_ratio: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=6)
-    metrics: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
-    parameters: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
+    final_capital: Decimal | None = Field(default=None, max_digits=15, decimal_places=2)
+    total_trades: int | None = None
+    winning_trades: int | None = None
+    losing_trades: int | None = None
+    win_rate: Decimal | None = Field(default=None, max_digits=5, decimal_places=4)
+    sharpe_ratio: Decimal | None = Field(default=None, max_digits=10, decimal_places=6)
+    sortino_ratio: Decimal | None = Field(default=None, max_digits=10, decimal_places=6)
+    max_drawdown: Decimal | None = Field(default=None, max_digits=5, decimal_places=4)
+    calmar_ratio: Decimal | None = Field(default=None, max_digits=10, decimal_places=6)
+    metrics: dict | None = Field(default=None, sa_column=Column(JSONB))
+    parameters: dict | None = Field(default=None, sa_column=Column(JSONB))
     status: str = Field(max_length=20, nullable=False)  # RUNNING, COMPLETED, FAILED
     started_at: datetime = Field(nullable=False, index=True)
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
@@ -371,7 +369,7 @@ class TrailingStopState(SQLModel, table=True):
 
     __tablename__ = "trailing_stop_states"
 
-    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    id: int | None = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     deal_id: str = Field(max_length=100, nullable=False, unique=True, index=True)
     epic: str = Field(max_length=50, nullable=False)
     direction: str = Field(max_length=4, nullable=False)  # BUY, SELL
@@ -379,22 +377,22 @@ class TrailingStopState(SQLModel, table=True):
     # Price levels
     entry_price: Decimal = Field(max_digits=15, decimal_places=4, nullable=False)
     current_stop: Decimal = Field(max_digits=15, decimal_places=4, nullable=False)
-    tp1_level: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=4)
-    tp2_level: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=4)
+    tp1_level: Decimal | None = Field(default=None, max_digits=15, decimal_places=4)
+    tp2_level: Decimal | None = Field(default=None, max_digits=15, decimal_places=4)
 
     # Tracking state
     phase: int = Field(default=1, nullable=False)  # 1-4
-    highest_price: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=4)
-    lowest_price: Optional[Decimal] = Field(default=None, max_digits=15, decimal_places=4)
+    highest_price: Decimal | None = Field(default=None, max_digits=15, decimal_places=4)
+    lowest_price: Decimal | None = Field(default=None, max_digits=15, decimal_places=4)
 
     # Metadata
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()"), "onupdate": text("NOW()")},
     )
@@ -408,17 +406,17 @@ class TradeJournalNote(SQLModel, table=True):
 
     __tablename__ = "trade_journal_notes"
 
-    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    id: int | None = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     epic: str = Field(max_length=50, nullable=False, index=True)
     signal_timestamp: str = Field(max_length=50, nullable=False)
     notes: str = Field(nullable=False)
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()"), "onupdate": text("NOW()")},
     )
@@ -432,7 +430,7 @@ class RiskStateSnapshot(SQLModel, table=True):
 
     __tablename__ = "risk_state_snapshots"
 
-    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    id: int | None = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
 
     # DrawdownMonitor state
     peak_equity: Decimal = Field(max_digits=15, decimal_places=2, nullable=False)
@@ -452,7 +450,7 @@ class RiskStateSnapshot(SQLModel, table=True):
 
     # Metadata
     snapshot_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         index=True,
         sa_column_kwargs={"server_default": text("NOW()")},
@@ -469,26 +467,26 @@ class MarketSpec(SQLModel, table=True):
     __tablename__ = "market_specs"
     __table_args__ = (UniqueConstraint("epic", "environment", name="uq_market_spec_epic_env"),)
 
-    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    id: int | None = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     epic: str = Field(max_length=50, nullable=False, index=True)
     environment: str = Field(max_length=10, nullable=False)  # DEMO | LIVE
     min_deal_size: Decimal = Field(sa_column=Column(Numeric(15, 6), nullable=False))
     min_deal_size_unit: str = Field(default="UNITS", max_length=20, nullable=False)
-    max_deal_size: Optional[Decimal] = Field(
+    max_deal_size: Decimal | None = Field(
         default=None, sa_column=Column(Numeric(15, 6), nullable=True)
     )
-    market_name: Optional[str] = Field(default=None, max_length=200, nullable=True)
+    market_name: str | None = Field(default=None, max_length=200, nullable=True)
     fetched_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
@@ -502,16 +500,16 @@ class Notification(SQLModel, table=True):
 
     __tablename__ = "notifications"
 
-    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    id: int | None = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     alert_type: str = Field(max_length=50, nullable=False, index=True)
     severity: str = Field(max_length=20, nullable=False, index=True)
     title: str = Field(max_length=300, nullable=False)
     message: str = Field(nullable=False)
-    epic: Optional[str] = Field(default=None, max_length=50, index=True)
-    details: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
+    epic: str | None = Field(default=None, max_length=50, index=True)
+    details: dict | None = Field(default=None, sa_column=Column(JSONB))
     is_read: bool = Field(default=False, nullable=False, index=True)
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )

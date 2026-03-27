@@ -4,7 +4,7 @@ Schedules periodic database backups at configured times.
 """
 
 import asyncio
-from datetime import datetime, time
+from datetime import datetime
 
 from croniter import croniter
 from loguru import logger

@@ -8,7 +8,7 @@ vision analysis, and the orchestrator integration layer.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -29,7 +29,7 @@ class ChartConfig(BaseModel):
 class VisionReport(BaseModel):
     """Output of the Vision Analyzer."""
 
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     trend_direction: Literal["BULLISH", "BEARISH", "NEUTRAL", "RANGING"] = "NEUTRAL"
     key_patterns: list[str] = Field(default_factory=list)
     support_levels: list[float] = Field(default_factory=list)

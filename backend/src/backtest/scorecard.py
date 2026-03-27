@@ -7,8 +7,8 @@ for live trading.
 """
 
 import json
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -121,7 +121,7 @@ def save_optimal_thresholds(
         }
 
     payload = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "default_confidence": default_confidence,
         "per_asset": per_asset,
     }

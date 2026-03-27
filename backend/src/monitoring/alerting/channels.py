@@ -3,7 +3,6 @@ Alert delivery channels.
 Email, Slack, Telegram, and Webhook notification channels.
 """
 
-import asyncio
 from abc import ABC, abstractmethod
 
 import httpx
@@ -73,9 +72,10 @@ class EmailChannel(AlertChannel):
 
         try:
             # Lazy import aiosmtplib (optional dependency)
-            import aiosmtplib
             from email.mime.multipart import MIMEMultipart
             from email.mime.text import MIMEText
+
+            import aiosmtplib
 
             # Create email message
             msg = MIMEMultipart()

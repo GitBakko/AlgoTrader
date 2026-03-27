@@ -2,7 +2,7 @@
 Strategy repository for trading strategy configurations.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,7 +25,7 @@ class StrategyRepository(BaseRepository[Strategy]):
             List of active strategies
         """
         result = await self.session.execute(
-            select(Strategy).where(Strategy.is_active == True).order_by(Strategy.name)
+            select(Strategy).where(Strategy.is_active).order_by(Strategy.name)
         )
         return list(result.scalars().all())
 
@@ -72,7 +72,7 @@ class StrategyRepository(BaseRepository[Strategy]):
             return None
 
         strategy.is_active = True
-        strategy.activated_at = datetime.now(timezone.utc)
+        strategy.activated_at = datetime.now(UTC)
 
         await self.session.flush()
         await self.session.refresh(strategy)
@@ -93,7 +93,7 @@ class StrategyRepository(BaseRepository[Strategy]):
             return None
 
         strategy.is_active = False
-        strategy.deactivated_at = datetime.now(timezone.utc)
+        strategy.deactivated_at = datetime.now(UTC)
 
         await self.session.flush()
         await self.session.refresh(strategy)

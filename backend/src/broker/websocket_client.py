@@ -5,9 +5,10 @@ Provides real-time market data (quotes, OHLC candles) via WebSocket.
 
 import asyncio
 import json
+from collections.abc import Callable
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
 import websockets
 from loguru import logger

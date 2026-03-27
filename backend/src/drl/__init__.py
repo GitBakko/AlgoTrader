@@ -1,22 +1,22 @@
 # MANTIS-EVOLUTION: DRL Ensemble package
 """Deep Reinforcement Learning ensemble for MANTIS AI (Sprint 5)."""
 
+from src.drl.agents import A2CAgent, PPOAgent, SACAgent, TD3Agent
+from src.drl.backtest import MantisDRLBacktester
+from src.drl.base_drl_agent import MantisDRLAgent
+from src.drl.ensemble import MantisDRLEnsemble
+from src.drl.performance_analyzer import MantisPerformanceAnalyzer
 from src.drl.schemas import (
-    DRLConfig,
-    TrainingResult,
-    PerformanceMetrics,
-    PerformanceSnapshot,
-    DRLEnsembleSignal,
-    ComparisonReport,
     BacktestConfig,
     BacktestResult,
+    ComparisonReport,
+    DRLConfig,
+    DRLEnsembleSignal,
+    PerformanceMetrics,
+    PerformanceSnapshot,
+    TrainingResult,
 )
-from src.drl.base_drl_agent import MantisDRLAgent
-from src.drl.agents import PPOAgent, SACAgent, A2CAgent, TD3Agent
-from src.drl.performance_analyzer import MantisPerformanceAnalyzer
-from src.drl.ensemble import MantisDRLEnsemble
 from src.drl.trainer import MantisDRLTrainer
-from src.drl.backtest import MantisDRLBacktester
 
 # NOTE: MantisDRLEnsembleAgent is NOT imported here to avoid a circular import:
 #   drl/__init__ -> drl_ensemble_agent -> agents.schemas -> agents/__init__

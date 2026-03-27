@@ -12,7 +12,7 @@ from typing import Any
 import numpy as np
 from loguru import logger
 
-from src.drl.schemas import DRLConfig, PerformanceMetrics, PerformanceSnapshot, TrainingResult
+from src.drl.schemas import DRLConfig, PerformanceSnapshot, TrainingResult
 
 try:
     import gymnasium as gym  # noqa: F401

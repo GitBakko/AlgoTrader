@@ -3,7 +3,7 @@ Pydantic models for data pipeline module.
 Extends broker models with storage-specific fields.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -48,7 +48,7 @@ class DataQualityReport(BaseModel):
     outliers_found: int
     validation_errors: list[str] = Field(default_factory=list)
     passed: bool
-    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class GapInfo(BaseModel):
@@ -86,7 +86,7 @@ class DownloadProgress(BaseModel):
     @property
     def candles_per_second(self) -> float:
         """Calculate download speed in candles/sec."""
-        elapsed = (datetime.now(timezone.utc) - self.start_time).total_seconds()
+        elapsed = (datetime.now(UTC) - self.start_time).total_seconds()
         if elapsed == 0:
             return 0.0
         return self.downloaded_candles / elapsed
@@ -123,7 +123,7 @@ class DataStorageStats(BaseModel):
     total_size_bytes: int
     earliest_data: datetime | None = None
     latest_data: datetime | None = None
-    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @property
     def total_size_mb(self) -> float:

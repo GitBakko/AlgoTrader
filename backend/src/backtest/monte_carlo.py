@@ -4,7 +4,7 @@ Shuffles trade P&L to generate confidence intervals for key metrics
 and estimate the probability that results are due to skill vs luck.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 from loguru import logger

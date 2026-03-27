@@ -6,7 +6,6 @@ structural breaks for trend analysis.
 
 import numpy as np
 import polars as pl
-from loguru import logger
 
 
 class MarketStructureDetector:
@@ -45,7 +44,7 @@ class MarketStructureDetector:
         """
         if len(df) < self.pivot_lookback * 3:
             # Not enough data for meaningful structure detection
-            n = len(df)
+            len(df)
             df = df.with_columns(
                 [
                     pl.lit(0).alias("bos_signal"),

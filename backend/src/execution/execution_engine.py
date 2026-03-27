@@ -3,7 +3,7 @@ Execution engine orchestrator.
 Coordinates order management, position tracking, and slippage recording.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from loguru import logger
@@ -140,7 +140,7 @@ class ExecutionEngine:
                             else None
                         ),
                         status="OPEN",
-                        opened_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                        opened_at=datetime.now(UTC).replace(tzinfo=None),
                     )
                     position_db = await self._position_repository.create(position_db)
 
@@ -155,7 +155,7 @@ class ExecutionEngine:
                         direction=signal.direction.value,
                         size=Decimal(str(risk_result.position_size)),
                         price=Decimal(str(result.fill_price)),
-                        executed_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                        executed_at=datetime.now(UTC).replace(tzinfo=None),
                     )
                     await self._trade_repository.create(trade_db)
 
@@ -237,7 +237,7 @@ class ExecutionEngine:
                         "direction": direction,
                         "pnl": round(pnl, 2),
                         "close_reason": reason,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "timestamp": datetime.now(UTC).isoformat(),
                     },
                 )
             except Exception as e:
@@ -277,7 +277,7 @@ class ExecutionEngine:
             try:
                 from src.database.models import Position, Trade
 
-                now = datetime.now(timezone.utc).replace(tzinfo=None)
+                now = datetime.now(UTC).replace(tzinfo=None)
 
                 async with self._db_session_factory() as session:
                     repo = PositionRepository(session)
@@ -359,7 +359,7 @@ class ExecutionEngine:
                 position_db = await self._position_repository.get_by_deal_id(deal_id)
                 if position_db:
                     position_db.status = "CLOSED"
-                    position_db.closed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                    position_db.closed_at = datetime.now(UTC).replace(tzinfo=None)
                     position_db.close_reason = db_reason
                     if fill_price:
                         position_db.current_price = Decimal(str(fill_price))
@@ -381,7 +381,7 @@ class ExecutionEngine:
                         size=position_db.size,
                         price=Decimal(str(fill_price)) if fill_price else position_db.entry_price,
                         profit_loss=position_db.profit_loss,
-                        executed_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                        executed_at=datetime.now(UTC).replace(tzinfo=None),
                     )
                     await self._trade_repository.create(trade_db)
 

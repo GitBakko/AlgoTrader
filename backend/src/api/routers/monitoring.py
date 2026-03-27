@@ -4,12 +4,12 @@ Monitoring API Router - Endpoints for trading logs and statistics.
 Provides access to structured logging data for analysis and debugging.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Query
 from loguru import logger
 
-from src.api.schemas import success_response, error_response
+from src.api.schemas import error_response, success_response
 from src.monitoring.log_analyzer import ExecutionStats, LogAnalyzer, RiskStats, SignalStats
 
 router = APIRouter(prefix="/monitoring", tags=["monitoring"])
@@ -50,7 +50,7 @@ async def get_signal_logs(
         Signal statistics
     """
     analyzer = get_log_analyzer()
-    end_date = datetime.now(timezone.utc)
+    end_date = datetime.now(UTC)
     start_date = end_date - timedelta(days=days)
 
     try:
@@ -106,7 +106,7 @@ async def get_execution_logs(
         Execution statistics
     """
     analyzer = get_log_analyzer()
-    end_date = datetime.now(timezone.utc)
+    end_date = datetime.now(UTC)
     start_date = end_date - timedelta(days=days)
 
     try:
@@ -167,7 +167,7 @@ async def get_risk_event_logs(
         Risk event statistics
     """
     analyzer = get_log_analyzer()
-    end_date = datetime.now(timezone.utc)
+    end_date = datetime.now(UTC)
     start_date = end_date - timedelta(days=days)
 
     try:
@@ -227,7 +227,7 @@ async def get_performance_overview(
         Combined performance statistics
     """
     analyzer = get_log_analyzer()
-    end_date = datetime.now(timezone.utc)
+    end_date = datetime.now(UTC)
     start_date = end_date - timedelta(days=days)
 
     try:

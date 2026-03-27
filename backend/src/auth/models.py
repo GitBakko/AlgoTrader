@@ -4,11 +4,10 @@ User, Role, and Permission tables for RBAC.
 """
 
 import secrets
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import BigInteger, Column, ForeignKey, Index, Table, text
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, SQLModel
 
 from src.database.models import metadata
 
@@ -34,11 +33,11 @@ class Role(SQLModel, table=True):
 
     __tablename__ = "roles"
 
-    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    id: int | None = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     name: str = Field(max_length=50, nullable=False, unique=True, index=True)
-    description: Optional[str] = Field(default=None, max_length=255)
+    description: str | None = Field(default=None, max_length=255)
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
@@ -52,12 +51,12 @@ class Permission(SQLModel, table=True):
 
     __tablename__ = "permissions"
 
-    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    id: int | None = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     resource: str = Field(max_length=100, nullable=False, index=True)
     action: str = Field(max_length=50, nullable=False, index=True)
-    description: Optional[str] = Field(default=None, max_length=255)
+    description: str | None = Field(default=None, max_length=255)
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
@@ -77,25 +76,25 @@ class User(SQLModel, table=True):
 
     __tablename__ = "users"
 
-    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    id: int | None = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     username: str = Field(max_length=100, nullable=False, unique=True, index=True)
     email: str = Field(max_length=255, nullable=False, unique=True, index=True)
     hashed_password: str = Field(max_length=255, nullable=False)
     role_id: int = Field(sa_column=Column(BigInteger, ForeignKey("roles.id"), nullable=False))
     is_active: bool = Field(default=True, nullable=False)
-    last_login: Optional[datetime] = None
+    last_login: datetime | None = None
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()"), "onupdate": text("NOW()")},
     )
-    avatar_url: Optional[str] = Field(default=None, max_length=500)
-    avatar_storage_path: Optional[str] = Field(default=None, max_length=500)
+    avatar_url: str | None = Field(default=None, max_length=500)
+    avatar_storage_path: str | None = Field(default=None, max_length=500)
 
 
 class RefreshToken(SQLModel, table=True):
@@ -107,7 +106,7 @@ class RefreshToken(SQLModel, table=True):
         Index("ix_refresh_tokens_user_id", "user_id"),
     )
 
-    id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
+    id: int | None = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     token: str = Field(
         max_length=128,
         nullable=False,
@@ -119,7 +118,7 @@ class RefreshToken(SQLModel, table=True):
     expires_at: datetime = Field(nullable=False)
     is_revoked: bool = Field(default=False, nullable=False)
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )

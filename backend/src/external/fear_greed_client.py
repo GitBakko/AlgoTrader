@@ -11,7 +11,7 @@ Computes a composite Fear & Greed index from multiple free sources:
 All components degrade gracefully: missing data → neutral (50).
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from loguru import logger
 
@@ -104,7 +104,7 @@ class FearGreedClient(SILBaseClient):
             is_extreme_fear=composite <= 20.0,
             is_extreme_greed=composite >= 80.0,
             gold_bias=round((100.0 - composite) / 100.0 * 2.0 - 1.0, 3),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
         self._set_cache("fear_greed", result)
         return result

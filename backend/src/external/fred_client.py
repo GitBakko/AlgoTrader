@@ -6,7 +6,7 @@ Economic Data (FRED) API. Free tier, no strict rate limit.
 TTL: 24 hours (economic data updates daily at most).
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from loguru import logger
 
@@ -88,7 +88,7 @@ class FREDClient(SILBaseClient):
 
         data = FREDData(
             **field_values,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
         self._set_cache("fred", data)
         logger.info(f"[FREDClient] Fetched {len(results)}/{len(SERIES_IDS)} series")

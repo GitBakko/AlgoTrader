@@ -3,10 +3,9 @@ Pydantic models for feature engineering module.
 Defines schemas for feature configuration, computed feature sets, and ML-ready matrices.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
-import polars as pl
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -61,7 +60,7 @@ class FeatureSet(BaseModel):
     num_features: int
     start_date: datetime | None = None
     end_date: datetime | None = None
-    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class FeatureMatrix(BaseModel):
@@ -81,4 +80,4 @@ class FeatureMatrix(BaseModel):
     start_date: datetime | None = None
     end_date: datetime | None = None
     regime_column: str | None = None
-    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

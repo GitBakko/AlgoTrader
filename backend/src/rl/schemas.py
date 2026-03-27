@@ -10,7 +10,7 @@ raw dicts allowed across RL module boundaries.
 from __future__ import annotations
 
 from enum import IntEnum
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 

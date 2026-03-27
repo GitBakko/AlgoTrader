@@ -134,7 +134,6 @@ async def drl_predict(
             try:
                 data_store = getattr(loop, "data_store", None) or getattr(loop, "_data_store", None)
                 if data_store is not None:
-                    import polars as pl
 
                     df = await data_store.get_latest(epic, bars=12)
                     if df is not None and len(df) >= 2 and "close" in df.columns:

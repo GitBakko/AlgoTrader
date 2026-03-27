@@ -10,7 +10,6 @@ Runs as a background task during app lifespan.
 """
 
 import asyncio
-from datetime import datetime, timezone
 
 import httpx
 from loguru import logger

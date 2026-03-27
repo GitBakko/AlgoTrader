@@ -3,7 +3,7 @@ Audit logger for recording user and system events.
 Provides async logging to database with structured event data.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from loguru import logger
@@ -87,7 +87,7 @@ class AuditLogger:
             component=component,
             message=message,
             details=event_details if event_details else None,
-            occurred_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            occurred_at=datetime.now(UTC).replace(tzinfo=None),
         )
 
         self.session.add(event)

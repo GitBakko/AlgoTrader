@@ -3,8 +3,6 @@ Role-Based Access Control (RBAC) manager.
 Handles permission checking and role management.
 """
 
-from typing import Any
-
 from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession

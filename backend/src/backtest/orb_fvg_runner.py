@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import statistics
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from math import sqrt
 from pathlib import Path
 
@@ -19,10 +19,10 @@ import polars as pl
 from loguru import logger
 
 from src.strategy.orb_fvg_strategy import (
+    _NYSE_SESSION_END,
     FVGSignal,
     _minutes_utc,
     _nyse_utc_minutes,
-    _NYSE_SESSION_END,
     process_session,
 )
 from src.strategy.schemas import SignalDirection
@@ -273,7 +273,7 @@ def run_backtest(
             ts = bar["timestamp"]
             if isinstance(ts, datetime):
                 if ts.tzinfo is None:
-                    bar["timestamp"] = ts.replace(tzinfo=timezone.utc)
+                    bar["timestamp"] = ts.replace(tzinfo=UTC)
             else:
                 # polars may return date or string — skip this day
                 continue

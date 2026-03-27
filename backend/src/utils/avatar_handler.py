@@ -3,14 +3,12 @@ Avatar file upload and management utilities.
 Handles validation, resizing, storage, and cleanup of user avatar images.
 """
 
-import os
 import uuid
 from pathlib import Path
-from typing import Optional
 
-from PIL import Image
-from fastapi import UploadFile, HTTPException, status
+from fastapi import HTTPException, UploadFile, status
 from loguru import logger
+from PIL import Image
 
 # Avatar configuration
 MAX_AVATAR_SIZE_MB = 5
@@ -97,7 +95,7 @@ def get_avatar_url(user_id: int) -> str:
 
 
 async def save_avatar(
-    file: UploadFile, user_id: int, old_avatar_path: Optional[str] = None
+    file: UploadFile, user_id: int, old_avatar_path: str | None = None
 ) -> tuple[str, str]:
     """
     Save and process avatar image.
@@ -195,7 +193,7 @@ def delete_avatar(storage_path: str) -> None:
         logger.warning(f"Failed to delete avatar {storage_path}: {e}")
 
 
-def get_avatar_file_path(user_id: int, storage_path: str) -> Optional[Path]:
+def get_avatar_file_path(user_id: int, storage_path: str) -> Path | None:
     """
     Get file path for user avatar.
 

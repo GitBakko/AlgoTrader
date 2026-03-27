@@ -5,14 +5,12 @@ Logs all trading activity to PostgreSQL for analysis without stopping the backen
 Gracefully degrades to file logging if PostgreSQL unavailable.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict, Field
 from loguru import logger
-
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text as sa_text
 
 from ..database.session import DatabaseManager
@@ -55,7 +53,7 @@ class RiskEventType(str, Enum):
 class SignalLog(BaseModel):
     """Signal generation log entry."""
 
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     source: str = Field(
         default="unknown", description="Origin: paper_trading, demo_trading, live_trading, api_test"
     )
@@ -103,7 +101,7 @@ class SignalLog(BaseModel):
 class ExecutionLog(BaseModel):
     """Trade execution log entry."""
 
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     source: str = Field(
         default="unknown", description="Origin: paper_trading, demo_trading, live_trading, api_test"
     )
@@ -156,7 +154,7 @@ class ExecutionLog(BaseModel):
 class RiskEventLog(BaseModel):
     """Risk management decision log."""
 
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     source: str = Field(
         default="unknown", description="Origin: paper_trading, demo_trading, live_trading, api_test"
     )
@@ -430,7 +428,7 @@ class TradeLogger:
                 for key, val in list(data.items()):
                     if isinstance(val, datetime):
                         # asyncpg TIMESTAMP WITHOUT TIME ZONE rejects tz-aware
-                        data[key] = val.astimezone(timezone.utc).replace(tzinfo=None)
+                        data[key] = val.astimezone(UTC).replace(tzinfo=None)
                     elif isinstance(val, (dict, list)):
                         data[key] = _json.dumps(val)
                     elif isinstance(val, Enum):

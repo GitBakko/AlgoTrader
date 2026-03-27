@@ -5,8 +5,6 @@ Manages open positions, equity calculation, and trade lifecycle.
 
 from datetime import datetime
 
-from loguru import logger
-
 from src.backtest.costs import CostSimulator
 from src.backtest.schemas import BacktestConfig, BacktestTrade, TradeDirection, TradeStatus
 from src.data.utils import timeframe_to_minutes

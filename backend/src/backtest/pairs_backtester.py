@@ -7,7 +7,6 @@ import numpy as np
 from loguru import logger
 from pydantic import BaseModel, Field
 
-from src.strategy.pairs.cointegration import CointegrationAnalyzer
 from src.strategy.pairs.pairs_strategy import PairsConfig, PairsTradingStrategy
 
 

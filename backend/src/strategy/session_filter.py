@@ -11,8 +11,6 @@ Kill zones (highest probability windows):
   Asia:        00:00-03:00 UTC (crypto/JPY only)
 """
 
-from loguru import logger
-
 # Asset → asset class mapping
 _ASSET_CLASS: dict[str, str] = {
     # Forex majors

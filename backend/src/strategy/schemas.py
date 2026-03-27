@@ -3,7 +3,7 @@ Pydantic models for strategy module.
 Defines schemas for trading signals, strategy configuration, and portfolio allocation.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field
@@ -28,7 +28,7 @@ class TradingSignal(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     signal_class: int = Field(ge=0, le=2)  # SignalClass value (0=SELL, 1=HOLD, 2=BUY)
     regime: str | None = None
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     technical_confirmation: bool = True
     entry_price: float
     suggested_stop: float | None = None

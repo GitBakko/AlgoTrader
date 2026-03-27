@@ -2,7 +2,7 @@
 Slippage tracking: records and analyzes expected vs actual execution prices.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass

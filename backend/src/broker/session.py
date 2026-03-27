@@ -4,12 +4,12 @@ Handles authentication, token refresh, and keep-alive pings.
 """
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import httpx
 from loguru import logger
 
-from src.broker.exceptions import AuthenticationError, SessionExpiredError, map_error
+from src.broker.exceptions import AuthenticationError
 from src.broker.models import SessionRequest, SessionTokens
 from src.utils.config import get_settings
 
@@ -108,7 +108,7 @@ class SessionManager:
                 raise AuthenticationError("Missing session tokens in response headers")
 
             self.tokens = SessionTokens(
-                cst=cst, security_token=security_token, created_at=datetime.now(timezone.utc)
+                cst=cst, security_token=security_token, created_at=datetime.now(UTC)
             )
 
             logger.success("Authentication successful")
@@ -143,7 +143,7 @@ class SessionManager:
             expiry_time = self.tokens.created_at + timedelta(
                 minutes=self.session_timeout_minutes - 1
             )
-            if datetime.now(timezone.utc) >= expiry_time:
+            if datetime.now(UTC) >= expiry_time:
                 logger.warning("Session tokens expired - re-authenticating...")
                 return await self._authenticate_inner()
 

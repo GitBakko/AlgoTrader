@@ -2,7 +2,7 @@
 Trade repository with audit trail queries.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +28,7 @@ class TradeRepository(BaseRepository[Trade]):
         """Get trades executed in the last N hours."""
         from datetime import timedelta
 
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+        cutoff = datetime.now(UTC) - timedelta(hours=hours)
         result = await self.session.execute(
             select(Trade).where(Trade.executed_at >= cutoff).order_by(Trade.executed_at.desc())
         )

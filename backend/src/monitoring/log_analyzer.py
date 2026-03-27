@@ -6,13 +6,12 @@ Works with both PostgreSQL tables and fallback JSONL files.
 """
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import polars as pl
 from loguru import logger
-
 from sqlalchemy import text as sa_text
 
 from ..database.session import DatabaseManager
@@ -110,9 +109,9 @@ class LogAnalyzer:
             Signal statistics
         """
         if start_date is None:
-            start_date = datetime.now(timezone.utc) - timedelta(days=30)
+            start_date = datetime.now(UTC) - timedelta(days=30)
         if end_date is None:
-            end_date = datetime.now(timezone.utc)
+            end_date = datetime.now(UTC)
 
         try:
             # Try PostgreSQL first
@@ -183,9 +182,9 @@ class LogAnalyzer:
             Execution statistics
         """
         if start_date is None:
-            start_date = datetime.now(timezone.utc) - timedelta(days=30)
+            start_date = datetime.now(UTC) - timedelta(days=30)
         if end_date is None:
-            end_date = datetime.now(timezone.utc)
+            end_date = datetime.now(UTC)
 
         try:
             df = await self._query_executions_pg(start_date, end_date)
@@ -304,9 +303,9 @@ class LogAnalyzer:
             Risk statistics
         """
         if start_date is None:
-            start_date = datetime.now(timezone.utc) - timedelta(days=30)
+            start_date = datetime.now(UTC) - timedelta(days=30)
         if end_date is None:
-            end_date = datetime.now(timezone.utc)
+            end_date = datetime.now(UTC)
 
         try:
             df = await self._query_risk_events_pg(start_date, end_date)
@@ -434,9 +433,9 @@ class LogAnalyzer:
         )
         # Ensure filter dates are timezone-aware
         if start_date.tzinfo is None:
-            start_date = start_date.replace(tzinfo=timezone.utc)
+            start_date = start_date.replace(tzinfo=UTC)
         if end_date.tzinfo is None:
-            end_date = end_date.replace(tzinfo=timezone.utc)
+            end_date = end_date.replace(tzinfo=UTC)
         return df.filter((pl.col("timestamp") >= start_date) & (pl.col("timestamp") <= end_date))
 
     def _read_executions_file(self, start_date: datetime, end_date: datetime) -> pl.DataFrame:
@@ -495,9 +494,9 @@ class LogAnalyzer:
         if ts_is_datetime:
             # Ensure filter dates are timezone-aware
             if start_date.tzinfo is None:
-                start_date = start_date.replace(tzinfo=timezone.utc)
+                start_date = start_date.replace(tzinfo=UTC)
             if end_date.tzinfo is None:
-                end_date = end_date.replace(tzinfo=timezone.utc)
+                end_date = end_date.replace(tzinfo=UTC)
             filters.extend([pl.col("timestamp") >= start_date, pl.col("timestamp") <= end_date])
 
         return df.filter(pl.all_horizontal(filters))
@@ -521,7 +520,7 @@ class LogAnalyzer:
         )
         # Ensure filter dates are timezone-aware
         if start_date.tzinfo is None:
-            start_date = start_date.replace(tzinfo=timezone.utc)
+            start_date = start_date.replace(tzinfo=UTC)
         if end_date.tzinfo is None:
-            end_date = end_date.replace(tzinfo=timezone.utc)
+            end_date = end_date.replace(tzinfo=UTC)
         return df.filter((pl.col("timestamp") >= start_date) & (pl.col("timestamp") <= end_date))

@@ -3,10 +3,10 @@ Authentication API router.
 Handles user login, registration, and profile retrieval.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status, UploadFile, File
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from loguru import logger
 from slowapi import Limiter
@@ -14,7 +14,7 @@ from slowapi.util import get_remote_address
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.schemas import error_response, success_response
+from src.api.schemas import success_response
 
 limiter = Limiter(key_func=get_remote_address)
 from src.auth.dependencies import get_current_user
@@ -25,16 +25,15 @@ from src.auth.rbac import RBACManager
 from src.auth.schemas import (
     LoginRequest,
     LoginResponse,
+    PermissionResponse,
     RefreshRequest,
     RefreshResponse,
     RegisterRequest,
-    TokenResponse,
     UserResponse,
-    PermissionResponse,
 )
 from src.database.session import get_db_session
+from src.utils.avatar_handler import delete_avatar, get_avatar_file_path, save_avatar
 from src.utils.config import get_settings
-from src.utils.avatar_handler import save_avatar, delete_avatar, get_avatar_file_path
 
 router = APIRouter()
 
@@ -89,7 +88,7 @@ async def login(
         )
 
     # Update last login (naive UTC for TIMESTAMP WITHOUT TIME ZONE column)
-    user.last_login = datetime.now(timezone.utc).replace(tzinfo=None)
+    user.last_login = datetime.now(UTC).replace(tzinfo=None)
     await session.commit()
 
     # Get role name for response
@@ -98,7 +97,7 @@ async def login(
     role = result_role.scalar_one_or_none()
 
     # Get role permissions
-    from src.auth.models import role_permissions, Permission
+    from src.auth.models import Permission, role_permissions
 
     stmt_perms = (
         select(Permission)
@@ -116,7 +115,7 @@ async def login(
     # Create refresh token (7 days default)
     refresh_token = RefreshToken(
         user_id=user.id,
-        expires_at=datetime.now(timezone.utc).replace(tzinfo=None)
+        expires_at=datetime.now(UTC).replace(tzinfo=None)
         + timedelta(days=settings.refresh_token_expire_days),
     )
     session.add(refresh_token)
@@ -251,7 +250,7 @@ async def get_current_user_profile(
     role = result.scalar_one_or_none()
 
     # Get role permissions (same as login endpoint)
-    from src.auth.models import role_permissions, Permission
+    from src.auth.models import Permission, role_permissions
 
     stmt_perms = (
         select(Permission)
@@ -331,7 +330,7 @@ async def refresh_token(
         )
 
     # Check expiration
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     if rt.expires_at < now:
         rt.is_revoked = True
         await session.commit()
