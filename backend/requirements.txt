@@ -11,7 +11,8 @@ python-multipart==0.0.22
 email-validator==2.3.0
 
 # Machine Learning
-torch==2.10.0+cpu
+# torch installed separately: pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch>=2.0.0
 xgboost==3.2.0
 scikit-learn==1.8.0
 optuna==4.7.0
