@@ -359,6 +359,49 @@ class PredictionService:
             logger.debug(f"HTF bias failed for {epic}: {e}")
             return None
 
+    def reload_model(self, epic: str) -> bool:
+        """
+        Hot-reload the latest trained model for a specific epic.
+
+        Used by TrainingOrchestrator after training completes to swap in
+        the new model without restarting the service.
+
+        Returns:
+            True if model was reloaded successfully, False otherwise.
+        """
+        try:
+            models = self.versioning.list_models(epic)
+            if not models:
+                logger.warning(f"No models found for {epic} during reload")
+                return False
+
+            xgb_models = [m for m in models if m.model_type == "xgboost"]
+            if not xgb_models:
+                logger.warning(f"No XGBoost model found for {epic} during reload")
+                return False
+
+            latest = xgb_models[0]  # sorted by created_at desc
+            model, meta = self.versioning.load_model(XGBoostClassifier, epic, latest.model_id)
+            self._loaded_models[epic] = (model, meta)
+
+            # Load calibrator if available
+            model_dir = self.versioning.base_dir / epic / latest.model_id
+            cal_dir = model_dir / "calibration"
+            if cal_dir.exists():
+                try:
+                    calibrator = ConfidenceCalibrator()
+                    calibrator.load(cal_dir)
+                    self._calibrators[epic] = calibrator
+                    logger.info(f"Reloaded calibrator for {epic}")
+                except Exception as ce:
+                    logger.warning(f"Failed to reload calibrator for {epic}: {ce}")
+
+            logger.info(f"Hot-reloaded model for {epic}: {latest.model_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to reload model for {epic}: {e}")
+            return False
+
     def get_loaded_models(self) -> dict[str, dict]:
         """Get info about currently loaded models."""
         result = {}
