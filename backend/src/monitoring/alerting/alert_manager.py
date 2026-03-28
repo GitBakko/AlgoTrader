@@ -293,6 +293,46 @@ class AlertManager:
         )
         await self.send_alert(alert)
 
+    async def alert_training_started(self, epic: str) -> None:
+        """Send training started alert."""
+        alert = Alert(
+            alert_type=AlertType.TRAINING_STARTED,
+            severity=AlertSeverity.INFO,
+            title=f"Training Started: {epic}",
+            message=f"Model training initiated for {epic}.",
+            epic=epic,
+        )
+        await self.send_alert(alert)
+
+    async def alert_training_complete(
+        self, epic: str, f1: float, accuracy: float, duration_s: float,
+    ) -> None:
+        """Send training complete alert."""
+        alert = Alert(
+            alert_type=AlertType.TRAINING_COMPLETE,
+            severity=AlertSeverity.INFO,
+            title=f"Training Complete: {epic}",
+            message=(
+                f"Model trained for {epic} in {duration_s:.0f}s. "
+                f"F1={f1:.4f}, Accuracy={accuracy:.4f}"
+            ),
+            epic=epic,
+            details={"f1": f1, "accuracy": accuracy, "duration_seconds": duration_s},
+        )
+        await self.send_alert(alert)
+
+    async def alert_training_failed(self, epic: str, error: str) -> None:
+        """Send training failed alert."""
+        alert = Alert(
+            alert_type=AlertType.TRAINING_FAILED,
+            severity=AlertSeverity.CRITICAL,
+            title=f"Training Failed: {epic}",
+            message=f"Model training failed for {epic}: {error}",
+            epic=epic,
+            details={"error": error},
+        )
+        await self.send_alert(alert)
+
 
 # Global alert manager instance
 _alert_manager: AlertManager | None = None

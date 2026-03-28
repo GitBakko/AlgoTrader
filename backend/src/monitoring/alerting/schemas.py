@@ -34,6 +34,9 @@ class AlertType(str, Enum):
     TRADE_OPENED = "TRADE_OPENED"
     TRADE_CLOSED = "TRADE_CLOSED"
     SIGNAL_GENERATED = "SIGNAL_GENERATED"
+    TRAINING_STARTED = "training_started"
+    TRAINING_COMPLETE = "training_complete"
+    TRAINING_FAILED = "training_failed"
 
 
 # Per-event-type emoji for Telegram/Slack notifications
@@ -52,6 +55,9 @@ ALERT_EMOJI: dict[str, str] = {
     AlertType.SYSTEM_ERROR: "💥",
     AlertType.BACKUP_START: "📦",
     AlertType.BACKUP_COMPLETE: "✅",
+    AlertType.TRAINING_STARTED: "\U0001f3cb",   # weight lifter
+    AlertType.TRAINING_COMPLETE: "\u2705",       # check mark
+    AlertType.TRAINING_FAILED: "\u274c",         # cross mark
 }
 
 # Severity fallback (used only when alert_type not in ALERT_EMOJI)
