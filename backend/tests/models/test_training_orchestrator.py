@@ -310,9 +310,11 @@ class TestTrainingOrchestrator:
 
         # --- mock for trainer (to avoid heavy imports in thread) ---
         mock_train_result = MagicMock()
-        mock_train_result.best_f1 = 0.58
-        mock_train_result.best_accuracy = 0.62
-        mock_train_result.folds = []
+        mock_train_result.avg_test_metrics = {"f1_macro": 0.58, "accuracy": 0.62}
+        mock_train_result.avg_val_metrics = {"f1_macro": 0.55, "accuracy": 0.60}
+        mock_train_result.num_folds = 5
+        mock_train_result.num_features = 71
+        mock_train_result.training_duration_seconds = 120.0
 
         mock_trainer_instance = MagicMock()
         mock_trainer_instance.train.return_value = mock_train_result
@@ -366,7 +368,7 @@ class TestTrainingOrchestrator:
         mock_provider_instance.download_and_store.assert_awaited_once_with(
             "BTCUSD", days_back=180, storage=mock_storage_instance
         )
-        assert metrics["f1"] == 0.58
+        assert metrics["f1_macro"] == 0.58
 
     @pytest.mark.asyncio
     async def test_extended_data_not_downloaded_when_flag_absent(self):

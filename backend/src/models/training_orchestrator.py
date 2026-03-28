@@ -173,7 +173,7 @@ class TrainingOrchestrator:
                 job.status = TrainingJobStatus.COMPLETED
                 job.completed_at = datetime.now(UTC)
                 job.metrics = metrics
-                job.progress = 1.0
+                job.progress = "Complete"
 
                 # Hot-reload model into PredictionService
                 if self._prediction_service:
@@ -194,7 +194,7 @@ class TrainingOrchestrator:
                     try:
                         await self._alert_manager.alert_training_complete(
                             epic=epic,
-                            f1=metrics.get("f1", 0.0),
+                            f1=metrics.get("f1_macro", 0.0),
                             accuracy=metrics.get("accuracy", 0.0),
                             duration_s=duration_s,
                         )
@@ -203,7 +203,7 @@ class TrainingOrchestrator:
 
                 logger.info(
                     f"Training completed for {epic}: "
-                    f"F1={metrics.get('f1', 0):.4f}, "
+                    f"F1={metrics.get('f1_macro', 0):.4f}, "
                     f"Accuracy={metrics.get('accuracy', 0):.4f}, "
                     f"Duration={duration_s:.0f}s"
                 )
@@ -285,28 +285,15 @@ class TrainingOrchestrator:
             )
 
             # Extract metrics from TrainingResult
+            avg_test = result.avg_test_metrics or {}
+            avg_val = result.avg_val_metrics or {}
             metrics: dict[str, Any] = {
-                "f1": result.best_f1 if hasattr(result, "best_f1") else 0.0,
-                "accuracy": (result.best_accuracy if hasattr(result, "best_accuracy") else 0.0),
-                "num_folds": len(result.folds) if hasattr(result, "folds") else 0,
+                "f1_macro": avg_test.get("f1_macro", avg_val.get("f1_macro", 0.0)),
+                "accuracy": avg_test.get("accuracy", avg_val.get("accuracy", 0.0)),
+                "num_folds": result.num_folds,
+                "num_features": result.num_features,
+                "duration_seconds": result.training_duration_seconds,
             }
-
-            # Use fold averages if best_* not available
-            if hasattr(result, "folds") and result.folds:
-                fold_f1s = [
-                    f.test_metrics.get("f1_weighted", 0.0)
-                    for f in result.folds
-                    if hasattr(f, "test_metrics")
-                ]
-                fold_accs = [
-                    f.test_metrics.get("accuracy", 0.0)
-                    for f in result.folds
-                    if hasattr(f, "test_metrics")
-                ]
-                if fold_f1s and metrics["f1"] == 0.0:
-                    metrics["f1"] = sum(fold_f1s) / len(fold_f1s)
-                if fold_accs and metrics["accuracy"] == 0.0:
-                    metrics["accuracy"] = sum(fold_accs) / len(fold_accs)
 
             return metrics
 
