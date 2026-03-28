@@ -353,3 +353,86 @@ $light-neutral: #6b7280;
   border-color: rgba(0, 0, 0, 0.1);
   border-top: 3px solid $light-green;
 }
+
+// ═══════════════════════════════════════════════
+// Component light mode overrides (audit 2026-03-28)
+// ═══════════════════════════════════════════════
+
+// Signal status badges
+[data-coreui-theme="light"] .signal-status {
+  &--executed .signal-status__dot { background-color: #16a34a; }
+  &--rejected .signal-status__dot { background-color: #dc2626; }
+  &--exec_failed .signal-status__dot { background-color: #dc2626; }
+  &--predicted .signal-status__dot { background-color: #2563eb; }
+  &--hold .signal-status__dot { background-color: #6b7280; }
+}
+
+// Regime badges
+[data-coreui-theme="light"] .regime-badge {
+  &--trending_up { background: rgba(22, 163, 74, 0.1); color: #16a34a; border-color: rgba(22, 163, 74, 0.3); }
+  &--trending_down { background: rgba(220, 38, 38, 0.1); color: #dc2626; border-color: rgba(220, 38, 38, 0.3); }
+  &--ranging { background: rgba(37, 99, 235, 0.1); color: #2563eb; border-color: rgba(37, 99, 235, 0.3); }
+}
+
+// Risk badges
+[data-coreui-theme="light"] .risk-badge {
+  &--local { background: rgba(245, 158, 11, 0.1); color: #d97706; border-color: rgba(245, 158, 11, 0.3); }
+  &--broker { background: rgba(37, 99, 235, 0.1); color: #2563eb; border-color: rgba(37, 99, 235, 0.3); }
+  &--none { background: rgba(220, 38, 38, 0.1); color: #dc2626; border-color: rgba(220, 38, 38, 0.3); }
+}
+
+// SL cooldown badges
+[data-coreui-theme="light"] .sl-cooldown-badge {
+  &--warning { background: rgba(245, 158, 11, 0.1); color: #d97706; border-color: rgba(245, 158, 11, 0.3); }
+  &--blocked { background: rgba(220, 38, 38, 0.1); color: #dc2626; border-color: rgba(220, 38, 38, 0.3); }
+}
+
+// Training job cards
+[data-coreui-theme="light"] .training-job-card {
+  border-color: rgba(0, 0, 0, 0.1);
+  &--queued { border-left-color: #9ca3af; }
+  &--running { border-left-color: #0891b2; }
+  &--completed { border-left-color: #16a34a; }
+  &--failed { border-left-color: #dc2626; }
+}
+
+// P&L header pills (soften glow for light bg)
+[data-coreui-theme="light"] .pnl-pill {
+  &--profit {
+    background: rgba(22, 163, 74, 0.1);
+    color: #16a34a;
+    border-color: rgba(22, 163, 74, 0.3);
+    text-shadow: none;
+  }
+  &--loss {
+    background: rgba(220, 38, 38, 0.1);
+    color: #dc2626;
+    border-color: rgba(220, 38, 38, 0.3);
+    text-shadow: none;
+  }
+}
+
+// Direction indicators
+[data-coreui-theme="light"] .dir-indicator {
+  &--buy { color: #16a34a; }
+  &--sell { color: #dc2626; }
+}
+
+// WS status pills
+[data-coreui-theme="light"] .ws-status-pill {
+  &--connected { background: rgba(22, 163, 74, 0.08); color: #16a34a; border-color: rgba(22, 163, 74, 0.2); }
+  &--disconnected { background: rgba(220, 38, 38, 0.08); color: #dc2626; border-color: rgba(220, 38, 38, 0.2); }
+  &--mock { background: rgba(245, 158, 11, 0.08); color: #d97706; border-color: rgba(245, 158, 11, 0.2); }
+}
+
+// Logo glow disabled in light mode
+[data-coreui-theme="light"] .mantis-logo-icon,
+[data-coreui-theme="light"] .mantis-logo-narrow {
+  filter: none;
+}
+
+// Table danger hover consistent in light mode
+[data-coreui-theme="light"] .table-danger:hover,
+[data-coreui-theme="light"] .table > tbody > tr.table-danger:hover {
+  background-color: rgba(220, 38, 38, 0.08) !important;
+}
