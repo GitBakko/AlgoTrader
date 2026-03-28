@@ -244,7 +244,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.currentMarketStatus.set(status);
       this.loadAll();
     } catch (error) {
-      console.error('Failed to fetch market status:', error);
       this.loadAll();
     }
 
@@ -259,7 +258,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
           this.loadAll();
         }
       } catch (error) {
-        console.error('Polling error:', error);
+        // polling error — continue
       }
 
       // Schedule next poll with dynamic interval

@@ -72,7 +72,6 @@ export class UserProfileComponent implements OnInit {
       },
       error: (error) => {
         this.loading.set(false);
-        console.error('[UserProfileComponent] Failed to refresh profile', error);
       }
     });
   }
@@ -122,7 +121,6 @@ export class UserProfileComponent implements OnInit {
       },
       error: (error) => {
         this.deletingAvatar.set(false);
-        console.error('[UserProfileComponent] Failed to delete avatar', error);
         this.toast.error('Errore durante l\'eliminazione dell\'avatar');
       }
     });

@@ -160,7 +160,6 @@ export class MonitoringService {
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       this.error.set(errorMsg);
-      console.error('Error fetching signal logs:', err);
     } finally {
       this.loading.set(false);
     }
@@ -188,7 +187,6 @@ export class MonitoringService {
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       this.error.set(errorMsg);
-      console.error('Error fetching execution logs:', err);
     } finally {
       this.loading.set(false);
     }
@@ -216,7 +214,6 @@ export class MonitoringService {
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       this.error.set(errorMsg);
-      console.error('Error fetching risk event logs:', err);
     } finally {
       this.loading.set(false);
     }
@@ -244,7 +241,6 @@ export class MonitoringService {
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       this.error.set(errorMsg);
-      console.error('Error fetching performance overview:', err);
     } finally {
       this.loading.set(false);
     }

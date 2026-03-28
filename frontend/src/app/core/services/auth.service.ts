@@ -79,7 +79,6 @@ export class AuthService {
         // Deferred to avoid circular dependency: AuthService constructor → HTTP → authInterceptor → inject(AuthService)
         queueMicrotask(() => this.getCurrentUser().subscribe());
       } catch (error) {
-        console.error('[AuthService] Failed to parse stored user data', error);
         this.clearAuth();
       }
     }
@@ -105,7 +104,6 @@ export class AuthService {
           }
         }),
         catchError(error => {
-          console.error('[AuthService] Login failed', error);
           return throwError(() => error);
         })
       );
@@ -121,7 +119,6 @@ export class AuthService {
       .pipe(
         tap(() => {}),
         catchError(error => {
-          console.error('[AuthService] Registration failed', error);
           return throwError(() => error);
         })
       );
@@ -169,7 +166,6 @@ export class AuthService {
           // Profile refreshed
         }),
         catchError(error => {
-          console.error('[AuthService] Failed to get current user', error);
           if (error.status === 401) {
             this.logout();
           }
@@ -216,7 +212,6 @@ export class AuthService {
         localStorage.setItem(this.REFRESH_TOKEN_KEY, data.refresh_token);
       }),
       catchError(error => {
-        console.error('[AuthService] Token refresh failed', error);
         return throwError(() => error);
       })
     );
@@ -284,7 +279,6 @@ export class AuthService {
           // Avatar uploaded
         }),
         catchError(error => {
-          console.error('[AuthService] Failed to upload avatar', error);
           return throwError(() => error);
         })
       );
@@ -308,7 +302,6 @@ export class AuthService {
           // Avatar deleted
         }),
         catchError(error => {
-          console.error('[AuthService] Failed to delete avatar', error);
           return throwError(() => error);
         })
       );

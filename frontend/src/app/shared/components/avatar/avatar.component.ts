@@ -130,7 +130,6 @@ export class AvatarComponent {
    * Handle image loading error - fallback to initials
    */
   onImageError(): void {
-    console.warn('[AvatarComponent] Failed to load avatar image:', this.avatarUrl());
     this.imageError.set(true);
   }
 }

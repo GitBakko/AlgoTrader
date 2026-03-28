@@ -160,7 +160,6 @@ export class RegisterComponent {
         this.loading.set(false);
         const message = error?.error?.error || error?.message || 'Errore durante la registrazione';
         this.errorMessage.set(message);
-        console.error('[RegisterComponent] Registration failed', error);
       }
     });
   }

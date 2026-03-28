@@ -51,7 +51,6 @@ export class NewsService {
           }
         }),
         catchError(error => {
-          console.error('Error fetching news:', error);
           this.error.set('Failed to fetch news');
           this.news.set([]);
           return of({ success: false, data: [] as NewsArticle[] });
@@ -78,7 +77,6 @@ export class NewsService {
           }
         }),
         catchError(error => {
-          console.error('Error fetching insider sentiment:', error);
           this.insiderSentiment.set(null);
           return of({ success: false, data: null });
         })
@@ -100,7 +98,6 @@ export class NewsService {
           return sentiment;
         }),
         catchError(error => {
-          console.error('Error fetching sentiment:', error);
           this.sentimentScore.set(0);
           return of(0);
         })

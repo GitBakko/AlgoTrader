@@ -193,7 +193,6 @@ export class LogoService {
         });
       }
     } catch (error) {
-      console.warn('Failed to load logo cache:', error);
     }
   }
 
@@ -208,7 +207,6 @@ export class LogoService {
       });
       localStorage.setItem(this.CACHE_KEY, JSON.stringify(data));
     } catch (error) {
-      console.warn('Failed to save logo cache:', error);
     }
   }
 

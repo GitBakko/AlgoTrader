@@ -59,7 +59,6 @@ export class MarketStatusService {
 
       throw new Error('API returned success: false');
     } catch (error) {
-      console.error(`Failed to fetch market status for ${epic}:`, error);
 
       // Return cached data if available (even if expired)
       if (cached) {

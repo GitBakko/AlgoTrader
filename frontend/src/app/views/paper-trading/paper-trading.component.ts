@@ -881,7 +881,6 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
       this.currentMarketStatus.set(mktStatus);
       this.loadAll();
     } catch (error) {
-      console.error('Failed to fetch market status:', error);
       this.loadAll();
     }
 
@@ -896,7 +895,7 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
           this.loadAll();
         }
       } catch (error) {
-        console.error('Polling error:', error);
+        // polling error — continue
       }
 
       this.pollTimer = setTimeout(() => poll(), this.pollingInterval());

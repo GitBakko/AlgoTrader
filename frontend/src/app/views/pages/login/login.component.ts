@@ -75,7 +75,6 @@ export class LoginComponent {
         this.loading.set(false);
         const message = error?.error?.error || error?.message || 'Errore durante il login';
         this.errorMessage.set(message);
-        console.error('[LoginComponent] Login failed', error);
       }
     });
   }

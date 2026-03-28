@@ -264,7 +264,6 @@ export class AvatarUploadComponent {
         this.isUploading.set(false);
         const errorMessage = error.error?.detail || error.message || 'Errore durante il caricamento dell\'avatar';
         this.error.set(errorMessage);
-        console.error('[AvatarUploadComponent] Upload failed:', error);
       }
     });
   }

@@ -122,7 +122,7 @@ export class EpicLogoComponent implements OnInit {
       const url = await this.logoService.getLogoUrl(this.epic);
       this.logoUrl.set(url);
     } catch (error) {
-      console.warn(`Failed to load logo for ${this.epic}:`, error);
+      // logo unavailable — fallback rendering handles this
     } finally {
       this.loading.set(false);
     }

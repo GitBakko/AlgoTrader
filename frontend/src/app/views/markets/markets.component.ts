@@ -265,7 +265,6 @@ export class MarketsComponent implements OnInit, OnDestroy {
       this.currentMarketStatus.set(status);
       this.trading.loadMarkets();
     } catch (error) {
-      console.error('Failed to fetch market status:', error);
       this.trading.loadMarkets();
     }
 
@@ -280,7 +279,7 @@ export class MarketsComponent implements OnInit, OnDestroy {
           this.trading.loadMarkets();
         }
       } catch (error) {
-        console.error('Polling error:', error);
+        // polling error — continue
       }
 
       this.pollTimer = setTimeout(() => poll(), this.pollingInterval());
