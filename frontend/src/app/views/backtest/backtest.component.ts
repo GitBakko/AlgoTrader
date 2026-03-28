@@ -1,4 +1,5 @@
 import { Component, ChangeDetectionStrategy, OnInit, inject, signal, computed } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -436,6 +437,7 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
 export class BacktestComponent implements OnInit {
   private readonly trading = inject(TradingService);
   private readonly toast = inject(ToastService);
+  private readonly route = inject(ActivatedRoute);
 
   readonly runs = signal<BacktestRun[]>([]);
   readonly running = signal(false);
@@ -472,6 +474,10 @@ export class BacktestComponent implements OnInit {
   config = { epic: 'XAUUSD', timeframe: '1h', initial_equity: 10000, risk_per_trade: 0.02, strategy: 'ml_ensemble' };
 
   ngOnInit(): void {
+    const epicParam = this.route.snapshot.queryParamMap.get('epic');
+    if (epicParam) {
+      this.config.epic = epicParam;
+    }
     this.loadRuns();
   }
 

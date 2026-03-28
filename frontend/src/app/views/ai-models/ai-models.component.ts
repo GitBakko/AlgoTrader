@@ -4,9 +4,10 @@ import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
   ColComponent, RowComponent, BadgeComponent,
   ProgressComponent, ProgressBarComponent,
-  TableDirective, NavModule,
+  TableDirective, NavModule, ButtonDirective,
 } from '@coreui/angular';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { TradingService } from '../../core/services/trading.service';
 import { NewsService } from '../../core/services/news.service';
 import { WebSocketService } from '../../core/services/websocket.service';
@@ -24,7 +25,7 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
     CommonModule, CardComponent, CardBodyComponent, CardHeaderComponent,
     ColComponent, RowComponent, BadgeComponent,
     ProgressComponent, ProgressBarComponent,
-    TableDirective, NavModule,
+    TableDirective, NavModule, ButtonDirective,
     EpicLogoComponent,
     NewsWidgetComponent,
     LoadingButtonComponent,
@@ -331,6 +332,14 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
                   </div>
                 }
 
+                <!-- Backtest button for completed jobs -->
+                @if (job.status === 'completed') {
+                  <button cButton color="primary" variant="outline" size="sm" class="mt-2"
+                          (click)="launchBacktest(job.epic); $event.stopPropagation()">
+                    Backtest
+                  </button>
+                }
+
                 <!-- Error -->
                 @if (job.status === 'failed' && job.error) {
                   <div class="text-danger small mt-2" style="word-break: break-word;">
@@ -375,6 +384,7 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
 export class AiModelsComponent implements OnInit, OnDestroy {
   private readonly trading = inject(TradingService);
   private readonly ws = inject(WebSocketService);
+  private readonly router = inject(Router);
   readonly newsService = inject(NewsService);
   readonly models = this.trading.models;
 
@@ -542,5 +552,9 @@ export class AiModelsComponent implements OnInit, OnDestroy {
   closeNewsModal(): void {
     this.showNewsModal.set(false);
     this.selectedEpic.set(null);
+  }
+
+  launchBacktest(epic: string): void {
+    this.router.navigate(['/backtest'], { queryParams: { epic } });
   }
 }
