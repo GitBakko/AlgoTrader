@@ -199,15 +199,24 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
           <div class="d-flex align-items-center justify-content-between">
             <div>
               @if (trainingRunning()) {
-                <span class="fw-semibold">
-                  <span class="pulse-dot me-2"></span>
-                  Training in corso:
-                  <span class="mantis-mono">{{ trainingCompletedCount() }}/{{ trainingTotalJobs() }}</span>
-                  completati
-                </span>
-                @if (trainingFailedCount() > 0) {
-                  <c-badge color="danger" class="ms-2">{{ trainingFailedCount() }} falliti</c-badge>
-                }
+                <div class="d-flex align-items-center gap-3 flex-grow-1 me-3">
+                  <span class="fw-semibold text-nowrap">
+                    <span class="pulse-dot me-1"></span>
+                    Training:
+                    <span class="mantis-mono">{{ trainingCompletedCount() }}/{{ trainingTotalJobs() }}</span>
+                  </span>
+                  <c-progress class="flex-grow-1" style="height: 8px;">
+                    <c-progress-bar
+                      [value]="trainingProgressPct()"
+                      color="success"
+                      [animated]="true">
+                    </c-progress-bar>
+                  </c-progress>
+                  <span class="mantis-mono small text-body-secondary">{{ trainingProgressPct() }}%</span>
+                  @if (trainingFailedCount() > 0) {
+                    <c-badge color="danger">{{ trainingFailedCount() }} falliti</c-badge>
+                  }
+                </div>
               } @else {
                 <span class="text-body-secondary">Nessun training attivo</span>
               }
@@ -474,11 +483,20 @@ export class AiModelsComponent implements OnInit, OnDestroy {
 
   // Training computed
   readonly trainingRunning = computed(() => this.trading.trainingStatus()?.running ?? false);
-  readonly trainingCompletedCount = computed(() => this.trading.trainingStatus()?.completed_count ?? 0);
+  readonly trainingCompletedCount = computed(() => {
+    const status = this.trading.trainingStatus();
+    if (!status) return 0;
+    return status.completed_count + status.failed_count;
+  });
   readonly trainingFailedCount = computed(() => this.trading.trainingStatus()?.failed_count ?? 0);
   readonly trainingTotalJobs = computed(() => {
     const status = this.trading.trainingStatus();
     return status ? Object.keys(status.jobs).length : 0;
+  });
+  readonly trainingProgressPct = computed(() => {
+    const total = this.trainingTotalJobs();
+    if (total === 0) return 0;
+    return Math.round((this.trainingCompletedCount() / total) * 100);
   });
   readonly trainingJobs = computed((): TrainingJobInfo[] => {
     const status = this.trading.trainingStatus();
@@ -533,7 +551,11 @@ export class AiModelsComponent implements OnInit, OnDestroy {
       this.trading.startTraining();
     }
     this.startPolling();
-    setTimeout(() => this.retrainStarting.set(false), 2000);
+    // Refresh status quickly after start, then clear loading flag
+    setTimeout(() => {
+      this.trading.loadTrainingStatus();
+      this.retrainStarting.set(false);
+    }, 1500);
   }
 
   retrainSingle(epic: string): void {
