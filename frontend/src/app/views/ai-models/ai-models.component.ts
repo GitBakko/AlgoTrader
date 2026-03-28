@@ -291,6 +291,53 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
         </c-card-body>
       </c-card>
 
+      <!-- P&L per Epic (always visible) -->
+      @if (pnlByEpic().length > 0) {
+        <c-card class="border-top border-top-3 border-top-primary mb-3">
+          <c-card-header class="d-flex align-items-center justify-content-between py-2">
+            <span class="fw-semibold small text-body-secondary">P&amp;L per Asset</span>
+            <span class="small text-body-secondary">ordinato dal peggiore</span>
+          </c-card-header>
+          <c-card-body class="p-0">
+            <div class="table-responsive-mobile">
+              <table cTable [small]="true" [hover]="true" class="mb-0">
+                <thead>
+                  <tr class="text-body-secondary">
+                    <th class="fw-semibold small">Asset</th>
+                    <th class="fw-semibold small text-end">P&amp;L</th>
+                    <th class="fw-semibold small text-end" style="width: 100px;">Azione</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (item of pnlByEpic(); track item.epic) {
+                    <tr>
+                      <td>
+                        <div class="d-flex align-items-center gap-2">
+                          <app-epic-logo [epic]="item.epic" [size]="20"></app-epic-logo>
+                          <span class="fw-semibold small">{{ item.epic }}</span>
+                        </div>
+                      </td>
+                      <td class="text-end mantis-mono fw-bold"
+                          [class.text-success]="item.pnl >= 0"
+                          [class.text-danger]="item.pnl < 0">
+                        {{ item.pnl >= 0 ? '+' : '' }}{{ item.pnl | number:'1.2-2' }}
+                      </td>
+                      <td class="text-end">
+                        <button cButton color="primary" variant="ghost" size="sm"
+                                [disabled]="trainingRunning()"
+                                (click)="retrainSingle(item.epic)">
+                          Retrain
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </c-card-body>
+        </c-card>
+      }
+
       <!-- Training Job Cards Grid -->
       @if (trainingJobs().length > 0) {
         <c-row>
@@ -439,9 +486,19 @@ export class AiModelsComponent implements OnInit, OnDestroy {
     return Object.values(status.jobs);
   });
 
+  // P&L per epic from performance data, sorted worst to best
+  readonly pnlByEpic = computed(() => {
+    const perf = this.trading.performance();
+    if (!perf?.pnl_by_epic) return [];
+    return Object.entries(perf.pnl_by_epic)
+      .map(([epic, pnl]) => ({ epic, pnl }))
+      .sort((a, b) => a.pnl - b.pnl);
+  });
+
   ngOnInit(): void {
     this.trading.loadModels();
     this.trading.loadTrainingStatus();
+    this.trading.loadPerformance();
   }
 
   ngOnDestroy(): void {
@@ -477,6 +534,12 @@ export class AiModelsComponent implements OnInit, OnDestroy {
     }
     this.startPolling();
     setTimeout(() => this.retrainStarting.set(false), 2000);
+  }
+
+  retrainSingle(epic: string): void {
+    this.trading.startTrainingSingle(epic);
+    this.activeTab.set('training');
+    this.startPolling();
   }
 
   startRetrainWithConfig(): void {
