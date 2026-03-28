@@ -210,6 +210,11 @@ export class TradingService {
       .subscribe({ next: () => this.loadTrainingStatus(), error: () => {} });
   }
 
+  startTrainingFull(body: Record<string, unknown>): void {
+    this.api.post<unknown>('/api/models/training/start', body)
+      .subscribe({ next: () => this.loadTrainingStatus(), error: () => {} });
+  }
+
   startTrainingSingle(epic: string): void {
     this.api.post<unknown>('/api/models/training/start/' + epic)
       .subscribe({ next: () => this.loadTrainingStatus(), error: () => {} });

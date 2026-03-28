@@ -6,6 +6,7 @@ import {
   ProgressComponent, ProgressBarComponent,
   TableDirective, NavModule,
 } from '@coreui/angular';
+import { FormsModule } from '@angular/forms';
 import { TradingService } from '../../core/services/trading.service';
 import { NewsService } from '../../core/services/news.service';
 import { WebSocketService } from '../../core/services/websocket.service';
@@ -27,6 +28,7 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
     EpicLogoComponent,
     NewsWidgetComponent,
     LoadingButtonComponent,
+    FormsModule,
   ],
   template: `
     <!-- Header -->
@@ -192,25 +194,99 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
     @if (activeTab() === 'training') {
       <!-- Status Banner + Action -->
       <c-card class="border-top border-top-3 border-top-primary mb-3">
-        <c-card-body class="d-flex align-items-center justify-content-between p-3">
-          <div>
-            @if (trainingRunning()) {
-              <span class="fw-semibold">
-                <span class="pulse-dot me-2"></span>
-                Training in corso:
-                <span class="mantis-mono">{{ trainingCompletedCount() }}/{{ trainingTotalJobs() }}</span>
-                completati
-              </span>
-              @if (trainingFailedCount() > 0) {
-                <c-badge color="danger" class="ms-2">{{ trainingFailedCount() }} falliti</c-badge>
+        <c-card-body class="p-3">
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              @if (trainingRunning()) {
+                <span class="fw-semibold">
+                  <span class="pulse-dot me-2"></span>
+                  Training in corso:
+                  <span class="mantis-mono">{{ trainingCompletedCount() }}/{{ trainingTotalJobs() }}</span>
+                  completati
+                </span>
+                @if (trainingFailedCount() > 0) {
+                  <c-badge color="danger" class="ms-2">{{ trainingFailedCount() }} falliti</c-badge>
+                }
+              } @else {
+                <span class="text-body-secondary">Nessun training attivo</span>
               }
-            } @else {
-              <span class="text-body-secondary">Nessun training attivo</span>
-            }
+            </div>
+            <app-loading-button color="primary" size="sm" [loading]="retrainStarting()" (clicked)="onRetrainAll()">
+              Retrain All
+            </app-loading-button>
           </div>
-          <app-loading-button color="primary" size="sm" [loading]="retrainStarting()" (clicked)="onRetrainAll()">
-            Retrain All
-          </app-loading-button>
+
+          <!-- Advanced config toggle -->
+          <div class="mt-2">
+            <button class="btn btn-sm btn-ghost-secondary p-0 small text-body-secondary"
+                    (click)="showAdvanced.set(!showAdvanced())">
+              {{ showAdvanced() ? 'Nascondi configurazione \u25B2' : 'Configurazione avanzata \u25BC' }}
+            </button>
+          </div>
+
+          @if (showAdvanced()) {
+            <div class="advanced-config mt-3 p-3 rounded">
+              <c-row class="g-3">
+                <!-- Timeframe -->
+                <c-col sm="6" xl="3">
+                  <label class="form-label small text-body-secondary mb-1">Timeframe</label>
+                  <select class="form-select form-select-sm"
+                          [ngModel]="configTimeframe()"
+                          (ngModelChange)="configTimeframe.set($event)">
+                    <option value="15min">15 min</option>
+                    <option value="1h">1 ora</option>
+                    <option value="4h">4 ore</option>
+                  </select>
+                </c-col>
+
+                <!-- Extended data toggle -->
+                <c-col sm="6" xl="3">
+                  <label class="form-label small text-body-secondary mb-1">Dati estesi</label>
+                  <div class="form-check form-switch mt-1">
+                    <input class="form-check-input" type="checkbox" role="switch" id="extDataToggle"
+                           [ngModel]="configExtendedData()"
+                           (ngModelChange)="configExtendedData.set($event)">
+                    <label class="form-check-label small" for="extDataToggle">
+                      {{ configExtendedData() ? 'Attivo' : 'Disattivo' }}
+                    </label>
+                  </div>
+                </c-col>
+
+                <!-- Days back (conditional) -->
+                @if (configExtendedData()) {
+                  <c-col sm="6" xl="3">
+                    <label class="form-label small text-body-secondary mb-1">Giorni indietro</label>
+                    <select class="form-select form-select-sm"
+                            [ngModel]="configDaysBack()"
+                            (ngModelChange)="configDaysBack.set(+$event)">
+                      <option [value]="365">1 anno (365)</option>
+                      <option [value]="730">2 anni (730)</option>
+                      <option [value]="1095">3 anni (1095)</option>
+                    </select>
+                  </c-col>
+                }
+
+                <!-- Epic selection -->
+                <c-col xs="12">
+                  <label class="form-label small text-body-secondary mb-1">
+                    Asset da allenare
+                    <span class="text-body-secondary ms-1">({{ configSelectedEpics().length === 0 ? 'tutti' : configSelectedEpics().length + ' selezionati' }})</span>
+                  </label>
+                  <div class="epic-grid">
+                    @for (epic of allEpics; track epic) {
+                      <label class="epic-chip" [class.epic-chip--selected]="isEpicSelected(epic)">
+                        <input type="checkbox" class="d-none"
+                               [checked]="isEpicSelected(epic)"
+                               (change)="toggleEpic(epic)">
+                        <app-epic-logo [epic]="epic" [size]="16"></app-epic-logo>
+                        <span class="small">{{ epic }}</span>
+                      </label>
+                    }
+                  </div>
+                </c-col>
+              </c-row>
+            </div>
+          }
         </c-card-body>
       </c-card>
 
@@ -317,6 +393,19 @@ export class AiModelsComponent implements OnInit, OnDestroy {
   readonly showNewsModal = signal(false);
   readonly retrainStarting = signal(false);
 
+  // Advanced training config
+  readonly showAdvanced = signal(false);
+  readonly configTimeframe = signal<string>('1h');
+  readonly configExtendedData = signal(false);
+  readonly configDaysBack = signal(730);
+  readonly configSelectedEpics = signal<string[]>([]);
+
+  readonly allEpics: string[] = [
+    'XAUUSD', 'BTCUSD', 'US500', 'WTIUSD', 'EURUSD', 'NVDA', 'TSLA',
+    'XAGUSD', 'DE40', 'SOLUSD', 'ETHUSD', 'BNBUSD', 'DOGUSD', 'DASHUSD',
+    'ICPUSD', 'NATGAS', 'COPPER', 'PLATINUM', 'GBPUSD', 'USDJPY', 'NAS100',
+  ];
+
   private pollingId: ReturnType<typeof setInterval> | null = null;
 
   // Models computed
@@ -371,10 +460,40 @@ export class AiModelsComponent implements OnInit, OnDestroy {
 
   onRetrainAll(): void {
     this.retrainStarting.set(true);
-    this.trading.startTraining();
+    if (this.showAdvanced()) {
+      this.startRetrainWithConfig();
+    } else {
+      this.trading.startTraining();
+    }
     this.startPolling();
-    // Reset starting flag after a short delay
     setTimeout(() => this.retrainStarting.set(false), 2000);
+  }
+
+  startRetrainWithConfig(): void {
+    const epics = this.configSelectedEpics().length > 0 ? this.configSelectedEpics() : undefined;
+    const config: Record<string, unknown> = {};
+    if (this.configExtendedData()) {
+      config['use_extended_data'] = true;
+      config['days_back'] = this.configDaysBack();
+    }
+    const body: Record<string, unknown> = {};
+    if (epics) body['epics'] = epics;
+    body['timeframe'] = this.configTimeframe();
+    body['config'] = config;
+    this.trading.startTrainingFull(body);
+  }
+
+  isEpicSelected(epic: string): boolean {
+    return this.configSelectedEpics().includes(epic);
+  }
+
+  toggleEpic(epic: string): void {
+    const current = this.configSelectedEpics();
+    if (current.includes(epic)) {
+      this.configSelectedEpics.set(current.filter(e => e !== epic));
+    } else {
+      this.configSelectedEpics.set([...current, epic]);
+    }
   }
 
   formatDate(iso: string | null): string {
