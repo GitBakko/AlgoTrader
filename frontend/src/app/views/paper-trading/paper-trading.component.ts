@@ -691,7 +691,7 @@ interface GroupedPosition {
 
     <!-- ═══════ NEWS MODAL (scoped) ═══════ -->
     @if (showNewsModal() && selectedEpic()) {
-      <div class="pt-modal-backdrop" (click)="closeNewsModal()">
+      <div class="pt-modal-backdrop" (click)="closeNewsModal()" role="dialog" aria-modal="true" aria-label="News">
         <div class="pt-modal" (click)="$event.stopPropagation()">
           <div class="pt-modal__header">
             <div class="pt-modal__title">

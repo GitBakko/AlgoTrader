@@ -50,12 +50,12 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
     <!-- Tab Navigation -->
     <c-nav variant="tabs" class="mb-3">
       <c-nav-item>
-        <a cNavLink [active]="activeTab() === 'models'" (click)="activeTab.set('models')" style="cursor:pointer">
+        <a cNavLink [active]="activeTab() === 'models'" (click)="activeTab.set('models')" role="tab">
           Modelli
         </a>
       </c-nav-item>
       <c-nav-item>
-        <a cNavLink [active]="activeTab() === 'training'" (click)="switchToTraining()" style="cursor:pointer">
+        <a cNavLink [active]="activeTab() === 'training'" (click)="switchToTraining()" role="tab">
           Training
           @if (trainingRunning()) {
             <c-badge color="info" class="ms-1">In corso</c-badge>
@@ -364,7 +364,7 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
 
     <!-- ═══════ NEWS MODAL ═══════ -->
     @if (showNewsModal() && selectedEpic()) {
-      <div class="am-modal-backdrop" (click)="closeNewsModal()">
+      <div class="am-modal-backdrop" (click)="closeNewsModal()" role="dialog" aria-modal="true" aria-label="News">
         <div class="am-modal" (click)="$event.stopPropagation()">
           <div class="am-modal__header">
             <div class="am-modal__title">

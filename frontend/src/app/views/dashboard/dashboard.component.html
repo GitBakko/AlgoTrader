@@ -475,7 +475,7 @@
               </thead>
               <tbody>
                 @for (pos of livePositions(); track pos.deal_id) {
-                  <tr (click)="auditService.openByDealId(pos.deal_id, pos.epic)" style="cursor:pointer;">
+                  <tr (click)="auditService.openByDealId(pos.deal_id, pos.epic)" (keydown.enter)="auditService.openByDealId(pos.deal_id, pos.epic)" tabindex="0" style="cursor:pointer;">
                     <td class="fw-semibold">
                       <div class="d-flex align-items-center gap-1">
                         <app-epic-logo [epic]="pos.epic" [size]="20" [rounded]="true" />

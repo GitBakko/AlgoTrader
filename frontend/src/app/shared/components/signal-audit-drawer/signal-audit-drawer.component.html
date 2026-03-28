@@ -1,6 +1,6 @@
 <!-- Backdrop -->
 @if (auditService.isOpen()) {
-  <div class="audit-backdrop" (click)="onBackdropClick()"></div>
+  <div class="audit-backdrop" (click)="onBackdropClick()" role="button" tabindex="-1" aria-label="Chiudi pannello"></div>
 }
 
 <!-- Drawer panel -->

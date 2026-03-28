@@ -286,7 +286,7 @@ type SortDir = 'asc' | 'desc';
 
     <!-- ═══════ NEWS MODAL ═══════ -->
     @if (showNewsModal() && selectedEpic()) {
-      <div class="tj-modal-backdrop" (click)="closeNewsModal()">
+      <div class="tj-modal-backdrop" (click)="closeNewsModal()" role="dialog" aria-modal="true" aria-label="News">
         <div class="tj-modal" (click)="$event.stopPropagation()">
           <div class="tj-modal__header">
             <div class="tj-modal__title">
@@ -304,7 +304,7 @@ type SortDir = 'asc' | 'desc';
 
     <!-- ═══════ NOTE MODAL ═══════ -->
     @if (showNoteModal()) {
-      <div class="tj-modal-backdrop" (click)="closeNoteModal()">
+      <div class="tj-modal-backdrop" (click)="closeNoteModal()" role="dialog" aria-modal="true" aria-label="Nota">
         <div class="tj-modal" style="max-width: 500px" (click)="$event.stopPropagation()">
           <div class="tj-modal__header">
             <div class="tj-modal__title">
