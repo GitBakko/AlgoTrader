@@ -152,18 +152,6 @@
     }
   }
 
-  // Model info popup (inline, below the date)
-  .model-info-popup {
-    background: var(--cui-tertiary-bg, rgba(255, 255, 255, 0.04));
-    border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.10));
-    line-height: 1.6;
-    max-width: 250px;
-
-    strong {
-      color: var(--cui-body-color);
-    }
-  }
-
   // Training job cards
   .training-job-card {
     padding: 0.75rem;

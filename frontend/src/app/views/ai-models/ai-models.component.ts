@@ -344,22 +344,13 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
                       <td class="small d-mobile-none">
                         @if (item.lastTrained) {
                           <span class="text-body-secondary">{{ item.lastTrained | date:'dd/MM HH:mm' }}</span>
-                          <button class="btn btn-sm p-0 ms-1 text-body-secondary"
-                                  (click)="toggleInfo(item.epic)"
-                                  [cTooltip]="'Dettagli modello'">
+                          <span class="ms-1 text-body-secondary"
+                                [cTooltip]="'v' + item.version + ' | F1: ' + (item.f1 | number:'1.4-4') + ' | Acc: ' + (item.accuracy | number:'1.4-4') + ' | Feat: ' + item.numFeatures"
+                                style="cursor: help;">
                             <svg cIcon name="cilInfo" size="sm"></svg>
-                          </button>
+                          </span>
                         } @else {
                           <span class="text-body-secondary">-</span>
-                        }
-                        @if (infoEpic() === item.epic) {
-                          <div class="model-info-popup mt-1 p-2 small rounded">
-                            <div><strong>Versione:</strong> {{ item.version }}</div>
-                            <div><strong>F1 Macro:</strong> <span class="mantis-mono">{{ item.f1 | number:'1.4-4' }}</span></div>
-                            <div><strong>Accuracy:</strong> <span class="mantis-mono">{{ item.accuracy | number:'1.4-4' }}</span></div>
-                            <div><strong>Features:</strong> <span class="mantis-mono">{{ item.numFeatures }}</span></div>
-                            <div><strong>Ultimo:</strong> {{ item.lastTrained | date:'dd/MM/yyyy HH:mm:ss' }}</div>
-                          </div>
                         }
                       </td>
                       <td class="text-end">
@@ -563,12 +554,6 @@ export class AiModelsComponent implements OnInit, OnDestroy {
       .sort((a, b) => a.pnl - b.pnl);
   });
 
-  // Info tooltip state
-  readonly infoEpic = signal<string | null>(null);
-
-  toggleInfo(epic: string): void {
-    this.infoEpic.set(this.infoEpic() === epic ? null : epic);
-  }
 
   ngOnInit(): void {
     this.trading.loadModels();
