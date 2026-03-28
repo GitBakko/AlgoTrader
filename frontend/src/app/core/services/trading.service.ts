@@ -21,6 +21,7 @@ import {
   ClosedPosition,
   PositionAggregates,
   TradingPerformance,
+  TrainingStatus,
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -62,6 +63,9 @@ export class TradingService {
   readonly closedTotal = signal<number>(0);
   readonly closedAggregates = signal<PositionAggregates | null>(null);
   readonly performance = signal<TradingPerformance | null>(null);
+
+  // Training
+  readonly trainingStatus = signal<TrainingStatus | null>(null);
 
   // Signal Notes (Trade Journal annotations)
   readonly signalNotes = signal<Record<string, string>>({});
@@ -190,6 +194,25 @@ export class TradingService {
 
   listModels() {
     return this.api.get<MLModel[]>('/api/models/');
+  }
+
+  // ── Training ──
+
+  loadTrainingStatus(): void {
+    this.api.get<TrainingStatus>('/api/models/training/status')
+      .subscribe({ next: data => this.trainingStatus.set(data), error: () => {} });
+  }
+
+  startTraining(epics?: string[]): void {
+    const body: Record<string, unknown> = {};
+    if (epics) body['epics'] = epics;
+    this.api.post<unknown>('/api/models/training/start', body)
+      .subscribe({ next: () => this.loadTrainingStatus(), error: () => {} });
+  }
+
+  startTrainingSingle(epic: string): void {
+    this.api.post<unknown>('/api/models/training/start/' + epic)
+      .subscribe({ next: () => this.loadTrainingStatus(), error: () => {} });
   }
 
   // ── System ──

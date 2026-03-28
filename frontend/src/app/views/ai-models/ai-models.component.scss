@@ -97,6 +97,20 @@
     }
   }
 
+  // Training job cards
+  .training-job-card {
+    padding: 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.10));
+    background: var(--cui-card-bg);
+    transition: border-color 0.2s ease;
+
+    &--queued { border-left: 3px solid var(--mantis-neutral, #8B949E); }
+    &--running { border-left: 3px solid var(--mantis-cyan, #00E5FF); }
+    &--completed { border-left: 3px solid var(--mantis-profit, #39FF14); }
+    &--failed { border-left: 3px solid var(--mantis-loss, #FF3D57); }
+  }
+
   // Mobile table min-width
   @media (max-width: 991.98px) {
     table[cTable] {

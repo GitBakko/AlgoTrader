@@ -436,5 +436,26 @@ export * from './notification.model';
 // News and Sentiment
 export * from './news.model';
 
+// Training
+export interface TrainingJobInfo {
+  epic: string;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  started_at: string | null;
+  completed_at: string | null;
+  duration_seconds: number | null;
+  error: string | null;
+  metrics: { f1_macro: number; accuracy: number; num_features: number } | null;
+  progress: string;
+}
+
+export interface TrainingStatus {
+  running: boolean;
+  max_parallel: number;
+  jobs: Record<string, TrainingJobInfo>;
+  queue: string[];
+  completed_count: number;
+  failed_count: number;
+}
+
 // Authentication and Authorization
 export * from './auth.models';
