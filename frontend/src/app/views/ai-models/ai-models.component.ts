@@ -539,7 +539,15 @@ export class AiModelsComponent implements OnInit, OnDestroy {
   readonly pnlByEpic = computed(() => {
     const perf = this.trading.performance();
     if (!perf?.pnl_by_epic) return [];
-    const modelsMap = new Map(this.models().map(m => [m.epic, m]));
+    // Build map with LATEST model per epic (most recent last_trained)
+    const allModels = this.models();
+    const modelsMap = new Map<string, typeof allModels[number]>();
+    for (const m of allModels) {
+      const existing = modelsMap.get(m.epic);
+      if (!existing || (m.last_trained && (!existing.last_trained || m.last_trained > existing.last_trained))) {
+        modelsMap.set(m.epic, m);
+      }
+    }
     return Object.entries(perf.pnl_by_epic)
       .map(([epic, pnl]) => {
         const model = modelsMap.get(epic);
@@ -609,8 +617,9 @@ export class AiModelsComponent implements OnInit, OnDestroy {
 
   retrainSingle(epic: string): void {
     this.trading.startTrainingSingle(epic);
-    this.activeTab.set('training');
     this.startPolling();
+    // Refresh models list after a delay to pick up hot-reloaded model
+    setTimeout(() => this.trading.loadModels(), 5000);
   }
 
   startRetrainWithConfig(): void {
