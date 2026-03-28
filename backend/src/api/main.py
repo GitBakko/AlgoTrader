@@ -369,10 +369,24 @@ async def lifespan(app: FastAPI):
         f"(use POST /api/trading/start to begin, state persistence: {'enabled' if app.state.db_session_factory else 'disabled'})"
     )
 
+    # Training orchestrator
+    from src.models.training_orchestrator import TrainingOrchestrator
+
+    app.state.training_orchestrator = TrainingOrchestrator(max_parallel=2)
+    app.state.training_orchestrator.set_prediction_service(app.state.prediction_service)
+    try:
+        from src.api.websocket import ws_manager
+
+        app.state.training_orchestrator.set_ws_broadcast(ws_manager.broadcast)
+    except Exception:
+        pass
+    logger.info("Training orchestrator initialized (max_parallel=2)")
+
     # Inject DB factory into InAppChannel for notification persistence
     from src.monitoring.alerting.alert_manager import get_alert_manager
 
     alert_mgr = get_alert_manager()
+    app.state.training_orchestrator.set_alert_manager(alert_mgr)
     if hasattr(alert_mgr, "in_app_channel") and app.state.db_session_factory:
         alert_mgr.in_app_channel.set_db_session_factory(app.state.db_session_factory)
         logger.info("InAppChannel DB session factory injected")

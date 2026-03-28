@@ -441,3 +441,69 @@ async def retrain_all(
     logger.info("Manual retrain-all triggered via API")
 
     return success_response({"message": "Retrain avviato per tutti gli asset attivi"})
+
+
+@router.get("/training/status")
+async def get_training_status(request: Request):
+    """Get current training orchestrator status."""
+    orch = getattr(request.app.state, "training_orchestrator", None)
+    if orch is None:
+        return error_response("Training orchestrator not initialized", 503)
+    return success_response(orch.get_status())
+
+
+@router.post("/training/start")
+async def start_training(request: Request):
+    """Start training for specified epics or all.
+
+    Body (optional JSON):
+        epics: list[str] — specific epics (default: all tradable)
+        timeframe: str — "1h" (default)
+        config: dict — optional training config overrides
+    """
+    import asyncio
+
+    from src.utils.constants import TRADABLE_ASSETS
+
+    orch = getattr(request.app.state, "training_orchestrator", None)
+    if orch is None:
+        return error_response("Training orchestrator not initialized", 503)
+    if orch._running:
+        return error_response("Training already in progress", 409)
+
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+
+    epics = body.get("epics") or list(TRADABLE_ASSETS)
+    timeframe = body.get("timeframe", "1h")
+    config = body.get("config", {})
+
+    asyncio.create_task(orch.train_epics(epics, timeframe, config))
+
+    return success_response({
+        "message": f"Training started for {len(epics)} epics",
+        "epics": epics,
+        "timeframe": timeframe,
+    })
+
+
+@router.post("/training/start/{epic}")
+async def start_training_single(request: Request, epic: str):
+    """Start training for a single epic."""
+    import asyncio
+
+    orch = getattr(request.app.state, "training_orchestrator", None)
+    if orch is None:
+        return error_response("Training orchestrator not initialized", 503)
+    if orch._running:
+        return error_response("Training already in progress", 409)
+
+    asyncio.create_task(orch.train_epics([epic]))
+
+    return success_response({
+        "message": f"Training started for {epic}",
+        "epic": epic,
+    })
