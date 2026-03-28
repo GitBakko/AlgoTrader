@@ -231,6 +231,38 @@ class TrainingOrchestrator:
         Returns:
             Dict with training metrics (f1, accuracy, etc.)
         """
+        # If config requests extended data, download before training
+        if config.get("use_extended_data", False):
+            days_back = config.get("days_back", 730)
+            job = self._jobs.get(epic)
+            if job:
+                job.progress = "Downloading extended data..."
+            await self._broadcast_status()
+
+            from src.data.extended_data_provider import ExtendedDataProvider
+            from src.data.storage import ParquetStorageManager
+
+            provider = ExtendedDataProvider()
+            storage = ParquetStorageManager()
+            try:
+                result = await provider.download_and_store(
+                    epic, days_back=days_back, storage=storage
+                )
+                logger.info(
+                    f"Extended data for {epic}: {result.get('bars_new', 0)} new bars"
+                    f" from {result.get('source')}"
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Extended data download failed for {epic}: {e}"
+                    " — training with existing data"
+                )
+
+            job = self._jobs.get(epic)
+            if job:
+                job.progress = "Training..."
+            await self._broadcast_status()
+
         from src.features.builder import FeatureBuilder
         from src.models.trainer import ModelTrainer
         from src.models.xgboost_model import XGBoostClassifier
