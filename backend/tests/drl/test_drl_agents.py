@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pytest
 import numpy as np
-import gymnasium as gym
+
+gym = pytest.importorskip("gymnasium", reason="gymnasium not installed")
 
 from src.drl.schemas import DRLConfig
 
