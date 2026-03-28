@@ -240,15 +240,16 @@ class AlertManager:
         take_profit: float | None = None,
     ):
         """Send trade opened alert."""
+        dir_icon = "🟢 ▲" if direction == "BUY" else "🔴 ▼"
         sl_str = f" SL={stop_loss:.4f}" if stop_loss else ""
         tp_str = f" TP={take_profit:.4f}" if take_profit else ""
         alert = Alert(
             alert_type=AlertType.TRADE_OPENED,
             severity=AlertSeverity.INFO,
-            title=f"Trade Opened: {epic} {direction}",
+            title=f"{dir_icon} {epic} {direction}",
             message=(
-                f"{direction} {epic} size={size:.4f} @ {entry_price:.4f}"
-                f"{sl_str}{tp_str} deal={deal_id}"
+                f"{dir_icon} {direction} {epic} size={size:.4f} @ {entry_price:.4f}"
+                f"{sl_str}{tp_str}"
             ),
             epic=epic,
             details={
