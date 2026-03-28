@@ -100,33 +100,9 @@ Automatic alerts for: trade opened (with direction arrows), trade closed (with P
 
 ## Architecture
 
-```
-                         MANTIS AI Architecture
-
-    +-------------------+          +--------------------+
-    |   Angular 21      |  REST    |   FastAPI Backend   |
-    |   MANTIS Theme    | <------> |   Python 3.12+      |
-    |   CoreUI + LWC    |   WS     |   15 REST routers   |
-    +-------------------+          +---------+----------+
-                                             |
-              +--------------------+---------+---------+-------------------+
-              |                    |                    |                   |
-     +--------+-------+  +--------+-------+  +--------+-------+  +-------+--------+
-     |    ML Models    |  |   Strategy     |  |   Risk Stack   |  |   Execution    |
-     | XGBoost/asset   |  | ML-Primary     |  | CircuitBreakers|  | Paper/DEMO/Live|
-     | 220+ features   |  | ScalpScore QG  |  | Kelly Sizing   |  | State Recovery |
-     | Optuna tuning   |  | Regime Router  |  | Trailing Stops |  | Hot Reload     |
-     | Calibration     |  | Squeeze/VWAP   |  | SL Cooldown    |  | Broker Retry   |
-     +--------+-------+  +----------------+  +----------------+  +----------------+
-              |
-     +--------+-------+  +----------------+  +----------------+
-     |   Data Layer    |  |   External     |  |  Monitoring    |
-     | Capital.com API |  | Finnhub        |  | Telegram Bot   |
-     | yfinance        |  | Marketaux      |  | Prometheus     |
-     | CryptoCompare   |  | FRED/COT       |  | Grafana        |
-     | Parquet/DuckDB  |  | Alpha Vantage  |  | JSON Logging   |
-     +----------------+  +----------------+  +----------------+
-```
+<p align="center">
+  <img src="docs/assets/architecture.svg" alt="MANTIS AI Architecture" width="100%">
+</p>
 
 ---
 

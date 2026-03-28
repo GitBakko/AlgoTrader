@@ -1,0 +1,214 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" font-family="'Segoe UI', system-ui, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0d1117"/>
+      <stop offset="100%" style="stop-color:#010409"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#00d97e"/>
+      <stop offset="100%" style="stop-color:#00b368"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#00E5FF"/>
+      <stop offset="100%" style="stop-color:#00b8d4"/>
+    </linearGradient>
+    <linearGradient id="purple" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#a78bfa"/>
+      <stop offset="100%" style="stop-color:#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="orange" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFB020"/>
+      <stop offset="100%" style="stop-color:#e09500"/>
+    </linearGradient>
+    <linearGradient id="red" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF3D57"/>
+      <stop offset="100%" style="stop-color:#dc2626"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1000" height="620" fill="url(#bg)" rx="12"/>
+
+  <!-- Title -->
+  <text x="500" y="36" text-anchor="middle" fill="#39FF14" font-size="16" font-weight="700" letter-spacing="3" filter="url(#glow)">MANTIS AI ARCHITECTURE</text>
+
+  <!-- ═══ TOP ROW: Frontend + Backend ═══ -->
+  <!-- Frontend -->
+  <rect x="60" y="60" width="200" height="90" rx="8" fill="#161b22" stroke="#00d97e" stroke-width="1.5"/>
+  <text x="160" y="85" text-anchor="middle" fill="#00d97e" font-size="13" font-weight="700">Angular 21</text>
+  <text x="160" y="103" text-anchor="middle" fill="#8B949E" font-size="10">CoreUI + TradingView</text>
+  <text x="160" y="118" text-anchor="middle" fill="#8B949E" font-size="10">13 Views + Dark/Light</text>
+  <text x="160" y="133" text-anchor="middle" fill="#8B949E" font-size="10">WebSocket Real-time</text>
+
+  <!-- Arrow Frontend -> Backend -->
+  <line x1="260" y1="105" x2="320" y2="105" stroke="#39FF14" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="290" y="98" text-anchor="middle" fill="#39FF14" font-size="9" font-weight="600">REST + WS</text>
+
+  <!-- Backend -->
+  <rect x="320" y="60" width="200" height="90" rx="8" fill="#161b22" stroke="#00d97e" stroke-width="1.5"/>
+  <text x="420" y="85" text-anchor="middle" fill="#00d97e" font-size="13" font-weight="700">FastAPI Backend</text>
+  <text x="420" y="103" text-anchor="middle" fill="#8B949E" font-size="10">Python 3.12+ Async</text>
+  <text x="420" y="118" text-anchor="middle" fill="#8B949E" font-size="10">15 REST Routers</text>
+  <text x="420" y="133" text-anchor="middle" fill="#8B949E" font-size="10">Pydantic v2 + Loguru</text>
+
+  <!-- Arrow Backend -> Broker -->
+  <line x1="520" y1="105" x2="580" y2="105" stroke="#FFB020" stroke-width="1.5" stroke-dasharray="6,3"/>
+
+  <!-- Broker -->
+  <rect x="580" y="60" width="180" height="90" rx="8" fill="#161b22" stroke="#FFB020" stroke-width="1.5"/>
+  <text x="670" y="85" text-anchor="middle" fill="#FFB020" font-size="13" font-weight="700">Capital.com</text>
+  <text x="670" y="103" text-anchor="middle" fill="#8B949E" font-size="10">REST + WebSocket</text>
+  <text x="670" y="118" text-anchor="middle" fill="#8B949E" font-size="10">Demo + Live modes</text>
+  <text x="670" y="133" text-anchor="middle" fill="#8B949E" font-size="10">21 Instruments</text>
+
+  <!-- Telegram -->
+  <rect x="810" y="60" width="140" height="90" rx="8" fill="#161b22" stroke="#00E5FF" stroke-width="1.5"/>
+  <text x="880" y="85" text-anchor="middle" fill="#00E5FF" font-size="13" font-weight="700">Telegram Bot</text>
+  <text x="880" y="103" text-anchor="middle" fill="#8B949E" font-size="10">/status /reset /stop</text>
+  <text x="880" y="118" text-anchor="middle" fill="#8B949E" font-size="10">Trade alerts</text>
+  <text x="880" y="133" text-anchor="middle" fill="#8B949E" font-size="10">Training alerts</text>
+
+  <!-- ═══ MIDDLE ROW: Core Engine ═══ -->
+  <!-- Vertical connector -->
+  <line x1="420" y1="150" x2="420" y2="185" stroke="#39FF14" stroke-width="1.5"/>
+
+  <!-- ML Models -->
+  <rect x="40" y="185" width="175" height="110" rx="8" fill="#1c2128" stroke="#a78bfa" stroke-width="1.2"/>
+  <rect x="40" y="185" width="175" height="26" rx="8" fill="url(#purple)" opacity="0.15"/>
+  <text x="128" y="203" text-anchor="middle" fill="#a78bfa" font-size="12" font-weight="700">ML Models</text>
+  <text x="128" y="225" text-anchor="middle" fill="#c9d1d9" font-size="10">XGBoost per-asset</text>
+  <text x="128" y="240" text-anchor="middle" fill="#c9d1d9" font-size="10">220+ features</text>
+  <text x="128" y="255" text-anchor="middle" fill="#c9d1d9" font-size="10">Optuna tuning</text>
+  <text x="128" y="270" text-anchor="middle" fill="#c9d1d9" font-size="10">Isotonic calibration</text>
+  <text x="128" y="285" text-anchor="middle" fill="#c9d1d9" font-size="10">Hot reload</text>
+
+  <!-- Strategy -->
+  <rect x="230" y="185" width="175" height="110" rx="8" fill="#1c2128" stroke="#00d97e" stroke-width="1.2"/>
+  <rect x="230" y="185" width="175" height="26" rx="8" fill="url(#green)" opacity="0.15"/>
+  <text x="318" y="203" text-anchor="middle" fill="#00d97e" font-size="12" font-weight="700">Strategy Engine</text>
+  <text x="318" y="225" text-anchor="middle" fill="#c9d1d9" font-size="10">ML-Primary mode</text>
+  <text x="318" y="240" text-anchor="middle" fill="#c9d1d9" font-size="10">ScalpScore 7-vote QG</text>
+  <text x="318" y="255" text-anchor="middle" fill="#c9d1d9" font-size="10">Composite confidence</text>
+  <text x="318" y="270" text-anchor="middle" fill="#c9d1d9" font-size="10">Regime detection</text>
+  <text x="318" y="285" text-anchor="middle" fill="#c9d1d9" font-size="10">Squeeze / VWAP / Pairs</text>
+
+  <!-- Risk Stack -->
+  <rect x="420" y="185" width="175" height="110" rx="8" fill="#1c2128" stroke="#FF3D57" stroke-width="1.2"/>
+  <rect x="420" y="185" width="175" height="26" rx="8" fill="url(#red)" opacity="0.15"/>
+  <text x="508" y="203" text-anchor="middle" fill="#FF3D57" font-size="12" font-weight="700">Risk Stack</text>
+  <text x="508" y="225" text-anchor="middle" fill="#c9d1d9" font-size="10">6 Circuit Breakers</text>
+  <text x="508" y="240" text-anchor="middle" fill="#c9d1d9" font-size="10">Epic SL Cooldown</text>
+  <text x="508" y="255" text-anchor="middle" fill="#c9d1d9" font-size="10">Kelly position sizing</text>
+  <text x="508" y="270" text-anchor="middle" fill="#c9d1d9" font-size="10">4-phase trailing stop</text>
+  <text x="508" y="285" text-anchor="middle" fill="#c9d1d9" font-size="10">Equity curve filter</text>
+
+  <!-- Execution -->
+  <rect x="610" y="185" width="175" height="110" rx="8" fill="#1c2128" stroke="#FFB020" stroke-width="1.2"/>
+  <rect x="610" y="185" width="175" height="26" rx="8" fill="url(#orange)" opacity="0.15"/>
+  <text x="698" y="203" text-anchor="middle" fill="#FFB020" font-size="12" font-weight="700">Execution</text>
+  <text x="698" y="225" text-anchor="middle" fill="#c9d1d9" font-size="10">Paper / DEMO / Live</text>
+  <text x="698" y="240" text-anchor="middle" fill="#c9d1d9" font-size="10">State recovery</text>
+  <text x="698" y="255" text-anchor="middle" fill="#c9d1d9" font-size="10">Smart SL/TP retry</text>
+  <text x="698" y="270" text-anchor="middle" fill="#c9d1d9" font-size="10">Position persistence</text>
+  <text x="698" y="285" text-anchor="middle" fill="#c9d1d9" font-size="10">Partial close</text>
+
+  <!-- Training -->
+  <rect x="800" y="185" width="160" height="110" rx="8" fill="#1c2128" stroke="#a78bfa" stroke-width="1.2"/>
+  <rect x="800" y="185" width="160" height="26" rx="8" fill="url(#purple)" opacity="0.15"/>
+  <text x="880" y="203" text-anchor="middle" fill="#a78bfa" font-size="12" font-weight="700">Training</text>
+  <text x="880" y="225" text-anchor="middle" fill="#c9d1d9" font-size="10">Parallel orchestrator</text>
+  <text x="880" y="240" text-anchor="middle" fill="#c9d1d9" font-size="10">Walk-forward splits</text>
+  <text x="880" y="255" text-anchor="middle" fill="#c9d1d9" font-size="10">Extended data fetch</text>
+  <text x="880" y="270" text-anchor="middle" fill="#c9d1d9" font-size="10">Auto hot reload</text>
+  <text x="880" y="285" text-anchor="middle" fill="#c9d1d9" font-size="10">Progress via WebSocket</text>
+
+  <!-- Arrows between middle boxes -->
+  <line x1="215" y1="240" x2="230" y2="240" stroke="#8B949E" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="405" y1="240" x2="420" y2="240" stroke="#8B949E" stroke-width="1"/>
+  <line x1="595" y1="240" x2="610" y2="240" stroke="#8B949E" stroke-width="1"/>
+
+  <!-- ═══ BOTTOM ROW: Data + Features + Monitoring ═══ -->
+  <!-- Vertical connectors -->
+  <line x1="128" y1="295" x2="128" y2="330" stroke="#8B949E" stroke-width="1"/>
+  <line x1="318" y1="295" x2="318" y2="330" stroke="#8B949E" stroke-width="1"/>
+  <line x1="698" y1="295" x2="698" y2="330" stroke="#8B949E" stroke-width="1"/>
+
+  <!-- Data Layer -->
+  <rect x="40" y="330" width="175" height="100" rx="8" fill="#1c2128" stroke="#00E5FF" stroke-width="1.2"/>
+  <rect x="40" y="330" width="175" height="26" rx="8" fill="url(#cyan)" opacity="0.15"/>
+  <text x="128" y="348" text-anchor="middle" fill="#00E5FF" font-size="12" font-weight="700">Data Layer</text>
+  <text x="128" y="370" text-anchor="middle" fill="#c9d1d9" font-size="10">Capital.com OHLCV</text>
+  <text x="128" y="385" text-anchor="middle" fill="#c9d1d9" font-size="10">yfinance (stocks/forex)</text>
+  <text x="128" y="400" text-anchor="middle" fill="#c9d1d9" font-size="10">CryptoCompare (crypto)</text>
+  <text x="128" y="415" text-anchor="middle" fill="#c9d1d9" font-size="10">Parquet + DuckDB</text>
+
+  <!-- Features -->
+  <rect x="230" y="330" width="175" height="100" rx="8" fill="#1c2128" stroke="#00E5FF" stroke-width="1.2"/>
+  <rect x="230" y="330" width="175" height="26" rx="8" fill="url(#cyan)" opacity="0.15"/>
+  <text x="318" y="348" text-anchor="middle" fill="#00E5FF" font-size="12" font-weight="700">Feature Engine</text>
+  <text x="318" y="370" text-anchor="middle" fill="#c9d1d9" font-size="10">220+ features (Polars)</text>
+  <text x="318" y="385" text-anchor="middle" fill="#c9d1d9" font-size="10">Technical + Keltner + VWAP</text>
+  <text x="318" y="400" text-anchor="middle" fill="#c9d1d9" font-size="10">Sentiment (SIL 5-source)</text>
+  <text x="318" y="415" text-anchor="middle" fill="#c9d1d9" font-size="10">Macro (VIX/DXY/10Y)</text>
+
+  <!-- External APIs -->
+  <rect x="420" y="330" width="175" height="100" rx="8" fill="#1c2128" stroke="#8B949E" stroke-width="1.2"/>
+  <rect x="420" y="330" width="175" height="26" rx="8" fill="#8B949E" opacity="0.1"/>
+  <text x="508" y="348" text-anchor="middle" fill="#8B949E" font-size="12" font-weight="700">External APIs</text>
+  <text x="508" y="370" text-anchor="middle" fill="#c9d1d9" font-size="10">Finnhub (equity data)</text>
+  <text x="508" y="385" text-anchor="middle" fill="#c9d1d9" font-size="10">Marketaux (news NLP)</text>
+  <text x="508" y="400" text-anchor="middle" fill="#c9d1d9" font-size="10">FRED / COT / Alpha V.</text>
+  <text x="508" y="415" text-anchor="middle" fill="#c9d1d9" font-size="10">Social sentiment</text>
+
+  <!-- Monitoring -->
+  <rect x="610" y="330" width="175" height="100" rx="8" fill="#1c2128" stroke="#FFB020" stroke-width="1.2"/>
+  <rect x="610" y="330" width="175" height="26" rx="8" fill="url(#orange)" opacity="0.15"/>
+  <text x="698" y="348" text-anchor="middle" fill="#FFB020" font-size="12" font-weight="700">Monitoring</text>
+  <text x="698" y="370" text-anchor="middle" fill="#c9d1d9" font-size="10">Prometheus + Grafana</text>
+  <text x="698" y="385" text-anchor="middle" fill="#c9d1d9" font-size="10">JSON structured logging</text>
+  <text x="698" y="400" text-anchor="middle" fill="#c9d1d9" font-size="10">Trade logger + audit</text>
+  <text x="698" y="415" text-anchor="middle" fill="#c9d1d9" font-size="10">Health checks</text>
+
+  <!-- Database -->
+  <rect x="800" y="330" width="160" height="100" rx="8" fill="#1c2128" stroke="#8B949E" stroke-width="1.2"/>
+  <rect x="800" y="330" width="160" height="26" rx="8" fill="#8B949E" opacity="0.1"/>
+  <text x="880" y="348" text-anchor="middle" fill="#8B949E" font-size="12" font-weight="700">Storage</text>
+  <text x="880" y="370" text-anchor="middle" fill="#c9d1d9" font-size="10">PostgreSQL 16</text>
+  <text x="880" y="385" text-anchor="middle" fill="#c9d1d9" font-size="10">Redis (cache/pubsub)</text>
+  <text x="880" y="400" text-anchor="middle" fill="#c9d1d9" font-size="10">DuckDB (analytics)</text>
+  <text x="880" y="415" text-anchor="middle" fill="#c9d1d9" font-size="10">All optional</text>
+
+  <!-- ═══ FLOW ARROWS (main pipeline) ═══ -->
+  <!-- Data -> Features -->
+  <line x1="215" y1="380" x2="230" y2="380" stroke="#00E5FF" stroke-width="1.2"/>
+  <!-- Features -> External -->
+  <line x1="405" y1="380" x2="420" y2="380" stroke="#8B949E" stroke-width="1"/>
+
+  <!-- ═══ BOTTOM BANNER: Signal Flow ═══ -->
+  <rect x="40" y="460" width="920" height="44" rx="8" fill="#161b22" stroke="#39FF14" stroke-width="1" opacity="0.8"/>
+  <text x="500" y="475" text-anchor="middle" fill="#39FF14" font-size="11" font-weight="700" letter-spacing="1">SIGNAL FLOW</text>
+  <text x="500" y="493" text-anchor="middle" fill="#8B949E" font-size="10">Data Fetch &rarr; Feature Build (220+) &rarr; ML Predict &rarr; ScalpScore QG &rarr; Risk Check &rarr; Execution &rarr; Position Tracking</text>
+
+  <!-- ═══ BOTTOM: Stats ═══ -->
+  <text x="120" y="535" text-anchor="middle" fill="#39FF14" font-size="22" font-weight="700">21</text>
+  <text x="120" y="552" text-anchor="middle" fill="#8B949E" font-size="10">Instruments</text>
+
+  <text x="300" y="535" text-anchor="middle" fill="#00E5FF" font-size="22" font-weight="700">220+</text>
+  <text x="300" y="552" text-anchor="middle" fill="#8B949E" font-size="10">ML Features</text>
+
+  <text x="480" y="535" text-anchor="middle" fill="#a78bfa" font-size="22" font-weight="700">2300+</text>
+  <text x="480" y="552" text-anchor="middle" fill="#8B949E" font-size="10">Tests Passing</text>
+
+  <text x="660" y="535" text-anchor="middle" fill="#FFB020" font-size="22" font-weight="700">7</text>
+  <text x="660" y="552" text-anchor="middle" fill="#8B949E" font-size="10">Risk Layers</text>
+
+  <text x="840" y="535" text-anchor="middle" fill="#FF3D57" font-size="22" font-weight="700">24/7</text>
+  <text x="840" y="552" text-anchor="middle" fill="#8B949E" font-size="10">Crypto Trading</text>
+
+  <!-- Footer -->
+  <text x="500" y="600" text-anchor="middle" fill="#39FF14" font-size="9" opacity="0.5" letter-spacing="2">MANTIS AI &bull; ALGORITHMIC TRADING PLATFORM</text>
+</svg>
