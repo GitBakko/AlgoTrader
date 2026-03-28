@@ -2099,7 +2099,9 @@ class PaperTradingLoop:
                             )
 
                             self._on_position_closed(
-                                deal_id, pnl, epic=epic,
+                                deal_id,
+                                pnl,
+                                epic=epic,
                                 close_reason=reason_label,
                             )
 

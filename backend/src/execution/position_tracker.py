@@ -118,8 +118,7 @@ class PositionTracker:
                         pos_dict["stop_level"] = local_sl
                         risk_local = True
                         logger.debug(
-                            f"[{p.epic}] Merged local SL={local_sl} "
-                            f"(broker has no SL set)"
+                            f"[{p.epic}] Merged local SL={local_sl} " f"(broker has no SL set)"
                         )
                 if pos_dict["profit_level"] is None and local.get("profit_level"):
                     pos_dict["profit_level"] = local["profit_level"]
