@@ -100,7 +100,39 @@ Automatic alerts for: trade opened (with direction arrows), trade closed (with P
 
 ## Architecture
 
-![MANTIS AI Architecture](https://raw.githubusercontent.com/GitBakko/AlgoTrader/master/docs/assets/architecture.svg)
+```
+                              MANTIS AI Architecture
+
+  ┌──────────────┐         ┌──────────────┐         ┌──────────────┐    ┌────────────┐
+  │  Angular 21  │  REST   │   FastAPI     │         │ Capital.com  │    │  Telegram  │
+  │  MANTIS UI   │◄───────►│  Python 3.12  │◄───────►│  REST + WS   │    │    Bot     │
+  │  CoreUI+LWC  │   WS    │  15 Routers   │         │  21 Assets   │    │ /status    │
+  └──────────────┘         └──────┬────────┘         └──────────────┘    └────────────┘
+                                  │
+        ┌─────────────────────────┼─────────────────────────┐
+        │                         │                         │
+  ┌─────┴──────┐  ┌──────────────┴┐  ┌──────────────┐  ┌──┴───────────┐  ┌────────────┐
+  │ ML Models  │  │   Strategy    │  │  Risk Stack  │  │  Execution   │  │  Training  │
+  │            │  │               │  │              │  │              │  │            │
+  │ XGBoost    │  │ ML-Primary    │  │ 6 Circuit    │  │ Paper/DEMO   │  │ Parallel   │
+  │ 220+ feat  │  │ ScalpScore QG │  │ Breakers     │  │ Live modes   │  │ Orchestr.  │
+  │ Optuna     │  │ Regime Router │  │ SL Cooldown  │  │ State Recov. │  │ Hot Reload │
+  │ Calibr.    │  │ Squeeze/VWAP  │  │ Kelly Sizing │  │ Smart SL/TP  │  │ yfinance   │
+  └─────┬──────┘  └───────────────┘  │ Trailing 4ph │  │ Partial Close│  │ CryptoCmp  │
+        │                             └──────────────┘  └──────────────┘  └────────────┘
+  ┌─────┴──────┐  ┌───────────────┐  ┌──────────────┐  ┌──────────────┐  ┌────────────┐
+  │ Data Layer │  │ Feature Eng.  │  │ External API │  │ Monitoring   │  │  Storage   │
+  │            │  │               │  │              │  │              │  │            │
+  │ Capital.com│  │ 220+ features │  │ Finnhub      │  │ Prometheus   │  │ PostgreSQL │
+  │ yfinance   │  │ Technical     │  │ Marketaux    │  │ Grafana      │  │ Redis      │
+  │ CryptoCmp  │  │ Sentiment SIL │  │ FRED/COT     │  │ JSON Logging │  │ DuckDB     │
+  │ Parquet    │  │ Macro overlay │  │ Alpha Vant.  │  │ Trade Audit  │  │ Parquet    │
+  └────────────┘  └───────────────┘  └──────────────┘  └──────────────┘  └────────────┘
+
+  Signal Flow: Data → Features (220+) → ML Predict → ScalpScore QG → Risk → Execute → Track
+
+  21 Instruments  ·  220+ ML Features  ·  2300+ Tests  ·  7 Risk Layers  ·  24/7 Crypto
+```
 
 ---
 
