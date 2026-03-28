@@ -210,5 +210,5 @@
   <text x="840" y="552" text-anchor="middle" fill="#8B949E" font-size="10">Crypto Trading</text>
 
   <!-- Footer -->
-  <text x="500" y="600" text-anchor="middle" fill="#39FF14" font-size="9" opacity="0.5" letter-spacing="2">MANTIS AI &bull; ALGORITHMIC TRADING PLATFORM</text>
+  <text x="500" y="600" text-anchor="middle" fill="#39FF14" font-size="9" opacity="0.5" letter-spacing="2">MANTIS AI &#x2022; ALGORITHMIC TRADING PLATFORM</text>
 </svg>
