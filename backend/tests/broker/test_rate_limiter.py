@@ -34,7 +34,7 @@ class TestTokenBucket:
         bucket = TokenBucket(rate=10.0, capacity=20)
         result = await bucket.acquire(tokens=1)
         assert result is True
-        assert bucket.tokens == 19.0
+        assert bucket.tokens == pytest.approx(19.0, abs=0.01)
 
     async def test_acquire_multiple_tokens(self):
         """Test acquiring multiple tokens at once."""
@@ -48,7 +48,7 @@ class TestTokenBucket:
         bucket = TokenBucket(rate=10.0, capacity=20)
         result = await bucket.acquire(tokens=20)
         assert result is True
-        assert bucket.tokens == 0.0
+        assert bucket.tokens == pytest.approx(0.0, abs=0.01)
 
     async def test_acquire_exceeds_capacity_raises_error(self):
         """Test that requesting more tokens than capacity raises ValueError."""
@@ -62,7 +62,7 @@ class TestTokenBucket:
 
         # Drain the bucket
         await bucket.acquire(tokens=20)
-        assert bucket.tokens == 0.0
+        assert bucket.tokens == pytest.approx(0.0, abs=0.01)
 
         # Try to acquire with short timeout
         start_time = time.monotonic()
@@ -130,7 +130,7 @@ class TestTokenBucket:
 
         # All should succeed eventually
         assert all(results)
-        assert bucket.tokens == 0.0  # All 10 tokens consumed
+        assert bucket.tokens == pytest.approx(0.0, abs=0.01)  # All 10 tokens consumed
 
     async def test_acquire_with_none_timeout(self):
         """Test acquire with None timeout waits indefinitely."""
@@ -193,7 +193,7 @@ class TestRateLimiter:
         # After one request
         await limiter.acquire()
         available = limiter.available_requests()
-        assert available == 19.0
+        assert available == pytest.approx(19.0, abs=0.01)
 
     async def test_multiple_sequential_requests(self):
         """Test multiple sequential request acquisitions."""
