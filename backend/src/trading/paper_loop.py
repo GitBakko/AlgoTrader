@@ -588,6 +588,21 @@ class PaperTradingLoop:
             close_reason = "EXTERNAL"
             exit_price = entry_price  # Fallback
 
+            # Sanity check: discard SL/TP on wrong side of entry (stale data)
+            if stop_level and entry_price and entry_price > 0:
+                if direction == "BUY" and stop_level >= entry_price:
+                    logger.warning(
+                        f"[{epic}] Discarding stale SL={stop_level:.5f} "
+                        f">= entry={entry_price:.5f} for LONG in close detection"
+                    )
+                    stop_level = None
+                elif direction == "SELL" and stop_level <= entry_price:
+                    logger.warning(
+                        f"[{epic}] Discarding stale SL={stop_level:.5f} "
+                        f"<= entry={entry_price:.5f} for SHORT in close detection"
+                    )
+                    stop_level = None
+
             if stop_level and stop_level > 0 and profit_level and profit_level > 0:
                 # Both SL and TP were set — get live price from broker to determine
                 # which level was hit. This is far more reliable than stale candle data.
@@ -2011,14 +2026,30 @@ class PaperTradingLoop:
 
                 # Check if stop loss violated
                 stop_violated = False
+                entry_price = position.get("level") or position.get("entry_price", 0)
                 if stop_level is not None and stop_level > 0:
-                    if direction == "BUY" and current_price <= stop_level:
+                    # Sanity check: SL must be on correct side of entry
+                    sl_sane = True
+                    if entry_price and entry_price > 0:
+                        if direction == "BUY" and stop_level >= entry_price:
+                            sl_sane = False
+                            logger.warning(
+                                f"[{epic}] Ignoring invalid SL={stop_level:.5f} "
+                                f">= entry={entry_price:.5f} for LONG (stale data?)"
+                            )
+                        elif direction == "SELL" and stop_level <= entry_price:
+                            sl_sane = False
+                            logger.warning(
+                                f"[{epic}] Ignoring invalid SL={stop_level:.5f} "
+                                f"<= entry={entry_price:.5f} for SHORT (stale data?)"
+                            )
+                    if sl_sane and direction == "BUY" and current_price <= stop_level:
                         stop_violated = True
                         logger.warning(
                             f"🚨 [{epic}] STOP LOSS VIOLATED! "
                             f"Price {current_price:.5f} <= SL {stop_level:.5f} (LONG)"
                         )
-                    elif direction == "SELL" and current_price >= stop_level:
+                    elif sl_sane and direction == "SELL" and current_price >= stop_level:
                         stop_violated = True
                         logger.warning(
                             f"🚨 [{epic}] STOP LOSS VIOLATED! "
@@ -2067,7 +2098,10 @@ class PaperTradingLoop:
                                 f"P&L = ${pnl:.2f}"
                             )
 
-                            self._on_position_closed(deal_id, pnl, epic=epic)
+                            self._on_position_closed(
+                                deal_id, pnl, epic=epic,
+                                close_reason=reason_label,
+                            )
 
                             # Persist closed position to database
                             await self._persist_position_close(

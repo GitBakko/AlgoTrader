@@ -96,12 +96,31 @@ class PositionTracker:
                 local = self._find_local_by_epic(p.epic)
             if local:
                 if pos_dict["stop_level"] is None and local.get("stop_level"):
-                    pos_dict["stop_level"] = local["stop_level"]
-                    risk_local = True
-                    logger.debug(
-                        f"[{p.epic}] Merged local SL={local['stop_level']} "
-                        f"(broker has no SL set)"
-                    )
+                    local_sl = local["stop_level"]
+                    entry = pos_dict.get("level", 0)
+                    direction = pos_dict.get("direction", "")
+                    # Sanity check: SL must be on correct side of entry
+                    sl_valid = True
+                    if entry and entry > 0:
+                        if direction == "BUY" and local_sl >= entry:
+                            sl_valid = False
+                            logger.warning(
+                                f"[{p.epic}] Rejected stale local SL={local_sl:.5f} "
+                                f">= entry={entry:.5f} for LONG — ignoring"
+                            )
+                        elif direction == "SELL" and local_sl <= entry:
+                            sl_valid = False
+                            logger.warning(
+                                f"[{p.epic}] Rejected stale local SL={local_sl:.5f} "
+                                f"<= entry={entry:.5f} for SHORT — ignoring"
+                            )
+                    if sl_valid:
+                        pos_dict["stop_level"] = local_sl
+                        risk_local = True
+                        logger.debug(
+                            f"[{p.epic}] Merged local SL={local_sl} "
+                            f"(broker has no SL set)"
+                        )
                 if pos_dict["profit_level"] is None and local.get("profit_level"):
                     pos_dict["profit_level"] = local["profit_level"]
                     risk_local = True

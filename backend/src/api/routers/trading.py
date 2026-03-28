@@ -308,11 +308,16 @@ async def reset_risk_state(request: Request):
     reset_list = loop.risk_manager.circuit_breakers.reset_all()
     loop._per_asset_losses.clear()
 
+    # Clear epic SL cooldown tracker
+    old_sl_cooldowns = {k: len(v) for k, v in loop._epic_sl_hits.items() if v}
+    loop._epic_sl_hits.clear()
+
     logger.warning(
         f"[RISK RESET] Manual full reset: "
         f"kelly_history={old_kelly_size}->0, "
         f"equity_points={old_eq_points}->0, "
-        f"cb={len(reset_list)}"
+        f"cb={len(reset_list)}, "
+        f"sl_cooldowns={old_sl_cooldowns}"
     )
 
     return success_response(
