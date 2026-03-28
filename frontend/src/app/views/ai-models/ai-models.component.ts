@@ -5,9 +5,11 @@ import {
   ColComponent, RowComponent, BadgeComponent,
   ProgressComponent, ProgressBarComponent,
   TableDirective, NavModule, ButtonDirective,
+  TooltipDirective,
 } from '@coreui/angular';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { IconDirective } from '@coreui/icons-angular';
 import { TradingService } from '../../core/services/trading.service';
 import { NewsService } from '../../core/services/news.service';
 import { WebSocketService } from '../../core/services/websocket.service';
@@ -25,7 +27,7 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
     CommonModule, CardComponent, CardBodyComponent, CardHeaderComponent,
     ColComponent, RowComponent, BadgeComponent,
     ProgressComponent, ProgressBarComponent,
-    TableDirective, NavModule, ButtonDirective,
+    TableDirective, NavModule, ButtonDirective, TooltipDirective, IconDirective,
     EpicLogoComponent,
     NewsWidgetComponent,
     LoadingButtonComponent,
@@ -314,7 +316,9 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
                   <tr class="text-body-secondary">
                     <th class="fw-semibold small">Asset</th>
                     <th class="fw-semibold small text-end">P&amp;L</th>
-                    <th class="fw-semibold small text-end" style="width: 100px;">Azione</th>
+                    <th class="fw-semibold small text-end d-mobile-none">F1</th>
+                    <th class="fw-semibold small d-mobile-none">Ultimo Training</th>
+                    <th class="fw-semibold small text-end" style="width: 120px;">Azione</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -331,8 +335,35 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
                           [class.text-danger]="item.pnl < 0">
                         {{ item.pnl >= 0 ? '+' : '' }}{{ item.pnl | number:'1.2-2' }}
                       </td>
+                      <td class="text-end mantis-mono small d-mobile-none"
+                          [class.text-success]="item.f1 >= 0.5"
+                          [class.text-warning]="item.f1 > 0 && item.f1 < 0.5"
+                          [class.text-body-secondary]="item.f1 === 0">
+                        {{ item.f1 > 0 ? (item.f1 | number:'1.3-3') : '-' }}
+                      </td>
+                      <td class="small d-mobile-none">
+                        @if (item.lastTrained) {
+                          <span class="text-body-secondary">{{ item.lastTrained | date:'dd/MM HH:mm' }}</span>
+                          <button class="btn btn-sm p-0 ms-1 text-body-secondary"
+                                  (click)="toggleInfo(item.epic)"
+                                  [cTooltip]="'Dettagli modello'">
+                            <svg cIcon name="cilInfo" size="sm"></svg>
+                          </button>
+                        } @else {
+                          <span class="text-body-secondary">-</span>
+                        }
+                        @if (infoEpic() === item.epic) {
+                          <div class="model-info-popup mt-1 p-2 small rounded">
+                            <div><strong>Versione:</strong> {{ item.version }}</div>
+                            <div><strong>F1 Macro:</strong> <span class="mantis-mono">{{ item.f1 | number:'1.4-4' }}</span></div>
+                            <div><strong>Accuracy:</strong> <span class="mantis-mono">{{ item.accuracy | number:'1.4-4' }}</span></div>
+                            <div><strong>Features:</strong> <span class="mantis-mono">{{ item.numFeatures }}</span></div>
+                            <div><strong>Ultimo:</strong> {{ item.lastTrained | date:'dd/MM/yyyy HH:mm:ss' }}</div>
+                          </div>
+                        }
+                      </td>
                       <td class="text-end">
-                        <button cButton color="primary" variant="ghost" size="sm"
+                        <button cButton color="primary" variant="outline" size="sm"
                                 [disabled]="trainingRunning()"
                                 (click)="retrainSingle(item.epic)">
                           Retrain
@@ -504,14 +535,32 @@ export class AiModelsComponent implements OnInit, OnDestroy {
     return Object.values(status.jobs);
   });
 
-  // P&L per epic from performance data, sorted worst to best
+  // P&L per epic enriched with model info, sorted worst to best
   readonly pnlByEpic = computed(() => {
     const perf = this.trading.performance();
     if (!perf?.pnl_by_epic) return [];
+    const modelsMap = new Map(this.models().map(m => [m.epic, m]));
     return Object.entries(perf.pnl_by_epic)
-      .map(([epic, pnl]) => ({ epic, pnl }))
+      .map(([epic, pnl]) => {
+        const model = modelsMap.get(epic);
+        return {
+          epic, pnl,
+          lastTrained: model?.last_trained ?? null,
+          f1: model?.f1_score ?? 0,
+          accuracy: model?.accuracy ?? 0,
+          version: model?.version ?? '-',
+          numFeatures: model?.num_features ?? 0,
+        };
+      })
       .sort((a, b) => a.pnl - b.pnl);
   });
+
+  // Info tooltip state
+  readonly infoEpic = signal<string | null>(null);
+
+  toggleInfo(epic: string): void {
+    this.infoEpic.set(this.infoEpic() === epic ? null : epic);
+  }
 
   ngOnInit(): void {
     this.trading.loadModels();

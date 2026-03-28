@@ -161,6 +161,7 @@ export interface MLModel {
   f1_score: number;
   last_trained: string | null;
   version: string;
+  num_features?: number;
 }
 
 // System
