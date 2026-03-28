@@ -6,16 +6,19 @@ import { PriceTick, TradeEvent, WsStatus } from '../models';
 export class WebSocketService {
   private priceWs: WebSocket | null = null;
   private tradeWs: WebSocket | null = null;
+  private trainingWs: WebSocket | null = null;
 
   // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 32s, max 60s
   private priceReconnectAttempts = 0;
   private tradeReconnectAttempts = 0;
+  private trainingReconnectAttempts = 0;
   private readonly MAX_RECONNECT_DELAY = 60000;
   private readonly BASE_DELAY = 1000;
 
   readonly prices = signal<Record<string, PriceTick>>({});
   readonly lastTrade = signal<TradeEvent | null>(null);
   readonly connected = signal(false);
+  readonly trainingUpdate = signal<any>(null);
 
   // Price source tracking — "broker" = real, "mock" = fake random walk
   readonly priceSource = signal<'broker' | 'mock' | 'unknown'>('unknown');
@@ -113,15 +116,48 @@ export class WebSocketService {
     };
   }
 
+  connectTraining(): void {
+    if (this.trainingWs) return;
+    const url = `${environment.wsUrl}/ws/training`;
+    this.trainingWs = new WebSocket(url);
+
+    this.trainingWs.onopen = () => {
+      this.trainingReconnectAttempts = 0;
+    };
+
+    this.trainingWs.onmessage = (event) => {
+      const raw = JSON.parse(event.data);
+      if (raw.type === 'pong') return;
+      // Backend sends: { channel: "training", data: {...training status...} }
+      if (raw.channel === 'training' && raw.data) {
+        this.trainingUpdate.set(raw.data);
+      }
+    };
+
+    this.trainingWs.onclose = () => {
+      this.trainingWs = null;
+      const delay = this.getReconnectDelay(this.trainingReconnectAttempts);
+      this.trainingReconnectAttempts++;
+      setTimeout(() => this.connectTraining(), delay);
+    };
+
+    this.trainingWs.onerror = () => {
+      this.trainingWs?.close();
+    };
+  }
+
   disconnect(): void {
     this.priceWs?.close();
     this.tradeWs?.close();
+    this.trainingWs?.close();
     this.priceWs = null;
     this.tradeWs = null;
+    this.trainingWs = null;
     this.connected.set(false);
     this.priceSource.set('unknown');
     this.brokerReconnectAttempts.set(0);
     this.priceReconnectAttempts = 0;
     this.tradeReconnectAttempts = 0;
+    this.trainingReconnectAttempts = 0;
   }
 }

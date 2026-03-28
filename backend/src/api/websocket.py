@@ -419,3 +419,17 @@ async def notifications_endpoint(websocket: WebSocket) -> None:
         pass
     finally:
         ws_manager.disconnect(websocket, "notifications")
+
+
+async def training_endpoint(websocket: WebSocket) -> None:
+    """WebSocket endpoint for real-time training status updates."""
+    await ws_manager.connect(websocket, "training")
+    try:
+        while True:
+            data = await websocket.receive_text()
+            if data == "ping":
+                await websocket.send_json({"type": "pong"})
+    except WebSocketDisconnect:
+        pass
+    finally:
+        ws_manager.disconnect(websocket, "training")

@@ -40,7 +40,7 @@ from src.api.routers import (
     trading,
     vision,
 )
-from src.api.websocket import notifications_endpoint, prices_endpoint, trades_endpoint
+from src.api.websocket import notifications_endpoint, prices_endpoint, trades_endpoint, training_endpoint
 from src.database.session import DatabaseManager
 from src.monitoring.health import HealthChecker
 from src.utils.config import get_settings
@@ -731,6 +731,7 @@ app.include_router(agents.router, prefix="/api/agents", tags=["Agents"])
 app.websocket("/ws/prices")(prices_endpoint)
 app.websocket("/ws/trades")(trades_endpoint)
 app.websocket("/ws/notifications")(notifications_endpoint)
+app.websocket("/ws/training")(training_endpoint)
 
 
 if __name__ == "__main__":

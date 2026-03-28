@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy, computed, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy, computed, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
@@ -8,6 +8,7 @@ import {
 } from '@coreui/angular';
 import { TradingService } from '../../core/services/trading.service';
 import { NewsService } from '../../core/services/news.service';
+import { WebSocketService } from '../../core/services/websocket.service';
 import { TrainingJobInfo } from '../../core/models';
 import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.component';
 import { NewsWidgetComponent } from '../../shared/components/news-widget/news-widget.component';
@@ -297,8 +298,19 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
 })
 export class AiModelsComponent implements OnInit, OnDestroy {
   private readonly trading = inject(TradingService);
+  private readonly ws = inject(WebSocketService);
   readonly newsService = inject(NewsService);
   readonly models = this.trading.models;
+
+  constructor() {
+    this.ws.connectTraining();
+    effect(() => {
+      const update = this.ws.trainingUpdate();
+      if (update) {
+        this.trading.trainingStatus.set(update);
+      }
+    });
+  }
 
   readonly activeTab = signal<'models' | 'training'>('models');
   readonly selectedEpic = signal<string | null>(null);
