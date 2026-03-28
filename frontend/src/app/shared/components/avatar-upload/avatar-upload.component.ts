@@ -83,13 +83,13 @@ import { AuthService } from '../../../core/services/auth.service';
     }
 
     .avatar-upload__zone {
-      border: 2px dashed rgba(57, 255, 20, 0.3);
+      border: 2px dashed var(--mantis-border-accent);
       border-radius: 0.5rem;
       padding: 2rem;
       text-align: center;
       cursor: pointer;
       transition: all 0.2s ease;
-      background: rgba(22, 27, 34, 0.5);
+      background: var(--mantis-surface-2, rgba(22, 27, 34, 0.5));
       min-height: 200px;
       display: flex;
       align-items: center;
@@ -97,12 +97,12 @@ import { AuthService } from '../../../core/services/auth.service';
     }
 
     .avatar-upload__zone:hover {
-      border-color: rgba(57, 255, 20, 0.5);
-      background: rgba(22, 27, 34, 0.7);
+      border-color: var(--mantis-border-strong);
+      background: var(--mantis-surface-2, rgba(22, 27, 34, 0.7));
     }
 
     .avatar-upload__zone--dragging {
-      border-color: #39FF14;
+      border-color: var(--mantis-neon);
       background: rgba(57, 255, 20, 0.1);
       box-shadow: 0 0 20px rgba(57, 255, 20, 0.2);
     }
@@ -126,7 +126,7 @@ import { AuthService } from '../../../core/services/auth.service';
     .avatar-upload__icon {
       width: 48px;
       height: 48px;
-      color: #39FF14;
+      color: var(--mantis-neon);
       margin-bottom: 0.5rem;
     }
 
@@ -137,7 +137,7 @@ import { AuthService } from '../../../core/services/auth.service';
     }
 
     .avatar-upload__text strong {
-      color: #39FF14;
+      color: var(--mantis-neon);
     }
 
     .avatar-upload__hint {
@@ -154,11 +154,11 @@ import { AuthService } from '../../../core/services/auth.service';
       display: flex;
       flex-direction: column;
       align-items: center;
-      color: #39FF14;
+      color: var(--mantis-neon);
     }
 
     .text-mantis {
-      color: #39FF14 !important;
+      color: var(--mantis-neon) !important;
     }
 
     .alert {

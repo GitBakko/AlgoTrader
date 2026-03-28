@@ -30,12 +30,11 @@ import { NewsArticle } from '../../../core/models/news.model';
                 class="news-widget-title text-decoration-none">
                 {{ article.title }}
               </a>
-              <c-badge
-                [color]="getSentimentBadge(article.sentiment)"
+              <span
                 class="sentiment-mini flex-shrink-0"
-                [style.background-color]="getSentimentColor(article.sentiment)">
+                [ngClass]="sentimentClass(article.sentiment)">
                 {{ article.sentiment >= 0 ? '+' : '' }}{{ article.sentiment | number:'1.1-1' }}
-              </c-badge>
+              </span>
             </div>
             <div class="d-flex gap-2 align-items-center">
               <small class="text-body-secondary">
@@ -93,9 +92,9 @@ import { NewsArticle } from '../../../core/models/news.model';
       padding: 0.15rem 0.35rem;
       font-weight: 600;
       border: none;
-      color: white !important;
       min-width: 32px;
       text-align: center;
+      border-radius: 4px;
     }
 
     .badge-xs {
@@ -106,7 +105,7 @@ import { NewsArticle } from '../../../core/models/news.model';
     // Mantis AI theme
     :host-context(.mantis-theme) {
       .news-widget-title:hover {
-        color: #39ff14;
+        color: var(--mantis-neon);
       }
     }
   `],
@@ -128,14 +127,14 @@ export class NewsWidgetComponent {
     return 'secondary';
   }
 
-  getSentimentColor(sentiment: number): string {
-    if (sentiment >= 0.5) return '#28a745';
-    if (sentiment >= 0.3) return '#5cb85c';
-    if (sentiment >= 0.1) return '#a0d468';
-    if (sentiment >= -0.1) return '#6c757d';
-    if (sentiment >= -0.3) return '#f0ad4e';
-    if (sentiment >= -0.5) return '#e8604c';
-    return '#dc3545';
+  sentimentClass(sentiment: number): string {
+    if (sentiment >= 0.6) return 'text-success';
+    if (sentiment >= 0.2) return 'text-success';
+    if (sentiment >= 0.05) return 'text-success opacity-75';
+    if (sentiment > -0.05) return 'text-body-secondary';
+    if (sentiment > -0.2) return 'text-warning';
+    if (sentiment > -0.6) return 'text-danger opacity-75';
+    return 'text-danger';
   }
 
   getRelativeTime(publishedAt: string): string {

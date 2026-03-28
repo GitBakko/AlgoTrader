@@ -702,27 +702,27 @@ h1, h2, h3, h4, h5, h6,
   }
 
   &--rejected, &--exec_failed {
-    color: #ef5350;
-    background: rgba(#ef5350, 0.1);
-    .signal-status__dot { background: #ef5350; }
+    color: $mantis-loss;
+    background: rgba($mantis-loss, 0.1);
+    .signal-status__dot { background: $mantis-loss; }
   }
 
   &--predicted {
-    color: #0dcaf0;
-    background: rgba(#0dcaf0, 0.08);
-    .signal-status__dot { background: #0dcaf0; }
+    color: $mantis-cyan;
+    background: rgba($mantis-cyan, 0.08);
+    .signal-status__dot { background: $mantis-cyan; }
   }
 
   &--hold {
-    color: #ffc107;
-    background: rgba(#ffc107, 0.08);
-    .signal-status__dot { background: #ffc107; }
+    color: $mantis-warning;
+    background: rgba($mantis-warning, 0.08);
+    .signal-status__dot { background: $mantis-warning; }
   }
 
   &--market_closed {
-    color: #6c757d;
-    background: rgba(#6c757d, 0.08);
-    .signal-status__dot { background: #6c757d; }
+    color: $mantis-neutral;
+    background: rgba($mantis-neutral, 0.08);
+    .signal-status__dot { background: $mantis-neutral; }
   }
 }
 

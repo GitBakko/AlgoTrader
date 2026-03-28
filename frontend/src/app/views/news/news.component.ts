@@ -52,10 +52,10 @@ export class NewsComponent implements OnInit, OnDestroy {
     this.loadNews();
   }
 
-  getSentimentColor(score: number): string {
-    if (score > 0.3) return '#00d97e';      // Mantis green (positive)
-    if (score < -0.3) return '#ef5350';     // Red (negative)
-    return '#adb5bd';                       // Gray (neutral)
+  getSentimentClass(score: number): string {
+    if (score > 0.3) return 'text-success';
+    if (score < -0.3) return 'text-danger';
+    return 'text-body-secondary';
   }
 
   getSentimentBadge(score: number): string {
