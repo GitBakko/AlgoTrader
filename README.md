@@ -100,9 +100,7 @@ Automatic alerts for: trade opened (with direction arrows), trade closed (with P
 
 ## Architecture
 
-<p align="center">
-  <img src="docs/assets/architecture.svg" alt="MANTIS AI Architecture" width="100%">
-</p>
+![MANTIS AI Architecture](https://raw.githubusercontent.com/GitBakko/AlgoTrader/master/docs/assets/architecture.svg)
 
 ---
 
