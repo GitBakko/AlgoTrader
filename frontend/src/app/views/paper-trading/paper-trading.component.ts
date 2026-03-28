@@ -739,14 +739,10 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   readonly status = this.trading.paperStatus;
   readonly statusLoaded = computed(() => this.status() !== null);
 
-  // Polling interval based on market status
-  readonly pollingInterval = computed(() => {
-    const mktStatus = this.currentMarketStatus();
-    if (!mktStatus) return 12000; // 12s default
-    if (!mktStatus.is_open) return 300000; // 5min if closed
-    if (mktStatus.status === 'TRADEABLE') return 12000; // 12s if open
-    return 60000; // 1min if suspended
-  });
+  // Polling interval based on trading status (10s active, 60s idle)
+  readonly pollingInterval = computed(() =>
+    this.trading.paperStatus()?.running ? 10_000 : 60_000
+  );
 
   // Signal/Trade conversion rate
   readonly conversionRate = computed(() => {
@@ -858,7 +854,7 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     }));
   });
 
-  private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private pollTimer: ReturnType<typeof setTimeout> | null = null;
 
   ngOnInit(): void {
     this.startSmartPolling();
@@ -867,7 +863,7 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.pollTimer) {
-      clearInterval(this.pollTimer);
+      clearTimeout(this.pollTimer);
       this.pollTimer = null;
     }
   }
@@ -889,15 +885,12 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
       try {
         const mktStatus = await this.marketStatus.getMarketStatus(epic);
         this.currentMarketStatus.set(mktStatus);
-
-        // Only load data if market is open
-        if (mktStatus.is_open) {
-          this.loadAll();
-        }
+        this.loadAll();
       } catch (error) {
         // polling error — continue
       }
 
+      // Schedule next poll: 10s when trading active, 60s when idle
       this.pollTimer = setTimeout(() => poll(), this.pollingInterval());
     };
 

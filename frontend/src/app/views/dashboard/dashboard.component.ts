@@ -203,14 +203,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return rs ? Math.min(rs.current_drawdown_pct * 100, 100) : 0;
   });
 
-  // Polling interval based on market status (12s open, 5min closed)
-  readonly pollingInterval = computed(() => {
-    const status = this.currentMarketStatus();
-    if (!status) return 30000; // 30s default
-    if (!status.is_open) return 300000; // 5min if closed
-    if (status.status === 'TRADEABLE') return 12000; // 12s if open
-    return 60000; // 1min if suspended
-  });
+  // Polling interval based on trading status (10s active, 60s idle)
+  readonly pollingInterval = computed(() =>
+    this.trading.paperStatus()?.running ? 10_000 : 60_000
+  );
 
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private newsTimer: ReturnType<typeof setInterval> | null = null;
@@ -252,16 +248,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
       try {
         const status = await this.marketStatus.getMarketStatus(epic);
         this.currentMarketStatus.set(status);
-
-        // Only load data if market is open, otherwise keep last available data
-        if (status.is_open) {
-          this.loadAll();
-        }
+        this.loadAll();
       } catch (error) {
         // polling error — continue
       }
 
-      // Schedule next poll with dynamic interval
+      // Schedule next poll: 10s when trading active, 60s when idle
       this.pollTimer = setTimeout(() => poll(), this.pollingInterval());
     };
 

@@ -455,7 +455,7 @@ export class PositionsComponent implements OnInit, OnDestroy {
   private readonly ws = inject(WebSocketService);
   private readonly toast = inject(ToastService);
   private readonly auditService = inject(SignalAuditService);
-  private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private pollTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly assets = TRADABLE_ASSETS;
   readonly activeTab = signal<Tab>('open');
@@ -499,16 +499,23 @@ export class PositionsComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.trading.loadPaperPositions();
     this.ws.connectPrices();
-    this.pollTimer = setInterval(() => {
-      this.trading.loadPaperPositions();
-    }, 10_000);
+    this.startSmartPolling();
   }
 
   ngOnDestroy(): void {
     if (this.pollTimer) {
-      clearInterval(this.pollTimer);
+      clearTimeout(this.pollTimer);
       this.pollTimer = null;
     }
+  }
+
+  private startSmartPolling(): void {
+    const poll = () => {
+      this.trading.loadPaperPositions();
+      const interval = this.trading.paperStatus()?.running ? 10_000 : 60_000;
+      this.pollTimer = setTimeout(poll, interval);
+    };
+    poll();
   }
 
   switchTab(tab: Tab): void {
