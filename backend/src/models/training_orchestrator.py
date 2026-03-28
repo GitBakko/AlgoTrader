@@ -4,11 +4,11 @@ hot-reload into PredictionService, and alert/WebSocket notifications.
 """
 
 import asyncio
-import time
+from collections.abc import Callable, Coroutine
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Coroutine
+from typing import Any
 
 from loguru import logger
 
@@ -88,20 +88,16 @@ class TrainingOrchestrator:
             "summary": {
                 "total": len(self._jobs),
                 "queued": sum(
-                    1 for j in self._jobs.values()
-                    if j.status == TrainingJobStatus.QUEUED
+                    1 for j in self._jobs.values() if j.status == TrainingJobStatus.QUEUED
                 ),
                 "running": sum(
-                    1 for j in self._jobs.values()
-                    if j.status == TrainingJobStatus.RUNNING
+                    1 for j in self._jobs.values() if j.status == TrainingJobStatus.RUNNING
                 ),
                 "completed": sum(
-                    1 for j in self._jobs.values()
-                    if j.status == TrainingJobStatus.COMPLETED
+                    1 for j in self._jobs.values() if j.status == TrainingJobStatus.COMPLETED
                 ),
                 "failed": sum(
-                    1 for j in self._jobs.values()
-                    if j.status == TrainingJobStatus.FAILED
+                    1 for j in self._jobs.values() if j.status == TrainingJobStatus.FAILED
                 ),
             },
         }
@@ -140,10 +136,7 @@ class TrainingOrchestrator:
         await self._broadcast_status()
 
         # Launch all training tasks (semaphore limits concurrency)
-        tasks = [
-            self._train_one(epic, semaphore, timeframe, config)
-            for epic in epics
-        ]
+        tasks = [self._train_one(epic, semaphore, timeframe, config) for epic in epics]
         await asyncio.gather(*tasks, return_exceptions=True)
 
         self._running = False
@@ -195,9 +188,7 @@ class TrainingOrchestrator:
 
                 # Fire training complete alert
                 duration_s = (
-                    (job.completed_at - job.started_at).total_seconds()
-                    if job.started_at
-                    else 0.0
+                    (job.completed_at - job.started_at).total_seconds() if job.started_at else 0.0
                 )
                 if self._alert_manager:
                     try:
@@ -208,9 +199,7 @@ class TrainingOrchestrator:
                             duration_s=duration_s,
                         )
                     except Exception as e:
-                        logger.warning(
-                            f"Failed to send training complete alert for {epic}: {e}"
-                        )
+                        logger.warning(f"Failed to send training complete alert for {epic}: {e}")
 
                 logger.info(
                     f"Training completed for {epic}: "
@@ -231,15 +220,11 @@ class TrainingOrchestrator:
                     try:
                         await self._alert_manager.alert_training_failed(epic, str(e))
                     except Exception as ae:
-                        logger.warning(
-                            f"Failed to send training failed alert for {epic}: {ae}"
-                        )
+                        logger.warning(f"Failed to send training failed alert for {epic}: {ae}")
 
             await self._broadcast_status()
 
-    async def _run_training(
-        self, epic: str, timeframe: str, config: dict
-    ) -> dict:
+    async def _run_training(self, epic: str, timeframe: str, config: dict) -> dict:
         """
         Execute the actual training in a thread pool.
 
@@ -270,9 +255,7 @@ class TrainingOrchestrator:
             # Extract metrics from TrainingResult
             metrics: dict[str, Any] = {
                 "f1": result.best_f1 if hasattr(result, "best_f1") else 0.0,
-                "accuracy": (
-                    result.best_accuracy if hasattr(result, "best_accuracy") else 0.0
-                ),
+                "accuracy": (result.best_accuracy if hasattr(result, "best_accuracy") else 0.0),
                 "num_folds": len(result.folds) if hasattr(result, "folds") else 0,
             }
 
@@ -302,8 +285,6 @@ class TrainingOrchestrator:
         if self._ws_broadcast:
             try:
                 status = self.get_status()
-                await self._ws_broadcast(
-                    {"type": "training_status", "data": status}
-                )
+                await self._ws_broadcast({"type": "training_status", "data": status})
             except Exception as e:
                 logger.debug(f"WebSocket broadcast failed: {e}")

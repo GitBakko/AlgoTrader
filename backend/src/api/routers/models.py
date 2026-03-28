@@ -483,11 +483,13 @@ async def start_training(request: Request):
 
     asyncio.create_task(orch.train_epics(epics, timeframe, config))
 
-    return success_response({
-        "message": f"Training started for {len(epics)} epics",
-        "epics": epics,
-        "timeframe": timeframe,
-    })
+    return success_response(
+        {
+            "message": f"Training started for {len(epics)} epics",
+            "epics": epics,
+            "timeframe": timeframe,
+        }
+    )
 
 
 @router.post("/training/start/{epic}")
@@ -503,7 +505,9 @@ async def start_training_single(request: Request, epic: str):
 
     asyncio.create_task(orch.train_epics([epic]))
 
-    return success_response({
-        "message": f"Training started for {epic}",
-        "epic": epic,
-    })
+    return success_response(
+        {
+            "message": f"Training started for {epic}",
+            "epic": epic,
+        }
+    )

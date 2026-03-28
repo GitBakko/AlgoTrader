@@ -55,9 +55,9 @@ ALERT_EMOJI: dict[str, str] = {
     AlertType.SYSTEM_ERROR: "💥",
     AlertType.BACKUP_START: "📦",
     AlertType.BACKUP_COMPLETE: "✅",
-    AlertType.TRAINING_STARTED: "\U0001f3cb",   # weight lifter
-    AlertType.TRAINING_COMPLETE: "\u2705",       # check mark
-    AlertType.TRAINING_FAILED: "\u274c",         # cross mark
+    AlertType.TRAINING_STARTED: "\U0001f3cb",  # weight lifter
+    AlertType.TRAINING_COMPLETE: "\u2705",  # check mark
+    AlertType.TRAINING_FAILED: "\u274c",  # cross mark
 }
 
 # Severity fallback (used only when alert_type not in ALERT_EMOJI)

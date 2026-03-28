@@ -9,10 +9,11 @@ Standard column schema (Polars):
     volume     : Float64
     epic       : Utf8
 """
+
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -115,9 +116,7 @@ class ExtendedDataProvider:
         # Flatten multi-level columns if present
         if isinstance(df_pd.columns, pd.MultiIndex):
             df_pd = df_pd.copy()
-            df_pd.columns = [
-                c[0] if isinstance(c, tuple) else c for c in df_pd.columns
-            ]
+            df_pd.columns = [c[0] if isinstance(c, tuple) else c for c in df_pd.columns]
 
         # Ensure the index is named and timezone-aware
         df_pd = df_pd.copy()
@@ -228,18 +227,14 @@ class ExtendedDataProvider:
             }
         """
         if raw.get("Response") != "Success":
-            logger.warning(
-                "_normalize_cryptocompare: non-success response: {}", raw.get("Message")
-            )
+            logger.warning("_normalize_cryptocompare: non-success response: {}", raw.get("Message"))
             return _empty_df()
 
         bars: list[dict] = raw.get("Data", {}).get("Data", [])
         if not bars:
             return _empty_df()
 
-        timestamps = [
-            datetime.fromtimestamp(b["time"], tz=timezone.utc) for b in bars
-        ]
+        timestamps = [datetime.fromtimestamp(b["time"], tz=UTC) for b in bars]
 
         pl_df = pl.DataFrame(
             {
@@ -251,7 +246,9 @@ class ExtendedDataProvider:
                 "volume": [float(b["volumefrom"]) for b in bars],
                 "epic": [epic] * len(bars),
             }
-        ).with_columns(pl.col("timestamp").dt.replace_time_zone("UTC").cast(pl.Datetime("us", "UTC")))
+        ).with_columns(
+            pl.col("timestamp").dt.replace_time_zone("UTC").cast(pl.Datetime("us", "UTC"))
+        )
 
         return pl_df.select(_COLUMNS)
 
@@ -294,9 +291,7 @@ class ExtendedDataProvider:
     # Merge / dedup helper
     # ------------------------------------------------------------------
 
-    def merge_with_existing(
-        self, existing: pl.DataFrame, extended: pl.DataFrame
-    ) -> pl.DataFrame:
+    def merge_with_existing(self, existing: pl.DataFrame, extended: pl.DataFrame) -> pl.DataFrame:
         """Concatenate two DataFrames, deduplicate on timestamp, and sort ascending.
 
         Both DataFrames must share the standard OHLCV schema.

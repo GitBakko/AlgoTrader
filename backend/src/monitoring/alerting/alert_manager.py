@@ -305,7 +305,11 @@ class AlertManager:
         await self.send_alert(alert)
 
     async def alert_training_complete(
-        self, epic: str, f1: float, accuracy: float, duration_s: float,
+        self,
+        epic: str,
+        f1: float,
+        accuracy: float,
+        duration_s: float,
     ) -> None:
         """Send training complete alert."""
         alert = Alert(
