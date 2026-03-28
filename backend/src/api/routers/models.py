@@ -2,13 +2,15 @@
 Models API router.
 Provides ML model information, performance metrics, and version history.
 Dual-mode: uses ModelVersioning from filesystem when available, falls back to static registry.
+Also exposes extended data download endpoints for the Training Dashboard.
 """
 
+import asyncio
 import subprocess
 import sys
 from pathlib import Path as FilePath
 
-from fastapi import APIRouter, Depends, Path, Request
+from fastapi import APIRouter, Depends, Path, Query, Request
 from loguru import logger
 
 from src.api.dependencies import get_model_versioning, get_prediction_service
@@ -509,5 +511,82 @@ async def start_training_single(request: Request, epic: str):
         {
             "message": f"Training started for {epic}",
             "epic": epic,
+        }
+    )
+
+
+# ──────────────────────────────────────────────────────────────────
+# Extended data download endpoints
+# ──────────────────────────────────────────────────────────────────
+
+
+@router.post("/data/download-extended/{epic}")
+async def download_extended_data(
+    request: Request,
+    epic: str = Path(...),
+    days_back: int = Query(730, ge=1, le=3650),
+):
+    """Download extended historical data for an epic from free APIs.
+
+    Runs in background and returns immediately.
+    """
+    from src.data.extended_data_provider import ExtendedDataProvider
+
+    storage = getattr(request.app.state, "storage", None)
+
+    provider = ExtendedDataProvider()
+
+    async def _download():
+        try:
+            result = await provider.download_and_store(epic, days_back=days_back, storage=storage)
+            logger.info("Extended download complete: {}", result)
+        except Exception as exc:
+            logger.error("Extended download failed for {}: {}", epic, exc)
+
+    asyncio.create_task(_download(), name=f"download_extended_{epic}")
+
+    return success_response(
+        {
+            "message": f"Download avviato per {epic} ({days_back} giorni)",
+            "epic": epic,
+            "days_back": days_back,
+            "source": provider.get_best_source(epic),
+        }
+    )
+
+
+@router.post("/data/download-extended")
+async def download_extended_all(
+    request: Request,
+    days_back: int = Query(730, ge=1, le=3650),
+):
+    """Download extended data for all tradable assets (background)."""
+    from src.data.extended_data_provider import ExtendedDataProvider
+    from src.utils.constants import TRADABLE_ASSETS
+
+    storage = getattr(request.app.state, "storage", None)
+
+    provider = ExtendedDataProvider()
+    epics = list(TRADABLE_ASSETS)
+
+    async def _download_all():
+        results = []
+        for ep in epics:
+            try:
+                r = await provider.download_and_store(ep, days_back=days_back, storage=storage)
+                results.append(r)
+                logger.info("Extended download done: {}", r)
+            except Exception as exc:
+                logger.error("Extended download failed for {}: {}", ep, exc)
+                results.append({"epic": ep, "bars_fetched": 0, "bars_new": 0, "error": str(exc)})
+        logger.info("Extended download-all complete: {} epics processed", len(results))
+
+    asyncio.create_task(_download_all(), name="download_extended_all")
+
+    return success_response(
+        {
+            "message": f"Download avviato per {len(epics)} asset ({days_back} giorni)",
+            "epics": epics,
+            "days_back": days_back,
         }
     )

@@ -1,8 +1,8 @@
 """Tests for ExtendedDataProvider — no external API calls (all mocked)."""
+
 from __future__ import annotations
 
-import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pandas as pd
@@ -11,10 +11,10 @@ import pytest
 
 from src.data.extended_data_provider import ExtendedDataProvider
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_yfinance_df() -> pd.DataFrame:
     """Create a minimal pandas DataFrame that mimics yfinance output."""
@@ -83,6 +83,7 @@ def _make_cryptocompare_response() -> dict:
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 class TestNormalizeYfinance:
     def test_columns_present(self):
@@ -167,8 +168,8 @@ class TestNormalizeCryptoCompare:
         provider = ExtendedDataProvider()
         raw = _make_cryptocompare_response()
         result = provider._normalize_cryptocompare(raw, "BTCUSD")
-        expected_ts = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
-        first_ts = result["timestamp"][0].replace(tzinfo=timezone.utc)
+        expected_ts = datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC)
+        first_ts = result["timestamp"][0].replace(tzinfo=UTC)
         assert first_ts == expected_ts
 
     def test_ohlcv_values(self):
@@ -199,10 +200,7 @@ class TestNormalizeCryptoCompare:
 
 class TestMergeWithExisting:
     def _make_polars_df(self, timestamps: list[str], epic: str = "XAUUSD") -> pl.DataFrame:
-        ts_list = [
-            datetime.fromisoformat(t).replace(tzinfo=timezone.utc)
-            for t in timestamps
-        ]
+        ts_list = [datetime.fromisoformat(t).replace(tzinfo=UTC) for t in timestamps]
         return pl.DataFrame(
             {
                 "timestamp": ts_list,
@@ -322,8 +320,8 @@ class TestFetchYfinanceAsync:
         mock_ticker.history.return_value = df_pd
 
         with patch("src.data.extended_data_provider.yf.Ticker", return_value=mock_ticker):
-            start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+            start = datetime(2024, 1, 1, tzinfo=UTC)
+            end = datetime(2024, 1, 2, tzinfo=UTC)
             result = await provider.fetch_yfinance("XAUUSD", start, end)
 
         assert isinstance(result, pl.DataFrame)
@@ -334,8 +332,8 @@ class TestFetchYfinanceAsync:
     async def test_fetch_yfinance_unknown_epic_returns_empty(self):
         """fetch_yfinance should return an empty DataFrame for unmapped epics."""
         provider = ExtendedDataProvider()
-        start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-        end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+        start = datetime(2024, 1, 1, tzinfo=UTC)
+        end = datetime(2024, 1, 2, tzinfo=UTC)
         result = await provider.fetch_yfinance("UNKNOWN_EPIC", start, end)
         assert isinstance(result, pl.DataFrame)
         assert len(result) == 0
@@ -387,8 +385,8 @@ class TestFetchExtended:
         mock_client.__aexit__ = AsyncMock(return_value=False)
         mock_client.get = AsyncMock(return_value=mock_response)
 
-        start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-        end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+        start = datetime(2024, 1, 1, tzinfo=UTC)
+        end = datetime(2024, 1, 2, tzinfo=UTC)
 
         with patch("src.data.extended_data_provider.httpx.AsyncClient", return_value=mock_client):
             result = await provider.fetch_extended("BTCUSD", start, end)
@@ -404,11 +402,206 @@ class TestFetchExtended:
         mock_ticker = MagicMock()
         mock_ticker.history.return_value = df_pd
 
-        start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-        end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+        start = datetime(2024, 1, 1, tzinfo=UTC)
+        end = datetime(2024, 1, 2, tzinfo=UTC)
 
         with patch("src.data.extended_data_provider.yf.Ticker", return_value=mock_ticker):
             result = await provider.fetch_extended("XAUUSD", start, end)
 
         assert isinstance(result, pl.DataFrame)
         assert len(result) == 3
+
+
+# ---------------------------------------------------------------------------
+# CryptoCompare pagination tests
+# ---------------------------------------------------------------------------
+
+
+def _make_cc_page(base_ts: int, count: int = 3, epic: str = "BTCUSD") -> dict:
+    """Build a CryptoCompare response with `count` bars starting at `base_ts`."""
+    bars = []
+    for i in range(count):
+        t = base_ts + i * 3600  # 1 hour apart
+        bars.append(
+            {
+                "time": t,
+                "open": 40000.0 + i,
+                "high": 41000.0 + i,
+                "low": 39000.0 + i,
+                "close": 40500.0 + i,
+                "volumefrom": 100.0 + i,
+                "volumeto": 4000000.0,
+            }
+        )
+    return {"Response": "Success", "Data": {"Data": bars}}
+
+
+class TestCryptoCompareExtended:
+    @pytest.mark.asyncio
+    async def test_pagination_multiple_pages(self):
+        """Should make multiple requests when days_back requires > 2000 bars."""
+        provider = ExtendedDataProvider()
+
+        now = datetime.now(UTC)
+        now_ts = int(now.timestamp())
+
+        # Page 0: most recent 3 bars
+        page0 = _make_cc_page(now_ts - 3 * 3600, count=3)
+        # Page 1: earlier 3 bars
+        page1 = _make_cc_page(now_ts - 6 * 3600, count=3)
+        # Page 2: empty — signals end
+        page2 = {"Response": "Success", "Data": {"Data": []}}
+
+        call_count = 0
+
+        async def mock_get(url, params=None):
+            nonlocal call_count
+            pages = [page0, page1, page2]
+            resp = MagicMock()
+            resp.json.return_value = pages[min(call_count, len(pages) - 1)]
+            resp.raise_for_status = MagicMock()
+            call_count += 1
+            return resp
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = mock_get
+
+        with patch(
+            "src.data.extended_data_provider.httpx.AsyncClient",
+            return_value=mock_client,
+        ):
+            result = await provider.fetch_cryptocompare_extended("BTCUSD", days_back=1)
+
+        assert result is not None
+        assert isinstance(result, pl.DataFrame)
+        # Should have fetched at least 2 pages before hitting empty
+        assert call_count >= 2
+        # All rows should be unique
+        assert len(result) == result.unique(subset=["timestamp"]).height
+
+    @pytest.mark.asyncio
+    async def test_non_crypto_returns_none(self):
+        provider = ExtendedDataProvider()
+        result = await provider.fetch_cryptocompare_extended("XAUUSD", days_back=30)
+        assert result is None
+
+
+class TestYfinanceExtended:
+    @pytest.mark.asyncio
+    async def test_uses_hourly_for_short_period(self):
+        provider = ExtendedDataProvider()
+        df_pd = _make_yfinance_df()
+        mock_ticker = MagicMock()
+        mock_ticker.history.return_value = df_pd
+
+        with patch("src.data.extended_data_provider.yf.Ticker", return_value=mock_ticker):
+            result = await provider.fetch_yfinance_extended("XAUUSD", days_back=365)
+
+        assert result is not None
+        assert len(result) == 3
+        # Verify interval was "1h" (default for <= 730 days)
+        call_kwargs = mock_ticker.history.call_args
+        assert call_kwargs[1]["interval"] == "1h"
+
+    @pytest.mark.asyncio
+    async def test_uses_daily_for_long_period(self):
+        provider = ExtendedDataProvider()
+        df_pd = _make_yfinance_df()
+        mock_ticker = MagicMock()
+        mock_ticker.history.return_value = df_pd
+
+        with patch("src.data.extended_data_provider.yf.Ticker", return_value=mock_ticker):
+            result = await provider.fetch_yfinance_extended("XAUUSD", days_back=1000)
+
+        assert result is not None
+        call_kwargs = mock_ticker.history.call_args
+        assert call_kwargs[1]["interval"] == "1d"
+
+    @pytest.mark.asyncio
+    async def test_unknown_epic_returns_none(self):
+        provider = ExtendedDataProvider()
+        result = await provider.fetch_yfinance_extended("UNKNOWN_EPIC", days_back=30)
+        assert result is None
+
+
+class TestDownloadAndStore:
+    @pytest.mark.asyncio
+    async def test_merges_with_storage(self):
+        """download_and_store should call storage.append_candles with OHLCBar list."""
+        provider = ExtendedDataProvider()
+        df_pd = _make_yfinance_df()
+        mock_ticker = MagicMock()
+        mock_ticker.history.return_value = df_pd
+
+        mock_storage = MagicMock()
+        mock_storage.append_candles.return_value = 3  # 3 new bars
+
+        with patch("src.data.extended_data_provider.yf.Ticker", return_value=mock_ticker):
+            result = await provider.download_and_store("XAUUSD", days_back=30, storage=mock_storage)
+
+        assert result["epic"] == "XAUUSD"
+        assert result["source"] == "yfinance"
+        assert result["bars_fetched"] == 3
+        assert result["bars_new"] == 3
+        mock_storage.append_candles.assert_called_once()
+        # Verify OHLCBar objects were passed
+        candles = mock_storage.append_candles.call_args[0][0]
+        assert len(candles) == 3
+        from src.data.models import OHLCBar
+
+        assert isinstance(candles[0], OHLCBar)
+
+    @pytest.mark.asyncio
+    async def test_no_storage_returns_stats_only(self):
+        """Without storage, should still return fetch stats."""
+        provider = ExtendedDataProvider()
+        df_pd = _make_yfinance_df()
+        mock_ticker = MagicMock()
+        mock_ticker.history.return_value = df_pd
+
+        with patch("src.data.extended_data_provider.yf.Ticker", return_value=mock_ticker):
+            result = await provider.download_and_store("XAUUSD", days_back=30, storage=None)
+
+        assert result["bars_fetched"] == 3
+        assert result["bars_new"] == 0
+
+    @pytest.mark.asyncio
+    async def test_crypto_uses_cryptocompare(self):
+        """download_and_store should route crypto to CryptoCompare."""
+        provider = ExtendedDataProvider()
+
+        now_ts = int(datetime.now(UTC).timestamp())
+        page0 = _make_cc_page(now_ts - 3 * 3600, count=2)
+        # Second page empty to stop pagination
+        page1 = {"Response": "Success", "Data": {"Data": []}}
+
+        call_idx = 0
+
+        async def mock_get(url, params=None):
+            nonlocal call_idx
+            pages = [page0, page1]
+            resp = MagicMock()
+            resp.json.return_value = pages[min(call_idx, len(pages) - 1)]
+            resp.raise_for_status = MagicMock()
+            call_idx += 1
+            return resp
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = mock_get
+
+        mock_storage = MagicMock()
+        mock_storage.append_candles.return_value = 2
+
+        with patch(
+            "src.data.extended_data_provider.httpx.AsyncClient",
+            return_value=mock_client,
+        ):
+            result = await provider.download_and_store("BTCUSD", days_back=1, storage=mock_storage)
+
+        assert result["source"] == "cryptocompare"
+        assert result["bars_fetched"] >= 1
+        mock_storage.append_candles.assert_called_once()

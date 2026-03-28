@@ -13,8 +13,8 @@ Standard column schema (Polars):
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
-from typing import Any
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Any
 
 import httpx
 import polars as pl
@@ -22,6 +22,9 @@ import yfinance as yf
 from loguru import logger
 
 from src.data.ticker_mapping import TickerMapper
+
+if TYPE_CHECKING:
+    from src.data.storage import ParquetStorageManager
 
 # CryptoCompare free-tier endpoint (no API key required, 2000 bars per request)
 _CC_BASE = "https://min-api.cryptocompare.com/data/v2/histohour"
@@ -286,6 +289,189 @@ class ExtendedDataProvider:
             return await self.fetch_cryptocompare(epic, limit=limit)
         else:
             return await self.fetch_yfinance(epic, start, end, interval=interval)
+
+    # ------------------------------------------------------------------
+    # CryptoCompare paginated (multi-year)
+    # ------------------------------------------------------------------
+
+    async def fetch_cryptocompare_extended(
+        self,
+        epic: str,
+        days_back: int = 730,
+    ) -> pl.DataFrame | None:
+        """Fetch multi-year hourly data from CryptoCompare via backward pagination.
+
+        CryptoCompare free tier: max 2000 bars per request.
+        For 2 years of hourly data = ~17,520 bars = ~9 requests.
+
+        Args:
+            epic: Capital.com epic (e.g. "BTCUSD").
+            days_back: How many days of history to fetch (default 730 = ~2 years).
+
+        Returns:
+            Combined Polars DataFrame or None on total failure.
+        """
+        mapping = TickerMapper.to_cryptocompare(epic)
+        if mapping is None:
+            logger.debug("fetch_cryptocompare_extended: {} is not a crypto epic", epic)
+            return None
+
+        cutoff = datetime.now(UTC) - timedelta(days=days_back)
+        cutoff_ts = int(cutoff.timestamp())
+
+        all_pages: list[pl.DataFrame] = []
+        to_ts: int | None = None
+        max_pages = (days_back * 24 // 2000) + 2  # safety limit
+
+        for page_num in range(max_pages):
+            page = await self.fetch_cryptocompare(epic, limit=2000, to_ts=to_ts)
+            if page.is_empty():
+                logger.debug("fetch_cryptocompare_extended: empty page {} for {}", page_num, epic)
+                break
+
+            all_pages.append(page)
+
+            # Earliest timestamp in this page becomes the upper bound for next request
+            earliest_ts = page["timestamp"].min()
+            if earliest_ts is None:
+                break
+            earliest_unix = int(earliest_ts.replace(tzinfo=UTC).timestamp())
+
+            # Stop if we've reached far enough back
+            if earliest_unix <= cutoff_ts:
+                logger.debug("fetch_cryptocompare_extended: reached cutoff at page {}", page_num)
+                break
+
+            # Next page ends just before the earliest bar we got
+            to_ts = earliest_unix - 1
+
+        if not all_pages:
+            return None
+
+        combined = pl.concat(all_pages, how="diagonal")
+        # Dedup and filter to requested range
+        combined = combined.unique(subset=["timestamp"], keep="first")
+        combined = combined.filter(pl.col("timestamp") >= cutoff)
+        combined = combined.sort("timestamp")
+
+        logger.info(
+            "fetch_cryptocompare_extended: {} — {} bars over {} pages",
+            epic,
+            len(combined),
+            len(all_pages),
+        )
+        return combined
+
+    # ------------------------------------------------------------------
+    # yfinance extended (auto-interval selection)
+    # ------------------------------------------------------------------
+
+    async def fetch_yfinance_extended(
+        self,
+        epic: str,
+        days_back: int = 730,
+    ) -> pl.DataFrame | None:
+        """Fetch extended data from yfinance, auto-selecting best interval.
+
+        yfinance limits hourly data to ~730 days. For longer periods this
+        method fetches daily bars and returns them as-is (the caller can
+        resample if needed).
+
+        Args:
+            epic: Capital.com epic (e.g. "XAUUSD").
+            days_back: How many days of history to fetch.
+
+        Returns:
+            Polars DataFrame or None on failure.
+        """
+        ticker_sym = TickerMapper.to_yfinance(epic)
+        if ticker_sym is None:
+            logger.warning("fetch_yfinance_extended: no yfinance mapping for {}", epic)
+            return None
+
+        # yfinance hourly limit is ~730 days
+        if days_back <= 730:
+            interval = "1h"
+        else:
+            interval = "1d"
+
+        end = datetime.now(UTC)
+        start = end - timedelta(days=days_back)
+
+        result = await self.fetch_yfinance(epic, start, end, interval=interval)
+        if result.is_empty():
+            return None
+
+        logger.info(
+            "fetch_yfinance_extended: {} — {} bars (interval={})",
+            epic,
+            len(result),
+            interval,
+        )
+        return result
+
+    # ------------------------------------------------------------------
+    # Unified download + store
+    # ------------------------------------------------------------------
+
+    async def download_and_store(
+        self,
+        epic: str,
+        days_back: int = 730,
+        storage: ParquetStorageManager | None = None,
+    ) -> dict:
+        """Download extended data and optionally merge with Parquet storage.
+
+        Args:
+            epic: Capital.com epic.
+            days_back: Days of history to fetch.
+            storage: If provided, append fetched data to Parquet files.
+
+        Returns:
+            Dict with keys: epic, bars_fetched, bars_new, source.
+        """
+        source = self.get_best_source(epic)
+
+        if source == "cryptocompare":
+            df = await self.fetch_cryptocompare_extended(epic, days_back=days_back)
+        else:
+            df = await self.fetch_yfinance_extended(epic, days_back=days_back)
+
+        bars_fetched = len(df) if df is not None else 0
+        bars_new = 0
+
+        if df is not None and not df.is_empty() and storage is not None:
+            from src.data.models import DataSource, OHLCBar
+
+            candles: list[OHLCBar] = []
+            for row in df.iter_rows(named=True):
+                ts = row["timestamp"]
+                # Ensure timezone-aware
+                if hasattr(ts, "tzinfo") and ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=UTC)
+                vol_raw = row.get("volume")
+                vol = int(vol_raw) if vol_raw is not None and vol_raw == vol_raw else 0
+                candles.append(
+                    OHLCBar(
+                        timestamp=ts,
+                        open=row["open"],
+                        high=row["high"],
+                        low=row["low"],
+                        close=row["close"],
+                        volume=vol,
+                        epic=epic,
+                        timeframe="1h",
+                        source=DataSource.HISTORICAL,
+                    )
+                )
+            bars_new = storage.append_candles(candles, epic, "1h")
+
+        return {
+            "epic": epic,
+            "bars_fetched": bars_fetched,
+            "bars_new": bars_new,
+            "source": source,
+        }
 
     # ------------------------------------------------------------------
     # Merge / dedup helper
