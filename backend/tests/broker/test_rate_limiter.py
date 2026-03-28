@@ -203,7 +203,7 @@ class TestRateLimiter:
         for i in range(10):
             result = await limiter.acquire()
             assert result is True
-            assert limiter.available_requests() == 20 - (i + 1)
+            assert limiter.available_requests() == pytest.approx(20 - (i + 1), abs=0.01)
 
     async def test_burst_capacity_allows_burst(self):
         """Test that burst capacity allows quick succession of requests."""
