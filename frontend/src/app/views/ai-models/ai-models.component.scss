@@ -26,21 +26,13 @@
   }
 
   // Progress bar heights
-  .am-progress-sm {
-    height: 6px;
-  }
+  .am-progress-sm { height: 6px; }
+  .am-progress-xs { height: 4px; }
 
-  .am-progress-xs {
-    height: 4px;
-  }
-
-  // Scoped modal
+  // ── Scoped modal ──────────────────────────
   .am-modal-backdrop {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    top: 0; left: 0; right: 0; bottom: 0;
     z-index: 1050;
     background: rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(4px);
@@ -53,7 +45,7 @@
     width: 90%;
     max-width: 800px;
     max-height: 80vh;
-    border-radius: var(--mantis-radius-md, 8px);
+    border-radius: 8px;
     border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.1));
     background: var(--cui-card-bg, var(--mantis-surface-1, #0d1117));
     overflow: hidden;
@@ -87,17 +79,89 @@
       color: var(--mantis-text-muted, rgba(255, 255, 255, 0.5));
       font-size: 1.25rem;
       cursor: pointer;
-      padding: 0.25rem;
+      padding: 0.5rem;
+      min-width: 44px;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       line-height: 1;
       transition: color 0.15s ease;
 
-      &:hover {
-        color: var(--mantis-text-primary, white);
-      }
+      &:hover { color: var(--mantis-text-primary, white); }
     }
   }
 
-  // Training job cards
+  // ── Model info hover card ─────────────────
+  .model-info-trigger {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: help;
+    color: var(--cui-body-color);
+    opacity: 0.4;
+    transition: opacity 0.15s ease;
+
+    &:hover { opacity: 1; }
+  }
+
+  .model-hover-card {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    right: -8px;
+    z-index: 1040;
+    min-width: 210px;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    background: var(--mantis-surface-4, #21262d);
+    border: 1px solid var(--mantis-border-accent, rgba(0, 217, 126, 0.15));
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+    font-size: 0.75rem;
+    line-height: 1;
+    pointer-events: none;
+    animation: hoverCardIn 0.12s ease-out;
+    white-space: nowrap;
+
+    // Arrow pointing down
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: -5px;
+      right: 10px;
+      width: 8px;
+      height: 8px;
+      background: var(--mantis-surface-4, #21262d);
+      border-right: 1px solid var(--mantis-border-accent, rgba(0, 217, 126, 0.15));
+      border-bottom: 1px solid var(--mantis-border-accent, rgba(0, 217, 126, 0.15));
+      transform: rotate(45deg);
+    }
+
+    &__row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.3rem 0;
+
+      & + & {
+        border-top: 1px solid var(--mantis-border-subtle, rgba(255, 255, 255, 0.06));
+      }
+    }
+
+    &__label {
+      color: var(--mantis-neutral, #8B949E);
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+  }
+
+  @keyframes hoverCardIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  // ── Training job cards ────────────────────
   .training-job-card {
     padding: 0.75rem;
     border-radius: 8px;
@@ -111,7 +175,7 @@
     &--failed { border-left: 3px solid var(--mantis-loss, #FF3D57); }
   }
 
-  // Advanced training config
+  // ── Advanced config ───────────────────────
   .advanced-config {
     background: var(--cui-tertiary-bg, var(--mantis-surface-3, #1c2128));
     border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.10));
@@ -135,34 +199,15 @@
     transition: border-color 0.15s ease, background 0.15s ease;
     user-select: none;
 
-    &:hover {
-      border-color: var(--mantis-border-strong, rgba(0, 217, 126, 0.30));
-    }
-
+    &:hover { border-color: var(--mantis-border-strong, rgba(0, 217, 126, 0.30)); }
     &--selected {
       border-color: var(--mantis-green, #00d97e);
       background: rgba(0, 217, 126, 0.08);
     }
   }
 
-  // Mobile table min-width
+  // ── Mobile ────────────────────────────────
   @media (max-width: 991.98px) {
-    table[cTable] {
-      min-width: 560px;
-    }
-  }
-
-  // Training job cards
-  .training-job-card {
-    padding: 0.75rem;
-    border-radius: 8px;
-    border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.10));
-    background: var(--cui-card-bg);
-    transition: border-color 0.2s ease;
-
-    &--queued { border-left: 3px solid var(--mantis-neutral, #8B949E); }
-    &--running { border-left: 3px solid var(--mantis-cyan, #00E5FF); }
-    &--completed { border-left: 3px solid var(--mantis-profit, #39FF14); }
-    &--failed { border-left: 3px solid var(--mantis-loss, #FF3D57); }
+    table[cTable] { min-width: 560px; }
   }
 }

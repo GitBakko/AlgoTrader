@@ -344,10 +344,34 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
                       <td class="small d-mobile-none">
                         @if (item.lastTrained) {
                           <span class="text-body-secondary">{{ item.lastTrained | date:'dd/MM HH:mm' }}</span>
-                          <span class="ms-1 text-body-secondary"
-                                [cTooltip]="'v' + item.version + ' | F1: ' + (item.f1 | number:'1.4-4') + ' | Acc: ' + (item.accuracy | number:'1.4-4') + ' | Feat: ' + item.numFeatures"
-                                style="cursor: help;">
+                          <span class="model-info-trigger ms-1"
+                                (mouseenter)="hoverEpic.set(item.epic)"
+                                (mouseleave)="hoverEpic.set(null)">
                             <svg cIcon name="cilInfo" size="sm"></svg>
+                            @if (hoverEpic() === item.epic) {
+                              <div class="model-hover-card">
+                                <div class="model-hover-card__row">
+                                  <span class="model-hover-card__label">Versione</span>
+                                  <span class="mantis-mono">{{ item.version }}</span>
+                                </div>
+                                <div class="model-hover-card__row">
+                                  <span class="model-hover-card__label">F1 Macro</span>
+                                  <span class="mantis-mono" [class.text-success]="item.f1 >= 0.5" [class.text-warning]="item.f1 > 0 && item.f1 < 0.5">{{ item.f1 | number:'1.4-4' }}</span>
+                                </div>
+                                <div class="model-hover-card__row">
+                                  <span class="model-hover-card__label">Accuracy</span>
+                                  <span class="mantis-mono">{{ (item.accuracy * 100) | number:'1.1-1' }}%</span>
+                                </div>
+                                <div class="model-hover-card__row">
+                                  <span class="model-hover-card__label">Features</span>
+                                  <span class="mantis-mono">{{ item.numFeatures }}</span>
+                                </div>
+                                <div class="model-hover-card__row">
+                                  <span class="model-hover-card__label">Addestrato</span>
+                                  <span>{{ item.lastTrained | date:'dd/MM/yyyy HH:mm' }}</span>
+                                </div>
+                              </div>
+                            }
                           </span>
                         } @else {
                           <span class="text-body-secondary">-</span>
@@ -487,6 +511,7 @@ export class AiModelsComponent implements OnInit, OnDestroy {
   readonly configExtendedData = signal(false);
   readonly configDaysBack = signal(730);
   readonly configSelectedEpics = signal<string[]>([]);
+  readonly hoverEpic = signal<string | null>(null);
 
   readonly allEpics: string[] = [
     'XAUUSD', 'BTCUSD', 'US500', 'WTIUSD', 'EURUSD', 'NVDA', 'TSLA',
