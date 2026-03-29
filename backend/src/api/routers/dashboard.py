@@ -134,10 +134,12 @@ async def get_overview(
 async def get_equity_curve(
     days: int = Query(default=30, ge=1, le=365),
     position_repo=Depends(get_position_repo),
+    risk_mgr: RiskManager = Depends(get_risk_manager),
 ):
     """
     Get equity curve data points from closed positions.
-    Falls back to placeholder if no DB data available.
+    Appends a live "now" point from the broker/drawdown monitor equity
+    so the curve always ends at the real current equity value.
     """
     if position_repo is not None:
         try:
@@ -145,10 +147,11 @@ async def get_equity_curve(
             stats = await position_repo.get_performance_stats(date_from=date_from)
             curve = stats.get("equity_curve", [])
             if curve:
+                initial = get_settings().initial_capital
                 points = [
                     EquityCurvePoint(
                         date=pt["date"],
-                        equity=get_settings().initial_capital + pt["value"],
+                        equity=initial + pt["value"],
                         drawdown_pct=pt.get("drawdown_pct", 0.0),
                         daily_pnl=pt.get("daily_pnl", 0.0),
                         trade_count=pt.get("trade_count", 0),
@@ -158,6 +161,28 @@ async def get_equity_curve(
                     ).model_dump()
                     for pt in curve
                 ]
+
+                # Append live equity point so curve matches the dashboard badge
+                live_equity = risk_mgr.drawdown_monitor.state.current_equity
+                if live_equity and live_equity > 0:
+                    today = datetime.now(UTC).strftime("%Y-%m-%d")
+                    last_pt = points[-1]
+                    if last_pt["date"] == today:
+                        # Replace today's point with live equity
+                        last_pt["equity"] = round(live_equity, 2)
+                    else:
+                        # Add a new point for today
+                        points.append(
+                            EquityCurvePoint(
+                                date=today,
+                                equity=round(live_equity, 2),
+                                drawdown_pct=round(
+                                    risk_mgr.drawdown_monitor.state.current_drawdown_pct * 100,
+                                    2,
+                                ),
+                            ).model_dump()
+                        )
+
                 return success_response(points)
         except Exception as e:
             logger.debug(f"Equity curve from DB failed: {e}")
