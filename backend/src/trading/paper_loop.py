@@ -633,9 +633,14 @@ class PaperTradingLoop:
 
         PRIMARY: Uses Capital.com Transaction History API for real exit price + P&L.
         FALLBACK: Live price heuristic (only if transaction API returns no match).
+
+        Populates self._broker_closed_deals so _check_stop_losses can skip them.
         """
         if self.execution_engine.mode == ExecutionMode.PAPER:
             return
+
+        # Reset per-iteration tracking of broker-closed deals
+        self._broker_closed_deals: set[str] = set()
 
         current_deals = {p.get("deal_id") for p in current_positions if p.get("deal_id")}
 
@@ -694,6 +699,9 @@ class PaperTradingLoop:
                 f"[{epic}] Position {deal_id} closed by broker "
                 f"(reason={close_reason}, exit={exit_price:.6f}, P&L=${pnl:.2f})"
             )
+
+            # Track this deal so _check_stop_losses doesn't double-close it
+            self._broker_closed_deals.add(deal_id)
 
             # Record in trade history for Kelly sizing + per-asset CB
             self._on_position_closed(deal_id, pnl, epic=epic, close_reason=close_reason)
@@ -2109,6 +2117,15 @@ class PaperTradingLoop:
             direction = position.get("direction", "")
             stop_level = position.get("stop_level")
             profit_level = position.get("profit_level")
+
+            # Skip positions already closed by _detect_broker_closed in this iteration
+            broker_closed = getattr(self, "_broker_closed_deals", set())
+            if deal_id and deal_id in broker_closed:
+                logger.debug(
+                    f"[{epic}] Skipping SL/TP check for {deal_id} — "
+                    f"already closed by broker detection"
+                )
+                continue
 
             # --- Time-based stop: close stale positions ---
             opened_at_str = position.get("opened_at")
