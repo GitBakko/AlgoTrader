@@ -752,19 +752,9 @@ class PaperTradingLoop:
             except Exception as e:
                 logger.debug(f"WS broadcast trade_closed failed: {e}")
 
-            # Log execution close for System Logs page
-            try:
-                await get_trade_logger().log_execution(
-                    epic=epic,
-                    direction=direction,
-                    size=size,
-                    entry_price=entry_price,
-                    status=ExecutionStatus.EXECUTED,
-                    deal_id=deal_id,
-                    source=self._log_source,
-                )
-            except Exception as e:
-                logger.debug(f"TradeLogger log_execution failed for broker-closed {deal_id}: {e}")
+            # NOTE: Do NOT call log_execution() here — it fires alert_trade_opened()
+            # which sends a misleading "new position" alert to Telegram.
+            # The trade close is already logged via _persist_position_close + alert below.
 
             # Fire trade-closed alert (Telegram, Email, etc.)
             if self._log_source in ("demo_trading", "live_trading"):
@@ -2350,19 +2340,8 @@ class PaperTradingLoop:
                             except Exception as e:
                                 logger.debug(f"WS broadcast trade_closed failed: {e}")
 
-                            # Log execution close for System Logs page
-                            try:
-                                await get_trade_logger().log_execution(
-                                    epic=epic,
-                                    direction=direction,
-                                    size=size,
-                                    entry_price=entry_price,
-                                    status=ExecutionStatus.EXECUTED,
-                                    deal_id=deal_id,
-                                    source=self._log_source,
-                                )
-                            except Exception as e:
-                                logger.debug(f"TradeLogger log_execution failed for {deal_id}: {e}")
+                            # NOTE: Do NOT call log_execution() here — it fires
+                            # alert_trade_opened() which sends a misleading alert.
 
                             status = "sl_hit" if stop_violated else "tp_hit"
                             self._signal_history.append(
