@@ -675,11 +675,41 @@ class PaperTradingLoop:
                 close_reason = "TP"
                 exit_price = profit_level
 
-            # Calculate P&L using actual exit price (SL/TP level)
+            # Calculate P&L using exit price
             if direction == "BUY":
                 pnl = (exit_price - entry_price) * size
             else:
                 pnl = (entry_price - exit_price) * size
+
+            # CRITICAL FIX: Sanity check — SL cannot produce profit, TP cannot produce loss.
+            # If the calculated P&L contradicts the close_reason, the live_price-based
+            # detection was wrong (price moved after close). Use EXTERNAL with live price.
+            if close_reason == "SL" and pnl > 0:
+                logger.warning(
+                    f"[{epic}] SL close with positive P&L (${pnl:.2f}) — "
+                    f"detection was wrong, correcting to EXTERNAL"
+                )
+                close_reason = "EXTERNAL"
+                if live_price:
+                    exit_price = live_price
+                    pnl = (
+                        (exit_price - entry_price) * size
+                        if direction == "BUY"
+                        else (entry_price - exit_price) * size
+                    )
+            elif close_reason == "TP" and pnl < 0:
+                logger.warning(
+                    f"[{epic}] TP close with negative P&L (${pnl:.2f}) — "
+                    f"detection was wrong, correcting to EXTERNAL"
+                )
+                close_reason = "EXTERNAL"
+                if live_price:
+                    exit_price = live_price
+                    pnl = (
+                        (exit_price - entry_price) * size
+                        if direction == "BUY"
+                        else (entry_price - exit_price) * size
+                    )
 
             logger.warning(
                 f"[{epic}] Position {deal_id} closed by broker "
