@@ -550,166 +550,145 @@ class PaperTradingLoop:
         except Exception as e:
             logger.warning(f"Position close persistence failed for {deal_id}: {e}")
 
+    async def _fetch_recent_transactions(self) -> list:
+        """Fetch recent transaction history from Capital.com for close detection.
+
+        Returns list of Transaction objects from the last 4 hours.
+        Uses a cache to avoid hammering the API on every loop iteration.
+        """
+        now = datetime.now(UTC)
+        # Cache transactions for 30 seconds to avoid excessive API calls
+        cache_attr = "_txn_cache"
+        cache_ts_attr = "_txn_cache_ts"
+        cached = getattr(self, cache_attr, None)
+        cached_ts = getattr(self, cache_ts_attr, None)
+        if cached is not None and cached_ts and (now - cached_ts).total_seconds() < 30:
+            return cached
+
+        try:
+            from src.broker.models import TransactionType
+
+            from_date = now - timedelta(hours=4)
+            transactions = await self.broker.get_transaction_history(
+                from_date, now, TransactionType.ALL_DEAL
+            )
+            setattr(self, cache_attr, transactions)
+            setattr(self, cache_ts_attr, now)
+            return transactions
+        except Exception as e:
+            logger.warning(f"Failed to fetch transaction history: {e}")
+            return []
+
+    def _match_transaction(
+        self, transactions: list, deal_id: str, epic: str, entry_price: float
+    ) -> tuple[float | None, float | None, str | None]:
+        """Match a closed deal_id to a broker transaction.
+
+        Returns (exit_price, pnl, close_reason) or (None, None, None) if no match.
+        """
+        from src.broker.client import EPIC_TO_BROKER
+
+        broker_epic = EPIC_TO_BROKER.get(epic, epic)
+
+        for txn in transactions:
+            # Match by reference (deal reference) or by instrument name + entry level
+            ref_match = txn.reference and deal_id and txn.reference == deal_id
+            instrument_match = txn.instrument_name and (
+                epic.lower() in txn.instrument_name.lower()
+                or broker_epic.lower() in txn.instrument_name.lower()
+            )
+            entry_match = (
+                txn.open_level is not None
+                and entry_price > 0
+                and abs(txn.open_level - entry_price) / max(entry_price, 1e-9) < 0.001
+            )
+
+            if ref_match or (instrument_match and entry_match):
+                exit_price = txn.close_level
+                pnl = txn.pl_value
+                if exit_price is None or pnl is None:
+                    continue  # Incomplete transaction data, skip
+
+                # Determine close reason from P&L sign
+                if pnl > 0:
+                    close_reason = "TP"
+                elif pnl < 0:
+                    close_reason = "SL"
+                else:
+                    close_reason = "EXTERNAL"
+
+                logger.info(
+                    f"[{epic}] Matched broker transaction: "
+                    f"exit={exit_price:.6f}, P&L=${pnl:.2f}, reason={close_reason} "
+                    f"(ref={txn.reference}, instrument={txn.instrument_name})"
+                )
+                return exit_price, pnl, close_reason
+
+        return None, None, None
+
     async def _detect_broker_closed(self, current_positions: list[dict]) -> None:
         """
         Detect positions closed by the broker (SL/TP hit on Capital.com side).
         Compares current broker positions with previous iteration to find disappeared ones.
-        Persists closures to DB, pushes WebSocket events, and logs for System Logs page.
+
+        PRIMARY: Uses Capital.com Transaction History API for real exit price + P&L.
+        FALLBACK: Live price heuristic (only if transaction API returns no match).
         """
         if self.execution_engine.mode == ExecutionMode.PAPER:
-            # PAPER mode: we manage all closes locally, no broker reconciliation needed
             return
 
         current_deals = {p.get("deal_id") for p in current_positions if p.get("deal_id")}
 
-        # First iteration: just record positions, nothing to compare yet
         if not self._previous_positions:
             self._previous_positions = {
                 p.get("deal_id"): p for p in current_positions if p.get("deal_id")
             }
             return
 
-        # Find positions that disappeared (closed by broker)
-        for deal_id, prev_pos in list(self._previous_positions.items()):
-            if deal_id in current_deals:
-                continue  # Still open
+        # Pre-fetch transaction history once for all disappeared positions
+        disappeared = [
+            (did, ppos)
+            for did, ppos in self._previous_positions.items()
+            if did not in current_deals
+        ]
+        transactions = []
+        if disappeared:
+            transactions = await self._fetch_recent_transactions()
+            if transactions:
+                logger.info(
+                    f"Fetched {len(transactions)} recent transactions for "
+                    f"{len(disappeared)} disappeared position(s)"
+                )
 
+        for deal_id, prev_pos in disappeared:
             epic = prev_pos.get("epic", "UNKNOWN")
             direction = prev_pos.get("direction", "BUY")
             size = prev_pos.get("size", 0)
             entry_price = prev_pos.get("level", 0)
-            stop_level = prev_pos.get("stop_level")
-            profit_level = prev_pos.get("profit_level")
 
-            # Determine close reason from SL/TP levels and live broker price.
-            # The broker closed this position — we query the current market price
-            # to determine whether SL or TP was hit (since we don't have the exact
-            # exit price from the broker activity API).
-            close_reason = "EXTERNAL"
-            exit_price = entry_price  # Fallback
+            # === PRIMARY: Try Transaction History API ===
+            txn_exit, txn_pnl, txn_reason = self._match_transaction(
+                transactions, deal_id, epic, entry_price
+            )
 
-            # Sanity check: discard SL/TP on wrong side of entry (stale data)
-            if stop_level and entry_price and entry_price > 0:
-                if direction == "BUY" and stop_level >= entry_price:
-                    logger.warning(
-                        f"[{epic}] Discarding stale SL={stop_level:.5f} "
-                        f">= entry={entry_price:.5f} for LONG in close detection"
-                    )
-                    stop_level = None
-                elif direction == "SELL" and stop_level <= entry_price:
-                    logger.warning(
-                        f"[{epic}] Discarding stale SL={stop_level:.5f} "
-                        f"<= entry={entry_price:.5f} for SHORT in close detection"
-                    )
-                    stop_level = None
-
-            if stop_level and stop_level > 0 and profit_level and profit_level > 0:
-                # Both SL and TP were set — get live price from broker to determine
-                # which level was hit. This is far more reliable than stale candle data.
-                live_price = None
-                try:
-                    market = await self.broker.get_market_details(epic)
-                    snapshot = market.get("snapshot", {})
-                    bid = snapshot.get("bid", 0)
-                    offer = snapshot.get("offer", 0)
-                    if bid and offer:
-                        live_price = (bid + offer) / 2
-                except Exception as e:
-                    logger.debug(f"Could not get live price for {epic}: {e}")
-
-                if live_price:
-                    # Use live price to determine which level was crossed
-                    if direction == "BUY":
-                        # BUY: SL below entry, TP above entry
-                        # If price is at/above TP level → TP hit
-                        # If price is at/below SL level → SL hit
-                        if live_price >= profit_level:
-                            close_reason = "TP"
-                            exit_price = profit_level
-                        elif live_price <= stop_level:
-                            close_reason = "SL"
-                            exit_price = stop_level
-                        else:
-                            # Price between SL and TP — compare distance
-                            dist_to_sl = abs(live_price - stop_level)
-                            dist_to_tp = abs(live_price - profit_level)
-                            if dist_to_tp < dist_to_sl:
-                                close_reason = "TP"
-                                exit_price = profit_level
-                            else:
-                                close_reason = "SL"
-                                exit_price = stop_level
-                    else:
-                        # SELL: SL above entry, TP below entry
-                        # If price is at/below TP level → TP hit
-                        # If price is at/above SL level → SL hit
-                        if live_price <= profit_level:
-                            close_reason = "TP"
-                            exit_price = profit_level
-                        elif live_price >= stop_level:
-                            close_reason = "SL"
-                            exit_price = stop_level
-                        else:
-                            dist_to_sl = abs(live_price - stop_level)
-                            dist_to_tp = abs(live_price - profit_level)
-                            if dist_to_tp < dist_to_sl:
-                                close_reason = "TP"
-                                exit_price = profit_level
-                            else:
-                                close_reason = "SL"
-                                exit_price = stop_level
-                else:
-                    # Fallback: no live price — cannot reliably determine SL vs TP.
-                    # Default to EXTERNAL (unknown) rather than guessing wrong.
-                    # This should rarely happen since we just queried the broker.
-                    close_reason = "EXTERNAL"
-                    exit_price = entry_price
-                    logger.warning(
-                        f"[{epic}] Cannot determine SL/TP for {deal_id} — "
-                        f"no live price available, marking as EXTERNAL"
-                    )
-            elif stop_level and stop_level > 0:
-                close_reason = "SL"
-                exit_price = stop_level
-            elif profit_level and profit_level > 0:
-                close_reason = "TP"
-                exit_price = profit_level
-
-            # Calculate P&L using exit price
-            if direction == "BUY":
-                pnl = (exit_price - entry_price) * size
+            if txn_exit is not None and txn_pnl is not None:
+                # Real broker data — use it directly
+                exit_price = txn_exit
+                pnl = txn_pnl
+                close_reason = txn_reason or "EXTERNAL"
+                logger.info(
+                    f"[{epic}] Using REAL broker data for {deal_id}: "
+                    f"exit={exit_price:.6f}, P&L=${pnl:.2f}, reason={close_reason}"
+                )
             else:
-                pnl = (entry_price - exit_price) * size
-
-            # CRITICAL FIX: Sanity check — SL cannot produce profit, TP cannot produce loss.
-            # If the calculated P&L contradicts the close_reason, the live_price-based
-            # detection was wrong (price moved after close). Use EXTERNAL with live price.
-            if close_reason == "SL" and pnl > 0:
+                # === FALLBACK: Live price heuristic (legacy) ===
                 logger.warning(
-                    f"[{epic}] SL close with positive P&L (${pnl:.2f}) — "
-                    f"detection was wrong, correcting to EXTERNAL"
+                    f"[{epic}] No transaction match for {deal_id} — "
+                    f"falling back to live price heuristic"
                 )
-                close_reason = "EXTERNAL"
-                if live_price:
-                    exit_price = live_price
-                    pnl = (
-                        (exit_price - entry_price) * size
-                        if direction == "BUY"
-                        else (entry_price - exit_price) * size
-                    )
-            elif close_reason == "TP" and pnl < 0:
-                logger.warning(
-                    f"[{epic}] TP close with negative P&L (${pnl:.2f}) — "
-                    f"detection was wrong, correcting to EXTERNAL"
+                exit_price, pnl, close_reason = await self._fallback_close_detection(
+                    deal_id, epic, direction, size, entry_price, prev_pos
                 )
-                close_reason = "EXTERNAL"
-                if live_price:
-                    exit_price = live_price
-                    pnl = (
-                        (exit_price - entry_price) * size
-                        if direction == "BUY"
-                        else (entry_price - exit_price) * size
-                    )
 
             logger.warning(
                 f"[{epic}] Position {deal_id} closed by broker "
@@ -718,6 +697,15 @@ class PaperTradingLoop:
 
             # Record in trade history for Kelly sizing + per-asset CB
             self._on_position_closed(deal_id, pnl, epic=epic, close_reason=close_reason)
+
+            # Refresh equity from broker immediately after close so drawdown
+            # monitor, Kelly sizer, and dashboard reflect the real account state.
+            try:
+                fresh_equity = await self._fetch_equity()
+                self.risk_manager.update_equity(fresh_equity)
+                logger.info(f"[{epic}] Equity refreshed after close: ${fresh_equity:,.2f}")
+            except Exception as eq_err:
+                logger.debug(f"Post-close equity refresh failed: {eq_err}")
 
             # Persist to database
             await self._persist_position_close(
@@ -792,6 +780,141 @@ class PaperTradingLoop:
         self._previous_positions = {
             p.get("deal_id"): p for p in current_positions if p.get("deal_id")
         }
+
+    async def _fallback_close_detection(
+        self,
+        deal_id: str,
+        epic: str,
+        direction: str,
+        size: float,
+        entry_price: float,
+        prev_pos: dict,
+    ) -> tuple[float, float, str]:
+        """Fallback close detection using live price heuristic.
+
+        Used ONLY when the Transaction History API returns no matching transaction.
+        This is the legacy logic — less accurate but better than nothing.
+
+        Returns (exit_price, pnl, close_reason).
+        """
+        stop_level = prev_pos.get("stop_level")
+        profit_level = prev_pos.get("profit_level")
+        close_reason = "EXTERNAL"
+        exit_price = entry_price
+
+        # Sanity check: discard SL/TP on wrong side of entry (stale data)
+        if stop_level and entry_price and entry_price > 0:
+            if direction == "BUY" and stop_level >= entry_price:
+                logger.warning(
+                    f"[{epic}] Discarding stale SL={stop_level:.5f} "
+                    f">= entry={entry_price:.5f} for LONG in close detection"
+                )
+                stop_level = None
+            elif direction == "SELL" and stop_level <= entry_price:
+                logger.warning(
+                    f"[{epic}] Discarding stale SL={stop_level:.5f} "
+                    f"<= entry={entry_price:.5f} for SHORT in close detection"
+                )
+                stop_level = None
+
+        live_price = None
+        if stop_level and stop_level > 0 and profit_level and profit_level > 0:
+            try:
+                market = await self.broker.get_market_details(epic)
+                snapshot = market.get("snapshot", {})
+                bid = snapshot.get("bid", 0)
+                offer = snapshot.get("offer", 0)
+                if bid and offer:
+                    live_price = (bid + offer) / 2
+            except Exception as e:
+                logger.debug(f"Could not get live price for {epic}: {e}")
+
+            if live_price:
+                if direction == "BUY":
+                    if live_price >= profit_level:
+                        close_reason = "TP"
+                        exit_price = profit_level
+                    elif live_price <= stop_level:
+                        close_reason = "SL"
+                        exit_price = stop_level
+                    else:
+                        dist_to_sl = abs(live_price - stop_level)
+                        dist_to_tp = abs(live_price - profit_level)
+                        if dist_to_tp < dist_to_sl:
+                            close_reason = "TP"
+                            exit_price = profit_level
+                        else:
+                            close_reason = "SL"
+                            exit_price = stop_level
+                else:
+                    if live_price <= profit_level:
+                        close_reason = "TP"
+                        exit_price = profit_level
+                    elif live_price >= stop_level:
+                        close_reason = "SL"
+                        exit_price = stop_level
+                    else:
+                        dist_to_sl = abs(live_price - stop_level)
+                        dist_to_tp = abs(live_price - profit_level)
+                        if dist_to_tp < dist_to_sl:
+                            close_reason = "TP"
+                            exit_price = profit_level
+                        else:
+                            close_reason = "SL"
+                            exit_price = stop_level
+            else:
+                close_reason = "EXTERNAL"
+                exit_price = entry_price
+                logger.warning(
+                    f"[{epic}] Cannot determine SL/TP for {deal_id} — "
+                    f"no live price available, marking as EXTERNAL"
+                )
+        elif stop_level and stop_level > 0:
+            close_reason = "SL"
+            exit_price = stop_level
+        elif profit_level and profit_level > 0:
+            close_reason = "TP"
+            exit_price = profit_level
+
+        # Calculate P&L
+        if direction == "BUY":
+            pnl = (exit_price - entry_price) * size
+        else:
+            pnl = (entry_price - exit_price) * size
+
+        # Sanity check — SL cannot produce profit, TP cannot produce loss
+        if close_reason == "SL" and pnl > 0:
+            logger.warning(
+                f"[{epic}] SL close with positive P&L (${pnl:.2f}) — "
+                f"detection was wrong, correcting to EXTERNAL"
+            )
+            close_reason = "EXTERNAL"
+            if live_price:
+                exit_price = live_price
+                pnl = (
+                    (exit_price - entry_price) * size
+                    if direction == "BUY"
+                    else (entry_price - exit_price) * size
+                )
+        elif close_reason == "TP" and pnl < 0:
+            logger.warning(
+                f"[{epic}] TP close with negative P&L (${pnl:.2f}) — "
+                f"detection was wrong, correcting to EXTERNAL"
+            )
+            close_reason = "EXTERNAL"
+            if live_price:
+                exit_price = live_price
+                pnl = (
+                    (exit_price - entry_price) * size
+                    if direction == "BUY"
+                    else (entry_price - exit_price) * size
+                )
+
+        logger.warning(
+            f"[{epic}] FALLBACK close detection for {deal_id}: "
+            f"reason={close_reason}, exit={exit_price:.6f}, P&L=${pnl:.2f}"
+        )
+        return exit_price, pnl, close_reason
 
     async def _persist_trailing_stop_state(self, deal_id: str) -> None:
         """

@@ -232,13 +232,53 @@ class Account(BaseModel):
 
 
 class Transaction(BaseModel):
-    """Transaction history entry."""
+    """Transaction history entry from Capital.com /history/transactions API.
+
+    Capital.com returns fields like instrumentName, openLevel, closeLevel,
+    profitAndLoss, size, etc.  We map them here so close detection can use
+    the **real** exit price and P&L instead of guessing from the live price.
+    """
+
+    model_config = {"populate_by_name": True}
 
     date: datetime
     type: str
-    reference: str
-    amount: float
-    currency: str
+    reference: str  # deal reference (not always deal_id)
+    instrument_name: str | None = Field(None, alias="instrumentName")
+    size: float | None = None
+    open_level: float | None = Field(None, alias="openLevel")
+    close_level: float | None = Field(None, alias="closeLevel")
+    profit_and_loss: str | None = Field(None, alias="profitAndLoss")
+    currency: str | None = None
+    # Keep legacy "amount" as optional fallback
+    amount: float | None = None
+
+    @property
+    def pl_value(self) -> float | None:
+        """Parse the profitAndLoss string (e.g. 'USD21.73' or '-USD6.69') into a float."""
+        raw = self.profit_and_loss
+        if raw is None:
+            return self.amount  # fallback to amount field if present
+        # Strip currency prefix: "USD21.73" → "21.73", "-USD6.69" → "-6.69"
+        cleaned = raw.strip()
+        if not cleaned:
+            return None
+        # Handle negative sign before currency code
+        sign = 1.0
+        if cleaned.startswith("-"):
+            sign = -1.0
+            cleaned = cleaned[1:]
+        # Strip non-numeric prefix (currency code like "USD", "EUR", etc.)
+        i = 0
+        while i < len(cleaned) and not (cleaned[i].isdigit() or cleaned[i] == "."):
+            i += 1
+        num_str = cleaned[i:]
+        if not num_str:
+            return None
+        try:
+            return sign * float(num_str)
+        except ValueError:
+            return None
 
 
 # ===== Trade Confirmation =====

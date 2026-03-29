@@ -55,6 +55,7 @@ export class DefaultHeaderComponent extends HeaderComponent {
 
   // Price source tracking
   readonly isMockPrices = this.#ws.isMockPrices;
+  readonly pricesAreFresh = this.#ws.pricesAreFresh;
   readonly brokerReconnectAttempts = this.#ws.brokerReconnectAttempts;
   readonly brokerMaxReconnectAttempts = this.#ws.brokerMaxReconnectAttempts;
 

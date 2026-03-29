@@ -26,6 +26,17 @@ export class WebSocketService {
   readonly brokerMaxReconnectAttempts = signal(12);
   readonly isMockPrices = computed(() => this.priceSource() === 'mock');
 
+  // Timestamp of the last received price tick (any epic)
+  readonly lastPriceUpdate = signal<number>(0);
+
+  /** True when prices are real broker data AND received within the last 90 seconds. */
+  readonly pricesAreFresh = computed(() => {
+    if (this.isMockPrices()) return false;
+    const lastUpdate = this.lastPriceUpdate();
+    if (!lastUpdate) return false;
+    return (Date.now() - lastUpdate) < 90_000;
+  });
+
   private getReconnectDelay(attempts: number): number {
     return Math.min(this.BASE_DELAY * Math.pow(2, attempts), this.MAX_RECONNECT_DELAY);
   }
@@ -65,6 +76,10 @@ export class WebSocketService {
           this.priceSource.set(tick.price_source);
         }
         this.prices.update(current => ({ ...current, [tick.epic]: tick }));
+        // Record when we last received a real price update
+        if (!tick.price_source || tick.price_source === 'broker') {
+          this.lastPriceUpdate.set(Date.now());
+        }
       }
     };
 

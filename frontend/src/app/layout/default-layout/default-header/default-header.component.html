@@ -40,12 +40,19 @@
             }
             @if (openPositionCount() > 0) {
               <span class="pnl-pill"
-                [class.pnl-pill--profit]="livePnl() >= 0"
-                [class.pnl-pill--loss]="livePnl() < 0"
-                [cTooltip]="openPositionCount() + ' posizioni aperte'">
+                [class.pnl-pill--profit]="livePnl() >= 0 && pricesAreFresh()"
+                [class.pnl-pill--loss]="livePnl() < 0 && pricesAreFresh()"
+                [class.pnl-pill--stale]="!pricesAreFresh()"
+                [cTooltip]="pricesAreFresh()
+                  ? openPositionCount() + ' posizioni aperte'
+                  : 'Prezzi non aggiornati — P&L potrebbe non essere accurato'">
                 <span class="pnl-pill__label">Live</span>
                 <span class="pnl-pill__value mantis-mono">
-                  {{ livePnl() >= 0 ? '+' : '' }}{{ livePnl() | number:'1.2-2' }}
+                  @if (pricesAreFresh()) {
+                    {{ livePnl() >= 0 ? '+' : '' }}{{ livePnl() | number:'1.2-2' }}
+                  } @else {
+                    ~{{ livePnl() >= 0 ? '+' : '' }}{{ livePnl() | number:'1.2-2' }}
+                  }
                 </span>
               </span>
             }
