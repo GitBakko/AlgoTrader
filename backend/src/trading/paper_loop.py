@@ -171,6 +171,7 @@ class PaperTradingLoop:
         self._active_assets: set[str] | None = None  # None = all assets
         self._asset_rotation_ts: float = 0.0
         self._per_asset_losses: dict[str, int] = {}  # consecutive loss counter per asset
+        self._spread_blocked_epics: dict[str, dict] = {}  # epic → spread block info
 
         # Epic SL cooldown tracker: epic → list of SL hit timestamps (UTC)
         self._epic_sl_hits: dict[str, list[datetime]] = {}
@@ -1588,6 +1589,48 @@ class PaperTradingLoop:
         # No time-based dedup — if a position was closed and the signal is still
         # valid, the system should be free to re-enter immediately.
 
+        # Step 3b: Spread filter — reject if spread cost > MAX_SPREAD_PCT of TP distance
+        _spread_settings = get_settings()
+        if self.broker and _spread_settings.max_spread_pct > 0:
+            try:
+                market_details = await self.broker.get_market_details(epic)
+                snapshot = market_details.get("snapshot", {})
+                bid = snapshot.get("bid", 0)
+                offer = snapshot.get("offer", 0)
+                if bid and offer and signal.entry_price > 0:
+                    spread = offer - bid
+                    # Estimate TP distance from ATR
+                    _tp_rr = (
+                        _spread_settings.scalp_tp_risk_reward
+                        if _spread_settings.scalp_mode_enabled
+                        else 2.5
+                    )
+                    tp_distance = market_data["atr"] * _tp_rr
+                    if tp_distance > 0:
+                        spread_ratio = spread / tp_distance
+                        if spread_ratio > _spread_settings.max_spread_pct:
+                            reason = (
+                                f"Spread too high: {spread:.6f} = "
+                                f"{spread_ratio:.1%} of TP distance "
+                                f"(limit {_spread_settings.max_spread_pct:.0%})"
+                            )
+                            logger.warning(f"[{epic}] {reason}")
+                            signal_info["status"] = "rejected"
+                            signal_info["rejection_reason"] = reason
+                            # Track blocked epics for API
+                            self._spread_blocked_epics[epic] = {
+                                "spread": round(spread, 8),
+                                "spread_pct": round(spread_ratio * 100, 1),
+                                "limit_pct": round(_spread_settings.max_spread_pct * 100, 1),
+                                "since": datetime.now(UTC).isoformat(),
+                            }
+                            return
+                        else:
+                            # Clear block if spread came back to normal
+                            self._spread_blocked_epics.pop(epic, None)
+            except Exception as e:
+                logger.debug(f"[{epic}] Spread check failed (non-blocking): {e}")
+
         # Step 4: Risk check (Phase 8: pass trade_history for Kelly sizing)
         equity = await self._fetch_equity()
         self.risk_manager.update_equity(equity)
@@ -2522,6 +2565,7 @@ class PaperTradingLoop:
             "min_deal_sizes_cached": len(self._min_deal_size_cache),
             "active_assets": len(self._active_assets) if self._active_assets else len(self.epics),
             "per_asset_losses": {k: v for k, v in self._per_asset_losses.items() if v > 0},
+            "spread_blocked_epics": self._spread_blocked_epics,
             "epic_sl_cooldowns": self.get_epic_sl_summary(),
             "sil": {
                 "enabled": _settings.sil_enabled,

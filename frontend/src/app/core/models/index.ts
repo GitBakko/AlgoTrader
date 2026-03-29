@@ -241,6 +241,7 @@ export interface PaperTradingStatus {
   equity_curve_below_sma: boolean;
   kelly_trade_history_size: number;
   kelly_stats: KellyStats | null;
+  spread_blocked_epics?: Record<string, { spread: number; spread_pct: number; limit_pct: number; since: string }>;
 }
 
 export interface KellyStats {

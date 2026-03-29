@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
   ColComponent, RowComponent, TableDirective, BadgeComponent,
-  ButtonGroupComponent, ButtonDirective,
+  ButtonGroupComponent, ButtonDirective, TooltipDirective,
 } from '@coreui/angular';
 import { TradingService } from '../../core/services/trading.service';
 import { WebSocketService } from '../../core/services/websocket.service';
@@ -38,7 +38,7 @@ const TIMEFRAMES = [
   imports: [
     CommonModule, CardComponent, CardBodyComponent, CardHeaderComponent,
     ColComponent, RowComponent, TableDirective, BadgeComponent,
-    ButtonGroupComponent, ButtonDirective,
+    ButtonGroupComponent, ButtonDirective, TooltipDirective,
     TvChartComponent, PriceFormatPipe, EpicLogoComponent, NewsWidgetComponent,
     SkeletonCardComponent,
   ],
@@ -76,7 +76,15 @@ const TIMEFRAMES = [
                   <app-epic-logo [epic]="p.epic" [size]="32" [rounded]="true" />
                   <div>
                     <div class="fw-semibold">{{ p.epic }}</div>
-                    <div class="text-body-secondary small">Spread: {{ p.spread | priceFormat:p.epic }}</div>
+                    <div class="text-body-secondary small">
+                      Spread: {{ p.spread | priceFormat:p.epic }}
+                      @if (p.spreadBlocked) {
+                        <span class="badge bg-danger ms-1" style="font-size: 0.6rem"
+                              [cTooltip]="'Spread ' + p.spreadPct + '% del TP — trading bloccato'">
+                          SPREAD
+                        </span>
+                      }
+                    </div>
                   </div>
                 </div>
                 <div class="text-end">
@@ -231,13 +239,22 @@ export class MarketsComponent implements OnInit, OnDestroy {
     }));
   });
 
+  readonly spreadBlocked = computed(() => this.trading.paperStatus()?.spread_blocked_epics ?? {});
+
   readonly livePrices = computed(() => {
     const prices = this.ws.prices();
+    const blocked = this.spreadBlocked();
     return EPICS
       .filter(e => prices[e])
       .map(e => {
         const t = prices[e];
-        return { epic: e, bid: t.bid, offer: t.offer, mid: (t.bid + t.offer) / 2, spread: t.offer - t.bid };
+        const blockInfo = blocked[e];
+        return {
+          epic: e, bid: t.bid, offer: t.offer,
+          mid: (t.bid + t.offer) / 2, spread: t.offer - t.bid,
+          spreadBlocked: !!blockInfo,
+          spreadPct: blockInfo?.spread_pct ?? null,
+        };
       });
   });
 
@@ -246,6 +263,7 @@ export class MarketsComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.startSmartPolling();
     this.ws.connectPrices();
+    this.trading.loadPaperStatus();
   }
 
   ngOnDestroy(): void {

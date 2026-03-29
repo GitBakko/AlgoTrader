@@ -205,6 +205,9 @@ class Settings(BaseSettings):
 
     # ===== Trading =====
     initial_capital: float = Field(default=11000.0, alias="INITIAL_CAPITAL")
+    max_spread_pct: float = Field(
+        default=0.15, alias="MAX_SPREAD_PCT"
+    )  # Max spread as % of TP distance
     trading_enabled: bool = Field(default=False, alias="TRADING_ENABLED")
     paper_trading: bool = Field(default=True, alias="PAPER_TRADING")
     execution_mode: str = Field(default="PAPER", alias="EXECUTION_MODE")
