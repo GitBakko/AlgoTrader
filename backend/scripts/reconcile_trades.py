@@ -97,6 +97,96 @@ def match_txn_to_position(txns: list, deal_id: str, epic: str, entry_price: floa
     return None
 
 
+async def equity_comparison(client: CapitalComClient, dry_run: bool) -> None:
+    """Compare total equity between broker and DB when per-trade data unavailable.
+
+    This is the fallback for demo accounts where Transaction History API returns empty.
+    Reports the discrepancy but cannot fix individual trades.
+    """
+    from sqlalchemy import text as sa_text
+
+    INITIAL_CAPITAL = 11_000.0
+
+    # Get broker account state
+    accounts = await client.get_accounts()
+    acc = accounts[0]
+    broker_balance = acc.balance  # deposit + realized P&L
+    broker_unrealized = acc.profit_loss  # open positions P&L
+    broker_equity = broker_balance + broker_unrealized
+    broker_realized_pnl = broker_balance - INITIAL_CAPITAL
+
+    logger.info("=" * 70)
+    logger.info("BROKER ACCOUNT STATE")
+    logger.info("=" * 70)
+    logger.info(f"  Balance (deposit + realized): ${broker_balance:,.2f}")
+    logger.info(f"  Unrealized P&L (open pos):    ${broker_unrealized:,.2f}")
+    logger.info(f"  Equity (total):               ${broker_equity:,.2f}")
+    logger.info(f"  Realized P&L since start:     ${broker_realized_pnl:,.2f}")
+
+    # Get DB state
+    DatabaseManager.initialize()
+    session_factory = DatabaseManager.get_session_factory()
+
+    async with session_factory() as session:
+        result = await session.execute(
+            sa_text(
+                "SELECT COUNT(*), COALESCE(SUM(profit_loss), 0) "
+                "FROM positions WHERE status = 'CLOSED'"
+            )
+        )
+        row = result.fetchone()
+        db_trade_count = row[0]
+        db_realized_pnl = float(row[1])
+
+        # Find suspicious trades (TP with loss, SL with profit)
+        result2 = await session.execute(
+            sa_text(
+                "SELECT COUNT(*), COALESCE(SUM(profit_loss), 0) "
+                "FROM positions WHERE status = 'CLOSED' "
+                "AND ((close_reason = 'TP' AND profit_loss < 0) "
+                "  OR (close_reason = 'SL' AND profit_loss > 0))"
+            )
+        )
+        suspicious = result2.fetchone()
+        suspicious_count = suspicious[0]
+        suspicious_pnl = float(suspicious[1])
+
+    logger.info("")
+    logger.info("=" * 70)
+    logger.info("MANTIS DB STATE")
+    logger.info("=" * 70)
+    logger.info(f"  Closed trades:               {db_trade_count}")
+    logger.info(f"  DB realized P&L:             ${db_realized_pnl:,.2f}")
+    logger.info(f"  Suspicious trades:           {suspicious_count} (TP+loss or SL+profit)")
+    logger.info(f"  Suspicious sum:              ${suspicious_pnl:,.2f}")
+
+    discrepancy = db_realized_pnl - broker_realized_pnl
+    logger.info("")
+    logger.info("=" * 70)
+    logger.info("COMPARISON")
+    logger.info("=" * 70)
+    logger.info(f"  Broker realized P&L: ${broker_realized_pnl:>10,.2f}")
+    logger.info(f"  DB realized P&L:     ${db_realized_pnl:>10,.2f}")
+    logger.info(f"  DISCREPANCY:         ${discrepancy:>10,.2f}")
+    logger.info(f"  (positive = DB shows less loss than reality)")
+
+    if abs(discrepancy) > 1.0:
+        logger.warning(
+            f"\n  The DB is off by ${discrepancy:,.2f}. "
+            f"This means our P&L records are inaccurate.\n"
+            f"  Cannot auto-fix per-trade because Transaction History API "
+            f"is empty on demo accounts.\n"
+            f"  Options:\n"
+            f"    1. Accept the discrepancy and ensure new trades are correct (Fix 1)\n"
+            f"    2. Manually review suspicious trades ({suspicious_count} found)\n"
+            f"    3. Switch to live account where Transaction History API works"
+        )
+    else:
+        logger.success("DB and broker are in sync (within $1.00)")
+
+    await DatabaseManager.close()
+
+
 async def reconcile(days: int, dry_run: bool) -> None:
     """Main reconciliation logic."""
     settings = get_settings()
@@ -118,7 +208,11 @@ async def reconcile(days: int, dry_run: bool) -> None:
     logger.info(f"Transactions with close data: {len(close_txns)}")
 
     if not close_txns:
-        logger.warning("No broker close transactions found — nothing to reconcile")
+        logger.warning(
+            "No broker close transactions found (common on demo accounts). "
+            "Falling back to equity-based comparison."
+        )
+        await equity_comparison(client, dry_run)
         await client.close()
         return
 
