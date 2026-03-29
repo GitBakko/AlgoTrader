@@ -9,7 +9,6 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, Depends, Query, Request
 from loguru import logger
 
-from src.utils.config import get_settings
 from src.api.dependencies import (
     get_execution_engine,
     get_position_repo,
@@ -24,6 +23,7 @@ from src.api.schemas import (
 )
 from src.execution.execution_engine import ExecutionEngine
 from src.risk.risk_manager import RiskManager
+from src.utils.config import get_settings
 
 router = APIRouter()
 
