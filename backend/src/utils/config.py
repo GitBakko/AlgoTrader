@@ -204,6 +204,7 @@ class Settings(BaseSettings):
     cb_daily_loss_limit: float = Field(default=0.10, alias="CB_DAILY_LOSS_LIMIT")
 
     # ===== Trading =====
+    initial_capital: float = Field(default=11000.0, alias="INITIAL_CAPITAL")
     trading_enabled: bool = Field(default=False, alias="TRADING_ENABLED")
     paper_trading: bool = Field(default=True, alias="PAPER_TRADING")
     execution_mode: str = Field(default="PAPER", alias="EXECUTION_MODE")

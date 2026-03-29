@@ -303,7 +303,9 @@ class PositionRepository(BaseRepository[Position]):
                 daily_buckets[day].append(float(p.profit_loss))
 
         # Second pass: build enriched equity points
-        initial_equity = 10_000.0
+        from src.utils.config import get_settings
+
+        initial_equity = get_settings().initial_capital
         equity_points: list[dict] = []
         cumulative = 0.0
         cumulative_trades = 0

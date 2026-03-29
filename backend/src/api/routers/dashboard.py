@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, Depends, Query, Request
 from loguru import logger
 
+from src.utils.config import get_settings
 from src.api.dependencies import (
     get_execution_engine,
     get_position_repo,
@@ -147,7 +148,7 @@ async def get_equity_curve(
                 points = [
                     EquityCurvePoint(
                         date=pt["date"],
-                        equity=10000.0 + pt["value"],
+                        equity=get_settings().initial_capital + pt["value"],
                         drawdown_pct=pt.get("drawdown_pct", 0.0),
                         daily_pnl=pt.get("daily_pnl", 0.0),
                         trade_count=pt.get("trade_count", 0),
@@ -163,7 +164,11 @@ async def get_equity_curve(
 
     # Fallback: single placeholder point
     now = datetime.now(UTC).isoformat()
-    points = [EquityCurvePoint(date=now, equity=10000.0, drawdown_pct=0.0).model_dump()]
+    points = [
+        EquityCurvePoint(
+            date=now, equity=get_settings().initial_capital, drawdown_pct=0.0
+        ).model_dump()
+    ]
 
     return success_response(points)
 
