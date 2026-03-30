@@ -172,6 +172,7 @@ class PaperTradingLoop:
         self._asset_rotation_ts: float = 0.0
         self._per_asset_losses: dict[str, int] = {}  # consecutive loss counter per asset
         self._spread_blocked_epics: dict[str, dict] = {}  # epic → spread block info
+        self._last_spread_refresh: float = 0.0  # timestamp of last hourly spread check
 
         # Epic SL cooldown tracker: epic → list of SL hit timestamps (UTC)
         self._epic_sl_hits: dict[str, list[datetime]] = {}
@@ -550,6 +551,70 @@ class PaperTradingLoop:
                 )
         except Exception as e:
             logger.warning(f"Position close persistence failed for {deal_id}: {e}")
+
+    async def _refresh_spread_blocks(self) -> None:
+        """Re-evaluate spread-blocked epics every hour.
+
+        Queries current bid/offer for each blocked epic and unblocks
+        those whose spread has come back within MAX_SPREAD_PCT of TP distance.
+        """
+        now = _time.monotonic()
+        if now - self._last_spread_refresh < 3600:  # 1 hour
+            return
+        self._last_spread_refresh = now
+
+        if not self._spread_blocked_epics or not self.broker:
+            return
+
+        _settings = get_settings()
+        if _settings.max_spread_pct <= 0:
+            return
+
+        _tp_rr = _settings.scalp_tp_risk_reward if _settings.scalp_mode_enabled else 2.5
+        unblocked = []
+
+        for epic in list(self._spread_blocked_epics.keys()):
+            try:
+                market = await self.broker.get_market_details(epic)
+                snapshot = market.get("snapshot", {})
+                bid = snapshot.get("bid", 0)
+                offer = snapshot.get("offer", 0)
+                if not bid or not offer:
+                    continue
+
+                spread = offer - bid
+                # Get ATR for TP distance estimate
+                market_data = self.prediction_service.get_market_data(
+                    epic, timeframe=self._candle_resolution
+                )
+                if not market_data or market_data.get("atr", 0) <= 0:
+                    continue
+
+                tp_distance = market_data["atr"] * _tp_rr
+                spread_ratio = spread / tp_distance if tp_distance > 0 else 1.0
+
+                if spread_ratio <= _settings.max_spread_pct:
+                    unblocked.append(epic)
+                    logger.info(
+                        f"[{epic}] Spread improved: {spread_ratio:.1%} <= "
+                        f"{_settings.max_spread_pct:.0%} limit — unblocked"
+                    )
+                else:
+                    # Update stored spread info
+                    self._spread_blocked_epics[epic]["spread"] = round(spread, 8)
+                    self._spread_blocked_epics[epic]["spread_pct"] = round(spread_ratio * 100, 1)
+            except Exception as e:
+                logger.debug(f"[{epic}] Spread refresh failed: {e}")
+
+        for epic in unblocked:
+            del self._spread_blocked_epics[epic]
+
+        if unblocked:
+            logger.info(f"Spread refresh: unblocked {unblocked}")
+        elif self._spread_blocked_epics:
+            logger.debug(
+                f"Spread refresh: {list(self._spread_blocked_epics.keys())} " f"still blocked"
+            )
 
     async def _fetch_recent_transactions(self) -> list:
         """Fetch recent transaction history from Capital.com for close detection.
@@ -1163,6 +1228,9 @@ class PaperTradingLoop:
 
         # CRITICAL: Check and auto-close positions with violated stop losses
         await self._check_stop_losses(current_positions)
+
+        # Refresh spread blocks hourly — unblock epics whose spread improved
+        await self._refresh_spread_blocks()
 
         open_epics = {p.get("epic") for p in current_positions}
 
