@@ -45,12 +45,25 @@ async def get_correlation_matrix(
     data_dir = Path("data/historical")
 
     for epic in EPICS:
-        pattern = f"{epic}_{timeframe}_*.parquet"
-        files = sorted(data_dir.glob(pattern))
+        epic_dir = data_dir / epic / timeframe
+        if not epic_dir.exists():
+            continue
+        files = sorted(epic_dir.glob("*.parquet"))
         if not files:
             continue
         try:
-            df = pl.read_parquet(files[-1])
+            # Read recent parquet files (last ~4 months covers 90 days)
+            recent_files = files[-4:] if len(files) > 4 else files
+            dfs = []
+            for f in recent_files:
+                chunk = pl.read_parquet(f)
+                # Normalize timestamp timezone to avoid schema mismatch on concat
+                if "timestamp" in chunk.columns:
+                    ts_col = chunk["timestamp"]
+                    if ts_col.dtype == pl.Datetime("us", "UTC"):
+                        chunk = chunk.with_columns(ts_col.dt.replace_time_zone(None))
+                dfs.append(chunk)
+            df = pl.concat(dfs) if len(dfs) > 1 else dfs[0]
         except Exception:
             continue
         if "close" not in df.columns or len(df) < 10:
