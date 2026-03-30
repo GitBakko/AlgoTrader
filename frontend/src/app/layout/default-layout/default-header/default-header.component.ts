@@ -59,12 +59,16 @@ export class DefaultHeaderComponent extends HeaderComponent {
   readonly brokerReconnectAttempts = this.#ws.brokerReconnectAttempts;
   readonly brokerMaxReconnectAttempts = this.#ws.brokerMaxReconnectAttempts;
 
-  // Real-time P&L (computed from live prices + open positions)
+  // Real-time P&L: prefer broker's upl (accurate even when market closed),
+  // fall back to WS price calculation for live markets.
   readonly livePnl = computed(() => {
     const positions = this.#trading.paperPositions();
     const prices = this.#ws.prices();
     if (!positions.length) return 0;
     return positions.reduce((sum, pos) => {
+      // Use broker's unrealized P&L if available (always accurate)
+      if (pos.upl != null) return sum + pos.upl;
+      // Fallback: calculate from WS prices
       const tick = prices[pos.epic];
       if (!tick) return sum;
       const current = pos.direction === 'BUY' ? tick.bid : tick.offer;

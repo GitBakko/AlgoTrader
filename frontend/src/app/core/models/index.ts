@@ -289,6 +289,8 @@ export interface PaperPosition {
   opened_at: string;
   trailing_stop_phase?: string; // "INITIAL" | "BREAKEVEN" | "TP1_LOCK" | "TRAILING"
   risk_managed_locally?: boolean; // true if SL/TP managed by MANTIS (not broker)
+  upl?: number | null;          // Broker's unrealized P&L (always accurate)
+  market_status?: string | null; // TRADEABLE, CLOSED, etc.
 }
 
 // Structured broker error detail (from broker_error_parser)

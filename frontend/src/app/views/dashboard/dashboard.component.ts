@@ -153,6 +153,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const positions = this.trading.paperPositions();
     const prices = this.ws.prices();
     return positions.map(pos => {
+      if (pos.upl != null) return { ...pos, live_pnl: pos.upl };
       const tick = prices[pos.epic];
       if (!tick) return { ...pos, live_pnl: 0 };
       const currentPrice = pos.direction === 'BUY' ? tick.bid : tick.offer;

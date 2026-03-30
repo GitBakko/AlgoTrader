@@ -161,6 +161,8 @@ class ModifyPositionRequest(BaseModel):
 class Position(BaseModel):
     """Open position information."""
 
+    model_config = {"populate_by_name": True}
+
     deal_id: str = Field(alias="dealId")
     epic: str
     direction: Direction
@@ -170,6 +172,8 @@ class Position(BaseModel):
     created_date: datetime = Field(alias="createdDate")
     stop_level: float | None = Field(None, alias="stopLevel")
     profit_level: float | None = Field(None, alias="profitLevel")
+    upl: float | None = None  # Unrealized P&L from broker
+    market_status: str | None = None  # TRADEABLE, CLOSED, etc.
 
 
 # ===== Working Order Models =====

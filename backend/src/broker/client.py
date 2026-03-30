@@ -420,6 +420,9 @@ class CapitalComClient:
             flat = {**pos_inner}
             if "epic" not in flat and "epic" in market_inner:
                 flat["epic"] = market_inner["epic"]
+            # Propagate market status from market block
+            if "marketStatus" in market_inner:
+                flat["market_status"] = market_inner["marketStatus"]
             position = Position(**flat)
             positions.append(position)
 

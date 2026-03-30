@@ -86,6 +86,8 @@ class PositionTracker:
                 "stop_level": p.stop_level,
                 "profit_level": p.profit_level,
                 "opened_at": p.created_date.isoformat() if p.created_date else None,
+                "upl": p.upl,  # Broker's real unrealized P&L
+                "market_status": p.market_status,  # TRADEABLE, CLOSED, etc.
             }
 
             # CRITICAL: Merge local SL/TP data if broker doesn't have them.

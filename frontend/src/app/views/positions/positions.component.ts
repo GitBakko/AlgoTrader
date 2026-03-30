@@ -480,6 +480,11 @@ export class PositionsComponent implements OnInit, OnDestroy {
     const positions = this.trading.paperPositions();
     const prices = this.ws.prices();
     return positions.map(pos => {
+      if (pos.upl != null) {
+        const tick = prices[pos.epic];
+        const currentPrice = tick ? (pos.direction === 'BUY' ? tick.bid : tick.offer) : null;
+        return { ...pos, live_pnl: pos.upl, current_price: currentPrice };
+      }
       const tick = prices[pos.epic];
       if (!tick) return { ...pos, live_pnl: 0, current_price: null as number | null };
       const currentPrice = pos.direction === 'BUY' ? tick.bid : tick.offer;
