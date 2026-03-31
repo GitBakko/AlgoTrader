@@ -173,6 +173,8 @@ class PaperTradingLoop:
         self._per_asset_losses: dict[str, int] = {}  # consecutive loss counter per asset
         self._spread_blocked_epics: dict[str, dict] = {}  # epic → spread block info
         self._last_spread_refresh: float = 0.0  # timestamp of last hourly spread check
+        self._correlation_regime: str = "normal"
+        self._correlation_regime_ts: float = 0.0
 
         # Epic SL cooldown tracker: epic → list of SL hit timestamps (UTC)
         self._epic_sl_hits: dict[str, list[datetime]] = {}
@@ -551,6 +553,42 @@ class PaperTradingLoop:
                 )
         except Exception as e:
             logger.warning(f"Position close persistence failed for {deal_id}: {e}")
+
+    async def _refresh_correlation_regime(self) -> None:
+        """Recompute correlation regime every 30 minutes."""
+        now = _time.monotonic()
+        if now - self._correlation_regime_ts < 1800:
+            return
+        self._correlation_regime_ts = now
+
+        _settings = get_settings()
+        if not _settings.correlation_regime_enabled:
+            return
+
+        try:
+            from src.features.cross_asset import CrossAssetEngine
+
+            engine = CrossAssetEngine()
+            all_dfs = {}
+            for epic in self.epics[:10]:
+                try:
+                    df = self.data_access.get_candles(epic, self._candle_resolution)
+                    if df is not None and len(df) >= 100:
+                        all_dfs[epic] = df
+                except Exception:
+                    pass
+
+            if len(all_dfs) >= 5:
+                regime_df = engine.compute_correlation_regime(all_dfs, window=50)
+                if len(regime_df) > 0:
+                    last = regime_df.row(-1, named=True)
+                    self._correlation_regime = last.get("correlation_regime") or "normal"
+                    mean_corr = last.get("mean_correlation", 0)
+                    logger.info(
+                        f"Correlation regime: {self._correlation_regime} " f"(mean={mean_corr:.3f})"
+                    )
+        except Exception as e:
+            logger.debug(f"Correlation regime update failed: {e}")
 
     async def _refresh_spread_blocks(self) -> None:
         """Re-evaluate spread-blocked epics every hour.
@@ -1231,6 +1269,7 @@ class PaperTradingLoop:
 
         # Refresh spread blocks hourly — unblock epics whose spread improved
         await self._refresh_spread_blocks()
+        await self._refresh_correlation_regime()
 
         open_epics = {p.get("epic") for p in current_positions}
 
@@ -1771,6 +1810,20 @@ class PaperTradingLoop:
                 f"to min_deal_size {min_deal_size}"
             )
             risk_result.position_size = min_deal_size
+
+        # Correlation regime adjustment: reduce size during panic
+        if self._correlation_regime == "panic" and get_settings().correlation_regime_enabled:
+            reduction = get_settings().correlation_regime_size_reduction
+            original_size = risk_result.position_size
+            risk_result.position_size *= 1.0 - reduction
+            risk_result.adjustments.append(
+                f"Correlation regime PANIC: size reduced by {reduction:.0%} "
+                f"({original_size:.4f} -> {risk_result.position_size:.4f})"
+            )
+            logger.info(
+                f"[{epic}] Correlation panic regime: size {original_size:.4f} "
+                f"-> {risk_result.position_size:.4f}"
+            )
 
         # Add approved risk audit data to features
         if audit_features is not None:
@@ -2613,6 +2666,7 @@ class PaperTradingLoop:
             "active_assets": len(self._active_assets) if self._active_assets else len(self.epics),
             "per_asset_losses": {k: v for k, v in self._per_asset_losses.items() if v > 0},
             "spread_blocked_epics": self._spread_blocked_epics,
+            "correlation_regime": self._correlation_regime,
             "epic_sl_cooldowns": self.get_epic_sl_summary(),
             "sil": {
                 "enabled": _settings.sil_enabled,

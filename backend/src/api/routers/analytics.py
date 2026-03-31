@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import polars as pl
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 
 router = APIRouter()
 
@@ -107,3 +107,15 @@ async def get_correlation_matrix(
             "data_points": common_len,
         },
     }
+
+
+@router.get("/correlation-regime")
+async def get_correlation_regime(request: Request):
+    """Get current correlation regime from trading loop."""
+    loop = getattr(request.app.state, "paper_loop", None)
+    if loop is None:
+        return {
+            "success": True,
+            "data": {"regime": "unknown", "reason": "trading loop not running"},
+        }
+    return {"success": True, "data": {"regime": loop._correlation_regime}}
