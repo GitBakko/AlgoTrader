@@ -15,6 +15,7 @@ import time as _time
 from collections import deque
 from datetime import UTC, datetime, timedelta
 
+import numpy as np
 from loguru import logger
 
 from src.broker.client import CapitalComClient
@@ -587,6 +588,29 @@ class PaperTradingLoop:
                     logger.info(
                         f"Correlation regime: {self._correlation_regime} " f"(mean={mean_corr:.3f})"
                     )
+
+                    # Also update CorrelationGuard's dynamic matrix
+                    try:
+                        epics_list = sorted(all_dfs.keys())
+                        common_len = min(len(df) for df in all_dfs.values())
+                        returns = np.array(
+                            [
+                                np.diff(
+                                    np.log(
+                                        np.maximum(
+                                            all_dfs[e]["close"].tail(common_len).to_numpy(),
+                                            1e-10,
+                                        )
+                                    )
+                                )
+                                for e in epics_list
+                            ]
+                        )
+                        corr_matrix = np.corrcoef(returns)
+                        self.risk_manager.correlation_guard.update_matrix(epics_list, corr_matrix)
+                        logger.debug(f"Updated CorrelationGuard matrix: {len(epics_list)} assets")
+                    except Exception as e:
+                        logger.debug(f"CorrelationGuard matrix update failed: {e}")
         except Exception as e:
             logger.debug(f"Correlation regime update failed: {e}")
 

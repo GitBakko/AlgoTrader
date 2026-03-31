@@ -49,6 +49,7 @@ class RiskManager:
         self.circuit_breakers = CircuitBreakerManager(circuit_breaker_config)
         self.equity_curve_filter = EquityCurveFilter(equity_curve_config)
         self.kelly_sizer = kelly_sizer
+        self.correlation_guard = CorrelationGuard()
 
     def check_trade(
         self,
