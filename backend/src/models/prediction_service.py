@@ -108,13 +108,16 @@ class PredictionService:
 
         model, meta = self._loaded_models[epic]
 
-        # Check if model was trained with multi-TF features
-        has_multi_tf = any(
-            f.startswith("4h_") or f.startswith("1d_") for f in (meta.feature_names or [])
+        # Check if model was trained with multi-TF or cross-asset features
+        feature_names = meta.feature_names or []
+        has_multi_tf = any(f.startswith("4h_") or f.startswith("1d_") for f in feature_names)
+        has_cross_asset = any(
+            f.startswith("corr_") or f.startswith("lead_") or f.startswith("sector_")
+            for f in feature_names
         )
 
-        # Build features (multi-TF uses build_features with data_access)
-        if has_multi_tf and self.data_access is not None:
+        # Build features (multi-TF or cross-asset need full build_features with data_access)
+        if (has_multi_tf or has_cross_asset) and self.data_access is not None:
             df_features, matrix = self.feature_builder.build_features(
                 epic=epic,
                 timeframe=timeframe,
