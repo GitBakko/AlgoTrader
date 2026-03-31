@@ -119,3 +119,21 @@ async def get_correlation_regime(request: Request):
             "data": {"regime": "unknown", "reason": "trading loop not running"},
         }
     return {"success": True, "data": {"regime": loop._correlation_regime}}
+
+
+@router.get("/regime/status")
+async def get_regime_status(request: Request):
+    """Get current regime gate status from trading loop."""
+    loop = getattr(request.app.state, "paper_loop", None)
+    if loop is None:
+        return {
+            "success": True,
+            "data": {"enabled": False, "reason": "trading loop not running"},
+        }
+    gate = getattr(loop, "_regime_gate", None)
+    if gate is None:
+        return {
+            "success": True,
+            "data": {"enabled": False, "reason": "regime gate not initialized"},
+        }
+    return {"success": True, "data": {"enabled": True, **gate.get_stats()}}
