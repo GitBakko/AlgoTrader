@@ -3,14 +3,12 @@ Test fix for inverted stop-loss logic in RiskManager.
 CRITICAL BUG: Stop losses were being set ABOVE entry for longs!
 """
 
-import pytest
 from unittest.mock import MagicMock, Mock, patch
 
-from src.risk.risk_manager import RiskManager
-from src.risk.schemas import RiskCheckResult
-from src.strategy.schemas import TradingSignal
-from src.models.schemas import SignalClass
 from src.broker.models import Direction
+from src.models.schemas import SignalClass
+from src.risk.risk_manager import RiskManager
+from src.strategy.schemas import TradingSignal
 
 
 def _non_scalp_settings():
@@ -45,9 +43,12 @@ def test_buy_position_sl_below_entry(mock_check_exposure, _mock_settings):
     risk_manager.drawdown_monitor.is_circuit_breaker_active.return_value = False
     risk_manager.drawdown_monitor.check_all.return_value = []  # No drawdown issues
     risk_manager.drawdown_monitor.check_limits.return_value = (True, None)  # No limit breaches
-    risk_manager.drawdown_monitor.update.return_value = None  # Update method called but returns nothing
+    risk_manager.drawdown_monitor.update.return_value = (
+        None  # Update method called but returns nothing
+    )
 
     risk_manager.correlation_guard = MagicMock()
+    risk_manager.correlation_guard.check_exposure_dynamic.return_value = (1.0, [])
     risk_manager.correlation_guard.calculate_correlation_multiplier.return_value = 1.0
     risk_manager.equity_curve_filter = MagicMock()
     risk_manager.equity_curve_filter.get_size_multiplier.return_value = 1.0
@@ -114,9 +115,12 @@ def test_sell_position_sl_above_entry(mock_check_exposure, _mock_settings):
     risk_manager.drawdown_monitor.is_circuit_breaker_active.return_value = False
     risk_manager.drawdown_monitor.check_all.return_value = []  # No drawdown issues
     risk_manager.drawdown_monitor.check_limits.return_value = (True, None)  # No limit breaches
-    risk_manager.drawdown_monitor.update.return_value = None  # Update method called but returns nothing
+    risk_manager.drawdown_monitor.update.return_value = (
+        None  # Update method called but returns nothing
+    )
 
     risk_manager.correlation_guard = MagicMock()
+    risk_manager.correlation_guard.check_exposure_dynamic.return_value = (1.0, [])
     risk_manager.correlation_guard.calculate_correlation_multiplier.return_value = 1.0
     risk_manager.equity_curve_filter = MagicMock()
     risk_manager.equity_curve_filter.get_size_multiplier.return_value = 1.0
@@ -183,9 +187,12 @@ def test_buy_with_suggested_stop_chooses_min(mock_check_exposure, _mock_settings
     risk_manager.drawdown_monitor.is_circuit_breaker_active.return_value = False
     risk_manager.drawdown_monitor.check_all.return_value = []  # No drawdown issues
     risk_manager.drawdown_monitor.check_limits.return_value = (True, None)  # No limit breaches
-    risk_manager.drawdown_monitor.update.return_value = None  # Update method called but returns nothing
+    risk_manager.drawdown_monitor.update.return_value = (
+        None  # Update method called but returns nothing
+    )
 
     risk_manager.correlation_guard = MagicMock()
+    risk_manager.correlation_guard.check_exposure_dynamic.return_value = (1.0, [])
     risk_manager.correlation_guard.calculate_correlation_multiplier.return_value = 1.0
     risk_manager.equity_curve_filter = MagicMock()
     risk_manager.equity_curve_filter.get_size_multiplier.return_value = 1.0
@@ -241,9 +248,12 @@ def test_sell_with_suggested_stop_chooses_max(mock_check_exposure, _mock_setting
     risk_manager.drawdown_monitor.is_circuit_breaker_active.return_value = False
     risk_manager.drawdown_monitor.check_all.return_value = []  # No drawdown issues
     risk_manager.drawdown_monitor.check_limits.return_value = (True, None)  # No limit breaches
-    risk_manager.drawdown_monitor.update.return_value = None  # Update method called but returns nothing
+    risk_manager.drawdown_monitor.update.return_value = (
+        None  # Update method called but returns nothing
+    )
 
     risk_manager.correlation_guard = MagicMock()
+    risk_manager.correlation_guard.check_exposure_dynamic.return_value = (1.0, [])
     risk_manager.correlation_guard.calculate_correlation_multiplier.return_value = 1.0
     risk_manager.equity_curve_filter = MagicMock()
     risk_manager.equity_curve_filter.get_size_multiplier.return_value = 1.0

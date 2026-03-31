@@ -8,14 +8,15 @@ CRITICAL BUG FIX TEST:
 - Ensures Broker client excludes None values (exclude_none=True)
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.risk.risk_manager import RiskManager
+import pytest
+
+from src.broker.models import DealConfirmation, Direction
 from src.execution.execution_engine import ExecutionEngine
 from src.execution.schemas import ExecutionMode
+from src.risk.risk_manager import RiskManager
 from src.strategy.schemas import TradingSignal
-from src.broker.models import Direction, DealConfirmation
 
 
 def _non_scalp_settings():
@@ -42,6 +43,7 @@ def mock_risk_manager():
     rm.drawdown_monitor.check_limits.return_value = (True, None)
 
     rm.correlation_guard = MagicMock()
+    rm.correlation_guard.check_exposure_dynamic.return_value = (1.0, [])
     rm.correlation_guard.calculate_correlation_multiplier.return_value = 1.0
     rm.equity_curve_filter = MagicMock()
     rm.equity_curve_filter.get_size_multiplier.return_value = 1.0
@@ -87,7 +89,9 @@ async def test_sl_tp_flow_to_broker(_mock_settings, mock_risk_manager):
 
     # 4. Verify correct SL/TP values
     # BUY: SL should be BELOW entry (entry - ATR*2)
-    assert risk_result.stop_loss < signal.entry_price, f"BUY SL must be below entry! SL={risk_result.stop_loss} entry={signal.entry_price}"
+    assert (
+        risk_result.stop_loss < signal.entry_price
+    ), f"BUY SL must be below entry! SL={risk_result.stop_loss} entry={signal.entry_price}"
     expected_sl = signal.entry_price - (10.0 * 2.0)  # 2000 - 20 = 1980
     assert abs(risk_result.stop_loss - expected_sl) < 0.01
 
@@ -136,9 +140,11 @@ async def test_sl_tp_flow_to_broker(_mock_settings, mock_risk_manager):
     assert captured_request.stop_level == risk_result.stop_loss
     assert captured_request.profit_level == risk_result.take_profit
 
-    print(f"[OK] SL/TP flow verified:")
+    print("[OK] SL/TP flow verified:")
     print(f"   RiskCheckResult: SL={risk_result.stop_loss:.2f} TP={risk_result.take_profit:.2f}")
-    print(f"   CreatePositionRequest: stop_level={captured_request.stop_level:.2f} profit_level={captured_request.profit_level:.2f}")
+    print(
+        f"   CreatePositionRequest: stop_level={captured_request.stop_level:.2f} profit_level={captured_request.profit_level:.2f}"
+    )
 
 
 @patch("src.risk.risk_manager.get_settings", side_effect=lambda: _non_scalp_settings())
@@ -164,7 +170,9 @@ async def test_sell_position_sl_tp_flow(_mock_settings, mock_risk_manager):
     )
 
     # SELL: SL should be ABOVE entry (entry + ATR*2)
-    assert risk_result.stop_loss > signal.entry_price, f"SELL SL must be above entry! SL={risk_result.stop_loss} entry={signal.entry_price}"
+    assert (
+        risk_result.stop_loss > signal.entry_price
+    ), f"SELL SL must be above entry! SL={risk_result.stop_loss} entry={signal.entry_price}"
     expected_sl = signal.entry_price + (10.0 * 2.0)  # 2000 + 20 = 2020
     assert abs(risk_result.stop_loss - expected_sl) < 0.01
 
@@ -200,9 +208,11 @@ async def test_broker_exclude_none():
 
     # Verify model_dump with exclude_none=False includes None fields
     payload_without_exclude = request.model_dump(by_alias=True, exclude_none=False)
-    assert "stopLevel" in payload_without_exclude, "stopLevel should be included when exclude_none=False"
+    assert (
+        "stopLevel" in payload_without_exclude
+    ), "stopLevel should be included when exclude_none=False"
     assert payload_without_exclude["stopLevel"] is None
 
-    print(f"[OK] exclude_none=True test passed:")
+    print("[OK] exclude_none=True test passed:")
     print(f"   With exclude_none=True: {payload_with_exclude}")
     print(f"   With exclude_none=False: {payload_without_exclude}")
