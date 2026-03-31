@@ -64,3 +64,35 @@ INDEX_ASSETS: set[str] = {"US500", "DE40", "NAS100"}
 
 # Stock assets
 STOCK_ASSETS: set[str] = {"NVDA", "TSLA"}
+
+# Cross-asset correlation clusters
+# Each asset maps to its cluster leader(s) — assets whose returns
+# are used as features for this asset's ML model.
+ASSET_CLUSTERS: dict[str, list[str]] = {
+    # Crypto: BTC leads the pack
+    "BTCUSD": ["US500", "XAUUSD"],
+    "ETHUSD": ["BTCUSD", "US500"],
+    "SOLUSD": ["BTCUSD", "ETHUSD"],
+    "BNBUSD": ["BTCUSD", "ETHUSD"],
+    "DOGUSD": ["BTCUSD", "ETHUSD"],
+    "DASHUSD": ["BTCUSD", "ETHUSD"],
+    "ICPUSD": ["BTCUSD", "ETHUSD"],
+    # Commodities: Gold leads, oil separate
+    "XAUUSD": ["USDJPY", "US500"],
+    "XAGUSD": ["XAUUSD", "COPPER"],
+    "WTIUSD": ["US500", "COPPER"],
+    "NATGAS": ["WTIUSD", "COPPER"],
+    "COPPER": ["US500", "WTIUSD"],
+    "PLATINUM": ["XAUUSD", "COPPER"],
+    # Forex: USD index dynamics
+    "EURUSD": ["GBPUSD", "USDJPY"],
+    "GBPUSD": ["EURUSD", "US500"],
+    "USDJPY": ["XAUUSD", "US500"],
+    # Indices: co-move strongly
+    "US500": ["NAS100", "DE40"],
+    "DE40": ["US500", "EURUSD"],
+    "NAS100": ["US500", "NVDA"],
+    # Stocks: sector + index
+    "NVDA": ["NAS100", "US500"],
+    "TSLA": ["NAS100", "US500"],
+}
