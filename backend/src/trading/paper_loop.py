@@ -177,6 +177,10 @@ class PaperTradingLoop:
         self._correlation_regime: str = "normal"
         self._correlation_regime_ts: float = 0.0
 
+        # Regime Gate (Phase 2)
+        self._regime_gate: object | None = None
+        self._regime_gate_feature_cols: list[str] = []
+
         # Epic SL cooldown tracker: epic → list of SL hit timestamps (UTC)
         self._epic_sl_hits: dict[str, list[datetime]] = {}
         self._epic_sl_window_hours = 2.0  # cooldown window
@@ -554,6 +558,56 @@ class PaperTradingLoop:
                 )
         except Exception as e:
             logger.warning(f"Position close persistence failed for {deal_id}: {e}")
+
+    def _init_regime_gate(self) -> None:
+        """Initialize RegimeGate if enabled and not already initialized."""
+        if self._regime_gate is not None:
+            return
+        _settings = get_settings()
+        if not _settings.regime_gate_enabled:
+            return
+
+        try:
+            from src.regime.gate import RegimeGate
+
+            self._regime_gate = RegimeGate(
+                confidence_threshold=_settings.regime_gate_confidence_threshold,
+                psi_threshold=_settings.regime_gate_psi_threshold,
+            )
+
+            # Load pre-trained detectors if available
+            import json
+            from pathlib import Path
+
+            from src.regime.drift_monitor import DriftMonitor
+            from src.regime.hmm_detector import HMMRegimeDetector
+
+            for epic in self.epics:
+                hmm_path = Path(f"data/models/{epic}/regime/hmm_detector.pkl")
+                drift_path = Path(f"data/models/{epic}/regime/drift_monitor.pkl")
+                features_path = Path(f"data/models/{epic}/regime/drift_features.json")
+                if hmm_path.exists():
+                    try:
+                        self._regime_gate.hmm_detector = HMMRegimeDetector.load(hmm_path)
+                        if drift_path.exists():
+                            self._regime_gate.drift_monitor = DriftMonitor.load(
+                                drift_path, _settings.regime_gate_psi_threshold
+                            )
+                        if features_path.exists():
+                            with open(features_path) as f:
+                                self._regime_gate_feature_cols = json.load(f)
+                        logger.info(f"Loaded regime detector from {epic}")
+                        break
+                    except Exception as e:
+                        logger.warning(f"Failed to load regime detector for {epic}: {e}")
+
+            logger.info(
+                f"RegimeGate initialized "
+                f"(confidence>{_settings.regime_gate_confidence_threshold}, "
+                f"PSI<{_settings.regime_gate_psi_threshold})"
+            )
+        except Exception as e:
+            logger.warning(f"RegimeGate init failed: {e}")
 
     async def _refresh_correlation_regime(self) -> None:
         """Recompute correlation regime every 30 minutes."""
@@ -1294,6 +1348,7 @@ class PaperTradingLoop:
         # Refresh spread blocks hourly — unblock epics whose spread improved
         await self._refresh_spread_blocks()
         await self._refresh_correlation_regime()
+        self._init_regime_gate()
 
         open_epics = {p.get("epic") for p in current_positions}
 
@@ -1751,6 +1806,23 @@ class PaperTradingLoop:
                             self._spread_blocked_epics.pop(epic, None)
             except Exception as e:
                 logger.debug(f"[{epic}] Spread check failed (non-blocking): {e}")
+
+        # Step 3d: Regime Gate — block if HMM confidence low or feature drift detected
+        if self._regime_gate is not None:
+            try:
+                recent_bars = market_data.get("recent_bars")
+                if recent_bars is not None and len(recent_bars) >= 20:
+                    gate_decision = self._regime_gate.check(
+                        recent_bars,
+                        feature_columns=self._regime_gate_feature_cols[:30],
+                    )
+                    if not gate_decision.approved:
+                        logger.info(f"[{epic}] Regime gate BLOCKED: {gate_decision.reason}")
+                        signal_info["status"] = "rejected"
+                        signal_info["rejection_reason"] = f"Regime gate: {gate_decision.reason}"
+                        return
+            except Exception as e:
+                logger.debug(f"[{epic}] Regime gate check failed (non-blocking): {e}")
 
         # Step 4: Risk check (Phase 8: pass trade_history for Kelly sizing)
         equity = await self._fetch_equity()
@@ -2691,6 +2763,7 @@ class PaperTradingLoop:
             "per_asset_losses": {k: v for k, v in self._per_asset_losses.items() if v > 0},
             "spread_blocked_epics": self._spread_blocked_epics,
             "correlation_regime": self._correlation_regime,
+            "regime_gate": self._regime_gate.get_stats() if self._regime_gate else None,
             "epic_sl_cooldowns": self.get_epic_sl_summary(),
             "sil": {
                 "enabled": _settings.sil_enabled,
