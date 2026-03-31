@@ -306,6 +306,6 @@ class TrainingOrchestrator:
         if self._ws_broadcast:
             try:
                 status = self.get_status()
-                await self._ws_broadcast({"type": "training_status", "data": status})
+                await self._ws_broadcast("training", {"type": "training_status", "data": status})
             except Exception as e:
                 logger.debug(f"WebSocket broadcast failed: {e}")

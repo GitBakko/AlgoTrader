@@ -253,10 +253,14 @@ class ParquetStorageManager:
         if not files:
             return pl.DataFrame(schema=EMPTY_DF_SCHEMA)
 
-        # Read only relevant files
+        # Read only relevant files, normalizing timestamp timezone for concat safety
         dfs = []
         for file_path in files:
             df = pl.read_parquet(file_path)
+            if "timestamp" in df.columns:
+                ts_dtype = df["timestamp"].dtype
+                if hasattr(ts_dtype, "time_zone") and ts_dtype.time_zone is not None:
+                    df = df.with_columns(pl.col("timestamp").dt.replace_time_zone(None))
             dfs.append(df)
 
         # Concatenate
