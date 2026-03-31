@@ -214,6 +214,13 @@ class Settings(BaseSettings):
     correlation_regime_size_reduction: float = Field(
         default=0.50, alias="CORRELATION_REGIME_SIZE_REDUCTION"
     )
+    # Regime Gate (Phase 2)
+    regime_gate_enabled: bool = Field(default=False, alias="REGIME_GATE_ENABLED")
+    regime_gate_confidence_threshold: float = Field(
+        default=0.65, alias="REGIME_GATE_CONFIDENCE_THRESHOLD"
+    )
+    regime_gate_psi_threshold: float = Field(default=0.20, alias="REGIME_GATE_PSI_THRESHOLD")
+    regime_gate_top_features: int = Field(default=30, alias="REGIME_GATE_TOP_FEATURES")
     trading_enabled: bool = Field(default=False, alias="TRADING_ENABLED")
     paper_trading: bool = Field(default=True, alias="PAPER_TRADING")
     execution_mode: str = Field(default="PAPER", alias="EXECUTION_MODE")

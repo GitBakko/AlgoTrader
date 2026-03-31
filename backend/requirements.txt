@@ -65,6 +65,7 @@ vaderSentiment==3.3.2
 
 # Numerical & Scientific
 scipy==1.17.0
+hmmlearn>=0.3.0
 
 # Monitoring
 prometheus-fastapi-instrumentator==7.1.0
