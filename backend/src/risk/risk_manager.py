@@ -237,8 +237,8 @@ class RiskManager:
             "take_profit": round(take_profit, 5),
         }
 
-        # 5. Check correlation exposure
-        corr_multiplier, corr_warnings = CorrelationGuard.check_exposure(
+        # 5. Check correlation exposure (dynamic matrix if available, else static)
+        corr_multiplier, corr_warnings = self.correlation_guard.check_exposure_dynamic(
             epic=signal.epic,
             direction=signal.direction.value,
             open_positions=open_positions,
