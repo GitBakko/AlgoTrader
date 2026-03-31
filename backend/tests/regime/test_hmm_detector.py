@@ -106,8 +106,7 @@ class TestHMMRegimeDetector:
         save_path = tmp_path / "hmm_model.pkl"
         detector.save(save_path)
 
-        loaded = HMMRegimeDetector()
-        loaded.load(save_path)
+        loaded = HMMRegimeDetector.load(save_path)
         state_after = loaded.predict(df)
 
         assert state_before.regime == state_after.regime
