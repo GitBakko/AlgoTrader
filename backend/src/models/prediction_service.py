@@ -122,6 +122,7 @@ class PredictionService:
                 include_regime=True,
                 multi_timeframe=True,
                 sil_data=sil_data,
+                cross_asset=True,
             )
         else:
             df = self.data_access.get_candles(epic, timeframe, limit=300)

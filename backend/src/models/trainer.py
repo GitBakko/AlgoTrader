@@ -92,6 +92,7 @@ class ModelTrainer:
             multi_timeframe=multi_timeframe,
             include_sentiment=include_sentiment,
             sil_data=sil_data,
+            cross_asset=True,
         )
 
         if df.is_empty():
