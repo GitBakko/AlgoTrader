@@ -209,18 +209,21 @@ class HMMRegimeDetector:
             pickle.dump(state, f)
         logger.info(f"HMM detector saved to {path}")
 
-    def load(self, path: Path | str) -> "HMMRegimeDetector":
+    @classmethod
+    def load(cls, path: Path | str) -> "HMMRegimeDetector":
         """Load detector from disk."""
         path = Path(path)
         with open(path, "rb") as f:
             state = pickle.load(f)  # noqa: S301
-        self.model = state["model"]
-        self._state_mapping = state["state_mapping"]
-        self.is_fitted = state["is_fitted"]
-        self.n_states = state["n_states"]
-        self.confidence_threshold = state["confidence_threshold"]
-        self.n_iter = state["n_iter"]
-        self._feature_mean = state["feature_mean"]
-        self._feature_std = state["feature_std"]
+        detector = cls(
+            n_states=state["n_states"],
+            confidence_threshold=state["confidence_threshold"],
+            n_iter=state["n_iter"],
+        )
+        detector.model = state["model"]
+        detector._state_mapping = state["state_mapping"]
+        detector.is_fitted = state["is_fitted"]
+        detector._feature_mean = state["feature_mean"]
+        detector._feature_std = state["feature_std"]
         logger.info(f"HMM detector loaded from {path}")
-        return self
+        return detector
