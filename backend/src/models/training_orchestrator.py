@@ -81,10 +81,16 @@ class TrainingOrchestrator:
 
     def get_status(self) -> dict:
         """Get full orchestrator status."""
+        completed = sum(1 for j in self._jobs.values() if j.status == TrainingJobStatus.COMPLETED)
+        failed = sum(1 for j in self._jobs.values() if j.status == TrainingJobStatus.FAILED)
         return {
             "running": self._running,
             "max_parallel": self.max_parallel,
             "jobs": {epic: job.to_dict() for epic, job in self._jobs.items()},
+            # Flat fields for frontend compatibility
+            "completed_count": completed,
+            "failed_count": failed,
+            "queue": [e for e, j in self._jobs.items() if j.status == TrainingJobStatus.QUEUED],
             "summary": {
                 "total": len(self._jobs),
                 "queued": sum(
@@ -93,12 +99,8 @@ class TrainingOrchestrator:
                 "running": sum(
                     1 for j in self._jobs.values() if j.status == TrainingJobStatus.RUNNING
                 ),
-                "completed": sum(
-                    1 for j in self._jobs.values() if j.status == TrainingJobStatus.COMPLETED
-                ),
-                "failed": sum(
-                    1 for j in self._jobs.values() if j.status == TrainingJobStatus.FAILED
-                ),
+                "completed": completed,
+                "failed": failed,
             },
         }
 
