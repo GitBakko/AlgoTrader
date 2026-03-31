@@ -423,24 +423,30 @@ async def train_model(epic: str = Path(...)):
 @router.post("/retrain-all")
 async def retrain_all(
     request: Request,
-    prediction_service=Depends(get_prediction_service),
 ):
-    """Trigger background retraining for all active assets."""
+    """Trigger background retraining for all active assets via the orchestrator.
+
+    Uses TrainingOrchestrator so the frontend can monitor progress via
+    WebSocket and /training/status endpoint (instead of silent auto_retrain).
+    """
     import asyncio
 
-    from src.models.auto_retrain import retrain_all_models
+    from src.utils.constants import TRADABLE_ASSETS
 
-    # Pass current SIL data so models train with sentiment features
-    sil_data = None
-    loop = getattr(request.app.state, "paper_loop", None)
-    if loop and getattr(loop, "_sil_clients_initialized", False):
-        sil_data = getattr(loop, "_sil_data", None)
+    orch = getattr(request.app.state, "training_orchestrator", None)
+    if orch is None:
+        return success_response(
+            {"message": "Training orchestrator non disponibile"}, status_code=503
+        )
+
+    if orch._running:
+        return success_response({"message": "Training gia in corso"})
 
     async def _run():
-        await retrain_all_models(prediction_service=prediction_service, sil_data=sil_data)
+        await orch.train_epics(list(TRADABLE_ASSETS))
 
     asyncio.create_task(_run(), name="manual_retrain_all")
-    logger.info("Manual retrain-all triggered via API")
+    logger.info("Manual retrain-all triggered via orchestrator")
 
     return success_response({"message": "Retrain avviato per tutti gli asset attivi"})
 
