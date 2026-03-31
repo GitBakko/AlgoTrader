@@ -32,8 +32,30 @@ ALL_ASSETS: list[str] = [
     "NAS100",
 ]
 
-# Assets actively traded by ML models (EURUSD excluded: ATR too small, -99% OOS)
-TRADABLE_ASSETS: list[str] = [a for a in ALL_ASSETS if a != "EURUSD"]
+# Assets excluded from trading based on Phase 0 walk-forward OOS validation (2026-03-31):
+# EURUSD: ATR too small, -99% OOS
+# DOGUSD: Sharpe -14.25, ruin 100%
+# ICPUSD: Sharpe -14.34, ruin 100%
+# NATGAS: Sharpe -21.10, ruin 100%
+# COPPER: Sharpe -17.71, ruin 100%
+# GBPUSD: Sharpe -18.49, ruin 100%
+# USDJPY: Sharpe -6.22, not significant
+# NAS100: Sharpe 0.62, p=0.40, not significant
+# XAGUSD: Sharpe 1.33, p=0.088, borderline (REVIEW)
+# WTIUSD: Sharpe 2.25, p=0.018, weak edge (REVIEW)
+# DASHUSD: Sharpe 2.30, p=0.000, weak edge (REVIEW)
+_EXCLUDED_ASSETS = {
+    "EURUSD",
+    "DOGUSD",
+    "ICPUSD",
+    "NATGAS",
+    "COPPER",
+    "GBPUSD",
+    "USDJPY",
+    "NAS100",
+}
+# REVIEW assets kept for now but monitored: XAGUSD, WTIUSD, DASHUSD
+TRADABLE_ASSETS: list[str] = [a for a in ALL_ASSETS if a not in _EXCLUDED_ASSETS]
 
 # Crypto assets (24/7 markets, different session handling)
 CRYPTO_ASSETS: set[str] = {
