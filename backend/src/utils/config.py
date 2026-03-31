@@ -208,6 +208,7 @@ class Settings(BaseSettings):
     max_spread_pct: float = Field(
         default=0.15, alias="MAX_SPREAD_PCT"
     )  # Max spread as % of TP distance
+    cross_asset_enabled: bool = Field(default=False, alias="CROSS_ASSET_ENABLED")
     trading_enabled: bool = Field(default=False, alias="TRADING_ENABLED")
     paper_trading: bool = Field(default=True, alias="PAPER_TRADING")
     execution_mode: str = Field(default="PAPER", alias="EXECUTION_MODE")

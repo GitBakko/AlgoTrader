@@ -80,4 +80,5 @@ class FeatureMatrix(BaseModel):
     start_date: datetime | None = None
     end_date: datetime | None = None
     regime_column: str | None = None
+    cross_asset_features: list[str] = []
     generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

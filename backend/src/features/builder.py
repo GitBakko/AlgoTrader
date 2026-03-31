@@ -24,6 +24,7 @@ from src.features.schemas import AssetFeatureConfig, FeatureMatrix
 from src.features.sentiment import SentimentFeatures
 from src.features.technical import TechnicalIndicators
 from src.features.vwap_bands import VWAPBands
+from src.utils.config import get_settings
 
 
 async def fetch_sentiment_data(
@@ -150,6 +151,7 @@ class FeatureBuilder:
         include_macro: bool = False,
         macro_df: pl.DataFrame | None = None,
         sil_data: "SILData | None" = None,
+        cross_asset: bool = False,
     ) -> tuple[pl.DataFrame, FeatureMatrix]:
         """
         Build complete feature matrix for an asset.
@@ -216,6 +218,40 @@ class FeatureBuilder:
 
         df = compute_sil_features(df, sil_data)
 
+        # Step 5.5: Cross-asset correlation features
+        cross_asset_cols: list[str] = []
+        if cross_asset and get_settings().cross_asset_enabled:
+            try:
+                from src.features.cross_asset import CrossAssetEngine
+                from src.utils.constants import ASSET_CLUSTERS
+
+                related_epics = ASSET_CLUSTERS.get(epic, [])
+                if related_epics:
+                    engine = CrossAssetEngine()
+                    related_dfs = {}
+                    for rel_epic in related_epics:
+                        try:
+                            rel_df = self.data_access.get_candles(
+                                epic=rel_epic,
+                                timeframe=timeframe,
+                                start_date=start_date,
+                                end_date=end_date,
+                            )
+                            if rel_df is not None and len(rel_df) >= 50:
+                                related_dfs[rel_epic] = rel_df
+                        except Exception as e:
+                            logger.debug(f"[{epic}] Failed to load {rel_epic}: {e}")
+
+                    if related_dfs:
+                        cols_before = set(df.columns)
+                        df = engine.build_cross_asset_features(
+                            main_df=df, epic=epic, related_dfs=related_dfs
+                        )
+                        cross_asset_cols = [c for c in df.columns if c not in cols_before]
+                        logger.info(f"[{epic}] Added {len(cross_asset_cols)} cross-asset features")
+            except Exception as e:
+                logger.warning(f"[{epic}] Cross-asset features failed: {e}")
+
         # Step 6: Multi-timeframe alignment (optional)
         if multi_timeframe and config.additional_timeframes:
             df = self._add_multi_timeframe_features(
@@ -267,6 +303,7 @@ class FeatureBuilder:
             start_date=df["timestamp"].min(),
             end_date=df["timestamp"].max(),
             regime_column="regime" if "regime" in df.columns else None,
+            cross_asset_features=cross_asset_cols,
         )
 
         logger.info(
