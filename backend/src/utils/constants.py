@@ -41,9 +41,9 @@ ALL_ASSETS: list[str] = [
 # GBPUSD: Sharpe -18.49, ruin 100%
 # USDJPY: Sharpe -6.22, not significant
 # NAS100: Sharpe 0.62, p=0.40, not significant
-# XAGUSD: Sharpe 1.33, p=0.088, borderline (REVIEW)
-# WTIUSD: Sharpe 2.25, p=0.018, weak edge (REVIEW)
-# DASHUSD: Sharpe 2.30, p=0.000, weak edge (REVIEW)
+# XAGUSD: Sharpe 1.33, p=0.088 — EXCLUDED after 48h live: 23.5% WR, -$71 (13 SL / 17 trades)
+# WTIUSD: Sharpe 2.25, p=0.018 — EXCLUDED: weak edge, no live profit
+# DASHUSD: Sharpe 2.30, p=0.000 — EXCLUDED: weak edge, spread issues
 _EXCLUDED_ASSETS = {
     "EURUSD",
     "DOGUSD",
@@ -52,6 +52,9 @@ _EXCLUDED_ASSETS = {
     "COPPER",
     "GBPUSD",
     "USDJPY",
+    "XAGUSD",
+    "WTIUSD",
+    "DASHUSD",
     "NAS100",
 }
 # REVIEW assets kept for now but monitored: XAGUSD, WTIUSD, DASHUSD

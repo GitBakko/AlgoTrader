@@ -91,13 +91,12 @@ class TestPortfolioExpansion:
     def test_active_epics_count(self):
         """PredictionService.ACTIVE_EPICS should have 13 (8 excluded after Phase 0 OOS validation)."""
         assert (
-            len(PredictionService.ACTIVE_EPICS) == 13
-        ), f"Expected 13 active EPICs, got {len(PredictionService.ACTIVE_EPICS)}"
+            len(PredictionService.ACTIVE_EPICS) == 10
+        ), f"Expected 10 active EPICs, got {len(PredictionService.ACTIVE_EPICS)}"
 
     def test_new_active_epics_present(self):
         """Surviving new EPICs should be in PredictionService.ACTIVE_EPICS."""
-        # Phase 0 excluded: DOGUSD, ICPUSD, NATGAS, COPPER, GBPUSD, USDJPY, NAS100
-        surviving_new = ["SOLUSD", "ETHUSD", "BNBUSD", "DASHUSD", "PLATINUM"]
+        surviving_new = ["SOLUSD", "ETHUSD", "BNBUSD", "PLATINUM"]
         for epic in surviving_new:
             assert (
                 epic in PredictionService.ACTIVE_EPICS
