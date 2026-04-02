@@ -3,7 +3,7 @@ Strategy manager orchestrator.
 Coordinates regime adaptation, signal generation, and portfolio allocation.
 """
 
-from datetime import UTC
+from datetime import UTC, datetime
 from pathlib import Path
 
 from loguru import logger
@@ -11,8 +11,9 @@ from loguru import logger
 from src.models.schemas import PredictionResult
 from src.strategy.portfolio_allocator import PortfolioAllocator
 from src.strategy.regime_adapter import RegimeAdapter
-from src.strategy.schemas import StrategyConfig, TradingSignal
+from src.strategy.schemas import SignalDirection, StrategyConfig, TradingSignal
 from src.strategy.signal_generator import SignalGenerator
+from src.utils.config import get_settings
 
 # Default location for per-asset thresholds produced by batch_oos_scorecard.py
 _DEFAULT_THRESHOLDS_PATH = (
@@ -134,6 +135,84 @@ class StrategyManager:
             raise ValueError(f"Invalid current_price: {current_price}")
         if not (isinstance(atr, (int, float)) and atr > 0):
             raise ValueError(f"Invalid ATR: {atr}")
+
+        # Mean Reversion Primary: MR rules decide direction, XGBoost scores quality
+        _settings = get_settings()
+        if _settings.mr_primary_enabled:
+            from src.strategy.mean_reversion_strategy import MeanReversionStrategy
+
+            mr = MeanReversionStrategy()
+            mr_signal = mr.generate_signal(market_data)
+
+            if mr_signal.direction == "HOLD":
+                return TradingSignal(
+                    epic=epic,
+                    direction=SignalDirection.HOLD,
+                    confidence=0.0,
+                    signal_class=1,
+                    regime=market_data.get("regime"),
+                    timestamp=datetime.now(UTC),
+                    technical_confirmation=False,
+                    entry_price=market_data.get("current_price", 0),
+                    suggested_stop=None,
+                    suggested_tp=None,
+                    strategy_name="mean_reversion",
+                    metadata={"mr_reason": mr_signal.reason, "mr_z": mr_signal.z_score},
+                )
+
+            # XGBoost quality score: use prediction confidence as setup quality
+            quality = prediction.confidence if prediction else 0.0
+
+            # Direction from MR rules, not from XGBoost
+            direction = (
+                SignalDirection.BUY if mr_signal.direction == "BUY" else SignalDirection.SELL
+            )
+
+            # Apply quality gate
+            if quality < _settings.mr_min_quality:
+                return TradingSignal(
+                    epic=epic,
+                    direction=SignalDirection.HOLD,
+                    confidence=quality,
+                    signal_class=1,
+                    regime=market_data.get("regime"),
+                    timestamp=datetime.now(UTC),
+                    technical_confirmation=False,
+                    entry_price=market_data.get("current_price", 0),
+                    suggested_stop=mr_signal.stop_level,
+                    suggested_tp=mr_signal.tp_level,
+                    strategy_name="mean_reversion",
+                    metadata={
+                        "mr_reason": f"Quality {quality:.2f} < {_settings.mr_min_quality}",
+                        "mr_z": mr_signal.z_score,
+                        "mr_quality": quality,
+                    },
+                )
+
+            logger.info(
+                f"MR-Primary [{epic}]: {mr_signal.direction} "
+                f"(z={mr_signal.z_score:.2f}, quality={quality:.2f})"
+            )
+
+            return TradingSignal(
+                epic=epic,
+                direction=direction,
+                confidence=quality,
+                signal_class=2 if direction == SignalDirection.BUY else 0,
+                regime=market_data.get("regime"),
+                timestamp=datetime.now(UTC),
+                technical_confirmation=True,
+                entry_price=market_data.get("current_price", 0),
+                suggested_stop=mr_signal.stop_level,
+                suggested_tp=mr_signal.tp_level,
+                strategy_name="mean_reversion",
+                metadata={
+                    "mr_z": mr_signal.z_score,
+                    "mr_quality": quality,
+                    "mr_direction": mr_signal.direction,
+                    "mr_reason": mr_signal.reason,
+                },
+            )
 
         # Route to ORB+FVG for configured epics during NYSE hours
         if (
