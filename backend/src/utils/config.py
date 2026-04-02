@@ -214,6 +214,13 @@ class Settings(BaseSettings):
     correlation_regime_size_reduction: float = Field(
         default=0.50, alias="CORRELATION_REGIME_SIZE_REDUCTION"
     )
+    # Mean Reversion Strategy
+    mr_primary_enabled: bool = Field(default=False, alias="MR_PRIMARY_ENABLED")
+    mr_min_quality: float = Field(default=0.55, alias="MR_MIN_QUALITY")
+    mr_z_entry: float = Field(default=2.0, alias="MR_Z_ENTRY")
+    mr_z_stop: float = Field(default=3.0, alias="MR_Z_STOP")
+    mr_adx_max: float = Field(default=30.0, alias="MR_ADX_MAX")
+
     # Regime Gate (Phase 2)
     regime_gate_enabled: bool = Field(default=False, alias="REGIME_GATE_ENABLED")
     regime_gate_confidence_threshold: float = Field(
