@@ -217,10 +217,35 @@ class TelegramBotPoller:
 
             pnl_sign = "+" if broker_pnl >= 0 else ""
 
+            # Daily realized P&L from DB
+            daily_pnl = 0.0
+            try:
+                from datetime import UTC, datetime
+
+                from src.database.session import DatabaseManager
+
+                session_factory = DatabaseManager.get_session_factory()
+                async with session_factory() as session:
+                    from src.database.repositories import PositionRepository
+
+                    repo = PositionRepository(session)
+                    today_start = datetime.now(UTC).replace(
+                        hour=0, minute=0, second=0, microsecond=0
+                    )
+                    closed_today = await repo.get_closed_in_period(today_start, datetime.now(UTC))
+                    daily_pnl = sum(
+                        float(p.profit_loss) for p in closed_today if p.profit_loss is not None
+                    )
+            except Exception:
+                pass  # DB not available, skip
+
+            daily_sign = "+" if daily_pnl >= 0 else ""
+
             msg = (
                 f"{'🟢' if is_running else '🔴'} *MANTIS AI Status*\n\n"
                 f"*Equity:* ${equity:,.2f}\n"
-                f"*P&L:* ${pnl_sign}{broker_pnl:.2f}\n"
+                f"*P&L aperto:* ${pnl_sign}{broker_pnl:.2f}\n"
+                f"*P&L giorno:* ${daily_sign}{daily_pnl:.2f}\n"
                 f"*Disponibile:* ${available:,.2f}\n\n"
                 f"*Posizioni ({pos_count}):*\n{pos_text}\n\n"
                 f"*Win Rate:* {wr_text}\n"
