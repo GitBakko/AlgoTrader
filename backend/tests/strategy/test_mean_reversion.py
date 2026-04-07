@@ -106,16 +106,18 @@ class TestHoldSignals:
         assert sig.direction == "HOLD"
         assert "No extreme" in sig.reason
 
-    def test_hold_no_rsi_confirmation(self, strategy):
-        """z > 2 but RSI < 70 -> HOLD (no RSI confirmation)."""
+    def test_sell_without_rsi_confirmation(self, strategy):
+        """z > 2 but RSI < 70 -> SELL (RSI is now a confidence boost, not a hard gate)."""
         data = _make_market_data(
             vwap_z_score=2.5,
-            rsi=60.0,  # Not overbought
+            rsi=60.0,  # Not overbought, but z-score is extreme
             adx=20.0,
         )
         sig = strategy.generate_signal(data)
 
-        assert sig.direction == "HOLD"
+        assert sig.direction == "SELL"
+        # No RSI boost since RSI < 70
+        assert sig.confidence < 0.95
 
 
 class TestConfidence:
@@ -131,7 +133,8 @@ class TestConfidence:
         )
         sig_low = strategy.generate_signal(data_low)
         assert sig_low.direction == "SELL"
-        assert sig_low.confidence == pytest.approx(0.5, abs=0.02)
+        # z=2.01 -> base 0.01, +0.2 RSI boost = 0.21, final = 0.5 + 0.21*0.5 = ~0.605
+        assert sig_low.confidence == pytest.approx(0.605, abs=0.02)
 
         # At z_stop boundary (z=3.0): confidence component = 1 -> 1.0
         data_high = _make_market_data(

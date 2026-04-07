@@ -75,10 +75,13 @@ class MeanReversionStrategy:
         # Mean target (use VWAP if available, else BB middle)
         mean_target = vwap if vwap and vwap > 0 else bb_middle
 
-        # SELL signal: price far above mean
-        if z_score > z_entry and rsi > self.RSI_OB:
+        # SELL signal: price far above mean. RSI is a confidence boost, not a hard gate.
+        if z_score > z_entry:
             # Confidence: how extreme (z=2 -> 0.5, z=3 -> 1.0)
             confidence = min((z_score - z_entry) / (z_stop - z_entry), 1.0)
+            # RSI boost: overbought confirms the SELL setup
+            if rsi > self.RSI_OB:
+                confidence = min(confidence + 0.2, 1.0)
             # SL: price extends further (z reaches z_stop)
             sl = current_price + (z_stop - z_score) * atr if atr > 0 else None
             # TP: return to mean
@@ -97,9 +100,12 @@ class MeanReversionStrategy:
                 reason=f"Price above mean: z={z_score:.2f}, RSI={rsi:.1f}",
             )
 
-        # BUY signal: price far below mean
-        if z_score < -z_entry and rsi < self.RSI_OS:
+        # BUY signal: price far below mean. RSI is a confidence boost, not a hard gate.
+        if z_score < -z_entry:
             confidence = min((abs(z_score) - z_entry) / (z_stop - z_entry), 1.0)
+            # RSI boost: oversold confirms the BUY setup
+            if rsi < self.RSI_OS:
+                confidence = min(confidence + 0.2, 1.0)
             sl = current_price - (z_stop - abs(z_score)) * atr if atr > 0 else None
             tp = mean_target
 
