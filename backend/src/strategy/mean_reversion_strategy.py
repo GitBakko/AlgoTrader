@@ -123,6 +123,10 @@ class MeanReversionStrategy:
             )
 
         # No extreme deviation
+        logger.info(
+            f"MR HOLD: z={z_score:.2f} (entry=±{z_entry}), bb_pctb={bb_pctb:.3f}, "
+            f"vwap_z={vwap_z:.2f}, RSI={rsi:.1f}, ADX={adx:.1f}"
+        )
         return MRSignal(
             direction="HOLD",
             z_score=z_score,

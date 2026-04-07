@@ -7,6 +7,10 @@
     "browser-tools": {
       "command": "npx",
       "args": ["-y", "@agentdeskai/browser-tools-mcp"]
+    },
+    "angular-cli": {
+      "command": "npx",
+      "args": ["-y", "@angular/cli", "mcp"]
     }
   }
 }
