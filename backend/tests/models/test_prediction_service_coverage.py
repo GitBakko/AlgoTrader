@@ -9,7 +9,7 @@ Tests for PredictionService covering untested paths:
 - get_market_data() with ADX present
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -20,10 +20,10 @@ from src.features.schemas import FeatureMatrix
 from src.models.prediction_service import PredictionService
 from src.models.schemas import ModelMetadata, PredictionResult
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_metadata(
     feature_names: list[str] | None = None,
@@ -38,20 +38,22 @@ def _make_metadata(
         version=1,
         feature_names=feature_names or ["feat_a", "feat_b", "feat_c", "feat_d"],
         num_features=len(feature_names) if feature_names else 4,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
 
 
 def _make_candles_df(n: int = 100) -> pl.DataFrame:
     """Create a minimal OHLC candle DataFrame with n rows."""
-    return pl.DataFrame({
-        "timestamp": [datetime(2026, 1, 1, i % 24) for i in range(n)],
-        "open": [2000.0 + i for i in range(n)],
-        "high": [2005.0 + i for i in range(n)],
-        "low": [1995.0 + i for i in range(n)],
-        "close": [2002.0 + i for i in range(n)],
-        "volume": [1000 + i for i in range(n)],
-    })
+    return pl.DataFrame(
+        {
+            "timestamp": [datetime(2026, 1, 1, i % 24) for i in range(n)],
+            "open": [2000.0 + i for i in range(n)],
+            "high": [2005.0 + i for i in range(n)],
+            "low": [1995.0 + i for i in range(n)],
+            "close": [2002.0 + i for i in range(n)],
+            "volume": [1000 + i for i in range(n)],
+        }
+    )
 
 
 def _make_features_df(
@@ -107,6 +109,7 @@ def _make_service(
 # ===========================================================================
 # predict() tests
 # ===========================================================================
+
 
 class TestPredictMultiTfFallback:
     """When model has multi-TF features but data_access is used in single-TF fallback."""
@@ -321,6 +324,7 @@ class TestPredictSuccessful:
 # get_market_data() tests
 # ===========================================================================
 
+
 class TestGetMarketData:
     """Tests for get_market_data() including regime detection and RSI."""
 
@@ -333,7 +337,11 @@ class TestGetMarketData:
             yield
 
     def _mock_ti_chain(self, mock_ti, candles, *, adx=None, rsi=None, ema_50=None):
-        """Helper: set up the mock chain for TechnicalIndicators calls."""
+        """Helper: set up the mock chain for TechnicalIndicators calls.
+
+        Each TI call returns a fresh df with the relevant column added.
+        BB and VWAP bands always add their columns (used by MR strategy).
+        """
         df = candles.clone()
         df = df.with_columns(pl.lit(25.0).alias("atr_14"))
         mock_ti.add_atr.return_value = df
@@ -349,7 +357,35 @@ class TestGetMarketData:
         if ema_50 is not None:
             df = df.with_columns(pl.lit(ema_50).alias("ema_50"))
         mock_ti.add_ema.return_value = df
+
+        # Bollinger Bands columns (added unconditionally now)
+        df = df.with_columns(
+            [
+                pl.lit(0.5).alias("bb_pctb"),
+                pl.lit(2050.0).alias("bb_middle"),
+                pl.lit(2100.0).alias("bb_upper"),
+                pl.lit(2000.0).alias("bb_lower"),
+            ]
+        )
+        mock_ti.add_bollinger_bands.return_value = df
         return df
+
+    @staticmethod
+    def _patch_vwap_bands():
+        """Return a patch context for VWAPBands.add_vwap_bands that adds vwap columns."""
+
+        def _add_vwap(df):
+            return df.with_columns(
+                [
+                    pl.lit(2050.0).alias("vwap_rolling"),
+                    pl.lit(0.0).alias("vwap_z_score"),
+                ]
+            )
+
+        return patch(
+            "src.features.vwap_bands.VWAPBands.add_vwap_bands",
+            side_effect=_add_vwap,
+        )
 
     def test_no_data_returns_none(self):
         """get_market_data() returns None when candles DataFrame is empty."""
@@ -375,6 +411,7 @@ class TestGetMarketData:
         svc._last_candles_cache["XAUUSD"] = ("1h", candles)
 
         with (
+            self._patch_vwap_bands(),
             patch("src.models.prediction_service.TechnicalIndicators") as mock_ti,
             patch("src.features.regime.RegimeDetector") as mock_rd,
         ):
@@ -401,6 +438,7 @@ class TestGetMarketData:
         svc = _make_service(meta=None, data_access=da)
 
         with (
+            self._patch_vwap_bands(),
             patch("src.models.prediction_service.TechnicalIndicators") as mock_ti,
             patch("src.features.regime.RegimeDetector") as mock_rd,
         ):
@@ -423,6 +461,7 @@ class TestGetMarketData:
         svc = _make_service(meta=None, data_access=da)
 
         with (
+            self._patch_vwap_bands(),
             patch("src.models.prediction_service.TechnicalIndicators") as mock_ti,
             patch("src.features.regime.RegimeDetector"),
         ):
@@ -443,6 +482,7 @@ class TestGetMarketData:
         svc = _make_service(meta=None, data_access=da)
 
         with (
+            self._patch_vwap_bands(),
             patch("src.models.prediction_service.TechnicalIndicators") as mock_ti,
             patch("src.features.regime.RegimeDetector"),
         ):
@@ -462,6 +502,7 @@ class TestGetMarketData:
         svc = _make_service(meta=None, data_access=da)
 
         with (
+            self._patch_vwap_bands(),
             patch("src.models.prediction_service.TechnicalIndicators") as mock_ti,
             patch("src.features.regime.RegimeDetector") as mock_rd,
         ):
@@ -486,6 +527,7 @@ class TestGetMarketData:
         svc = _make_service(meta=None, data_access=da)
 
         with (
+            self._patch_vwap_bands(),
             patch("src.models.prediction_service.TechnicalIndicators") as mock_ti,
             patch("src.features.regime.RegimeDetector") as mock_rd,
         ):
@@ -508,6 +550,7 @@ class TestGetMarketData:
         svc = _make_service(meta=None, data_access=da)
 
         with (
+            self._patch_vwap_bands(),
             patch("src.models.prediction_service.TechnicalIndicators") as mock_ti,
             patch("src.features.regime.RegimeDetector") as mock_rd,
         ):
@@ -529,6 +572,7 @@ class TestGetMarketData:
         svc = _make_service(meta=None, data_access=da)
 
         with (
+            self._patch_vwap_bands(),
             patch("src.models.prediction_service.TechnicalIndicators") as mock_ti,
             patch("src.features.regime.RegimeDetector") as mock_rd,
         ):
@@ -539,7 +583,12 @@ class TestGetMarketData:
             result = svc.get_market_data("XAUUSD")
 
         assert result is not None
-        assert set(result.keys()) == {"current_price", "atr", "adx", "rsi", "regime"}
+        # Required keys (TI + regime)
+        required = {"current_price", "atr", "adx", "rsi", "regime"}
+        assert required.issubset(set(result.keys()))
+        # MR indicators always present (BB + VWAP + recent_bars)
+        mr_keys = {"bb_pctb", "bb_middle", "bb_upper", "bb_lower", "recent_bars"}
+        assert mr_keys.issubset(set(result.keys()))
         assert result["regime"] == "trending_down"
         assert result["adx"] == pytest.approx(40.0)
         assert result["rsi"] == pytest.approx(55.0)
