@@ -245,13 +245,17 @@ class PredictionService:
         df = TechnicalIndicators.add_adx(df, period=14)
         df = TechnicalIndicators.add_rsi(df, period=14)
         df = TechnicalIndicators.add_ema(df, periods=[50])
+        # Bollinger Bands and VWAP — required by MR strategy + scalp
+        df = TechnicalIndicators.add_bollinger_bands(df)
+        from src.features.vwap_bands import VWAPBands
+
+        df = VWAPBands.add_vwap_bands(df)
 
         # Scalp mode: add extra indicators for ScalpScoreStrategy
         settings = get_settings()
         if settings.scalp_mode_enabled:
             df = TechnicalIndicators.add_ema(df, periods=[9, 21])
             df = TechnicalIndicators.add_macd(df)
-            df = TechnicalIndicators.add_bollinger_bands(df)
             # Volume SMA (raw, not ratio)
             df = df.with_columns(
                 pl.col("volume").rolling_mean(window_size=20).alias("volume_sma_20")
@@ -259,10 +263,6 @@ class PredictionService:
             from src.features.keltner import KeltnerChannel
 
             df = KeltnerChannel.add_keltner(df)
-            # VWAP for directional filter
-            from src.features.vwap_bands import VWAPBands
-
-            df = VWAPBands.add_vwap_bands(df)
 
         # Regime detection (requires adx + ema_50)
         detector = RegimeDetector()
