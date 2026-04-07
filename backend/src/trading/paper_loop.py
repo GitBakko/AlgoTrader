@@ -37,7 +37,11 @@ from src.utils.constants import TRADABLE_ASSETS
 
 # How often to check for new candles (seconds)
 _settings = get_settings()
-CHECK_INTERVAL = _settings.scalp_check_interval if _settings.scalp_mode_enabled else 300
+CHECK_INTERVAL = (
+    _settings.scalp_check_interval
+    if (_settings.scalp_mode_enabled or _settings.mr_primary_enabled)
+    else 300
+)
 MAX_SIGNAL_HISTORY = 200
 
 
@@ -150,10 +154,12 @@ class PaperTradingLoop:
         self._signal_dedup_window_seconds = (
             _settings.scalp_signal_dedup_seconds if _settings.scalp_mode_enabled else 60
         )
-        # Candle resolution: 15min for scalp, 1h for swing
-        self._candle_resolution = (
-            _settings.scalp_candle_resolution if _settings.scalp_mode_enabled else "1h"
-        )
+        # Candle resolution: scalp_candle_resolution for scalp/MR, 1h fallback for legacy ML
+        # Both scalp and MR_PRIMARY use the configured resolution (e.g. 4h for MR)
+        if _settings.scalp_mode_enabled or _settings.mr_primary_enabled:
+            self._candle_resolution = _settings.scalp_candle_resolution
+        else:
+            self._candle_resolution = "1h"
         self._last_signals: dict[str, dict] = {}
         self._signal_history: deque[dict] = deque(maxlen=MAX_SIGNAL_HISTORY)
         # Track last processed candle timestamp per epic
