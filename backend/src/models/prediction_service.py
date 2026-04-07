@@ -291,6 +291,18 @@ class PredictionService:
         if regime_val is not None:
             result["regime"] = str(regime_val)
 
+        # MR indicators — always included (used by MR_PRIMARY mode)
+        for key in ("bb_pctb", "bb_middle", "bb_upper", "bb_lower", "vwap_z_score"):
+            val = last.get(key)
+            if val is not None:
+                result[key] = float(val)
+        # VWAP target (always include for MR)
+        vwap_target = last.get("vwap_rolling") or last.get("vwap")
+        if vwap_target is not None:
+            result["vwap"] = float(vwap_target)
+        # Recent bars for regime gate (always include)
+        result["recent_bars"] = df.tail(100)
+
         # Scalp indicators (only present when scalp mode enabled)
         if settings.scalp_mode_enabled:
             for key in (
