@@ -147,8 +147,9 @@ class PredictionService:
             return None
 
         # Cache for get_market_data reuse (only fetch if not already cached)
+        # Need 300 bars for VWAP rolling, BB, EMA-50, ADX-14 stabilization
         if epic not in self._last_candles_cache:
-            df_cache = self.data_access.get_candles(epic, timeframe, limit=30)
+            df_cache = self.data_access.get_candles(epic, timeframe, limit=300)
             self._last_candles_cache[epic] = (timeframe, df_cache)
 
         if matrix.num_features == 0:
