@@ -630,6 +630,30 @@ class PaperTradingLoop:
         except Exception as e:
             logger.warning(f"RegimeGate init failed: {e}")
 
+    async def _read_broker_stops(
+        self, deal_id: str, epic: str | None = None
+    ) -> tuple[float | None, float | None]:
+        """Read the current SL/TP from the broker for a position.
+
+        Capital.com may return a different deal_id from create vs list, so
+        we also try matching by epic as a fallback.
+        """
+        if not self.broker:
+            return None, None
+        try:
+            positions = await self.broker.list_positions()
+            for p in positions:
+                if p.deal_id == deal_id:
+                    return p.stop_level, p.profit_level
+            # Fallback: match by epic
+            if epic:
+                for p in positions:
+                    if p.epic == epic:
+                        return p.stop_level, p.profit_level
+        except Exception as e:
+            logger.debug(f"_read_broker_stops failed: {e}")
+        return None, None
+
     async def _refresh_correlation_regime(self) -> None:
         """Recompute correlation regime every 30 minutes."""
         now = _time.monotonic()
@@ -2009,6 +2033,41 @@ class PaperTradingLoop:
                 )
                 risk_result.stop_loss = new_sl
                 risk_result.take_profit = new_tp
+
+                # CRITICAL: Push the recalculated levels to the broker so the
+                # broker's SL/TP match what MANTIS is managing. Without this,
+                # the broker keeps the original (slipped) SL while MANTIS thinks
+                # it's tracking the new ones — causing R:R blow-up.
+                if exec_result.deal_id:
+                    try:
+                        update_result = await self.execution_engine.update_stops(
+                            deal_id=exec_result.deal_id,
+                            stop_level=new_sl,
+                            profit_level=new_tp,
+                        )
+                        if update_result.success:
+                            logger.info(
+                                f"[{epic}] Broker SL/TP updated to recalc values: "
+                                f"SL={new_sl:.4f} TP={new_tp:.4f}"
+                            )
+                            # Re-read actual values (broker may apply further adjustments)
+                            try:
+                                actual_sl, actual_tp = await self._read_broker_stops(
+                                    exec_result.deal_id, epic
+                                )
+                                if actual_sl is not None:
+                                    exec_result.actual_stop_loss = actual_sl
+                                if actual_tp is not None:
+                                    exec_result.actual_take_profit = actual_tp
+                            except Exception as e:
+                                logger.debug(f"[{epic}] Could not re-read stops: {e}")
+                        else:
+                            logger.warning(
+                                f"[{epic}] Failed to push recalc SL/TP to broker: "
+                                f"{update_result.error}"
+                            )
+                    except Exception as e:
+                        logger.warning(f"[{epic}] Exception updating broker stops post-recalc: {e}")
 
             # CRITICAL: Use the broker's ACTUAL SL/TP as authoritative source.
             # The broker may have adjusted our requested levels (min-distance
