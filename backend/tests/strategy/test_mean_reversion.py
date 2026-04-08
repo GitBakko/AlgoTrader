@@ -41,42 +41,63 @@ def mock_settings():
 
 class TestSellSignal:
     def test_sell_signal_overbought(self, strategy):
-        """z > 2, RSI > 70, ADX < 30 -> SELL with TP at mean."""
+        """z > 2, RSI > 70, ADX < 30 -> SELL with TP at mean (capped at 4 ATR)."""
+        # Use a wider ATR so that TP at mean (5 below) is within the 4*ATR cap
         data = _make_market_data(
             current_price=105.0,
             vwap_z_score=2.5,
             rsi=75.0,
             adx=20.0,
             vwap=100.0,
+            atr=2.0,  # 4*ATR cap = 8, so TP at 100 (5 below) is valid
+        )
+        sig = strategy.generate_signal(data)
+
+        assert sig.direction == "SELL"
+        assert sig.tp_level == 100.0  # TP at VWAP (within cap)
+        assert sig.stop_level is not None
+        # SL = entry + 2*ATR = 105 + 4 = 109
+        assert sig.stop_level == 109.0
+        assert sig.confidence >= 0.5
+        assert "above mean" in sig.reason
+
+    def test_sell_signal_tp_capped(self, strategy):
+        """When mean is too far, TP is capped at 4 ATR from entry."""
+        data = _make_market_data(
+            current_price=105.0,
+            vwap_z_score=2.5,
+            rsi=75.0,
+            adx=20.0,
+            vwap=80.0,  # Way too far (25 below entry)
             atr=1.0,
         )
         sig = strategy.generate_signal(data)
 
         assert sig.direction == "SELL"
-        assert sig.tp_level == 100.0  # TP at VWAP
-        assert sig.stop_level is not None
-        assert sig.stop_level > 105.0  # SL above entry
-        assert sig.confidence >= 0.5
-        assert "above mean" in sig.reason
+        # TP capped at 4 ATR = 105 - 4 = 101
+        assert sig.tp_level == 101.0
+        # SL = entry + 2 ATR = 107
+        assert sig.stop_level == 107.0
 
 
 class TestBuySignal:
     def test_buy_signal_oversold(self, strategy):
-        """z < -2, RSI < 30, ADX < 30 -> BUY with TP at mean."""
+        """z < -2, RSI < 30, ADX < 30 -> BUY with TP at mean (capped at 4 ATR)."""
         data = _make_market_data(
             current_price=95.0,
             vwap_z_score=-2.5,
             rsi=25.0,
             adx=20.0,
             vwap=100.0,
-            atr=1.0,
+            atr=2.0,  # 4*ATR cap = 8, so TP at 100 (5 above) is valid
         )
         sig = strategy.generate_signal(data)
 
         assert sig.direction == "BUY"
-        assert sig.tp_level == 100.0  # TP at VWAP
+        assert sig.tp_level == 100.0  # TP at VWAP (within cap)
         assert sig.stop_level is not None
-        assert sig.stop_level < 95.0  # SL below entry
+        # SL = entry - 2*ATR = 95 - 4 = 91
+        assert sig.stop_level == 91.0
         assert sig.confidence >= 0.5
         assert "below mean" in sig.reason
 

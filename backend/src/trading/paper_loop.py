@@ -2008,15 +2008,38 @@ class PaperTradingLoop:
                 # Phase 14: persist trailing stop state
                 await self._persist_trailing_stop_state(exec_result.deal_id)
 
+            # Sanity check: validate R:R is in a sane range
+            _entry = exec_result.fill_price or signal.entry_price
+            _sl = risk_result.stop_loss
+            _tp = risk_result.take_profit
+            if _sl and _tp and _entry > 0:
+                _risk = abs(_entry - _sl)
+                _reward = abs(_entry - _tp)
+                _rr = _reward / _risk if _risk > 0 else 0
+                _sl_dist_pct = _risk / _entry * 100
+                if _rr < 0.5 or _rr > 5.0 or _sl_dist_pct < 0.05:
+                    logger.warning(
+                        f"[{epic}] SUSPICIOUS LEVELS: R:R={_rr:.2f}, "
+                        f"SL_dist={_sl_dist_pct:.3f}%, "
+                        f"entry={_entry:.4f} SL={_sl:.4f} TP={_tp:.4f} "
+                        f"({signal.direction.value})"
+                    )
+                else:
+                    logger.info(
+                        f"[{epic}] Levels OK: R:R={_rr:.2f}, "
+                        f"SL_dist={_sl_dist_pct:.2f}%, "
+                        f"entry={_entry:.4f} SL={_sl:.4f} TP={_tp:.4f}"
+                    )
+
             # Persist position to database
             await self._persist_position_open(
                 deal_id=exec_result.deal_id or "",
                 epic=epic,
                 direction=signal.direction.value,
                 size=risk_result.position_size,
-                entry_price=exec_result.fill_price or signal.entry_price,
-                stop_loss=risk_result.stop_loss,
-                take_profit=risk_result.take_profit,
+                entry_price=_entry,
+                stop_loss=_sl,
+                take_profit=_tp,
             )
 
             # Log executed signal + execution

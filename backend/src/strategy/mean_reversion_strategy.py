@@ -75,6 +75,12 @@ class MeanReversionStrategy:
         # Mean target (use VWAP if available, else BB middle)
         mean_target = vwap if vwap and vwap > 0 else bb_middle
 
+        # SL/TP sizing: use fixed ATR multiples to ensure sane risk/reward.
+        # SL must be at least SL_MIN_ATR away from entry (avoid micro-stops).
+        # TP is the mean target, but capped at TP_MAX_ATR away to avoid huge R:R.
+        SL_ATR_MULT = 2.0  # Stop loss = 2 ATR away from entry
+        TP_MAX_ATR = 4.0  # Cap TP distance at 4 ATR (max R:R = 2.0 with 2 ATR SL)
+
         # SELL signal: price far above mean. RSI is a confidence boost, not a hard gate.
         if z_score > z_entry:
             # Confidence: how extreme (z=2 -> 0.5, z=3 -> 1.0)
@@ -82,14 +88,25 @@ class MeanReversionStrategy:
             # RSI boost: overbought confirms the SELL setup
             if rsi > self.RSI_OB:
                 confidence = min(confidence + 0.2, 1.0)
-            # SL: price extends further (z reaches z_stop)
-            sl = current_price + (z_stop - z_score) * atr if atr > 0 else None
-            # TP: return to mean
-            tp = mean_target
 
+            # SL: 2 ATR ABOVE current price (price extends further against us)
+            sl = current_price + SL_ATR_MULT * atr if atr > 0 else None
+
+            # TP: return to mean, but capped to avoid unrealistic R:R
+            raw_tp = mean_target
+            min_tp = current_price - TP_MAX_ATR * atr if atr > 0 else raw_tp
+            # For SELL: TP must be BELOW entry; cap distance to TP_MAX_ATR
+            tp = max(raw_tp, min_tp) if raw_tp < current_price else min_tp
+
+            rr = (
+                (current_price - tp) / (sl - current_price)
+                if sl and tp and sl > current_price
+                else 0
+            )
             logger.info(
                 f"MR SELL: z={z_score:.2f}, RSI={rsi:.1f}, ADX={adx:.1f}, "
-                f"TP={tp:.2f}, SL={f'{sl:.2f}' if sl else 'N/A'}"
+                f"entry={current_price:.2f}, TP={tp:.2f}, "
+                f"SL={f'{sl:.2f}' if sl else 'N/A'}, R:R={rr:.2f}"
             )
             return MRSignal(
                 direction="SELL",
@@ -106,12 +123,25 @@ class MeanReversionStrategy:
             # RSI boost: oversold confirms the BUY setup
             if rsi < self.RSI_OS:
                 confidence = min(confidence + 0.2, 1.0)
-            sl = current_price - (z_stop - abs(z_score)) * atr if atr > 0 else None
-            tp = mean_target
 
+            # SL: 2 ATR BELOW current price
+            sl = current_price - SL_ATR_MULT * atr if atr > 0 else None
+
+            # TP: return to mean, capped at TP_MAX_ATR away
+            raw_tp = mean_target
+            max_tp = current_price + TP_MAX_ATR * atr if atr > 0 else raw_tp
+            # For BUY: TP must be ABOVE entry; cap distance
+            tp = min(raw_tp, max_tp) if raw_tp > current_price else max_tp
+
+            rr = (
+                (tp - current_price) / (current_price - sl)
+                if sl and tp and sl < current_price
+                else 0
+            )
             logger.info(
                 f"MR BUY: z={z_score:.2f}, RSI={rsi:.1f}, ADX={adx:.1f}, "
-                f"TP={tp:.2f}, SL={f'{sl:.2f}' if sl else 'N/A'}"
+                f"entry={current_price:.2f}, TP={tp:.2f}, "
+                f"SL={f'{sl:.2f}' if sl else 'N/A'}, R:R={rr:.2f}"
             )
             return MRSignal(
                 direction="BUY",
