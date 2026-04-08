@@ -100,9 +100,18 @@ type Tab = 'open' | 'history';
                     </div>
                   </div>
                   <div class="d-flex justify-content-between align-items-center">
-                    <div class="d-flex gap-2 small text-body-secondary">
+                    <div class="d-flex gap-2 small text-body-secondary flex-wrap">
                       @if (pos.stop_level != null) {
                         <span>SL: <span class="mantis-mono">{{ pos.stop_level | priceFormat:pos.epic }}</span></span>
+                      }
+                      @if (pos.profit_level != null) {
+                        <span>TP: <span class="mantis-mono">{{ pos.profit_level | priceFormat:pos.epic }}</span></span>
+                      }
+                      @if (pos.level_deviation && (pos.level_deviation.sl_deviation !== 0 || pos.level_deviation.tp_deviation !== 0)) {
+                        <span class="badge bg-warning text-dark"
+                              [cTooltip]="'Richiesto: SL=' + (pos.level_deviation.requested_sl | priceFormat:pos.epic) + ' TP=' + (pos.level_deviation.requested_tp | priceFormat:pos.epic) + ' | Effettivo broker: SL=' + (pos.level_deviation.actual_sl | priceFormat:pos.epic) + ' TP=' + (pos.level_deviation.actual_tp | priceFormat:pos.epic) + ' | Scostamento SL: ' + pos.level_deviation.sl_deviation_pct.toFixed(2) + '% TP: ' + pos.level_deviation.tp_deviation_pct.toFixed(2) + '%'">
+                          ⚠ broker adj
+                        </span>
                       }
                       @if (pos.trailing_stop_phase) {
                         <span class="trailing-phase trailing-phase--sm"
@@ -164,8 +173,24 @@ type Tab = 'open' | 'history';
                           [class.text-danger]="pos.live_pnl < 0">
                         {{ pos.current_price ? (pos.current_price | priceFormat:pos.epic) : '—' }}
                       </td>
-                      <td class="mantis-mono">{{ pos.stop_level != null ? (pos.stop_level | priceFormat:pos.epic) : '—' }}</td>
-                      <td class="mantis-mono">{{ pos.profit_level != null ? (pos.profit_level | priceFormat:pos.epic) : '—' }}</td>
+                      <td class="mantis-mono">
+                        {{ pos.stop_level != null ? (pos.stop_level | priceFormat:pos.epic) : '—' }}
+                        @if (pos.level_deviation && pos.level_deviation.sl_deviation !== 0) {
+                          <span class="badge bg-warning text-dark ms-1" style="font-size: 0.65rem;"
+                                [cTooltip]="'Richiesto: ' + (pos.level_deviation.requested_sl | priceFormat:pos.epic) + ' | Scost.: ' + pos.level_deviation.sl_deviation_pct.toFixed(2) + '%'">
+                            adj
+                          </span>
+                        }
+                      </td>
+                      <td class="mantis-mono">
+                        {{ pos.profit_level != null ? (pos.profit_level | priceFormat:pos.epic) : '—' }}
+                        @if (pos.level_deviation && pos.level_deviation.tp_deviation !== 0) {
+                          <span class="badge bg-warning text-dark ms-1" style="font-size: 0.65rem;"
+                                [cTooltip]="'Richiesto: ' + (pos.level_deviation.requested_tp | priceFormat:pos.epic) + ' | Scost.: ' + pos.level_deviation.tp_deviation_pct.toFixed(2) + '%'">
+                            adj
+                          </span>
+                        }
+                      </td>
                       <td>
                         @if (pos.risk_managed_locally) {
                           <span class="risk-badge risk-badge--slim risk-badge--local"

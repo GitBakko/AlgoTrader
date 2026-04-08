@@ -38,6 +38,10 @@ class ExecutionResult(BaseModel):
     deal_id: str | None = None
     fill_price: float | None = None
     slippage: float = 0.0
+    # Actual SL/TP set on the broker (may differ from requested due to broker
+    # min-distance corrections). None if not applicable or unknown.
+    actual_stop_loss: float | None = None
+    actual_take_profit: float | None = None
     error: str | None = None
     error_detail: dict | None = None
     execution_time_ms: float = 0.0

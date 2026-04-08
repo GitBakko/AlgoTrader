@@ -224,8 +224,10 @@ class OrderManager:
             )
 
             # CRITICAL: If opened without stops, set SL/TP via modify_stops
+            actual_sl = order.stop_loss
+            actual_tp = order.take_profit
             if opened_without_stops and confirmation.deal_id:
-                await self._set_stops_after_fill(
+                actual_sl, actual_tp = await self._set_stops_after_fill(
                     deal_id=confirmation.deal_id,
                     epic=order.epic,
                     direction=order.direction,
@@ -235,11 +237,22 @@ class OrderManager:
                     original_entry=order.entry_price,
                 )
 
+            # Read back the actual SL/TP from the broker as authoritative source
+            if confirmation.deal_id:
+                try:
+                    actual_sl, actual_tp = await self._read_actual_stops(
+                        confirmation.deal_id, fallback_sl=actual_sl, fallback_tp=actual_tp
+                    )
+                except Exception as e:
+                    logger.debug(f"Could not read actual stops for {confirmation.deal_id}: {e}")
+
             return ExecutionResult(
                 success=True,
                 deal_id=confirmation.deal_id,
                 fill_price=confirmation.level,
                 slippage=slippage,
+                actual_stop_loss=actual_sl,
+                actual_take_profit=actual_tp,
             )
 
         except MarketClosedError as e:
@@ -328,11 +341,26 @@ class OrderManager:
                                 f"{order.direction} size={order.size:.4f} "
                                 f"@ {confirmation.level:.2f}"
                             )
+                            # Read back actual stops from broker (corrected_sl/tp are
+                            # what we sent, but broker may have applied further adjustments)
+                            final_sl = corrected_sl
+                            final_tp = corrected_tp
+                            if confirmation.deal_id:
+                                try:
+                                    final_sl, final_tp = await self._read_actual_stops(
+                                        confirmation.deal_id,
+                                        fallback_sl=corrected_sl,
+                                        fallback_tp=corrected_tp,
+                                    )
+                                except Exception as ex:
+                                    logger.debug(f"Could not read actual stops: {ex}")
                             return ExecutionResult(
                                 success=True,
                                 deal_id=confirmation.deal_id,
                                 fill_price=confirmation.level,
                                 slippage=slippage,
+                                actual_stop_loss=final_sl,
+                                actual_take_profit=final_tp,
                             )
                     except Exception:
                         pass  # Fall through to no-stops retry
@@ -357,8 +385,10 @@ class OrderManager:
                         )
 
                         # Set stops after fill
+                        applied_sl = None
+                        applied_tp = None
                         if confirmation.deal_id:
-                            await self._set_stops_after_fill(
+                            applied_sl, applied_tp = await self._set_stops_after_fill(
                                 deal_id=confirmation.deal_id,
                                 epic=order.epic,
                                 direction=order.direction,
@@ -367,12 +397,23 @@ class OrderManager:
                                 original_tp=order.take_profit,
                                 original_entry=order.entry_price,
                             )
+                            # Read back authoritative values from broker
+                            try:
+                                applied_sl, applied_tp = await self._read_actual_stops(
+                                    confirmation.deal_id,
+                                    fallback_sl=applied_sl,
+                                    fallback_tp=applied_tp,
+                                )
+                            except Exception as ex:
+                                logger.debug(f"Could not read actual stops: {ex}")
 
                         return ExecutionResult(
                             success=True,
                             deal_id=confirmation.deal_id,
                             fill_price=confirmation.level,
                             slippage=slippage,
+                            actual_stop_loss=applied_sl,
+                            actual_take_profit=applied_tp,
                         )
                 except Exception:
                     pass  # Fall through to original error
@@ -401,16 +442,20 @@ class OrderManager:
         original_sl: float | None,
         original_tp: float | None,
         original_entry: float,
-    ) -> None:
+    ) -> tuple[float | None, float | None]:
         """
         Set SL/TP on a broker position AFTER it has been filled.
 
         Recalculates stop/profit levels relative to the actual fill price
         (not the predicted OHLC price used to compute the original levels).
         This handles the case where broker rejected the initial SL/TP.
+
+        Returns:
+            (actual_sl, actual_tp) — the levels actually applied (may be None
+            on failure or differ from requested due to broker constraints).
         """
         if original_sl is None and original_tp is None:
-            return
+            return None, None
 
         # Recalculate SL/TP relative to fill price (preserve distance from entry)
         adjusted_sl = None
@@ -479,7 +524,7 @@ class OrderManager:
                     logger.info(
                         f"[{epic}] ✅ SL/TP set on broker: SL={adjusted_sl}, TP={adjusted_tp}"
                     )
-                    return  # Success
+                    return adjusted_sl, adjusted_tp
                 elif "not-found" in (result.error or ""):
                     logger.debug(f"[{epic}] Deal not yet available (attempt {attempt + 1})")
                     continue  # Retry
@@ -489,7 +534,7 @@ class OrderManager:
                         f"Position {deal_id} will use LOCAL stop management only."
                     )
                     self._update_local_stops(deal_id, adjusted_sl, adjusted_tp)
-                    return  # Non-retryable error
+                    return adjusted_sl, adjusted_tp
             except Exception as e:
                 if attempt < max_retries - 1:
                     logger.debug(f"[{epic}] Exception on attempt {attempt + 1}: {e}")
@@ -499,6 +544,49 @@ class OrderManager:
                     f"Position {deal_id} will use LOCAL stop management only."
                 )
                 self._update_local_stops(deal_id, adjusted_sl, adjusted_tp)
+        return adjusted_sl, adjusted_tp
+
+    async def _read_actual_stops(
+        self,
+        deal_id: str,
+        fallback_sl: float | None = None,
+        fallback_tp: float | None = None,
+    ) -> tuple[float | None, float | None]:
+        """Read the actual SL/TP currently set on the broker for a position.
+
+        Capital.com sometimes adjusts SL/TP values to satisfy minimum-distance
+        constraints (rejecting our requested level and applying a slightly
+        wider one). This reads the authoritative values from the broker so
+        the trailing stop manager and DB stay in sync with reality.
+
+        Args:
+            deal_id: Position deal ID (the one returned at creation)
+            fallback_sl: Value to return if broker lookup fails
+            fallback_tp: Value to return if broker lookup fails
+
+        Returns:
+            (actual_sl, actual_tp) — broker-confirmed values, or fallbacks.
+        """
+        if self._broker is None:
+            return fallback_sl, fallback_tp
+
+        try:
+            # Capital.com returns different deal_ids for create vs list, so
+            # match by deal_id substring or by listing all positions.
+            positions = await asyncio.wait_for(self._broker.list_positions(), timeout=5.0)
+            for p in positions:
+                if p.deal_id == deal_id or (deal_id and deal_id in p.deal_id):
+                    sl_val = p.stop_level if p.stop_level else fallback_sl
+                    tp_val = p.profit_level if p.profit_level else fallback_tp
+                    if sl_val != fallback_sl or tp_val != fallback_tp:
+                        logger.info(
+                            f"[{p.epic}] Broker actual stops differ from requested: "
+                            f"SL={sl_val} (req {fallback_sl}), TP={tp_val} (req {fallback_tp})"
+                        )
+                    return sl_val, tp_val
+        except Exception as e:
+            logger.debug(f"_read_actual_stops failed: {e}")
+        return fallback_sl, fallback_tp
 
     def _update_local_stops(self, deal_id: str, sl: float | None, tp: float | None) -> None:
         """Update local position SL/TP when broker rejects. Falls back gracefully."""

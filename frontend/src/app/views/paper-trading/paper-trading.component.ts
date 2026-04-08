@@ -408,6 +408,13 @@ interface GroupedPosition {
                                 <span class="mantis-mono">SL: {{ pos.stop_level !== null ? (pos.stop_level | priceFormat:pos.epic) : '—' }}</span>
                                 <span class="text-body-secondary">|</span>
                                 <span class="mantis-mono">TP: {{ pos.profit_level !== null ? (pos.profit_level | priceFormat:pos.epic) : '—' }}</span>
+                                @if (pos.level_deviation && (pos.level_deviation.sl_deviation !== 0 || pos.level_deviation.tp_deviation !== 0)) {
+                                  <span class="text-body-secondary">|</span>
+                                  <span class="badge bg-warning text-dark"
+                                        [cTooltip]="'Richiesto SL=' + (pos.level_deviation.requested_sl | priceFormat:pos.epic) + ' TP=' + (pos.level_deviation.requested_tp | priceFormat:pos.epic) + ' | Scost. SL ' + pos.level_deviation.sl_deviation_pct.toFixed(2) + '% TP ' + pos.level_deviation.tp_deviation_pct.toFixed(2) + '%'">
+                                    ⚠ broker adj
+                                  </span>
+                                }
                                 @if (pos.trailing_stop_phase) {
                                   <span class="text-body-secondary">|</span>
                                   <c-badge [color]="trailingPhaseColor(pos.trailing_stop_phase)" class="badge-sm">

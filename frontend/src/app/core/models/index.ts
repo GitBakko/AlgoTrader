@@ -278,6 +278,17 @@ export interface ModelLoadedInfo {
 }
 
 // Paper Trading Positions (GET /api/trading/positions)
+export interface LevelDeviation {
+  requested_sl: number;
+  requested_tp: number;
+  actual_sl: number;
+  actual_tp: number;
+  sl_deviation: number;     // actual - requested
+  tp_deviation: number;
+  sl_deviation_pct: number; // % of entry
+  tp_deviation_pct: number;
+}
+
 export interface PaperPosition {
   deal_id: string;
   epic: string;
@@ -291,6 +302,7 @@ export interface PaperPosition {
   risk_managed_locally?: boolean; // true if SL/TP managed by MANTIS (not broker)
   upl?: number | null;          // Broker's unrealized P&L (always accurate)
   market_status?: string | null; // TRADEABLE, CLOSED, etc.
+  level_deviation?: LevelDeviation; // Difference between requested and broker-actual SL/TP
 }
 
 // Structured broker error detail (from broker_error_parser)

@@ -179,6 +179,10 @@ class PaperTradingLoop:
         self._asset_rotation_ts: float = 0.0
         self._per_asset_losses: dict[str, int] = {}  # consecutive loss counter per asset
         self._spread_blocked_epics: dict[str, dict] = {}  # epic → spread block info
+        # deal_id -> {requested_sl, requested_tp, actual_sl, actual_tp, sl_dev, tp_dev}
+        # Tracks the difference between what we requested at order creation and
+        # what the broker actually applied (due to min-distance constraints).
+        self._level_deviations: dict[str, dict] = {}
         self._last_spread_refresh: float = 0.0  # timestamp of last hourly spread check
         self._correlation_regime: str = "normal"
         self._correlation_regime_ts: float = 0.0
@@ -338,6 +342,17 @@ class PaperTradingLoop:
                 from src.risk.trailing_stop_manager import TrailingPhase
 
                 pos["trailing_stop_phase"] = TrailingPhase(state.phase).name
+
+            # Attach level deviation info (requested vs broker-actual SL/TP)
+            deviation = self._level_deviations.get(deal_id)
+            if deviation is None:
+                # Fallback: match by epic if deal_id differs (Capital.com quirk)
+                for tracked_id, dev in self._level_deviations.items():
+                    if pos.get("epic") and tracked_id.startswith(pos.get("epic", "")):
+                        deviation = dev
+                        break
+            if deviation:
+                pos["level_deviation"] = deviation
         return positions
 
     def get_paper_positions(self) -> list[dict]:
@@ -1995,23 +2010,64 @@ class PaperTradingLoop:
                 risk_result.stop_loss = new_sl
                 risk_result.take_profit = new_tp
 
+            # CRITICAL: Use the broker's ACTUAL SL/TP as authoritative source.
+            # The broker may have adjusted our requested levels (min-distance
+            # constraints, etc.). Trailing stop and DB must match what the
+            # broker actually has, not what we asked for.
+            _entry = exec_result.fill_price or signal.entry_price
+            _requested_sl = risk_result.stop_loss
+            _requested_tp = risk_result.take_profit
+            _broker_sl = exec_result.actual_stop_loss
+            _broker_tp = exec_result.actual_take_profit
+            _sl = _broker_sl if _broker_sl is not None else _requested_sl
+            _tp = _broker_tp if _broker_tp is not None else _requested_tp
+
+            _sl_deviation = (_sl - _requested_sl) if (_sl and _requested_sl) else 0.0
+            _tp_deviation = (_tp - _requested_tp) if (_tp and _requested_tp) else 0.0
+
+            if _broker_sl is not None and abs(_sl_deviation) > 1e-6:
+                logger.warning(
+                    f"[{epic}] Broker adjusted SL: {_requested_sl:.4f} -> {_broker_sl:.4f} "
+                    f"(deviation {_sl_deviation:+.4f})"
+                )
+            if _broker_tp is not None and abs(_tp_deviation) > 1e-6:
+                logger.warning(
+                    f"[{epic}] Broker adjusted TP: {_requested_tp:.4f} -> {_broker_tp:.4f} "
+                    f"(deviation {_tp_deviation:+.4f})"
+                )
+
+            # Track deviation for API exposure
+            if exec_result.deal_id:
+                self._level_deviations[exec_result.deal_id] = {
+                    "requested_sl": _requested_sl,
+                    "requested_tp": _requested_tp,
+                    "actual_sl": _sl,
+                    "actual_tp": _tp,
+                    "sl_deviation": round(_sl_deviation, 6),
+                    "tp_deviation": round(_tp_deviation, 6),
+                    "sl_deviation_pct": round(
+                        (_sl_deviation / _entry * 100) if _entry > 0 else 0, 4
+                    ),
+                    "tp_deviation_pct": round(
+                        (_tp_deviation / _entry * 100) if _entry > 0 else 0, 4
+                    ),
+                }
+
             # Phase 8: register position for trailing stop management
+            # Use the broker's actual SL so trailing stop calculations are aligned
             if exec_result.deal_id:
                 self.trailing_stop_manager.register_position(
                     deal_id=exec_result.deal_id,
                     epic=epic,
                     direction=signal.direction.value,
                     entry_price=actual_entry,
-                    stop_loss=risk_result.stop_loss,
+                    stop_loss=_sl,
                     atr=market_data["atr"],
                 )
                 # Phase 14: persist trailing stop state
                 await self._persist_trailing_stop_state(exec_result.deal_id)
 
-            # Sanity check: validate R:R is in a sane range
-            _entry = exec_result.fill_price or signal.entry_price
-            _sl = risk_result.stop_loss
-            _tp = risk_result.take_profit
+            # Sanity check: validate R:R is in a sane range (using broker values)
             if _sl and _tp and _entry > 0:
                 _risk = abs(_entry - _sl)
                 _reward = abs(_entry - _tp)
@@ -2026,12 +2082,12 @@ class PaperTradingLoop:
                     )
                 else:
                     logger.info(
-                        f"[{epic}] Levels OK: R:R={_rr:.2f}, "
+                        f"[{epic}] Levels OK (broker confirmed): R:R={_rr:.2f}, "
                         f"SL_dist={_sl_dist_pct:.2f}%, "
                         f"entry={_entry:.4f} SL={_sl:.4f} TP={_tp:.4f}"
                     )
 
-            # Persist position to database
+            # Persist position to database with broker-confirmed levels
             await self._persist_position_open(
                 deal_id=exec_result.deal_id or "",
                 epic=epic,
@@ -2060,8 +2116,8 @@ class PaperTradingLoop:
                     entry_price=exec_result.fill_price or signal.entry_price,
                     status=ExecutionStatus.EXECUTED,
                     deal_id=exec_result.deal_id,
-                    stop_loss=risk_result.stop_loss,
-                    take_profit=risk_result.take_profit,
+                    stop_loss=_sl,
+                    take_profit=_tp,
                     equity_at_entry=equity,
                     source=self._log_source,
                 )
@@ -2075,8 +2131,8 @@ class PaperTradingLoop:
                     direction=signal.direction.value,
                     confidence=signal.confidence,
                     entry_price=exec_result.fill_price or signal.entry_price,
-                    stop_loss=risk_result.stop_loss,
-                    take_profit=risk_result.take_profit,
+                    stop_loss=_sl,
+                    take_profit=_tp,
                     status="EXECUTED",
                     features=audit_features,
                 )
@@ -2180,13 +2236,28 @@ class PaperTradingLoop:
                         stop_multiplier=_sl_m,
                         risk_reward=_rr_m,
                     )
+                # Use broker-confirmed values when available
+                _r_broker_sl = exec_result.actual_stop_loss
+                _r_broker_tp = exec_result.actual_take_profit
+                _r_sl = _r_broker_sl if _r_broker_sl is not None else risk_result.stop_loss
+                _r_tp = _r_broker_tp if _r_broker_tp is not None else risk_result.take_profit
+                if _r_broker_sl is not None and _r_broker_sl != risk_result.stop_loss:
+                    logger.warning(
+                        f"[{epic}] Broker adjusted SL (retry path): "
+                        f"{risk_result.stop_loss:.4f} -> {_r_broker_sl:.4f}"
+                    )
+                if _r_broker_tp is not None and _r_broker_tp != risk_result.take_profit:
+                    logger.warning(
+                        f"[{epic}] Broker adjusted TP (retry path): "
+                        f"{risk_result.take_profit:.4f} -> {_r_broker_tp:.4f}"
+                    )
                 if exec_result.deal_id:
                     self.trailing_stop_manager.register_position(
                         deal_id=exec_result.deal_id,
                         epic=epic,
                         direction=signal.direction.value,
                         entry_price=actual_entry,
-                        stop_loss=risk_result.stop_loss,
+                        stop_loss=_r_sl,
                         atr=market_data["atr"],
                     )
                     await self._persist_trailing_stop_state(exec_result.deal_id)
@@ -2196,8 +2267,8 @@ class PaperTradingLoop:
                     direction=signal.direction.value,
                     size=risk_result.position_size,
                     entry_price=actual_entry,
-                    stop_loss=risk_result.stop_loss,
-                    take_profit=risk_result.take_profit,
+                    stop_loss=_r_sl,
+                    take_profit=_r_tp,
                 )
             else:
                 signal_info["status"] = "exec_failed"
@@ -2652,6 +2723,8 @@ class PaperTradingLoop:
 
         # Trailing stop: unregister
         self.trailing_stop_manager.unregister_position(deal_id)
+        # Clean up level deviation tracking for this deal
+        self._level_deviations.pop(deal_id, None)
 
     def _get_recent_sl_count(self, epic: str) -> int:
         """Count SL hits for an epic within the cooldown window."""
