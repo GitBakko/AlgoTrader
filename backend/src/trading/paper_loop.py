@@ -2022,74 +2022,86 @@ class PaperTradingLoop:
                 duration_seconds=exec_duration,
             )
 
-            # FIX: Recalculate SL/TP from actual fill price (not candle close).
-            # When fill drifts from signal.entry_price, the original SL or TP can
-            # end up on the wrong side (e.g. SL above entry for BUY, TP below).
+            # ALWAYS recompute MR-correct SL/TP from the actual fill price and
+            # push them to the broker. This handles BOTH cases:
+            #   1. Fill drift (signal computed at candle close, fill drifted)
+            #   2. Broker min-distance corrections that blow up R:R on indices
+            # The broker's initial wide stops are overwritten with our tighter
+            # MR-aligned levels (R:R 2.0). If the broker rejects, we log the
+            # full error for analysis.
             actual_entry = exec_result.fill_price or signal.entry_price
             _risk_settings = get_settings()
             _sl_mult = (
                 _risk_settings.scalp_sl_multiplier if _risk_settings.scalp_mode_enabled else 2.0
             )
-            _rr = _risk_settings.scalp_tp_risk_reward if _risk_settings.scalp_mode_enabled else 2.5
+            _rr = _risk_settings.scalp_tp_risk_reward if _risk_settings.scalp_mode_enabled else 2.0
 
-            _sl_ok = _validate_sl_side(signal.direction.value, actual_entry, risk_result.stop_loss)
-            _tp_ok = _validate_tp_side(
-                signal.direction.value, actual_entry, risk_result.take_profit
+            from src.utils.price_rounding import round_price
+
+            new_sl, new_tp = _recalculate_sl_tp_from_fill(
+                direction=signal.direction.value,
+                fill_price=actual_entry,
+                atr=market_data["atr"],
+                stop_multiplier=_sl_mult,
+                risk_reward=_rr,
             )
+            # Round to broker tick precision (1 decimal for indices, etc.)
+            new_sl = round_price(epic, new_sl)
+            new_tp = round_price(epic, new_tp)
 
-            if not _sl_ok or not _tp_ok:
-                new_sl, new_tp = _recalculate_sl_tp_from_fill(
-                    direction=signal.direction.value,
-                    fill_price=actual_entry,
-                    atr=market_data["atr"],
-                    stop_multiplier=_sl_mult,
-                    risk_reward=_rr,
-                )
-                logger.warning(
-                    f"[{epic}] SL/TP invalid for fill! "
-                    f"{'SL wrong side' if not _sl_ok else ''}"
-                    f"{'TP wrong side' if not _tp_ok else ''} "
-                    f"Recalculated from fill={actual_entry:.2f}: "
-                    f"SL {risk_result.stop_loss:.2f} -> {new_sl:.2f}, "
-                    f"TP {risk_result.take_profit:.2f} -> {new_tp:.2f}"
-                )
-                risk_result.stop_loss = new_sl
-                risk_result.take_profit = new_tp
+            logger.info(
+                f"[{epic}] MR levels from fill={actual_entry}: "
+                f"SL={new_sl} TP={new_tp} ATR={market_data['atr']:.4f} R:R={_rr}"
+            )
+            risk_result.stop_loss = new_sl
+            risk_result.take_profit = new_tp
 
-                # CRITICAL: Push the recalculated levels to the broker so the
-                # broker's SL/TP match what MANTIS is managing. Without this,
-                # the broker keeps the original (slipped) SL while MANTIS thinks
-                # it's tracking the new ones — causing R:R blow-up.
-                if exec_result.deal_id:
-                    try:
-                        update_result = await self.execution_engine.update_stops(
-                            deal_id=exec_result.deal_id,
-                            stop_level=new_sl,
-                            profit_level=new_tp,
+            # Push the rounded MR levels to the broker (modify_stops on the
+            # already-open position). Capital.com tends to accept narrower
+            # stops on a modify than on a create.
+            if exec_result.deal_id and new_sl and new_tp:
+                try:
+                    update_result = await self.execution_engine.update_stops(
+                        deal_id=exec_result.deal_id,
+                        stop_level=new_sl,
+                        profit_level=new_tp,
+                    )
+                    if update_result.success:
+                        logger.info(
+                            f"[{epic}] Broker SL/TP modified to MR values: "
+                            f"SL={new_sl} TP={new_tp}"
                         )
-                        if update_result.success:
-                            logger.info(
-                                f"[{epic}] Broker SL/TP updated to recalc values: "
-                                f"SL={new_sl:.4f} TP={new_tp:.4f}"
+                        # Re-read to capture any further broker adjustments
+                        try:
+                            actual_sl, actual_tp = await self._read_broker_stops(
+                                exec_result.deal_id, epic
                             )
-                            # Re-read actual values (broker may apply further adjustments)
-                            try:
-                                actual_sl, actual_tp = await self._read_broker_stops(
-                                    exec_result.deal_id, epic
+                            if actual_sl is not None:
+                                exec_result.actual_stop_loss = actual_sl
+                            if actual_tp is not None:
+                                exec_result.actual_take_profit = actual_tp
+                            if (
+                                actual_sl
+                                and actual_tp
+                                and (actual_sl != new_sl or actual_tp != new_tp)
+                            ):
+                                logger.warning(
+                                    f"[{epic}] Broker post-modify deviation: "
+                                    f"sent SL={new_sl} TP={new_tp}, "
+                                    f"broker has SL={actual_sl} TP={actual_tp}"
                                 )
-                                if actual_sl is not None:
-                                    exec_result.actual_stop_loss = actual_sl
-                                if actual_tp is not None:
-                                    exec_result.actual_take_profit = actual_tp
-                            except Exception as e:
-                                logger.debug(f"[{epic}] Could not re-read stops: {e}")
-                        else:
-                            logger.warning(
-                                f"[{epic}] Failed to push recalc SL/TP to broker: "
-                                f"{update_result.error}"
-                            )
-                    except Exception as e:
-                        logger.warning(f"[{epic}] Exception updating broker stops post-recalc: {e}")
+                        except Exception as e:
+                            logger.debug(f"[{epic}] Could not re-read stops: {e}")
+                    else:
+                        # FULL error logging — this is the diagnostic data we need
+                        logger.error(
+                            f"[{epic}] BROKER REJECTED MODIFY: error={update_result.error} "
+                            f"detail={update_result.error_detail} | "
+                            f"sent SL={new_sl} TP={new_tp} fill={actual_entry} "
+                            f"direction={signal.direction.value}"
+                        )
+                except Exception as e:
+                    logger.warning(f"[{epic}] Exception modifying broker stops: {e}")
 
             # CRITICAL: Use the broker's ACTUAL SL/TP as authoritative source.
             # The broker may have adjusted our requested levels (min-distance
