@@ -2381,19 +2381,35 @@ class PaperTradingLoop:
                 self.trailing_stop_manager.unregister_position(deal_id)
                 continue
 
-            current_price = position.get("level", 0)
-            if current_price <= 0:
-                continue
-
-            # Get ATR for the epic (from prediction service market data)
+            # Get CURRENT market price (NOT position.level which is the entry price).
+            # Prefer broker bid/offer; fall back to market_data current_price.
             epic = position.get("epic", "")
+            direction = position.get("direction", "BUY")
+            current_price: float = 0.0
             atr = None
             try:
                 md = self.prediction_service.get_market_data(epic)
                 if md:
                     atr = md.get("atr")
+                    # For BUY positions: exit at bid; for SELL: exit at offer
+                    current_price = float(md.get("current_price", 0))
             except Exception:
                 pass
+
+            # Fall back to broker market details for live bid/offer
+            if current_price <= 0 and self.broker:
+                try:
+                    details = await self.broker.get_market_details(epic)
+                    snap = details.get("snapshot", {}) if isinstance(details, dict) else {}
+                    bid = snap.get("bid", 0)
+                    offer = snap.get("offer", 0)
+                    if bid and offer:
+                        current_price = float(bid) if direction == "BUY" else float(offer)
+                except Exception as e:
+                    logger.debug(f"[{epic}] Market details fetch failed: {e}")
+
+            if current_price <= 0:
+                continue
 
             state_before = self.trailing_stop_manager.get_state(deal_id)
             phase_before = (
