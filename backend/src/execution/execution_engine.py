@@ -396,20 +396,31 @@ class ExecutionEngine:
 
         return None
 
-    async def update_stops(self, deal_id: str, new_stop: float) -> ExecutionResult:
+    async def update_stops(
+        self,
+        deal_id: str,
+        new_stop: float | None = None,
+        stop_level: float | None = None,
+        profit_level: float | None = None,
+    ) -> ExecutionResult:
         """
-        Update stop-loss on an open position.
+        Update stop-loss and/or take-profit on an open position.
 
         Args:
             deal_id: Deal ID to modify
-            new_stop: New stop-loss level
+            new_stop: Legacy alias for stop_level (kept for backward compat)
+            stop_level: New stop-loss level
+            profit_level: New take-profit level
 
         Returns:
             ExecutionResult
         """
+        # Support both old (new_stop) and new (stop_level) call sites
+        sl = stop_level if stop_level is not None else new_stop
         return await self._order_manager.modify_stops(
             deal_id=deal_id,
-            stop_level=new_stop,
+            stop_level=sl,
+            profit_level=profit_level,
         )
 
     async def partial_close(
