@@ -2059,10 +2059,34 @@ class PaperTradingLoop:
             # Push the rounded MR levels to the broker (modify_stops on the
             # already-open position). Capital.com tends to accept narrower
             # stops on a modify than on a create.
-            if exec_result.deal_id and new_sl and new_tp:
+            #
+            # CRITICAL: Capital.com returns DIFFERENT dealIds for create vs list.
+            # The exec_result.deal_id is from creation; modify requires the
+            # list_positions() dealId. We look it up by epic with retries to
+            # allow broker propagation.
+            if exec_result.deal_id and new_sl and new_tp and self.broker:
+                actual_deal_id = exec_result.deal_id
+                for attempt_delay in (1.5, 2.5, 4.0):
+                    try:
+                        await asyncio.sleep(attempt_delay)
+                        positions = await self.broker.list_positions()
+                        for p in positions:
+                            if p.epic == epic:
+                                actual_deal_id = p.deal_id
+                                break
+                        if actual_deal_id != exec_result.deal_id:
+                            logger.debug(
+                                f"[{epic}] Resolved modify dealId: "
+                                f"{exec_result.deal_id[:16]} -> {actual_deal_id[:16]}"
+                            )
+                            break
+                    except Exception as e:
+                        logger.debug(f"[{epic}] Position lookup attempt failed: {e}")
+                        continue
+
                 try:
                     update_result = await self.execution_engine.update_stops(
-                        deal_id=exec_result.deal_id,
+                        deal_id=actual_deal_id,
                         stop_level=new_sl,
                         profit_level=new_tp,
                     )
@@ -2074,7 +2098,7 @@ class PaperTradingLoop:
                         # Re-read to capture any further broker adjustments
                         try:
                             actual_sl, actual_tp = await self._read_broker_stops(
-                                exec_result.deal_id, epic
+                                actual_deal_id, epic
                             )
                             if actual_sl is not None:
                                 exec_result.actual_stop_loss = actual_sl
