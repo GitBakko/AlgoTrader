@@ -101,21 +101,11 @@ type Tab = 'open' | 'history';
                   </div>
                   <div class="d-flex justify-content-between align-items-center">
                     <div class="d-flex gap-2 small text-body-secondary flex-wrap">
-                      @if (pos.internal_sl != null) {
-                        <span class="text-info">SL int: <span class="mantis-mono">{{ pos.internal_sl | priceFormat:pos.epic }}</span></span>
-                      } @else if (pos.stop_level != null) {
+                      @if (pos.stop_level != null) {
                         <span>SL: <span class="mantis-mono">{{ pos.stop_level | priceFormat:pos.epic }}</span></span>
                       }
-                      @if (pos.internal_tp != null) {
-                        <span class="text-info">TP int: <span class="mantis-mono">{{ pos.internal_tp | priceFormat:pos.epic }}</span></span>
-                      } @else if (pos.profit_level != null) {
+                      @if (pos.profit_level != null) {
                         <span>TP: <span class="mantis-mono">{{ pos.profit_level | priceFormat:pos.epic }}</span></span>
-                      }
-                      @if (pos.internal_rr != null) {
-                        <span class="badge bg-info text-dark"
-                              [cTooltip]="'MANTIS internal R:R (broker hard stops are wider). Broker SL=' + (pos.stop_level | priceFormat:pos.epic) + ' TP=' + (pos.profit_level | priceFormat:pos.epic)">
-                          R:R {{ pos.internal_rr.toFixed(2) }}
-                        </span>
                       }
                       @if (pos.level_deviation && (pos.level_deviation.sl_deviation !== 0 || pos.level_deviation.tp_deviation !== 0)) {
                         <span class="badge bg-warning text-dark"
@@ -184,13 +174,7 @@ type Tab = 'open' | 'history';
                         {{ pos.current_price ? (pos.current_price | priceFormat:pos.epic) : '—' }}
                       </td>
                       <td class="mantis-mono">
-                        @if (pos.internal_sl != null) {
-                          <span class="text-info" [cTooltip]="'MANTIS internal SL (broker hard SL: ' + (pos.stop_level | priceFormat:pos.epic) + ')'">
-                            {{ pos.internal_sl | priceFormat:pos.epic }}
-                          </span>
-                        } @else {
-                          {{ pos.stop_level != null ? (pos.stop_level | priceFormat:pos.epic) : '—' }}
-                        }
+                        {{ pos.stop_level != null ? (pos.stop_level | priceFormat:pos.epic) : '—' }}
                         @if (pos.level_deviation && pos.level_deviation.sl_deviation !== 0) {
                           <span class="badge bg-warning text-dark ms-1" style="font-size: 0.65rem;"
                                 [cTooltip]="'Richiesto: ' + (pos.level_deviation.requested_sl | priceFormat:pos.epic) + ' | Scost.: ' + pos.level_deviation.sl_deviation_pct.toFixed(2) + '%'">
@@ -199,13 +183,7 @@ type Tab = 'open' | 'history';
                         }
                       </td>
                       <td class="mantis-mono">
-                        @if (pos.internal_tp != null) {
-                          <span class="text-info" [cTooltip]="'MANTIS internal TP (broker hard TP: ' + (pos.profit_level | priceFormat:pos.epic) + ')'">
-                            {{ pos.internal_tp | priceFormat:pos.epic }}
-                          </span>
-                        } @else {
-                          {{ pos.profit_level != null ? (pos.profit_level | priceFormat:pos.epic) : '—' }}
-                        }
+                        {{ pos.profit_level != null ? (pos.profit_level | priceFormat:pos.epic) : '—' }}
                         @if (pos.level_deviation && pos.level_deviation.tp_deviation !== 0) {
                           <span class="badge bg-warning text-dark ms-1" style="font-size: 0.65rem;"
                                 [cTooltip]="'Richiesto: ' + (pos.level_deviation.requested_tp | priceFormat:pos.epic) + ' | Scost.: ' + pos.level_deviation.tp_deviation_pct.toFixed(2) + '%'">

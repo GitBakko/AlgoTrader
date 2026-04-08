@@ -303,9 +303,6 @@ export interface PaperPosition {
   upl?: number | null;          // Broker's unrealized P&L (always accurate)
   market_status?: string | null; // TRADEABLE, CLOSED, etc.
   level_deviation?: LevelDeviation; // Difference between requested and broker-actual SL/TP
-  internal_sl?: number | null;  // MANTIS-managed tighter SL (closes position when hit)
-  internal_tp?: number | null;  // MANTIS-managed tighter TP
-  internal_rr?: number | null;  // MANTIS-managed risk:reward ratio
 }
 
 // Structured broker error detail (from broker_error_parser)

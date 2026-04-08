@@ -183,11 +183,6 @@ class PaperTradingLoop:
         # Tracks the difference between what we requested at order creation and
         # what the broker actually applied (due to min-distance constraints).
         self._level_deviations: dict[str, dict] = {}
-        # deal_id -> {internal_sl, internal_tp, entry, direction, epic}
-        # MANTIS-managed internal SL/TP that override the broker's wide hard
-        # stops. The broker keeps wide stops for protection; MANTIS closes
-        # the position internally when these tighter targets are hit.
-        self._internal_levels: dict[str, dict] = {}
         self._last_spread_refresh: float = 0.0  # timestamp of last hourly spread check
         self._correlation_regime: str = "normal"
         self._correlation_regime_ts: float = 0.0
@@ -358,19 +353,6 @@ class PaperTradingLoop:
                         break
             if deviation:
                 pos["level_deviation"] = deviation
-
-            # Attach MANTIS internal SL/TP targets (tighter than broker hard stops)
-            internal = self._internal_levels.get(deal_id)
-            if internal is None:
-                # Fallback: match by epic
-                for tracked_id, lvl in self._internal_levels.items():
-                    if lvl.get("epic") == pos.get("epic"):
-                        internal = lvl
-                        break
-            if internal:
-                pos["internal_sl"] = internal.get("internal_sl")
-                pos["internal_tp"] = internal.get("internal_tp")
-                pos["internal_rr"] = internal.get("rr")
         return positions
 
     def get_paper_positions(self) -> list[dict]:
@@ -1408,10 +1390,6 @@ class PaperTradingLoop:
         # CRITICAL: Check and auto-close positions with violated stop losses
         await self._check_stop_losses(current_positions)
 
-        # MANTIS internal targets: close positions that hit our tighter
-        # internal SL/TP (the broker has wider hard stops we can't change)
-        await self._check_internal_targets(current_positions)
-
         # Refresh spread blocks hourly — unblock epics whose spread improved
         await self._refresh_spread_blocks()
         await self._refresh_correlation_regime()
@@ -2170,44 +2148,15 @@ class PaperTradingLoop:
                     ),
                 }
 
-            # CRITICAL: Save MANTIS internal SL/TP (the MR-recalculated values)
-            # which are tighter than the broker's hard stops. The internal-target
-            # check loop will close the position when these are hit, regardless
-            # of where the broker's hard SL/TP are.
-            # Use _requested_sl/_requested_tp because those are the MR-recalculated
-            # values BEFORE the broker corrected them (broker corrections create
-            # the R:R blow-up problem on indices like US500/DE40).
-            if exec_result.deal_id and _requested_sl and _requested_tp:
-                # Compute internal R:R for log
-                _i_risk = abs(_entry - _requested_sl)
-                _i_reward = abs(_entry - _requested_tp)
-                _i_rr = _i_reward / _i_risk if _i_risk > 0 else 0
-                self._internal_levels[exec_result.deal_id] = {
-                    "epic": epic,
-                    "direction": signal.direction.value,
-                    "entry": _entry,
-                    "internal_sl": _requested_sl,
-                    "internal_tp": _requested_tp,
-                    "rr": round(_i_rr, 2),
-                }
-                logger.info(
-                    f"[{epic}] Internal targets set: SL={_requested_sl:.4f} "
-                    f"TP={_requested_tp:.4f} R:R={_i_rr:.2f} "
-                    f"(broker has SL={_sl:.4f} TP={_tp:.4f})"
-                )
-
             # Phase 8: register position for trailing stop management.
-            # Use the INTERNAL SL (tighter, MR-recalculated) so the trailing
-            # stop progresses based on the realistic risk distance, not the
-            # wide broker-imposed one.
-            _trailing_sl = _requested_sl if _requested_sl else _sl
+            # _sl is the broker-confirmed SL (post-fill modify aligned to MR levels).
             if exec_result.deal_id:
                 self.trailing_stop_manager.register_position(
                     deal_id=exec_result.deal_id,
                     epic=epic,
                     direction=signal.direction.value,
                     entry_price=actual_entry,
-                    stop_loss=_trailing_sl,
+                    stop_loss=_sl,
                     atr=market_data["atr"],
                 )
                 # Phase 14: persist trailing stop state
@@ -2605,99 +2554,6 @@ class PaperTradingLoop:
                 except Exception as e:
                     logger.warning(f"[{epic}] TP1 partial close failed: {e}")
 
-    async def _check_internal_targets(self, current_positions: list[dict]) -> None:
-        """Check MANTIS internal SL/TP targets and close positions when hit.
-
-        The broker (Capital.com) imposes wide min-distance SL/TP on indices,
-        causing R:R blow-up. MANTIS keeps tighter internal targets and closes
-        positions manually when those are reached, regardless of where the
-        broker's hard stops are.
-
-        Internal levels are stored in self._internal_levels[deal_id] = {
-            epic, direction, entry, internal_sl, internal_tp, rr
-        }
-        """
-        if not self._internal_levels or not current_positions:
-            return
-
-        # Build deal_id -> position lookup
-        pos_by_deal = {p.get("deal_id"): p for p in current_positions if p.get("deal_id")}
-        # Also index by epic in case the broker returns a different deal_id
-        pos_by_epic = {p.get("epic"): p for p in current_positions if p.get("epic")}
-
-        for deal_id in list(self._internal_levels.keys()):
-            levels = self._internal_levels[deal_id]
-            epic = levels["epic"]
-            direction = levels["direction"]
-            internal_sl = levels["internal_sl"]
-            internal_tp = levels["internal_tp"]
-
-            # Find the live position (try deal_id first, then epic)
-            position = pos_by_deal.get(deal_id) or pos_by_epic.get(epic)
-            if position is None:
-                # Position closed externally → cleanup
-                self._internal_levels.pop(deal_id, None)
-                continue
-
-            # Get current market price
-            current_price = 0.0
-            try:
-                md = self.prediction_service.get_market_data(epic)
-                if md:
-                    current_price = float(md.get("current_price", 0))
-            except Exception:
-                pass
-
-            if current_price <= 0 and self.broker:
-                try:
-                    details = await self.broker.get_market_details(epic)
-                    snap = details.get("snapshot", {}) if isinstance(details, dict) else {}
-                    bid = snap.get("bid", 0)
-                    offer = snap.get("offer", 0)
-                    if bid and offer:
-                        # For BUY exit at bid, for SELL exit at offer (close cost)
-                        current_price = float(bid) if direction == "BUY" else float(offer)
-                except Exception as e:
-                    logger.debug(f"[{epic}] Internal target price fetch failed: {e}")
-
-            if current_price <= 0:
-                continue
-
-            # Check if internal SL or TP is hit
-            hit_reason = None
-            if direction == "BUY":
-                if current_price <= internal_sl:
-                    hit_reason = "INTERNAL_SL"
-                elif current_price >= internal_tp:
-                    hit_reason = "INTERNAL_TP"
-            else:  # SELL
-                if current_price >= internal_sl:
-                    hit_reason = "INTERNAL_SL"
-                elif current_price <= internal_tp:
-                    hit_reason = "INTERNAL_TP"
-
-            if hit_reason:
-                logger.warning(
-                    f"[{epic}] {hit_reason} hit: price={current_price:.4f} "
-                    f"vs internal_sl={internal_sl:.4f} internal_tp={internal_tp:.4f} "
-                    f"({direction}). Closing position {deal_id[:20]}..."
-                )
-                try:
-                    # Use the position's actual broker deal_id (not our cached one)
-                    actual_deal_id = position.get("deal_id", deal_id)
-                    result = await self.execution_engine.close_position(
-                        deal_id=actual_deal_id,
-                        reason=hit_reason,
-                    )
-                    if result.success:
-                        logger.info(f"[{epic}] {hit_reason} close OK at {current_price:.4f}")
-                    else:
-                        logger.warning(f"[{epic}] {hit_reason} close failed: {result.error}")
-                except Exception as e:
-                    logger.warning(f"[{epic}] Internal target close exception: {e}")
-                # Clean up regardless of success — next iteration will retry if still open
-                self._internal_levels.pop(deal_id, None)
-
     async def _check_stop_losses(self, current_positions: list[dict]) -> None:
         """
         CRITICAL: Check if any open position has violated its stop loss OR take profit
@@ -2980,8 +2836,6 @@ class PaperTradingLoop:
         self.trailing_stop_manager.unregister_position(deal_id)
         # Clean up level deviation tracking for this deal
         self._level_deviations.pop(deal_id, None)
-        # Clean up MANTIS internal target tracking for this deal
-        self._internal_levels.pop(deal_id, None)
 
     def _get_recent_sl_count(self, epic: str) -> int:
         """Count SL hits for an epic within the cooldown window."""
