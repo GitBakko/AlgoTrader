@@ -405,9 +405,21 @@ interface GroupedPosition {
                                   </span>
                                 }
                                 <span class="text-body-secondary">|</span>
-                                <span class="mantis-mono">SL: {{ pos.stop_level !== null ? (pos.stop_level | priceFormat:pos.epic) : '—' }}</span>
+                                @if (pos.internal_sl != null) {
+                                  <span class="mantis-mono text-info" [cTooltip]="'MANTIS internal SL (broker hard SL: ' + (pos.stop_level | priceFormat:pos.epic) + ')'">SL: {{ pos.internal_sl | priceFormat:pos.epic }}</span>
+                                } @else {
+                                  <span class="mantis-mono">SL: {{ pos.stop_level !== null ? (pos.stop_level | priceFormat:pos.epic) : '—' }}</span>
+                                }
                                 <span class="text-body-secondary">|</span>
-                                <span class="mantis-mono">TP: {{ pos.profit_level !== null ? (pos.profit_level | priceFormat:pos.epic) : '—' }}</span>
+                                @if (pos.internal_tp != null) {
+                                  <span class="mantis-mono text-info" [cTooltip]="'MANTIS internal TP (broker hard TP: ' + (pos.profit_level | priceFormat:pos.epic) + ')'">TP: {{ pos.internal_tp | priceFormat:pos.epic }}</span>
+                                } @else {
+                                  <span class="mantis-mono">TP: {{ pos.profit_level !== null ? (pos.profit_level | priceFormat:pos.epic) : '—' }}</span>
+                                }
+                                @if (pos.internal_rr != null) {
+                                  <span class="text-body-secondary">|</span>
+                                  <span class="badge bg-info text-dark">R:R {{ pos.internal_rr.toFixed(2) }}</span>
+                                }
                                 @if (pos.level_deviation && (pos.level_deviation.sl_deviation !== 0 || pos.level_deviation.tp_deviation !== 0)) {
                                   <span class="text-body-secondary">|</span>
                                   <span class="badge bg-warning text-dark"
