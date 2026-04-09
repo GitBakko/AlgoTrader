@@ -79,7 +79,11 @@ class MeanReversionStrategy:
         # SL must be at least SL_MIN_ATR away from entry (avoid micro-stops).
         # TP is the mean target, but capped at TP_MAX_ATR away to avoid huge R:R.
         SL_ATR_MULT = 2.0  # Stop loss = 2 ATR away from entry
-        TP_MAX_ATR = 4.0  # Cap TP distance at 4 ATR (max R:R = 2.0 with 2 ATR SL)
+        # TP cap aligned with MR literature (Lopez de Prado, QuantPedia, Robot Wealth):
+        # MR expectancy peaks at TP/SL ~ 0.5-1.0 with high hit-rate (55-65%).
+        # 4.0 was a trend-following ratio mis-applied to MR -> hit-rate too low,
+        # holding times too long, trades drifted into regime changes.
+        TP_MAX_ATR = 1.5  # R:R nominal ~ 0.75 (1.5 ATR TP vs 2.0 ATR SL)
 
         # SELL signal: price far above mean. RSI is a confidence boost, not a hard gate.
         if z_score > z_entry:

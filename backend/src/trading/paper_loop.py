@@ -2569,7 +2569,12 @@ class PaperTradingLoop:
             return
 
         _loop_settings = get_settings()
-        max_hold_hours = _loop_settings.scalp_max_hold_hours
+        # When MR is the primary strategy, use the MR-specific (shorter) time-stop.
+        # MR positions stale after ~1*OU half-life (~24h on 4h bars) -> close them.
+        if _loop_settings.mr_primary_enabled:
+            max_hold_hours = _loop_settings.mr_max_hold_hours
+        else:
+            max_hold_hours = _loop_settings.scalp_max_hold_hours
         now_utc = datetime.now(UTC)
 
         for position in current_positions:

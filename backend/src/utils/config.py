@@ -252,6 +252,9 @@ class Settings(BaseSettings):
     scalp_htf_enabled: bool = Field(default=True, alias="SCALP_HTF_ENABLED")
     scalp_htf_gate_enabled: bool = Field(default=True, alias="SCALP_HTF_GATE_ENABLED")
     scalp_max_hold_hours: float = Field(default=12.0, alias="SCALP_MAX_HOLD_HOURS")
+    # MR hard time-stop: ~6 bars on 4h = 24h. Aligned with OU half-life literature
+    # (Avellaneda-Lee 2010, Chan 2013) recommending exit at ~1*t_half if TP not hit.
+    mr_max_hold_hours: float = Field(default=24.0, alias="MR_MAX_HOLD_HOURS")
     scalp_chop_zone_min_confluence: int = Field(default=5, alias="SCALP_CHOP_ZONE_MIN_CONFLUENCE")
     scalp_chop_zone_start: int = Field(default=16, alias="SCALP_CHOP_ZONE_START")
     scalp_chop_zone_end: int = Field(default=20, alias="SCALP_CHOP_ZONE_END")
