@@ -142,7 +142,7 @@ class StrategyManager:
             from src.strategy.mean_reversion_strategy import MeanReversionStrategy
 
             mr = MeanReversionStrategy()
-            mr_signal = mr.generate_signal(market_data)
+            mr_signal = mr.generate_signal(market_data, epic=epic)
 
             if mr_signal.direction == "HOLD":
                 return TradingSignal(

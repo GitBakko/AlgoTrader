@@ -10,6 +10,36 @@ from dataclasses import dataclass
 from loguru import logger
 
 from src.utils.config import get_settings
+from src.utils.constants import CRYPTO_ASSETS, COMMODITY_ASSETS
+
+# ATR multipliers per asset class.
+# Target: SL between 1-2.5% for all classes regardless of per-asset volatility.
+# Forex/Indices have low ATR% -> can afford 2.0x. High-vol assets need tighter.
+_STOCK_ASSETS = {"NVDA", "TSLA"}
+_INDEX_ASSETS = {"US500", "DE40", "NAS100"}
+
+# (SL_ATR_MULT, TP_MAX_ATR) — TP = SL * 0.75 for consistent R:R across classes
+_CLASS_ATR_PARAMS: dict[str, tuple[float, float]] = {
+    "forex":     (2.0, 1.5),   # ATR% ~0.2-0.3% -> SL ~0.5%
+    "index":     (2.0, 1.5),   # ATR% ~0.7-1.0% -> SL ~1.5-2.0%
+    "commodity": (1.2, 0.9),   # ATR% ~1.4-3.2% -> SL ~1.7-3.8%
+    "crypto":    (1.2, 0.9),   # ATR% ~1.4-1.9% -> SL ~1.7-2.3%
+    "stock":     (1.0, 0.75),  # ATR% ~1.4-2.2% -> SL ~1.4-2.2%
+}
+
+
+def _get_atr_params(epic: str) -> tuple[float, float]:
+    """Return (SL_ATR_MULT, TP_MAX_ATR) for the given epic's asset class."""
+    if epic in _STOCK_ASSETS:
+        return _CLASS_ATR_PARAMS["stock"]
+    if epic in _INDEX_ASSETS:
+        return _CLASS_ATR_PARAMS["index"]
+    if epic in CRYPTO_ASSETS:
+        return _CLASS_ATR_PARAMS["crypto"]
+    if epic in COMMODITY_ASSETS:
+        return _CLASS_ATR_PARAMS["commodity"]
+    # Default: forex (lowest vol, widest mult is safe)
+    return _CLASS_ATR_PARAMS["forex"]
 
 
 @dataclass
@@ -36,7 +66,7 @@ class MeanReversionStrategy:
     RSI_OB = 70  # Overbought
     RSI_OS = 30  # Oversold
 
-    def generate_signal(self, market_data: dict) -> MRSignal:
+    def generate_signal(self, market_data: dict, epic: str = "") -> MRSignal:
         """Generate mean reversion signal from market data.
 
         Args:
@@ -75,15 +105,11 @@ class MeanReversionStrategy:
         # Mean target (use VWAP if available, else BB middle)
         mean_target = vwap if vwap and vwap > 0 else bb_middle
 
-        # SL/TP sizing: use fixed ATR multiples to ensure sane risk/reward.
-        # SL must be at least SL_MIN_ATR away from entry (avoid micro-stops).
-        # TP is the mean target, but capped at TP_MAX_ATR away to avoid huge R:R.
-        SL_ATR_MULT = 2.0  # Stop loss = 2 ATR away from entry
-        # TP cap aligned with MR literature (Lopez de Prado, QuantPedia, Robot Wealth):
-        # MR expectancy peaks at TP/SL ~ 0.5-1.0 with high hit-rate (55-65%).
-        # 4.0 was a trend-following ratio mis-applied to MR -> hit-rate too low,
-        # holding times too long, trades drifted into regime changes.
-        TP_MAX_ATR = 1.5  # R:R nominal ~ 0.75 (1.5 ATR TP vs 2.0 ATR SL)
+        # SL/TP sizing: per-asset-class ATR multiples.
+        # Literature (Lopez de Prado, QuantPedia) says MR works at TP/SL ~ 0.5-1.0.
+        # Different asset classes have wildly different ATR% so a single multiplier
+        # produces 0.5% SL on forex but 5% SL on stocks — we normalize per class.
+        SL_ATR_MULT, TP_MAX_ATR = _get_atr_params(epic)
 
         # SELL signal: price far above mean. RSI is a confidence boost, not a hard gate.
         if z_score > z_entry:
