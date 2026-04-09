@@ -2000,36 +2000,27 @@ class PaperTradingLoop:
                 duration_seconds=exec_duration,
             )
 
-            # ALWAYS recompute MR-correct SL/TP from the actual fill price and
-            # push them to the broker. This handles BOTH cases:
-            #   1. Fill drift (signal computed at candle close, fill drifted)
-            #   2. Broker min-distance corrections that blow up R:R on indices
-            # The broker's initial wide stops are overwritten with our tighter
-            # MR-aligned levels (R:R 2.0). If the broker rejects, we log the
-            # full error for analysis.
+            # Adjust strategy SL/TP for fill drift and round to broker precision.
+            # The strategy (MR) already computed correct SL/TP with TP_MAX_ATR cap;
+            # we only shift them proportionally if fill drifted from signal price.
             actual_entry = exec_result.fill_price or signal.entry_price
-            _risk_settings = get_settings()
-            _sl_mult = (
-                _risk_settings.scalp_sl_multiplier if _risk_settings.scalp_mode_enabled else 2.0
-            )
-            _rr = _risk_settings.scalp_tp_risk_reward if _risk_settings.scalp_mode_enabled else 2.0
-
             from src.utils.price_rounding import round_price
 
-            new_sl, new_tp = _recalculate_sl_tp_from_fill(
-                direction=signal.direction.value,
-                fill_price=actual_entry,
-                atr=market_data["atr"],
-                stop_multiplier=_sl_mult,
-                risk_reward=_rr,
-            )
+            # Shift SL/TP by the fill drift (preserves strategy's R:R / ATR ratios)
+            fill_drift = actual_entry - signal.entry_price
+            new_sl = risk_result.stop_loss + fill_drift if risk_result.stop_loss else None
+            new_tp = risk_result.take_profit + fill_drift if risk_result.take_profit else None
+
             # Round to broker tick precision (1 decimal for indices, etc.)
             new_sl = round_price(epic, new_sl)
             new_tp = round_price(epic, new_tp)
 
+            _risk_dist = abs(actual_entry - new_sl) if new_sl else 0
+            _reward_dist = abs(actual_entry - new_tp) if new_tp else 0
+            _actual_rr = _reward_dist / _risk_dist if _risk_dist > 0 else 0
             logger.info(
-                f"[{epic}] MR levels from fill={actual_entry}: "
-                f"SL={new_sl} TP={new_tp} ATR={market_data['atr']:.4f} R:R={_rr}"
+                f"[{epic}] Post-fill SL/TP: fill={actual_entry} drift={fill_drift:.4f} "
+                f"SL={new_sl} TP={new_tp} R:R={_actual_rr:.2f}"
             )
             risk_result.stop_loss = new_sl
             risk_result.take_profit = new_tp
@@ -2306,31 +2297,24 @@ class PaperTradingLoop:
                     f"[{epic}] EXECUTED (retry): deal_id={exec_result.deal_id}, "
                     f"fill={exec_result.fill_price:.2f}"
                 )
-                # Register trailing stop with corrected values
+                # Adjust strategy SL/TP for fill drift (retry path)
                 actual_entry = exec_result.fill_price or signal.entry_price
-                _risk_settings = get_settings()
-                _sl_m = (
-                    _risk_settings.scalp_sl_multiplier if _risk_settings.scalp_mode_enabled else 2.0
-                )
-                _rr_m = (
-                    _risk_settings.scalp_tp_risk_reward
-                    if _risk_settings.scalp_mode_enabled
-                    else 2.5
-                )
+                fill_drift = actual_entry - signal.entry_price
+                from src.utils.price_rounding import round_price as _rp
+
+                _adj_sl = risk_result.stop_loss + fill_drift if risk_result.stop_loss else None
+                _adj_tp = risk_result.take_profit + fill_drift if risk_result.take_profit else None
+                _adj_sl = _rp(epic, _adj_sl)
+                _adj_tp = _rp(epic, _adj_tp)
                 _sl_valid = _validate_sl_side(
-                    signal.direction.value, actual_entry, risk_result.stop_loss
-                )
+                    signal.direction.value, actual_entry, _adj_sl
+                ) if _adj_sl else False
                 _tp_valid = _validate_tp_side(
-                    signal.direction.value, actual_entry, risk_result.take_profit
-                )
-                if not _sl_valid or not _tp_valid:
-                    risk_result.stop_loss, risk_result.take_profit = _recalculate_sl_tp_from_fill(
-                        direction=signal.direction.value,
-                        fill_price=actual_entry,
-                        atr=market_data["atr"],
-                        stop_multiplier=_sl_m,
-                        risk_reward=_rr_m,
-                    )
+                    signal.direction.value, actual_entry, _adj_tp
+                ) if _adj_tp else False
+                if _sl_valid and _tp_valid:
+                    risk_result.stop_loss = _adj_sl
+                    risk_result.take_profit = _adj_tp
                 # Use broker-confirmed values when available
                 _r_broker_sl = exec_result.actual_stop_loss
                 _r_broker_tp = exec_result.actual_take_profit
