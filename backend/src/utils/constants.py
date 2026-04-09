@@ -32,32 +32,21 @@ ALL_ASSETS: list[str] = [
     "NAS100",
 ]
 
-# Assets excluded from trading based on Phase 0 walk-forward OOS validation (2026-03-31):
-# EURUSD: ATR too small, -99% OOS
-# DOGUSD: Sharpe -14.25, ruin 100%
-# ICPUSD: Sharpe -14.34, ruin 100%
-# NATGAS: Sharpe -21.10, ruin 100%
-# COPPER: Sharpe -17.71, ruin 100%
-# GBPUSD: Sharpe -18.49, ruin 100%
-# USDJPY: Sharpe -6.22, not significant
-# NAS100: Sharpe 0.62, p=0.40, not significant
-# XAGUSD: Sharpe 1.33, p=0.088 — EXCLUDED after 48h live: 23.5% WR, -$71 (13 SL / 17 trades)
-# WTIUSD: Sharpe 2.25, p=0.018 — EXCLUDED: weak edge, no live profit
-# DASHUSD: Sharpe 2.30, p=0.000 — EXCLUDED: weak edge, spread issues
+# Assets excluded from trading.
+# Phase 0 OOS validation (2026-03-31) excluded 11 assets based on models with
+# 83 features (F1 ~0.23). After retrain on 2026-04-09 with 199 features (multi-TF),
+# all except NAS100 now have F1 > 0.53. Reactivated 8 with high confidence.
+#
+# Still excluded:
+# NAS100: insufficient historical data (3706 bars vs 8071 needed), F1=0.30
+# XAGUSD: F1=0.548 post-retrain but FAILED in live (23.5% WR, -$71 in 48h) — needs
+#          paper confirmation before reactivation
+# DASHUSD: F1=0.537 but known spread issues (MAX_SPREAD_PCT filter blocks most signals)
 _EXCLUDED_ASSETS = {
-    "EURUSD",
-    "DOGUSD",
-    "ICPUSD",
-    "NATGAS",
-    "COPPER",
-    "GBPUSD",
-    "USDJPY",
-    "XAGUSD",
-    "WTIUSD",
-    "DASHUSD",
     "NAS100",
+    "XAGUSD",
+    "DASHUSD",
 }
-# REVIEW assets kept for now but monitored: XAGUSD, WTIUSD, DASHUSD
 TRADABLE_ASSETS: list[str] = [a for a in ALL_ASSETS if a not in _EXCLUDED_ASSETS]
 
 # Crypto assets (24/7 markets, different session handling)
