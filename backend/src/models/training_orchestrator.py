@@ -267,13 +267,27 @@ class TrainingOrchestrator:
 
         from src.features.builder import FeatureBuilder
         from src.models.trainer import ModelTrainer
+        from src.models.walk_forward import WalkForwardSplitter
         from src.models.xgboost_model import XGBoostClassifier
 
         loop = asyncio.get_event_loop()
 
         def _do_train() -> dict:
+            # Walk-forward windows sized for 1h bars:
+            # train=6048 (~252 trading days), val=1512 (~63d), test=504 (~21d),
+            # step=504 (~21d) → ~10 folds. Matches the config that produced
+            # F1 0.51-0.59 on the Apr 5 models.
+            splitter = WalkForwardSplitter(
+                train_window=config.get("train_window", 6048),
+                val_window=config.get("val_window", 1512),
+                test_window=config.get("test_window", 504),
+                step_size=config.get("step_size", 504),
+                purge_gap=config.get("purge_gap", 5),
+                embargo=config.get("embargo", 2),
+            )
             trainer = ModelTrainer(
                 feature_builder=FeatureBuilder(),
+                splitter=splitter,
             )
             model = XGBoostClassifier()
 
@@ -282,7 +296,7 @@ class TrainingOrchestrator:
                 epic=epic,
                 timeframe=timeframe,
                 save_best=True,
-                multi_timeframe=config.get("multi_timeframe", False),
+                multi_timeframe=config.get("multi_timeframe", True),
                 include_sentiment=config.get("include_sentiment", False),
             )
 
