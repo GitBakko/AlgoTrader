@@ -2578,6 +2578,12 @@ class PaperTradingLoop:
                 continue
 
             # --- Time-based stop: close stale positions ---
+            # Skip if market is closed — can't close, and retrying every 15min
+            # just spams errors (e.g. weekends for stocks/indices).
+            market_status = position.get("market_status", "TRADEABLE")
+            if market_status != "TRADEABLE":
+                continue
+
             opened_at_str = position.get("opened_at")
             if opened_at_str and max_hold_hours < 9000:
                 try:
