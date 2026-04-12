@@ -48,13 +48,14 @@ class DataScheduler:
         self._assets = list(TRADABLE_ASSETS)
         self._timeframes = ["1h", "4h", "1d"]
 
-        # Include scalp timeframe if scalp mode is enabled
+        # Include candle timeframe for scalp or MR primary mode
         from src.utils.config import get_settings
 
         settings = get_settings()
         self._scalp_mode = settings.scalp_mode_enabled
-        if self._scalp_mode:
-            scalp_tf = settings.scalp_candle_resolution  # e.g. "15min"
+        self._mr_primary_mode = settings.mr_primary_enabled
+        if self._scalp_mode or self._mr_primary_mode:
+            scalp_tf = settings.scalp_candle_resolution  # e.g. "15min" or "4h"
             if scalp_tf not in self._timeframes:
                 self._timeframes.insert(0, scalp_tf)
             self._scalp_timeframe = scalp_tf
@@ -71,13 +72,22 @@ class DataScheduler:
             replace_existing=True,
         )
 
-        # 0b. Scalp candle refresh - every 5 min (for scalp mode)
+        # 0b. Candle refresh for scalp/MR timeframe
+        # Scalp mode: every 5 min. MR primary (4h): every hour at :10 (after 1h refresh at :05)
         if self._scalp_mode:
             self.scheduler.add_job(
                 self.job_scalp_refresh,
                 CronTrigger(minute="*/5"),
                 id="scalp_refresh",
                 name=f"Scalp candle refresh ({self._scalp_timeframe})",
+                replace_existing=True,
+            )
+        elif self._mr_primary_mode:
+            self.scheduler.add_job(
+                self.job_scalp_refresh,
+                CronTrigger(minute=10),
+                id="mr_candle_refresh",
+                name=f"MR candle refresh ({self._scalp_timeframe})",
                 replace_existing=True,
             )
 

@@ -816,3 +816,7 @@ When something looks wrong in the UI:
 | Guards/Interceptors     | `frontend/src/app/core/guards/`, `interceptors/`     |
 | TradingView chart       | `frontend/src/app/shared/components/tv-chart/`       |
 | Package.json            | `frontend/package.json`                              |
+
+## Trading Strategy Rules
+
+NEVER override strategy-level TP/SL parameters with hardcoded values in execution loops (e.g., paper_loop.py). Always respect TP_MAX_ATR caps from the strategy config. When fixing trading bugs, check the full execution chain: strategy → signal → paper_loop → order
