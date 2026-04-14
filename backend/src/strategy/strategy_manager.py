@@ -163,6 +163,19 @@ class StrategyManager:
             # XGBoost quality score: use prediction confidence as setup quality
             quality = prediction.confidence if prediction else 0.0
 
+            # --- DUAL DIRECTION LOGGING (added 2026-04-14) ---
+            # Log both ML and MR directions to measure agreement rate.
+            # This data will answer: "should ML or MR decide direction?"
+            ml_direction = prediction.signal_name if prediction else "NONE"
+            mr_direction = mr_signal.direction
+            agrees = ml_direction == mr_direction
+            logger.info(
+                f"[{epic}] DIRECTION AUDIT: "
+                f"MR={mr_direction} ML={ml_direction} agree={agrees} "
+                f"ml_conf={quality:.3f} mr_z={mr_signal.z_score:.2f} "
+                f"adx={market_data.get('adx', 0):.1f}"
+            )
+
             # Direction from MR rules, not from XGBoost
             direction = (
                 SignalDirection.BUY if mr_signal.direction == "BUY" else SignalDirection.SELL
@@ -186,6 +199,8 @@ class StrategyManager:
                         "mr_reason": f"Quality {quality:.2f} < {_settings.mr_min_quality}",
                         "mr_z": mr_signal.z_score,
                         "mr_quality": quality,
+                        "ml_direction": ml_direction,
+                        "ml_agrees": agrees,
                     },
                 )
 
@@ -211,6 +226,9 @@ class StrategyManager:
                     "mr_quality": quality,
                     "mr_direction": mr_signal.direction,
                     "mr_reason": mr_signal.reason,
+                    "ml_direction": ml_direction,
+                    "ml_agrees": agrees,
+                    "adx": market_data.get("adx", 0),
                 },
             )
 
