@@ -106,6 +106,8 @@ class PositionRepository(BaseRepository[Position]):
         result = await self.session.execute(
             select(Position)
             .where(Position.status == "CLOSED")
+            .where(Position.close_reason != "UNRECONCILED")
+            .where(Position.profit_loss.is_not(None))
             .where(Position.closed_at >= naive_start)
             .where(Position.closed_at <= naive_end)
             .order_by(Position.closed_at.desc())
@@ -245,6 +247,7 @@ class PositionRepository(BaseRepository[Position]):
         query = (
             select(Position)
             .where(Position.status == "CLOSED")
+            .where(Position.close_reason != "UNRECONCILED")
             .where(Position.profit_loss.is_not(None))
         )
         if date_from:
