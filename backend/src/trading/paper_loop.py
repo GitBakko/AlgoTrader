@@ -437,6 +437,7 @@ class PaperTradingLoop:
         entry_price: float,
         stop_loss: float | None,
         take_profit: float | None,
+        deal_reference: str | None = None,
     ) -> None:
         """Persist a newly opened position to the database."""
         if self._db_session_factory is None:
@@ -460,6 +461,7 @@ class PaperTradingLoop:
 
                 pos = Position(
                     deal_id=deal_id,
+                    deal_reference=deal_reference,
                     epic=epic,
                     direction=direction,
                     size=Decimal(str(size)),
@@ -2305,6 +2307,7 @@ class PaperTradingLoop:
                 entry_price=_entry,
                 stop_loss=_sl,
                 take_profit=_tp,
+                deal_reference=exec_result.deal_reference,
             )
 
             # Log executed signal + execution
@@ -2475,6 +2478,7 @@ class PaperTradingLoop:
                     entry_price=actual_entry,
                     stop_loss=_r_sl,
                     take_profit=_r_tp,
+                    deal_reference=exec_result.deal_reference,
                 )
             else:
                 signal_info["status"] = "exec_failed"

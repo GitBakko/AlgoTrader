@@ -58,6 +58,7 @@ class Position(SQLModel, table=True):
 
     id: int | None = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     deal_id: str = Field(max_length=100, nullable=False, unique=True, index=True)
+    deal_reference: str | None = Field(default=None, max_length=100, nullable=True)
     epic: str = Field(max_length=50, nullable=False, index=True)
     direction: str = Field(max_length=4, nullable=False)  # BUY, SELL
     size: Decimal = Field(max_digits=10, decimal_places=4, nullable=False)
