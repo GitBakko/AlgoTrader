@@ -1,4 +1,5 @@
 """Tests for Transaction.pl_value currency handling."""
+
 from __future__ import annotations
 
 import logging
@@ -32,9 +33,7 @@ def _propagate_loguru_to_caplog(caplog):
     class _PropagateHandler:
         def write(self, message):
             record = message.record
-            logging.getLogger(record["name"]).log(
-                record["level"].no, record["message"]
-            )
+            logging.getLogger(record["name"]).log(record["level"].no, record["message"])
 
     handler_id = logger.add(_PropagateHandler(), format="{message}", level="WARNING")
     yield

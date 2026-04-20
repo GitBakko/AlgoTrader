@@ -1,7 +1,8 @@
 """Tests for close detection matching strategies in paper_loop."""
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -198,7 +199,7 @@ def test_match_skips_transaction_with_none_pl(paper_loop):
 # Integration-style tests for the three-tier _detect_broker_closed flow
 # ---------------------------------------------------------------------------
 
-from datetime import timedelta
+from datetime import UTC, timedelta
 
 from src.trading.paper_loop import PaperTradingLoop, PendingClose
 
@@ -282,7 +283,7 @@ async def test_deferred_when_no_match_on_first_iteration(loop_with_mocks):
 async def test_unreconciled_after_timeout(loop_with_mocks):
     """After 10min without match → persist with pnl=None, close_reason=UNRECONCILED."""
     loop = loop_with_mocks
-    past = datetime.now(timezone.utc) - timedelta(seconds=601)
+    past = datetime.now(UTC) - timedelta(seconds=601)
     loop._pending_close_detections["deal-1"] = PendingClose(
         deal_id="deal-1",
         deal_reference=None,
@@ -318,7 +319,7 @@ async def test_reconciled_on_retry(loop_with_mocks):
         size=10.0,
         entry_price=84.50,
         prev_pos={"level": 84.50, "deal_id": "deal-1"},
-        first_seen=datetime.now(timezone.utc),
+        first_seen=datetime.now(UTC),
         retry_count=2,
     )
     loop._fetch_recent_transactions.return_value = [

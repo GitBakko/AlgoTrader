@@ -1,9 +1,10 @@
 """End-to-end test: broker returns [] for N iterations, then the matching
 transaction; verify the three-tier flow resolves to a primary path match
 with the real broker P&L (no UNRECONCILED record, no invented P&L)."""
+
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -13,17 +14,17 @@ from src.execution.schemas import ExecutionMode
 
 
 def _txn(**kw):
-    defaults = dict(
-        date=datetime(2026, 4, 20, 0, 2, 0),
-        type="DEAL",
-        reference="ref-e2e",
-        instrumentName="Oil - Crude",
-        openLevel=84.50,
-        closeLevel=85.60,
-        profitAndLoss="USD246.86",
-        size=10.0,
-        currency="USD",
-    )
+    defaults = {
+        "date": datetime(2026, 4, 20, 0, 2, 0),
+        "type": "DEAL",
+        "reference": "ref-e2e",
+        "instrumentName": "Oil - Crude",
+        "openLevel": 84.50,
+        "closeLevel": 85.60,
+        "profitAndLoss": "USD246.86",
+        "size": 10.0,
+        "currency": "USD",
+    }
     defaults.update(kw)
     return Transaction(**defaults)
 
@@ -93,44 +94,44 @@ async def test_defer_three_times_then_reconcile(loop_for_e2e):
 
     # --- Iteration 1: position disappeared, no transaction yet → defer ---
     await loop._detect_broker_closed(current_positions=[])
-    assert "deal-e2e" in loop._pending_close_detections, (
-        "Position should be queued in pending on first miss"
-    )
+    assert (
+        "deal-e2e" in loop._pending_close_detections
+    ), "Position should be queued in pending on first miss"
     loop._persist_position_close.assert_not_awaited()
     loop._on_position_closed.assert_not_called()
 
     # --- Iterations 2 & 3: still no transaction → retry_count increments ---
     for _ in range(2):
         await loop._detect_broker_closed(current_positions=[])
-    assert "deal-e2e" in loop._pending_close_detections, (
-        "Position should remain pending while broker still returns []"
-    )
+    assert (
+        "deal-e2e" in loop._pending_close_detections
+    ), "Position should remain pending while broker still returns []"
     pending = loop._pending_close_detections["deal-e2e"]
-    assert pending.retry_count >= 2, (
-        f"Expected retry_count >= 2 after 2 retries, got {pending.retry_count}"
-    )
+    assert (
+        pending.retry_count >= 2
+    ), f"Expected retry_count >= 2 after 2 retries, got {pending.retry_count}"
     loop._persist_position_close.assert_not_awaited()
 
     # --- Iteration 4: broker returns the matching transaction → primary path ---
     await loop._detect_broker_closed(current_positions=[])
 
     # Reconciled: pending entry removed
-    assert "deal-e2e" not in loop._pending_close_detections, (
-        "Pending entry should be removed after successful reconciliation"
-    )
+    assert (
+        "deal-e2e" not in loop._pending_close_detections
+    ), "Pending entry should be removed after successful reconciliation"
 
     # _persist_position_close called exactly once with real data
     loop._persist_position_close.assert_awaited_once()
     kwargs = loop._persist_position_close.await_args.kwargs
-    assert kwargs["pnl"] == pytest.approx(246.86), (
-        f"Expected real broker P&L 246.86, got {kwargs['pnl']}"
-    )
-    assert kwargs["close_reason"] == "TP", (
-        f"Expected close_reason='TP', got {kwargs['close_reason']}"
-    )
-    assert kwargs["exit_price"] == pytest.approx(85.60), (
-        f"Expected exit_price=85.60 from broker closeLevel, got {kwargs['exit_price']}"
-    )
+    assert kwargs["pnl"] == pytest.approx(
+        246.86
+    ), f"Expected real broker P&L 246.86, got {kwargs['pnl']}"
+    assert (
+        kwargs["close_reason"] == "TP"
+    ), f"Expected close_reason='TP', got {kwargs['close_reason']}"
+    assert kwargs["exit_price"] == pytest.approx(
+        85.60
+    ), f"Expected exit_price=85.60 from broker closeLevel, got {kwargs['exit_price']}"
 
     # _on_position_closed called exactly once (Kelly/CB update)
     loop._on_position_closed.assert_called_once()
@@ -150,7 +151,7 @@ async def test_deferred_then_unreconciled_after_timeout(loop_for_e2e):
     # Clear _previous_positions so no new disappearance fires — only the pre-aged pending
     loop._previous_positions = {}
 
-    past = datetime.now(timezone.utc) - timedelta(seconds=601)
+    past = datetime.now(UTC) - timedelta(seconds=601)
     loop._pending_close_detections["deal-timeout"] = PendingClose(
         deal_id="deal-timeout",
         deal_reference=None,
@@ -169,17 +170,15 @@ async def test_deferred_then_unreconciled_after_timeout(loop_for_e2e):
     # UNRECONCILED path: _persist_position_close called with pnl=None
     loop._persist_position_close.assert_awaited_once()
     kwargs = loop._persist_position_close.await_args.kwargs
-    assert kwargs["pnl"] is None, (
-        f"Expected pnl=None for UNRECONCILED, got {kwargs['pnl']}"
-    )
-    assert kwargs["close_reason"] == "UNRECONCILED", (
-        f"Expected close_reason='UNRECONCILED', got {kwargs['close_reason']}"
-    )
+    assert kwargs["pnl"] is None, f"Expected pnl=None for UNRECONCILED, got {kwargs['pnl']}"
+    assert (
+        kwargs["close_reason"] == "UNRECONCILED"
+    ), f"Expected close_reason='UNRECONCILED', got {kwargs['close_reason']}"
 
     # _on_position_closed must NOT be called for UNRECONCILED
     loop._on_position_closed.assert_not_called()
 
     # Pending dict emptied
-    assert "deal-timeout" not in loop._pending_close_detections, (
-        "Timed-out pending entry should be removed"
-    )
+    assert (
+        "deal-timeout" not in loop._pending_close_detections
+    ), "Timed-out pending entry should be removed"

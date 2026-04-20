@@ -13,7 +13,7 @@ Phase 8 integration:
 import asyncio
 import time as _time
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import numpy as np
@@ -998,7 +998,11 @@ class PaperTradingLoop:
             pending.retry_count += 1
             deal_ref = pending.deal_reference or deal_ref_map.get(deal_id)
             txn_exit, txn_pnl, txn_reason = self._match_transaction(
-                transactions, deal_id, deal_ref, pending.epic, pending.entry_price,
+                transactions,
+                deal_id,
+                deal_ref,
+                pending.epic,
+                pending.entry_price,
             )
             if txn_exit is not None and txn_pnl is not None:
                 logger.info(
@@ -1035,7 +1039,11 @@ class PaperTradingLoop:
             deal_reference = prev_pos.get("deal_reference") or deal_ref_map.get(deal_id)
 
             txn_exit, txn_pnl, txn_reason = self._match_transaction(
-                transactions, deal_id, deal_reference, epic, entry_price,
+                transactions,
+                deal_id,
+                deal_reference,
+                epic,
+                entry_price,
             )
 
             if txn_exit is not None and txn_pnl is not None:
@@ -1059,6 +1067,7 @@ class PaperTradingLoop:
                 )
                 try:
                     from src.monitoring.metrics import MetricsCollector
+
                     MetricsCollector.record_close_detection(path="deferred", epic=epic)
                 except Exception:
                     pass
@@ -1102,7 +1111,10 @@ class PaperTradingLoop:
 
         try:
             from src.monitoring.metrics import MetricsCollector
-            MetricsCollector.record_close_detection(path=metric_path, epic=epic, retry_count=retry_count)
+
+            MetricsCollector.record_close_detection(
+                path=metric_path, epic=epic, retry_count=retry_count
+            )
         except Exception:
             pass
 
@@ -1179,6 +1191,7 @@ class PaperTradingLoop:
 
         try:
             from src.monitoring.metrics import MetricsCollector
+
             MetricsCollector.record_close_detection(
                 path="unreconciled", epic=pending.epic, retry_count=pending.retry_count
             )
@@ -2416,12 +2429,16 @@ class PaperTradingLoop:
                 _adj_tp = risk_result.take_profit + fill_drift if risk_result.take_profit else None
                 _adj_sl = _rp(epic, _adj_sl)
                 _adj_tp = _rp(epic, _adj_tp)
-                _sl_valid = _validate_sl_side(
-                    signal.direction.value, actual_entry, _adj_sl
-                ) if _adj_sl else False
-                _tp_valid = _validate_tp_side(
-                    signal.direction.value, actual_entry, _adj_tp
-                ) if _adj_tp else False
+                _sl_valid = (
+                    _validate_sl_side(signal.direction.value, actual_entry, _adj_sl)
+                    if _adj_sl
+                    else False
+                )
+                _tp_valid = (
+                    _validate_tp_side(signal.direction.value, actual_entry, _adj_tp)
+                    if _adj_tp
+                    else False
+                )
                 if _sl_valid and _tp_valid:
                     risk_result.stop_loss = _adj_sl
                     risk_result.take_profit = _adj_tp

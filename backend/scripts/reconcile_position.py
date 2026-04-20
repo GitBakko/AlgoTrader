@@ -14,12 +14,13 @@ Exit codes:
     2  position still OPEN (refused)
     3  no match and nothing entered manually
 """
+
 from __future__ import annotations
 
 import argparse
 import asyncio
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -77,20 +78,16 @@ async def reconcile_deal_id(
             ),
         }
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     from_dt = now - timedelta(days=days)
-    transactions = await broker.get_transaction_history(
-        from_dt, now, TransactionType.ALL_DEAL
-    )
+    transactions = await broker.get_transaction_history(from_dt, now, TransactionType.ALL_DEAL)
 
     # Use the same three-strategy matching as paper_loop at runtime.
     # Position model has no deal_reference field, so Strategy 1 is effectively
     # bypassed (deal_reference=None). Strategy 2 (deal_id) and Strategy 3
     # (normalized instrument name + entry price tolerance) carry the load.
     class _Stub:
-        _normalize_instrument_name = staticmethod(
-            PaperTradingLoop._normalize_instrument_name
-        )
+        _normalize_instrument_name = staticmethod(PaperTradingLoop._normalize_instrument_name)
 
     exit_price, pnl, reason = PaperTradingLoop._match_transaction(
         _Stub(),
@@ -103,7 +100,10 @@ async def reconcile_deal_id(
 
     if exit_price is None or pnl is None:
         if assume_yes:
-            return {"status": "skipped", "message": f"No match in last {days} days (--yes auto-skip)"}
+            return {
+                "status": "skipped",
+                "message": f"No match in last {days} days (--yes auto-skip)",
+            }
 
         print(
             f"\nNo matching transaction for {deal_id!r} in the last {days} days.\n"
@@ -162,15 +162,19 @@ async def _main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--deal-id", required=True,
+        "--deal-id",
+        required=True,
         help="Position deal_id to reconcile (as stored in the positions table)",
     )
     parser.add_argument(
-        "--days", type=int, default=7,
+        "--days",
+        type=int,
+        default=7,
         help="Transaction history window in days (default: 7)",
     )
     parser.add_argument(
-        "--yes", action="store_true",
+        "--yes",
+        action="store_true",
         help="Skip all confirmation prompts; auto-skip when no match is found",
     )
     args = parser.parse_args()

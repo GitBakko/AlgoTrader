@@ -1,7 +1,8 @@
 """Tests for scripts/reconcile_position.py CLI — manual P&L reconciliation."""
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
@@ -36,8 +37,8 @@ def _make_position(**kwargs) -> MagicMock:
     p.profit_loss = kwargs.get("profit_loss", None)
     p.current_price = kwargs.get("current_price", None)
     p.close_reason = kwargs.get("close_reason", "UNRECONCILED")
-    p.opened_at = kwargs.get("opened_at", datetime.now(timezone.utc).replace(tzinfo=None))
-    p.closed_at = kwargs.get("closed_at", datetime.now(timezone.utc).replace(tzinfo=None))
+    p.opened_at = kwargs.get("opened_at", datetime.now(UTC).replace(tzinfo=None))
+    p.closed_at = kwargs.get("closed_at", datetime.now(UTC).replace(tzinfo=None))
     return p
 
 

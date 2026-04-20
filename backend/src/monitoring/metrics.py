@@ -263,9 +263,7 @@ class MetricsCollector:
         mantis_circuit_breaker_trips_total.labels(epic=epic, reason=reason).inc()
 
     @classmethod
-    def record_close_detection(
-        cls, *, path: str, epic: str, retry_count: int = 0
-    ) -> None:
+    def record_close_detection(cls, *, path: str, epic: str, retry_count: int = 0) -> None:
         """Record the path taken for a close detection event.
 
         Args:

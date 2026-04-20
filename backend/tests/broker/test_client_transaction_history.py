@@ -1,7 +1,8 @@
 """Tests for CapitalComClient.get_transaction_history parameter serialization."""
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 
 import pytest
@@ -18,8 +19,8 @@ async def test_transaction_history_sends_iso8601_utc_with_z_suffix():
     client = CapitalComClient.__new__(CapitalComClient)
     client._request = AsyncMock(return_value={"transactions": []})
 
-    from_dt = datetime(2026, 4, 19, 20, 0, 0, tzinfo=timezone.utc)
-    to_dt = datetime(2026, 4, 20, 0, 0, 0, tzinfo=timezone.utc)
+    from_dt = datetime(2026, 4, 19, 20, 0, 0, tzinfo=UTC)
+    to_dt = datetime(2026, 4, 20, 0, 0, 0, tzinfo=UTC)
 
     await client.get_transaction_history(from_dt, to_dt, TransactionType.ALL_DEAL)
 

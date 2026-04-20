@@ -586,7 +586,8 @@ class StateRecoveryService:
             return 0
 
         broker_deal_ids = {
-            getattr(p, "deal_id", None) for p in broker_positions
+            getattr(p, "deal_id", None)
+            for p in broker_positions
             if getattr(p, "deal_id", None) is not None
         }
 
@@ -602,7 +603,8 @@ class StateRecoveryService:
         # Step 3: filter to orphans (DB=OPEN but broker has no record)
         pending_map = self.paper_loop._pending_close_detections
         orphans = [
-            p for p in db_open
+            p
+            for p in db_open
             if p.deal_id not in broker_deal_ids
             and p.deal_id not in pending_map  # skip already-queued
         ]

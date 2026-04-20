@@ -3,7 +3,7 @@ Capital.com REST API client.
 Provides high-level interface for market data, trading, and account management.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -511,8 +511,8 @@ class CapitalComClient:
             List of transactions
         """
         params = {
-            "from": from_date.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "to": to_date.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "from": from_date.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "to": to_date.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "type": transaction_type.value,
         }
         response = await self._request("GET", "/api/v1/history/transactions", params=params)

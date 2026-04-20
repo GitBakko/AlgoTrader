@@ -1,8 +1,9 @@
 """Tests for StateRecovery.reinject_orphans — bringing DB-OPEN positions
 that no longer exist on broker back into the close-detection retry loop."""
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
@@ -11,8 +12,8 @@ import pytest
 from src.execution.schemas import ExecutionMode
 from src.execution.state_recovery import StateRecoveryService
 
-
 # ─── helpers ──────────────────────────────────────────────────────────────────
+
 
 def _make_service(broker, paper_loop, db_positions):
     """Build a minimal StateRecoveryService wired for orphan tests."""
@@ -76,7 +77,7 @@ def _make_db_position(
     pos.size = size
     pos.entry_price = entry_price
     pos.status = status
-    pos.opened_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    pos.opened_at = datetime.now(UTC).replace(tzinfo=None)
     return pos
 
 
@@ -125,9 +126,7 @@ async def test_no_orphan_when_broker_still_has_position():
     paper_loop._pending_close_detections = {}
 
     broker = AsyncMock()
-    broker.list_positions = AsyncMock(
-        return_value=[_make_broker_position("still-open-1")]
-    )
+    broker.list_positions = AsyncMock(return_value=[_make_broker_position("still-open-1")])
 
     db_positions = [_make_db_position("still-open-1")]
 
@@ -146,9 +145,7 @@ async def test_multiple_orphans_all_reinjected():
 
     broker = AsyncMock()
     # Broker has one position open, two are gone
-    broker.list_positions = AsyncMock(
-        return_value=[_make_broker_position("still-open-1")]
-    )
+    broker.list_positions = AsyncMock(return_value=[_make_broker_position("still-open-1")])
 
     db_positions = [
         _make_db_position("orphan-a", epic="XAUUSD"),
@@ -197,7 +194,7 @@ async def test_already_pending_not_duplicated():
         size=10.0,
         entry_price=84.50,
         prev_pos={},
-        first_seen=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        first_seen=datetime(2026, 1, 1, tzinfo=UTC),
         retry_count=3,
     )
 
