@@ -789,13 +789,13 @@ class PaperTradingLoop:
         cache_ts_attr = "_txn_cache_ts"
         cached = getattr(self, cache_attr, None)
         cached_ts = getattr(self, cache_ts_attr, None)
-        if cached is not None and cached_ts and (now - cached_ts).total_seconds() < 30:
+        if cached is not None and cached_ts and (now - cached_ts).total_seconds() < 60:
             return cached
 
         try:
             from src.broker.models import TransactionType
 
-            from_date = now - timedelta(hours=4)
+            from_date = now - timedelta(hours=24)
             transactions = await self.broker.get_transaction_history(
                 from_date, now, TransactionType.ALL_DEAL
             )
