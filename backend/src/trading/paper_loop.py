@@ -498,11 +498,16 @@ class PaperTradingLoop:
         size: float,
         entry_price: float,
         exit_price: float,
-        pnl: float,
+        pnl: float | None,
         close_reason: str,
         opened_at: datetime | None = None,
     ) -> None:
-        """Persist position close to the database (update status + create CLOSE trade)."""
+        """Persist position close to the database (update status + create CLOSE trade).
+
+        `pnl` may be None on the UNRECONCILED path (Tier 3 fail-safe) — in that
+        case we store NULL for both Position.profit_loss and Trade.profit_loss
+        so aggregate stats (see repository filters) can correctly skip the row.
+        """
         if self._db_session_factory is None:
             return
 
@@ -516,12 +521,15 @@ class PaperTradingLoop:
             "Graceful shutdown": "MANUAL",
         }
         close_reason = reason_map.get(close_reason, close_reason)
+        pnl_repr = f"{pnl:.2f}" if pnl is not None else "NULL"
 
         try:
             from decimal import Decimal
 
             from src.database.models import Position, Trade
             from src.database.repositories import PositionRepository
+
+            pnl_decimal = Decimal(str(round(pnl, 2))) if pnl is not None else None
 
             async with self._db_session_factory() as session:
                 repo = PositionRepository(session)
@@ -558,7 +566,7 @@ class PaperTradingLoop:
                         size=Decimal(str(size)),
                         entry_price=Decimal(str(entry_price)),
                         current_price=Decimal(str(exit_price)),
-                        profit_loss=Decimal(str(round(pnl, 2))),
+                        profit_loss=pnl_decimal,
                         stop_loss=None,
                         take_profit=None,
                         status="CLOSED",
@@ -572,7 +580,7 @@ class PaperTradingLoop:
                     now = datetime.now(UTC).replace(tzinfo=None)
                     pos.status = "CLOSED"
                     pos.current_price = Decimal(str(exit_price))
-                    pos.profit_loss = Decimal(str(round(pnl, 2)))
+                    pos.profit_loss = pnl_decimal
                     pos.closed_at = now
                     pos.close_reason = close_reason
                     # Guard: correct opened_at if it's somehow after closed_at
@@ -594,13 +602,13 @@ class PaperTradingLoop:
                     direction=direction,
                     size=Decimal(str(size)),
                     price=Decimal(str(exit_price)),
-                    profit_loss=Decimal(str(round(pnl, 2))),
+                    profit_loss=pnl_decimal,
                     executed_at=datetime.now(UTC).replace(tzinfo=None),
                 )
                 session.add(trade)
                 await session.commit()
                 logger.info(
-                    f"Persisted CLOSED position to DB: {deal_id} ({epic} P&L={pnl:.2f} reason={close_reason})"
+                    f"Persisted CLOSED position to DB: {deal_id} ({epic} P&L={pnl_repr} reason={close_reason})"
                 )
         except Exception as e:
             logger.warning(f"Position close persistence failed for {deal_id}: {e}")
