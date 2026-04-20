@@ -214,6 +214,12 @@ class Settings(BaseSettings):
     correlation_regime_size_reduction: float = Field(
         default=0.50, alias="CORRELATION_REGIME_SIZE_REDUCTION"
     )
+    # Close-detection reconciliation: how long to wait for a transaction match
+    # before giving up and finalising a pending close with a heuristic P&L.
+    close_reconciliation_timeout_seconds: int = Field(
+        default=600, alias="CLOSE_RECONCILIATION_TIMEOUT_SECONDS"
+    )  # 10 minutes
+
     # Mean Reversion Strategy
     mr_primary_enabled: bool = Field(default=False, alias="MR_PRIMARY_ENABLED")
     mr_min_quality: float = Field(default=0.55, alias="MR_MIN_QUALITY")

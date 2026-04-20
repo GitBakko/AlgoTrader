@@ -13,6 +13,7 @@ Phase 8 integration:
 import asyncio
 import time as _time
 from collections import deque
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
 import numpy as np
@@ -34,6 +35,25 @@ from src.strategy.schemas import SignalDirection
 from src.strategy.strategy_manager import StrategyManager
 from src.utils.config import get_settings
 from src.utils.constants import TRADABLE_ASSETS
+
+
+@dataclass
+class PendingClose:
+    """A position that disappeared from broker but whose close transaction
+    has not yet been matched. Held in memory for retry during subsequent
+    loop iterations, up to Settings.close_reconciliation_timeout_seconds.
+    """
+
+    deal_id: str
+    deal_reference: str | None
+    epic: str
+    direction: str
+    size: float
+    entry_price: float
+    prev_pos: dict
+    first_seen: datetime
+    retry_count: int = 0
+
 
 # How often to check for new candles (seconds)
 _settings = get_settings()
@@ -174,6 +194,9 @@ class PaperTradingLoop:
         self._regime_counts: dict[str, dict[str, int]] = {}
         # Track positions from previous iteration to detect broker-closed positions
         self._previous_positions: dict[str, dict] = {}
+        # Positions that disappeared from broker but whose close transaction has not
+        # yet been matched — keyed by deal_id, held until reconciliation or timeout.
+        self._pending_close_detections: dict[str, PendingClose] = {}
         # Asset momentum rotation
         self._active_assets: set[str] | None = None  # None = all assets
         self._asset_rotation_ts: float = 0.0
