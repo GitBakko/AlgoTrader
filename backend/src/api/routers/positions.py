@@ -116,7 +116,11 @@ async def list_closed_positions(
         close_reason=close_reason,
         epic=epic,
     )
-    pnl_values = [float(p.profit_loss) for p in all_positions if p.profit_loss is not None]
+    pnl_values = [
+        float(p.profit_loss)
+        for p in all_positions
+        if p.profit_loss is not None and p.close_reason != "UNRECONCILED"
+    ]
     wins = [v for v in pnl_values if v > 0]
     losses = [v for v in pnl_values if v <= 0]
 

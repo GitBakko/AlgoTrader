@@ -136,6 +136,13 @@ mantis_broker_websocket_messages_total = Counter(
     ["message_type"],  # quote, trade, heartbeat
 )
 
+# ===== Close Detection Metrics =====
+close_detection_path_counter = Counter(
+    "mantis_close_detection_path_total",
+    "Close detection paths taken (primary, deferred, unreconciled)",
+    ["path", "epic"],
+)
+
 
 class MetricsCollector:
     """
@@ -254,6 +261,22 @@ class MetricsCollector:
     def record_circuit_breaker(epic: str, reason: str):
         """Record circuit breaker activation."""
         mantis_circuit_breaker_trips_total.labels(epic=epic, reason=reason).inc()
+
+    @classmethod
+    def record_close_detection(cls, *, path: str, epic: str, retry_count: int = 0) -> None:
+        """Record the path taken for a close detection event.
+
+        Args:
+            path: 'primary' | 'deferred' | 'unreconciled'
+            epic: asset epic (e.g. 'WTIUSD')
+            retry_count: number of deferred retries before this path was taken
+                (intentionally NOT a label to avoid cardinality explosion;
+                exposed via logs instead)
+        """
+        try:
+            close_detection_path_counter.labels(path=path, epic=epic).inc()
+        except Exception:
+            pass
 
     @staticmethod
     def record_model_prediction(

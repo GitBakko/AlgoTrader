@@ -127,6 +127,7 @@ class ExecutionEngine:
 
                     position_db = Position(
                         deal_id=result.deal_id,
+                        deal_reference=result.deal_reference,
                         epic=signal.epic,
                         direction=signal.direction.value,
                         size=Decimal(str(risk_result.position_size)),
@@ -306,6 +307,7 @@ class ExecutionEngine:
 
                         position_db = Position(
                             deal_id=deal_id,
+                            deal_reference=None,  # not available at close time for legacy positions
                             epic=epic,
                             direction=direction,
                             size=Decimal(str(size)),

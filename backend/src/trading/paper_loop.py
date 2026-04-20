@@ -13,6 +13,7 @@ Phase 8 integration:
 import asyncio
 import time as _time
 from collections import deque
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import numpy as np
@@ -34,6 +35,25 @@ from src.strategy.schemas import SignalDirection
 from src.strategy.strategy_manager import StrategyManager
 from src.utils.config import get_settings
 from src.utils.constants import TRADABLE_ASSETS
+
+
+@dataclass
+class PendingClose:
+    """A position that disappeared from broker but whose close transaction
+    has not yet been matched. Held in memory for retry during subsequent
+    loop iterations, up to Settings.close_reconciliation_timeout_seconds.
+    """
+
+    deal_id: str
+    deal_reference: str | None
+    epic: str
+    direction: str
+    size: float
+    entry_price: float
+    prev_pos: dict
+    first_seen: datetime
+    retry_count: int = 0
+
 
 # How often to check for new candles (seconds)
 _settings = get_settings()
@@ -174,6 +194,9 @@ class PaperTradingLoop:
         self._regime_counts: dict[str, dict[str, int]] = {}
         # Track positions from previous iteration to detect broker-closed positions
         self._previous_positions: dict[str, dict] = {}
+        # Positions that disappeared from broker but whose close transaction has not
+        # yet been matched — keyed by deal_id, held until reconciliation or timeout.
+        self._pending_close_detections: dict[str, PendingClose] = {}
         # Asset momentum rotation
         self._active_assets: set[str] | None = None  # None = all assets
         self._asset_rotation_ts: float = 0.0
@@ -414,6 +437,7 @@ class PaperTradingLoop:
         entry_price: float,
         stop_loss: float | None,
         take_profit: float | None,
+        deal_reference: str | None = None,
     ) -> None:
         """Persist a newly opened position to the database."""
         if self._db_session_factory is None:
@@ -437,6 +461,7 @@ class PaperTradingLoop:
 
                 pos = Position(
                     deal_id=deal_id,
+                    deal_reference=deal_reference,
                     epic=epic,
                     direction=direction,
                     size=Decimal(str(size)),
@@ -473,11 +498,16 @@ class PaperTradingLoop:
         size: float,
         entry_price: float,
         exit_price: float,
-        pnl: float,
+        pnl: float | None,
         close_reason: str,
         opened_at: datetime | None = None,
     ) -> None:
-        """Persist position close to the database (update status + create CLOSE trade)."""
+        """Persist position close to the database (update status + create CLOSE trade).
+
+        `pnl` may be None on the UNRECONCILED path (Tier 3 fail-safe) — in that
+        case we store NULL for both Position.profit_loss and Trade.profit_loss
+        so aggregate stats (see repository filters) can correctly skip the row.
+        """
         if self._db_session_factory is None:
             return
 
@@ -491,12 +521,15 @@ class PaperTradingLoop:
             "Graceful shutdown": "MANUAL",
         }
         close_reason = reason_map.get(close_reason, close_reason)
+        pnl_repr = f"{pnl:.2f}" if pnl is not None else "NULL"
 
         try:
             from decimal import Decimal
 
             from src.database.models import Position, Trade
             from src.database.repositories import PositionRepository
+
+            pnl_decimal = Decimal(str(round(pnl, 2))) if pnl is not None else None
 
             async with self._db_session_factory() as session:
                 repo = PositionRepository(session)
@@ -533,7 +566,7 @@ class PaperTradingLoop:
                         size=Decimal(str(size)),
                         entry_price=Decimal(str(entry_price)),
                         current_price=Decimal(str(exit_price)),
-                        profit_loss=Decimal(str(round(pnl, 2))),
+                        profit_loss=pnl_decimal,
                         stop_loss=None,
                         take_profit=None,
                         status="CLOSED",
@@ -547,7 +580,7 @@ class PaperTradingLoop:
                     now = datetime.now(UTC).replace(tzinfo=None)
                     pos.status = "CLOSED"
                     pos.current_price = Decimal(str(exit_price))
-                    pos.profit_loss = Decimal(str(round(pnl, 2)))
+                    pos.profit_loss = pnl_decimal
                     pos.closed_at = now
                     pos.close_reason = close_reason
                     # Guard: correct opened_at if it's somehow after closed_at
@@ -569,13 +602,13 @@ class PaperTradingLoop:
                     direction=direction,
                     size=Decimal(str(size)),
                     price=Decimal(str(exit_price)),
-                    profit_loss=Decimal(str(round(pnl, 2))),
+                    profit_loss=pnl_decimal,
                     executed_at=datetime.now(UTC).replace(tzinfo=None),
                 )
                 session.add(trade)
                 await session.commit()
                 logger.info(
-                    f"Persisted CLOSED position to DB: {deal_id} ({epic} P&L={pnl:.2f} reason={close_reason})"
+                    f"Persisted CLOSED position to DB: {deal_id} ({epic} P&L={pnl_repr} reason={close_reason})"
                 )
         except Exception as e:
             logger.warning(f"Position close persistence failed for {deal_id}: {e}")
@@ -789,13 +822,13 @@ class PaperTradingLoop:
         cache_ts_attr = "_txn_cache_ts"
         cached = getattr(self, cache_attr, None)
         cached_ts = getattr(self, cache_ts_attr, None)
-        if cached is not None and cached_ts and (now - cached_ts).total_seconds() < 30:
+        if cached is not None and cached_ts and (now - cached_ts).total_seconds() < 60:
             return cached
 
         try:
             from src.broker.models import TransactionType
 
-            from_date = now - timedelta(hours=4)
+            from_date = now - timedelta(hours=24)
             transactions = await self.broker.get_transaction_history(
                 from_date, now, TransactionType.ALL_DEAL
             )
@@ -806,340 +839,440 @@ class PaperTradingLoop:
             logger.warning(f"Failed to fetch transaction history: {e}")
             return []
 
-    def _match_transaction(
-        self, transactions: list, deal_id: str, epic: str, entry_price: float
-    ) -> tuple[float | None, float | None, str | None]:
-        """Match a closed deal_id to a broker transaction.
+    @staticmethod
+    def _normalize_instrument_name(name: str) -> str:
+        """Normalize instrument/epic names for fuzzy matching.
 
-        Returns (exit_price, pnl, close_reason) or (None, None, None) if no match.
+        Strips underscores, hyphens, whitespace; lowercases; keeps only alphanumerics.
+        'OIL_CRUDE' → 'oilcrude', 'Oil - Crude' → 'oilcrude', 'Germany 40' → 'germany40'.
+        """
+        return "".join(ch for ch in (name or "").lower() if ch.isalnum())
+
+    def _match_transaction(
+        self,
+        transactions: list,
+        deal_id: str,
+        deal_reference: str | None,
+        epic: str,
+        entry_price: float,
+    ) -> tuple[float | None, float | None, str | None]:
+        """Match a closed deal to a broker Transaction using three strategies
+        in order of decreasing determinism.
+
+        Strategy 1: deal_reference (deterministic, 1-to-1 with the open)
+        Strategy 2: deal_id (legacy path, still supported for positions
+                   opened before deal_reference was persisted)
+        Strategy 3: normalized instrument name + entry price tolerance (< 0.1%)
+
+        Returns (exit_price, pnl, close_reason) or (None, None, None).
         """
         from src.broker.client import EPIC_TO_BROKER
 
         broker_epic = EPIC_TO_BROKER.get(epic, epic)
+        norm_epic = self._normalize_instrument_name(epic)
+        norm_broker = self._normalize_instrument_name(broker_epic)
 
-        for txn in transactions:
-            # Match by reference (deal reference) or by instrument name + entry level
-            ref_match = txn.reference and deal_id and txn.reference == deal_id
-            instrument_match = txn.instrument_name and (
-                epic.lower() in txn.instrument_name.lower()
-                or broker_epic.lower() in txn.instrument_name.lower()
+        def _finalize(txn) -> tuple[float | None, float | None, str | None]:
+            exit_price = txn.close_level
+            pnl = txn.pl_value
+            if exit_price is None or pnl is None:
+                return None, None, None
+            if pnl > 0:
+                reason = "TP"
+            elif pnl < 0:
+                reason = "SL"
+            else:
+                reason = "EXTERNAL"
+            logger.info(
+                f"[{epic}] Matched broker transaction: "
+                f"exit={exit_price:.6f}, P&L=${pnl:.2f}, reason={reason} "
+                f"(ref={txn.reference}, instrument={txn.instrument_name})"
             )
-            entry_match = (
+            return exit_price, pnl, reason
+
+        # Strategy 1: deal_reference (deterministic)
+        if deal_reference:
+            for txn in transactions:
+                if txn.reference == deal_reference:
+                    result = _finalize(txn)
+                    if result[0] is not None:
+                        return result
+
+        # Strategy 2: deal_id (legacy)
+        if deal_id:
+            for txn in transactions:
+                if txn.reference == deal_id:
+                    result = _finalize(txn)
+                    if result[0] is not None:
+                        return result
+
+        # Strategy 3: normalized instrument name + entry tolerance
+        candidates = []
+        for txn in transactions:
+            if not txn.instrument_name:
+                continue
+            norm_name = self._normalize_instrument_name(txn.instrument_name)
+            name_hit = (
+                norm_epic in norm_name
+                or norm_name in norm_epic
+                or norm_broker in norm_name
+                or norm_name in norm_broker
+            )
+            entry_hit = (
                 txn.open_level is not None
                 and entry_price > 0
                 and abs(txn.open_level - entry_price) / max(entry_price, 1e-9) < 0.001
             )
+            if name_hit and entry_hit:
+                candidates.append(txn)
 
-            if ref_match or (instrument_match and entry_match):
-                exit_price = txn.close_level
-                pnl = txn.pl_value
-                if exit_price is None or pnl is None:
-                    continue  # Incomplete transaction data, skip
+        if len(candidates) > 1:
+            logger.warning(
+                f"[{epic}] Ambiguous match in Strategy 3: {len(candidates)} "
+                f"candidates with same instrument+entry. Picking most recent."
+            )
+            candidates.sort(key=lambda t: t.date, reverse=True)
 
-                # Determine close reason from P&L sign
-                if pnl > 0:
-                    close_reason = "TP"
-                elif pnl < 0:
-                    close_reason = "SL"
-                else:
-                    close_reason = "EXTERNAL"
-
-                logger.info(
-                    f"[{epic}] Matched broker transaction: "
-                    f"exit={exit_price:.6f}, P&L=${pnl:.2f}, reason={close_reason} "
-                    f"(ref={txn.reference}, instrument={txn.instrument_name})"
-                )
-                return exit_price, pnl, close_reason
+        if candidates:
+            result = _finalize(candidates[0])
+            if result[0] is not None:
+                return result
 
         return None, None, None
 
     async def _detect_broker_closed(self, current_positions: list[dict]) -> None:
-        """
-        Detect positions closed by the broker (SL/TP hit on Capital.com side).
-        Compares current broker positions with previous iteration to find disappeared ones.
+        """Three-tier close detection.
 
-        PRIMARY: Uses Capital.com Transaction History API for real exit price + P&L.
-        FALLBACK: Live price heuristic (only if transaction API returns no match).
-
-        Populates self._broker_closed_deals so _check_stop_losses can skip them.
+        Tier 1 (primary):   Transaction History API match → write REAL data.
+        Tier 2 (deferred):  no match → keep in _pending_close_detections,
+                            retry on next loop iteration.
+        Tier 3 (timeout):   10min without match → write UNRECONCILED record.
         """
+        from src.utils.config import get_settings
+
         if self.execution_engine.mode == ExecutionMode.PAPER:
             return
 
-        # Reset per-iteration tracking of broker-closed deals
-        self._broker_closed_deals: set[str] = set()
+        self._broker_closed_deals = set()
+        now = datetime.now(UTC)
+        timeout_sec = get_settings().close_reconciliation_timeout_seconds
 
         current_deals = {p.get("deal_id") for p in current_positions if p.get("deal_id")}
 
-        if not self._previous_positions:
+        if not self._previous_positions and not self._pending_close_detections:
             self._previous_positions = {
                 p.get("deal_id"): p for p in current_positions if p.get("deal_id")
             }
             return
 
-        # Pre-fetch transaction history once for all disappeared positions
-        disappeared = [
+        newly_disappeared = [
             (did, ppos)
             for did, ppos in self._previous_positions.items()
-            if did not in current_deals
+            if did not in current_deals and did not in self._pending_close_detections
         ]
-        transactions = []
-        if disappeared:
-            transactions = await self._fetch_recent_transactions()
-            if transactions:
-                logger.info(
-                    f"Fetched {len(transactions)} recent transactions for "
-                    f"{len(disappeared)} disappeared position(s)"
-                )
+        retry_pending = list(self._pending_close_detections.items())
 
-        for deal_id, prev_pos in disappeared:
+        if not newly_disappeared and not retry_pending:
+            self._previous_positions = {
+                p.get("deal_id"): p for p in current_positions if p.get("deal_id")
+            }
+            return
+
+        transactions = await self._fetch_recent_transactions()
+        if transactions:
+            logger.info(
+                f"Fetched {len(transactions)} recent transactions for "
+                f"{len(newly_disappeared)} new + {len(retry_pending)} pending"
+            )
+
+        # Bridge deal_reference from DB for all disappeared ids
+        deal_ref_map: dict[str, str | None] = {}
+        disappeared_ids = [did for did, _ in newly_disappeared] + [did for did, _ in retry_pending]
+        if disappeared_ids and self._db_session_factory is not None:
+            try:
+                from sqlalchemy import select
+
+                from src.database.models import Position as DBPosition
+
+                async with self._db_session_factory() as session:
+                    stmt = select(DBPosition.deal_id, DBPosition.deal_reference).where(
+                        DBPosition.deal_id.in_(disappeared_ids)
+                    )
+                    rows = (await session.execute(stmt)).all()
+                    deal_ref_map = {row.deal_id: row.deal_reference for row in rows}
+            except Exception as e:
+                logger.warning(f"deal_reference DB lookup failed: {e}")
+
+        # ============ Retry previously-deferred closes ============
+        for deal_id, pending in retry_pending:
+            pending.retry_count += 1
+            deal_ref = pending.deal_reference or deal_ref_map.get(deal_id)
+            txn_exit, txn_pnl, txn_reason = self._match_transaction(
+                transactions,
+                deal_id,
+                deal_ref,
+                pending.epic,
+                pending.entry_price,
+            )
+            if txn_exit is not None and txn_pnl is not None:
+                logger.info(
+                    f"[{pending.epic}] Reconciled after {pending.retry_count} retries: "
+                    f"exit={txn_exit:.6f}, P&L=${txn_pnl:.2f}"
+                )
+                await self._finalize_close(
+                    deal_id=deal_id,
+                    epic=pending.epic,
+                    direction=pending.direction,
+                    size=pending.size,
+                    entry_price=pending.entry_price,
+                    prev_pos=pending.prev_pos,
+                    exit_price=txn_exit,
+                    pnl=txn_pnl,
+                    close_reason=txn_reason or "EXTERNAL",
+                    metric_path="primary",
+                    retry_count=pending.retry_count,
+                )
+                del self._pending_close_detections[deal_id]
+                continue
+
+            age = (now - pending.first_seen).total_seconds()
+            if age > timeout_sec:
+                await self._emit_unreconciled_close(pending)
+                del self._pending_close_detections[deal_id]
+
+        # ============ Newly-disappeared positions ============
+        for deal_id, prev_pos in newly_disappeared:
             epic = prev_pos.get("epic", "UNKNOWN")
             direction = prev_pos.get("direction", "BUY")
             size = prev_pos.get("size", 0)
             entry_price = prev_pos.get("level", 0)
+            deal_reference = prev_pos.get("deal_reference") or deal_ref_map.get(deal_id)
 
-            # === PRIMARY: Try Transaction History API ===
             txn_exit, txn_pnl, txn_reason = self._match_transaction(
-                transactions, deal_id, epic, entry_price
+                transactions,
+                deal_id,
+                deal_reference,
+                epic,
+                entry_price,
             )
 
             if txn_exit is not None and txn_pnl is not None:
-                # Real broker data — use it directly
-                exit_price = txn_exit
-                pnl = txn_pnl
-                close_reason = txn_reason or "EXTERNAL"
-                logger.info(
-                    f"[{epic}] Using REAL broker data for {deal_id}: "
-                    f"exit={exit_price:.6f}, P&L=${pnl:.2f}, reason={close_reason}"
+                await self._finalize_close(
+                    deal_id=deal_id,
+                    epic=epic,
+                    direction=direction,
+                    size=size,
+                    entry_price=entry_price,
+                    prev_pos=prev_pos,
+                    exit_price=txn_exit,
+                    pnl=txn_pnl,
+                    close_reason=txn_reason or "EXTERNAL",
+                    metric_path="primary",
+                    retry_count=0,
                 )
             else:
-                # === FALLBACK: Live price heuristic (legacy) ===
                 logger.warning(
-                    f"[{epic}] No transaction match for {deal_id} — "
-                    f"falling back to live price heuristic"
+                    f"[{epic}] Close detected but no broker transaction match for "
+                    f"{deal_id} — deferring (timeout {timeout_sec}s)"
                 )
-                exit_price, pnl, close_reason = await self._fallback_close_detection(
-                    deal_id, epic, direction, size, entry_price, prev_pos
-                )
-
-            logger.warning(
-                f"[{epic}] Position {deal_id} closed by broker "
-                f"(reason={close_reason}, exit={exit_price:.6f}, P&L=${pnl:.2f})"
-            )
-
-            # Track this deal so _check_stop_losses doesn't double-close it
-            self._broker_closed_deals.add(deal_id)
-
-            # Record in trade history for Kelly sizing + per-asset CB
-            self._on_position_closed(deal_id, pnl, epic=epic, close_reason=close_reason)
-
-            # Refresh equity from broker immediately after close so drawdown
-            # monitor, Kelly sizer, and dashboard reflect the real account state.
-            try:
-                fresh_equity = await self._fetch_equity()
-                self.risk_manager.update_equity(fresh_equity)
-                logger.info(f"[{epic}] Equity refreshed after close: ${fresh_equity:,.2f}")
-            except Exception as eq_err:
-                logger.debug(f"Post-close equity refresh failed: {eq_err}")
-
-            # Persist to database
-            await self._persist_position_close(
-                deal_id=deal_id,
-                epic=epic,
-                direction=direction,
-                size=size,
-                entry_price=entry_price,
-                exit_price=exit_price,
-                pnl=pnl,
-                close_reason=close_reason,
-                opened_at=prev_pos.get("opened_at"),
-            )
-
-            # Clean up trailing stop if tracked
-            if deal_id in self.trailing_stop_manager.tracked_positions:
-                self.trailing_stop_manager.unregister_position(deal_id)
-
-            # Broadcast trade_closed event to frontend via WebSocket
-            try:
-                from src.api.websocket import ws_manager
-
-                await ws_manager.broadcast(
-                    "trades",
-                    {
-                        "type": "trade_closed",
-                        "deal_id": deal_id,
-                        "epic": epic,
-                        "direction": direction,
-                        "pnl": round(pnl, 2),
-                        "close_reason": close_reason,
-                        "timestamp": datetime.now(UTC).isoformat(),
-                    },
-                )
-            except Exception as e:
-                logger.debug(f"WS broadcast trade_closed failed: {e}")
-
-            # NOTE: Do NOT call log_execution() here — it fires alert_trade_opened()
-            # which sends a misleading "new position" alert to Telegram.
-            # The trade close is already logged via _persist_position_close + alert below.
-
-            # Fire trade-closed alert (Telegram, Email, etc.)
-            if self._log_source in ("demo_trading", "live_trading"):
                 try:
-                    from src.monitoring.alerting.alert_manager import get_alert_manager
-                    from src.utils.config import get_settings
+                    from src.monitoring.metrics import MetricsCollector
 
-                    if getattr(get_settings(), "alerts_enabled", False):
-                        am = get_alert_manager()
-                        await am.alert_trade_closed(
-                            epic=epic,
-                            direction=direction,
-                            deal_id=deal_id,
-                            exit_price=exit_price,
-                            pnl=round(pnl, 2),
-                            reason=close_reason,
-                        )
-                except Exception as alert_err:
-                    logger.warning(f"Trade close alert failed: {alert_err}")
+                    MetricsCollector.record_close_detection(path="deferred", epic=epic)
+                except Exception:
+                    pass
+                self._pending_close_detections[deal_id] = PendingClose(
+                    deal_id=deal_id,
+                    deal_reference=deal_reference,
+                    epic=epic,
+                    direction=direction,
+                    size=float(size or 0),
+                    entry_price=float(entry_price or 0),
+                    prev_pos=prev_pos,
+                    first_seen=now,
+                    retry_count=0,
+                )
 
-        # Update previous positions for next iteration
         self._previous_positions = {
             p.get("deal_id"): p for p in current_positions if p.get("deal_id")
         }
 
-    async def _fallback_close_detection(
+    async def _finalize_close(
         self,
+        *,
         deal_id: str,
         epic: str,
         direction: str,
         size: float,
         entry_price: float,
         prev_pos: dict,
-    ) -> tuple[float, float, str]:
-        """Fallback close detection using live price heuristic.
-
-        Used ONLY when the Transaction History API returns no matching transaction.
-        This is the legacy logic — less accurate but better than nothing.
-
-        Returns (exit_price, pnl, close_reason).
-        """
-        stop_level = prev_pos.get("stop_level")
-        profit_level = prev_pos.get("profit_level")
-        close_reason = "EXTERNAL"
-        exit_price = entry_price
-
-        # Sanity check: discard SL/TP on wrong side of entry (stale data)
-        if stop_level and entry_price and entry_price > 0:
-            if direction == "BUY" and stop_level >= entry_price:
-                logger.warning(
-                    f"[{epic}] Discarding stale SL={stop_level:.5f} "
-                    f">= entry={entry_price:.5f} for LONG in close detection"
-                )
-                stop_level = None
-            elif direction == "SELL" and stop_level <= entry_price:
-                logger.warning(
-                    f"[{epic}] Discarding stale SL={stop_level:.5f} "
-                    f"<= entry={entry_price:.5f} for SHORT in close detection"
-                )
-                stop_level = None
-
-        live_price = None
-        if stop_level and stop_level > 0 and profit_level and profit_level > 0:
-            try:
-                market = await self.broker.get_market_details(epic)
-                snapshot = market.get("snapshot", {})
-                bid = snapshot.get("bid", 0)
-                offer = snapshot.get("offer", 0)
-                if bid and offer:
-                    live_price = (bid + offer) / 2
-            except Exception as e:
-                logger.debug(f"Could not get live price for {epic}: {e}")
-
-            if live_price:
-                if direction == "BUY":
-                    if live_price >= profit_level:
-                        close_reason = "TP"
-                        exit_price = profit_level
-                    elif live_price <= stop_level:
-                        close_reason = "SL"
-                        exit_price = stop_level
-                    else:
-                        dist_to_sl = abs(live_price - stop_level)
-                        dist_to_tp = abs(live_price - profit_level)
-                        if dist_to_tp < dist_to_sl:
-                            close_reason = "TP"
-                            exit_price = profit_level
-                        else:
-                            close_reason = "SL"
-                            exit_price = stop_level
-                else:
-                    if live_price <= profit_level:
-                        close_reason = "TP"
-                        exit_price = profit_level
-                    elif live_price >= stop_level:
-                        close_reason = "SL"
-                        exit_price = stop_level
-                    else:
-                        dist_to_sl = abs(live_price - stop_level)
-                        dist_to_tp = abs(live_price - profit_level)
-                        if dist_to_tp < dist_to_sl:
-                            close_reason = "TP"
-                            exit_price = profit_level
-                        else:
-                            close_reason = "SL"
-                            exit_price = stop_level
-            else:
-                close_reason = "EXTERNAL"
-                exit_price = entry_price
-                logger.warning(
-                    f"[{epic}] Cannot determine SL/TP for {deal_id} — "
-                    f"no live price available, marking as EXTERNAL"
-                )
-        elif stop_level and stop_level > 0:
-            close_reason = "SL"
-            exit_price = stop_level
-        elif profit_level and profit_level > 0:
-            close_reason = "TP"
-            exit_price = profit_level
-
-        # Calculate P&L
-        if direction == "BUY":
-            pnl = (exit_price - entry_price) * size
-        else:
-            pnl = (entry_price - exit_price) * size
-
-        # Sanity check — SL cannot produce profit, TP cannot produce loss
-        if close_reason == "SL" and pnl > 0:
-            logger.warning(
-                f"[{epic}] SL close with positive P&L (${pnl:.2f}) — "
-                f"detection was wrong, correcting to EXTERNAL"
-            )
-            close_reason = "EXTERNAL"
-            if live_price:
-                exit_price = live_price
-                pnl = (
-                    (exit_price - entry_price) * size
-                    if direction == "BUY"
-                    else (entry_price - exit_price) * size
-                )
-        elif close_reason == "TP" and pnl < 0:
-            logger.warning(
-                f"[{epic}] TP close with negative P&L (${pnl:.2f}) — "
-                f"detection was wrong, correcting to EXTERNAL"
-            )
-            close_reason = "EXTERNAL"
-            if live_price:
-                exit_price = live_price
-                pnl = (
-                    (exit_price - entry_price) * size
-                    if direction == "BUY"
-                    else (entry_price - exit_price) * size
-                )
-
+        exit_price: float,
+        pnl: float,
+        close_reason: str,
+        metric_path: str = "primary",
+        retry_count: int = 0,
+    ) -> None:
+        """Persist a matched close (Tier 1 success, immediate or via retry)."""
         logger.warning(
-            f"[{epic}] FALLBACK close detection for {deal_id}: "
-            f"reason={close_reason}, exit={exit_price:.6f}, P&L=${pnl:.2f}"
+            f"[{epic}] Position {deal_id} closed by broker "
+            f"(reason={close_reason}, exit={exit_price:.6f}, P&L=${pnl:.2f}, "
+            f"retry={retry_count})"
         )
-        return exit_price, pnl, close_reason
+
+        try:
+            from src.monitoring.metrics import MetricsCollector
+
+            MetricsCollector.record_close_detection(
+                path=metric_path, epic=epic, retry_count=retry_count
+            )
+        except Exception:
+            pass
+
+        self._broker_closed_deals.add(deal_id)
+        self._on_position_closed(deal_id, pnl, epic=epic, close_reason=close_reason)
+
+        try:
+            fresh_equity = await self._fetch_equity()
+            self.risk_manager.update_equity(fresh_equity)
+            logger.info(f"[{epic}] Equity refreshed after close: ${fresh_equity:,.2f}")
+        except Exception as eq_err:
+            logger.debug(f"Post-close equity refresh failed: {eq_err}")
+
+        await self._persist_position_close(
+            deal_id=deal_id,
+            epic=epic,
+            direction=direction,
+            size=size,
+            entry_price=entry_price,
+            exit_price=exit_price,
+            pnl=pnl,
+            close_reason=close_reason,
+            opened_at=prev_pos.get("opened_at"),
+        )
+
+        if deal_id in self.trailing_stop_manager.tracked_positions:
+            self.trailing_stop_manager.unregister_position(deal_id)
+
+        try:
+            from src.api.websocket import ws_manager
+
+            await ws_manager.broadcast(
+                "trades",
+                {
+                    "type": "trade_closed",
+                    "deal_id": deal_id,
+                    "epic": epic,
+                    "direction": direction,
+                    "pnl": round(pnl, 2),
+                    "close_reason": close_reason,
+                    "timestamp": datetime.now(UTC).isoformat(),
+                },
+            )
+        except Exception as e:
+            logger.debug(f"WS broadcast trade_closed failed: {e}")
+
+        if self._log_source in ("demo_trading", "live_trading"):
+            try:
+                from src.monitoring.alerting.alert_manager import get_alert_manager
+                from src.utils.config import get_settings
+
+                if getattr(get_settings(), "alerts_enabled", False):
+                    am = get_alert_manager()
+                    await am.alert_trade_closed(
+                        epic=epic,
+                        direction=direction,
+                        deal_id=deal_id,
+                        exit_price=exit_price,
+                        pnl=round(pnl, 2),
+                        reason=close_reason,
+                    )
+            except Exception as alert_err:
+                logger.warning(f"Trade close alert failed: {alert_err}")
+
+    async def _emit_unreconciled_close(self, pending: "PendingClose") -> None:
+        """Tier 3: persist a close we could not reconcile with broker data.
+
+        pnl=NULL, close_reason='UNRECONCILED'. Downstream stats must skip it.
+        """
+        logger.error(
+            f"[{pending.epic}] UNRECONCILED close after {pending.retry_count} "
+            f"retries: deal_id={pending.deal_id}, prev_pos={pending.prev_pos}"
+        )
+
+        try:
+            from src.monitoring.metrics import MetricsCollector
+
+            MetricsCollector.record_close_detection(
+                path="unreconciled", epic=pending.epic, retry_count=pending.retry_count
+            )
+        except Exception:
+            pass
+
+        self._broker_closed_deals.add(pending.deal_id)
+        exit_price = float(pending.prev_pos.get("level") or pending.entry_price)
+
+        await self._persist_position_close(
+            deal_id=pending.deal_id,
+            epic=pending.epic,
+            direction=pending.direction,
+            size=pending.size,
+            entry_price=pending.entry_price,
+            exit_price=exit_price,
+            pnl=None,
+            close_reason="UNRECONCILED",
+            opened_at=pending.prev_pos.get("opened_at"),
+        )
+
+        if pending.deal_id in self.trailing_stop_manager.tracked_positions:
+            self.trailing_stop_manager.unregister_position(pending.deal_id)
+
+        try:
+            from src.api.websocket import ws_manager
+
+            await ws_manager.broadcast(
+                "trades",
+                {
+                    "type": "trade_closed",
+                    "deal_id": pending.deal_id,
+                    "epic": pending.epic,
+                    "direction": pending.direction,
+                    "pnl": None,
+                    "close_reason": "UNRECONCILED",
+                    "timestamp": datetime.now(UTC).isoformat(),
+                },
+            )
+        except Exception as e:
+            logger.debug(f"WS broadcast unreconciled close failed: {e}")
+
+        if self._log_source in ("demo_trading", "live_trading"):
+            try:
+                from src.monitoring.alerting.alert_manager import get_alert_manager
+                from src.monitoring.alerting.schemas import Alert, AlertSeverity, AlertType
+                from src.utils.config import get_settings
+
+                if getattr(get_settings(), "alerts_enabled", False):
+                    am = get_alert_manager()
+                    alert = Alert(
+                        alert_type=AlertType.POSITION_STUCK,
+                        severity=AlertSeverity.WARNING,
+                        title=f"UNRECONCILED CLOSE: {pending.epic}",
+                        message=(
+                            f"Position {pending.deal_id} closed by broker but P&L not confirmed "
+                            f"after {pending.retry_count} retries. "
+                            f"Run: python scripts/reconcile_position.py "
+                            f"--deal-id {pending.deal_id}"
+                        ),
+                        epic=pending.epic,
+                        details={
+                            "direction": pending.direction,
+                            "deal_id": pending.deal_id,
+                            "exit_price": exit_price,
+                            "retry_count": pending.retry_count,
+                        },
+                    )
+                    await am.send_alert(alert)
+            except Exception as alert_err:
+                logger.warning(f"Unreconciled close alert failed: {alert_err}")
 
     async def _persist_trailing_stop_state(self, deal_id: str) -> None:
         """
@@ -2182,6 +2315,7 @@ class PaperTradingLoop:
                 entry_price=_entry,
                 stop_loss=_sl,
                 take_profit=_tp,
+                deal_reference=exec_result.deal_reference,
             )
 
             # Log executed signal + execution
@@ -2306,12 +2440,16 @@ class PaperTradingLoop:
                 _adj_tp = risk_result.take_profit + fill_drift if risk_result.take_profit else None
                 _adj_sl = _rp(epic, _adj_sl)
                 _adj_tp = _rp(epic, _adj_tp)
-                _sl_valid = _validate_sl_side(
-                    signal.direction.value, actual_entry, _adj_sl
-                ) if _adj_sl else False
-                _tp_valid = _validate_tp_side(
-                    signal.direction.value, actual_entry, _adj_tp
-                ) if _adj_tp else False
+                _sl_valid = (
+                    _validate_sl_side(signal.direction.value, actual_entry, _adj_sl)
+                    if _adj_sl
+                    else False
+                )
+                _tp_valid = (
+                    _validate_tp_side(signal.direction.value, actual_entry, _adj_tp)
+                    if _adj_tp
+                    else False
+                )
                 if _sl_valid and _tp_valid:
                     risk_result.stop_loss = _adj_sl
                     risk_result.take_profit = _adj_tp
@@ -2348,6 +2486,7 @@ class PaperTradingLoop:
                     entry_price=actual_entry,
                     stop_loss=_r_sl,
                     take_profit=_r_tp,
+                    deal_reference=exec_result.deal_reference,
                 )
             else:
                 signal_info["status"] = "exec_failed"
@@ -2791,13 +2930,20 @@ class PaperTradingLoop:
                 logger.debug(f"[{epic}] Risk level check failed: {e}")
 
     def _on_position_closed(
-        self, deal_id: str, pnl: float, epic: str = "", close_reason: str = ""
+        self, deal_id: str, pnl: float | None, epic: str = "", close_reason: str = ""
     ) -> None:
         """
         Handle position close events for Phase 8 modules.
         Records trade result for circuit breakers, equity curve, Kelly history,
         per-asset circuit breaker, and epic SL cooldown tracker.
         """
+        if pnl is None:
+            logger.debug(
+                f"[{epic}] _on_position_closed called with pnl=None "
+                f"(UNRECONCILED) — skipping Kelly/CB/equity-filter updates"
+            )
+            return
+
         # Circuit breaker: track consecutive wins/losses
         self.risk_manager.circuit_breakers.record_trade_result(is_win=(pnl > 0))
 

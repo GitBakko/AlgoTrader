@@ -36,6 +36,7 @@ class ExecutionResult(BaseModel):
 
     success: bool
     deal_id: str | None = None
+    deal_reference: str | None = None  # Capital.com dealReference (distinct from dealId)
     fill_price: float | None = None
     slippage: float = 0.0
     # Actual SL/TP set on the broker (may differ from requested due to broker

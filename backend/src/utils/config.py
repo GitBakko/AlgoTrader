@@ -214,6 +214,12 @@ class Settings(BaseSettings):
     correlation_regime_size_reduction: float = Field(
         default=0.50, alias="CORRELATION_REGIME_SIZE_REDUCTION"
     )
+    # Close-detection reconciliation: how long to wait for a transaction match
+    # before giving up and finalising a pending close with a heuristic P&L.
+    close_reconciliation_timeout_seconds: int = Field(
+        default=600, alias="CLOSE_RECONCILIATION_TIMEOUT_SECONDS"
+    )  # 10 minutes
+
     # Mean Reversion Strategy
     mr_primary_enabled: bool = Field(default=False, alias="MR_PRIMARY_ENABLED")
     mr_min_quality: float = Field(default=0.55, alias="MR_MIN_QUALITY")
@@ -234,6 +240,9 @@ class Settings(BaseSettings):
     min_confidence_threshold: float = Field(default=0.65, alias="MIN_CONFIDENCE_THRESHOLD")
     max_total_open_positions: int = Field(default=5, alias="MAX_TOTAL_OPEN_POSITIONS")
     max_total_exposure: float = Field(default=1.0, alias="MAX_TOTAL_EXPOSURE")
+
+    # ===== Close Detection (State Recovery) =====
+    orphan_reinject_max_age_days: int = Field(default=2, alias="ORPHAN_REINJECT_MAX_AGE_DAYS")
 
     # ===== Scalp Strategy =====
     scalp_mode_enabled: bool = Field(default=False, alias="SCALP_MODE_ENABLED")

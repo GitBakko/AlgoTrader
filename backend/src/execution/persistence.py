@@ -52,6 +52,7 @@ class ExecutionPersistence:
         # Create Position record
         position = Position(
             deal_id=result.deal_id,
+            deal_reference=result.deal_reference,
             epic=signal.epic,
             direction=signal.direction.value,
             size=Decimal(str(position_size)),
