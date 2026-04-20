@@ -627,7 +627,7 @@ class StateRecoveryService:
         for p in orphans:
             pending_map[p.deal_id] = PendingClose(
                 deal_id=p.deal_id,
-                deal_reference=None,  # not stored in DB yet
+                deal_reference=p.deal_reference,  # populated for new rows post-migration
                 epic=p.epic,
                 direction=p.direction,
                 size=float(p.size or 0),

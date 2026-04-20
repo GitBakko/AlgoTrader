@@ -68,10 +68,12 @@ def _make_db_position(
     size: Decimal = Decimal("10.0"),
     entry_price: Decimal = Decimal("84.50"),
     status: str = "OPEN",
+    deal_reference: str | None = None,
 ) -> MagicMock:
     """Return a mock Position ORM row."""
     pos = MagicMock()
     pos.deal_id = deal_id
+    pos.deal_reference = deal_reference
     pos.epic = epic
     pos.direction = direction
     pos.size = size
@@ -117,6 +119,27 @@ async def test_orphan_reinjected_into_pending_close_detections():
     assert pending.deal_id == "orphan-1"
     assert pending.deal_reference is None
     assert isinstance(pending.first_seen, datetime)
+
+
+@pytest.mark.asyncio
+async def test_orphan_carries_deal_reference_when_present():
+    """Post-Task-14 orphans have deal_reference stored in DB; it must flow
+    into the PendingClose so Strategy 1 (deterministic match) fires at
+    close reconciliation."""
+    paper_loop = MagicMock()
+    paper_loop._pending_close_detections = {}
+
+    broker = AsyncMock()
+    broker.list_positions = AsyncMock(return_value=[])
+
+    db_positions = [_make_db_position("orphan-ref", deal_reference="O_broker_ref_abc")]
+
+    service = _make_service(broker, paper_loop, db_positions)
+    injected = await service.reinject_orphans()
+
+    assert injected == 1
+    pending = paper_loop._pending_close_detections["orphan-ref"]
+    assert pending.deal_reference == "O_broker_ref_abc"
 
 
 @pytest.mark.asyncio
