@@ -249,7 +249,7 @@ class OrderManager:
             return ExecutionResult(
                 success=True,
                 deal_id=confirmation.deal_id,
-                deal_reference=confirmation.deal_reference,
+                deal_reference=confirmation.deal_reference if isinstance(getattr(confirmation, "deal_reference", None), str) else None,
                 fill_price=confirmation.level,
                 slippage=slippage,
                 actual_stop_loss=actual_sl,
@@ -358,7 +358,7 @@ class OrderManager:
                             return ExecutionResult(
                                 success=True,
                                 deal_id=confirmation.deal_id,
-                                deal_reference=confirmation.deal_reference,
+                                deal_reference=confirmation.deal_reference if isinstance(getattr(confirmation, "deal_reference", None), str) else None,
                                 fill_price=confirmation.level,
                                 slippage=slippage,
                                 actual_stop_loss=final_sl,
@@ -412,7 +412,7 @@ class OrderManager:
                         return ExecutionResult(
                             success=True,
                             deal_id=confirmation.deal_id,
-                            deal_reference=confirmation.deal_reference,
+                            deal_reference=confirmation.deal_reference if isinstance(getattr(confirmation, "deal_reference", None), str) else None,
                             fill_price=confirmation.level,
                             slippage=slippage,
                             actual_stop_loss=applied_sl,
