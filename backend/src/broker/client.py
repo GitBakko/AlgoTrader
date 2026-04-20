@@ -510,9 +510,15 @@ class CapitalComClient:
         Returns:
             List of transactions
         """
+        # Capital.com history/transactions expects `yyyy-MM-dd'T'HH:mm:ss`
+        # WITHOUT any timezone suffix (neither `Z` nor `+00:00`). The server
+        # interprets it in its own timezone. We still normalize the input to
+        # UTC here so the serialized string is unambiguous to us, but we
+        # must strip the timezone marker before sending or the endpoint
+        # returns error.invalid.from (HTTP 400).
         params = {
-            "from": from_date.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "to": to_date.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "from": from_date.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S"),
+            "to": to_date.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S"),
             "type": transaction_type.value,
         }
         response = await self._request("GET", "/api/v1/history/transactions", params=params)
