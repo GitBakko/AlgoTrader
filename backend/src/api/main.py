@@ -80,6 +80,36 @@ limiter = Limiter(
 )
 
 
+async def _connect_broker_with_retry(
+    broker, *, max_attempts: int = 3, initial_wait: float = 2.0
+) -> None:
+    """Connect to Capital.com with exponential backoff on HTTP 429 / rate-limit errors.
+
+    Raises the last exception if all attempts fail. Logs each retry at WARNING.
+    Non-rate-limit errors (e.g. 401 auth failures) are NOT retried.
+    """
+    wait = initial_wait
+    for attempt in range(1, max_attempts + 1):
+        try:
+            await broker.connect()
+            if attempt > 1:
+                logger.info(
+                    f"Broker connect succeeded on attempt {attempt}/{max_attempts}"
+                )
+            return
+        except Exception as e:
+            msg = str(e)
+            is_rate_limited = "429" in msg or "rate limit" in msg.lower() or "too many" in msg.lower()
+            if attempt == max_attempts or not is_rate_limited:
+                raise
+            logger.warning(
+                f"Broker connect attempt {attempt}/{max_attempts} failed "
+                f"(rate-limited), retrying in {wait:.0f}s: {e}"
+            )
+            await asyncio.sleep(wait)
+            wait *= 2
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -113,7 +143,7 @@ async def lifespan(app: FastAPI):
         from src.broker.client import CapitalComClient
 
         broker = CapitalComClient()
-        await broker.connect()
+        await _connect_broker_with_retry(broker)
         app.state.broker_client = broker
         logger.info("Broker connected to Capital.com demo")
 
@@ -188,8 +218,10 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         desired = getattr(app.state, "_desired_execution_mode", "PAPER")
         if desired != "PAPER":
-            logger.warning(
-                f"Broker failed but {desired} mode requested — falling back to PAPER: {e}"
+            logger.critical(
+                f"BROKER CONNECT FAILED after retries — {desired} mode requested but "
+                f"falling back to PAPER. Positions will show as local-only ghosts. "
+                f"Restart backend after rate limit window to restore {desired} mode. Error: {e}"
             )
         else:
             logger.warning(f"Broker connection failed (continuing in PAPER mode): {e}")
