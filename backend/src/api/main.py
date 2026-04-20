@@ -336,6 +336,25 @@ async def lifespan(app: FastAPI):
         )
 
     # ══════════════════════════════════════════════════════════
+    # 🔁 ORPHAN POSITION RE-INJECTION (Task 10)
+    # Positions that closed on broker while backend was down never appear in
+    # _previous_positions on restart. Re-inject them so the three-tier close
+    # detection can reconcile them within the timeout window.
+    # ══════════════════════════════════════════════════════════
+    recovery_service.paper_loop = app.state.paper_loop
+    try:
+        orphans_injected = await recovery_service.reinject_orphans()
+        if orphans_injected:
+            logger.warning(
+                f"⚠️  {orphans_injected} orphan position(s) re-injected for "
+                f"close reconciliation (DB=OPEN but broker missing)"
+            )
+        else:
+            logger.info("Orphan check: no orphan positions detected")
+    except Exception as e:
+        logger.error(f"reinject_orphans failed (non-fatal): {e}")
+
+    # ══════════════════════════════════════════════════════════
     # 📦 PRE-FETCH MARKET SPECS (minDealSize cache)
     # ══════════════════════════════════════════════════════════
     environment = "DEMO" if settings.use_demo else "LIVE"

@@ -52,12 +52,14 @@ class StateRecoveryService:
         trailing_stop_manager: TrailingStopManager,
         broker: CapitalComClient | None = None,
         db_session_factory=None,
+        paper_loop=None,
     ):
         self.execution_engine = execution_engine
         self.risk_manager = risk_manager
         self.trailing_stop_manager = trailing_stop_manager
         self.broker = broker
         self.db_session_factory = db_session_factory
+        self.paper_loop = paper_loop
         self.mode = execution_engine.mode
 
     async def recover_all_state(self) -> RecoveryReport:
@@ -549,3 +551,89 @@ class StateRecoveryService:
         except Exception as e:
             logger.error(f"Risk state restoration failed: {e}")
             return False
+
+    async def reinject_orphans(self) -> int:
+        """For each Position in DB with status='OPEN' that the broker no
+        longer reports, insert a PendingClose into
+        paper_loop._pending_close_detections so the three-tier close
+        detection picks it up within the reconciliation timeout window.
+
+        An orphan arises when the backend was down while the broker closed
+        the position — the DB still shows OPEN but the broker has no record.
+
+        Returns:
+            Number of orphans re-injected (0 on any error or guard condition).
+        """
+        from sqlalchemy import select
+
+        from src.database.models import Position
+        from src.trading.paper_loop import PendingClose
+
+        # Guard: needs both broker and paper_loop to do anything useful
+        if self.paper_loop is None:
+            logger.warning("reinject_orphans: paper_loop not wired, skipping")
+            return 0
+
+        if not self.db_session_factory:
+            logger.warning("reinject_orphans: no db_session_factory, skipping")
+            return 0
+
+        # Step 1: fetch broker's live positions
+        try:
+            broker_positions = await self.broker.list_positions() if self.broker else []
+        except Exception as e:
+            logger.warning(f"reinject_orphans: broker.list_positions() failed: {e}")
+            return 0
+
+        broker_deal_ids = {
+            getattr(p, "deal_id", None) for p in broker_positions
+            if getattr(p, "deal_id", None) is not None
+        }
+
+        # Step 2: fetch all DB-OPEN positions
+        try:
+            async with self.db_session_factory() as session:
+                stmt = select(Position).where(Position.status == "OPEN")
+                db_open = (await session.execute(stmt)).scalars().all()
+        except Exception as e:
+            logger.error(f"reinject_orphans: DB query failed: {e}")
+            return 0
+
+        # Step 3: filter to orphans (DB=OPEN but broker has no record)
+        pending_map = self.paper_loop._pending_close_detections
+        orphans = [
+            p for p in db_open
+            if p.deal_id not in broker_deal_ids
+            and p.deal_id not in pending_map  # skip already-queued
+        ]
+
+        if not orphans:
+            logger.info("reinject_orphans: no orphans to reinject")
+            return 0
+
+        now = datetime.now(UTC)
+        for p in orphans:
+            pending_map[p.deal_id] = PendingClose(
+                deal_id=p.deal_id,
+                deal_reference=None,  # not stored in DB yet
+                epic=p.epic,
+                direction=p.direction,
+                size=float(p.size or 0),
+                entry_price=float(p.entry_price or 0),
+                prev_pos={
+                    "deal_id": p.deal_id,
+                    "epic": p.epic,
+                    "direction": p.direction,
+                    "size": float(p.size or 0),
+                    "level": float(p.entry_price or 0),
+                    "opened_at": p.opened_at,
+                },
+                first_seen=now,
+                retry_count=0,
+            )
+            logger.warning(
+                f"[{p.epic}] Orphan position {p.deal_id} re-injected at startup "
+                f"for close reconciliation (DB=OPEN but broker missing)"
+            )
+
+        return len(orphans)
