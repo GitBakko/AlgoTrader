@@ -806,50 +806,104 @@ class PaperTradingLoop:
             logger.warning(f"Failed to fetch transaction history: {e}")
             return []
 
-    def _match_transaction(
-        self, transactions: list, deal_id: str, epic: str, entry_price: float
-    ) -> tuple[float | None, float | None, str | None]:
-        """Match a closed deal_id to a broker transaction.
+    @staticmethod
+    def _normalize_instrument_name(name: str) -> str:
+        """Normalize instrument/epic names for fuzzy matching.
 
-        Returns (exit_price, pnl, close_reason) or (None, None, None) if no match.
+        Strips underscores, hyphens, whitespace; lowercases; keeps only alphanumerics.
+        'OIL_CRUDE' → 'oilcrude', 'Oil - Crude' → 'oilcrude', 'Germany 40' → 'germany40'.
+        """
+        return "".join(ch for ch in (name or "").lower() if ch.isalnum())
+
+    def _match_transaction(
+        self,
+        transactions: list,
+        deal_id: str,
+        deal_reference: str | None,
+        epic: str,
+        entry_price: float,
+    ) -> tuple[float | None, float | None, str | None]:
+        """Match a closed deal to a broker Transaction using three strategies
+        in order of decreasing determinism.
+
+        Strategy 1: deal_reference (deterministic, 1-to-1 with the open)
+        Strategy 2: deal_id (legacy path, still supported for positions
+                   opened before deal_reference was persisted)
+        Strategy 3: normalized instrument name + entry price tolerance (< 0.1%)
+
+        Returns (exit_price, pnl, close_reason) or (None, None, None).
         """
         from src.broker.client import EPIC_TO_BROKER
 
         broker_epic = EPIC_TO_BROKER.get(epic, epic)
+        norm_epic = self._normalize_instrument_name(epic)
+        norm_broker = self._normalize_instrument_name(broker_epic)
 
-        for txn in transactions:
-            # Match by reference (deal reference) or by instrument name + entry level
-            ref_match = txn.reference and deal_id and txn.reference == deal_id
-            instrument_match = txn.instrument_name and (
-                epic.lower() in txn.instrument_name.lower()
-                or broker_epic.lower() in txn.instrument_name.lower()
+        def _finalize(txn) -> tuple[float | None, float | None, str | None]:
+            exit_price = txn.close_level
+            pnl = txn.pl_value
+            if exit_price is None or pnl is None:
+                return None, None, None
+            if pnl > 0:
+                reason = "TP"
+            elif pnl < 0:
+                reason = "SL"
+            else:
+                reason = "EXTERNAL"
+            logger.info(
+                f"[{epic}] Matched broker transaction: "
+                f"exit={exit_price:.6f}, P&L=${pnl:.2f}, reason={reason} "
+                f"(ref={txn.reference}, instrument={txn.instrument_name})"
             )
-            entry_match = (
+            return exit_price, pnl, reason
+
+        # Strategy 1: deal_reference (deterministic)
+        if deal_reference:
+            for txn in transactions:
+                if txn.reference == deal_reference:
+                    result = _finalize(txn)
+                    if result[0] is not None:
+                        return result
+
+        # Strategy 2: deal_id (legacy)
+        if deal_id:
+            for txn in transactions:
+                if txn.reference == deal_id:
+                    result = _finalize(txn)
+                    if result[0] is not None:
+                        return result
+
+        # Strategy 3: normalized instrument name + entry tolerance
+        candidates = []
+        for txn in transactions:
+            if not txn.instrument_name:
+                continue
+            norm_name = self._normalize_instrument_name(txn.instrument_name)
+            name_hit = (
+                norm_epic in norm_name
+                or norm_name in norm_epic
+                or norm_broker in norm_name
+                or norm_name in norm_broker
+            )
+            entry_hit = (
                 txn.open_level is not None
                 and entry_price > 0
                 and abs(txn.open_level - entry_price) / max(entry_price, 1e-9) < 0.001
             )
+            if name_hit and entry_hit:
+                candidates.append(txn)
 
-            if ref_match or (instrument_match and entry_match):
-                exit_price = txn.close_level
-                pnl = txn.pl_value
-                if exit_price is None or pnl is None:
-                    continue  # Incomplete transaction data, skip
+        if len(candidates) > 1:
+            logger.warning(
+                f"[{epic}] Ambiguous match in Strategy 3: {len(candidates)} "
+                f"candidates with same instrument+entry. Picking most recent."
+            )
+            candidates.sort(key=lambda t: t.date, reverse=True)
 
-                # Determine close reason from P&L sign
-                if pnl > 0:
-                    close_reason = "TP"
-                elif pnl < 0:
-                    close_reason = "SL"
-                else:
-                    close_reason = "EXTERNAL"
-
-                logger.info(
-                    f"[{epic}] Matched broker transaction: "
-                    f"exit={exit_price:.6f}, P&L=${pnl:.2f}, reason={close_reason} "
-                    f"(ref={txn.reference}, instrument={txn.instrument_name})"
-                )
-                return exit_price, pnl, close_reason
+        if candidates:
+            result = _finalize(candidates[0])
+            if result[0] is not None:
+                return result
 
         return None, None, None
 
@@ -899,8 +953,9 @@ class PaperTradingLoop:
             entry_price = prev_pos.get("level", 0)
 
             # === PRIMARY: Try Transaction History API ===
+            deal_reference = prev_pos.get("deal_reference")
             txn_exit, txn_pnl, txn_reason = self._match_transaction(
-                transactions, deal_id, epic, entry_price
+                transactions, deal_id, deal_reference, epic, entry_price
             )
 
             if txn_exit is not None and txn_pnl is not None:
