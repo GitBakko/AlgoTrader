@@ -284,6 +284,38 @@ class Transaction(BaseModel):
         except ValueError:
             return None
 
+    def pl_value_in(self, account_currency: str) -> float | None:
+        """Return parsed P&L, logging a WARNING if the currency prefix in
+        profitAndLoss differs from account_currency.
+
+        We DO NOT convert (a reliable FX feed is out of scope).
+        The caller decides what to do with a mismatched value; at minimum
+        the mismatch becomes observable in logs.
+        """
+        from loguru import logger
+
+        value = self.pl_value
+        if value is None:
+            return None
+
+        raw = (self.profit_and_loss or "").strip()
+        prefix = ""
+        for ch in raw.lstrip("-"):
+            if ch.isdigit() or ch == ".":
+                break
+            prefix += ch
+        prefix = prefix.upper()
+        account = (account_currency or "").upper()
+
+        if prefix and account and prefix != account:
+            logger.warning(
+                f"Transaction P&L currency mismatch: "
+                f"txn={prefix}{value:+.2f} account={account} "
+                f"(ref={self.reference}, instrument={self.instrument_name}) — "
+                f"value used as-is, no FX conversion"
+            )
+        return value
+
 
 # ===== Trade Confirmation =====
 class DealConfirmation(BaseModel):
