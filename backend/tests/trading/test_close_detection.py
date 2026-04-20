@@ -1,8 +1,8 @@
 """Tests for close detection matching strategies in paper_loop."""
 from __future__ import annotations
 
-from datetime import datetime
-from unittest.mock import MagicMock
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -192,3 +192,144 @@ def test_match_skips_transaction_with_none_pl(paper_loop):
     # Strategy 1 finds incomplete first → skips → finds good
     assert result[0] is not None
     assert result[1] == pytest.approx(74.18)
+
+
+# ---------------------------------------------------------------------------
+# Integration-style tests for the three-tier _detect_broker_closed flow
+# ---------------------------------------------------------------------------
+
+from datetime import timedelta
+
+from src.trading.paper_loop import PaperTradingLoop, PendingClose
+
+
+class _AsyncCM:
+    """Async context manager yielding a mock DB session that returns [] for execute."""
+
+    async def __aenter__(self):
+        session = AsyncMock()
+        result = MagicMock()
+        result.all = MagicMock(return_value=[])
+        session.execute = AsyncMock(return_value=result)
+        return session
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return None
+
+
+@pytest.fixture
+def loop_with_mocks(monkeypatch):
+    """PaperTradingLoop with all external deps mocked for _detect_broker_closed."""
+    loop = PaperTradingLoop.__new__(PaperTradingLoop)
+    loop._previous_positions = {}
+    loop._pending_close_detections = {}
+    loop._broker_closed_deals = set()
+    loop.execution_engine = MagicMock()
+
+    class _ModeEnum:
+        PAPER = "PAPER"
+        DEMO = "DEMO"
+
+    loop.execution_engine.mode = _ModeEnum.DEMO
+
+    loop.broker = AsyncMock()
+    loop.risk_manager = MagicMock()
+    loop.trailing_stop_manager = MagicMock()
+    loop.trailing_stop_manager.tracked_positions = {}
+    loop._fetch_equity = AsyncMock(return_value=10000.0)
+    loop._persist_position_close = AsyncMock()
+    loop._on_position_closed = MagicMock()
+    loop._log_source = "demo_trading"
+    loop._fetch_recent_transactions = AsyncMock(return_value=[])
+
+    # Use the real ExecutionMode so the mode check works
+    monkeypatch.setattr(
+        "src.trading.paper_loop.ExecutionMode",
+        _ModeEnum,
+        raising=False,
+    )
+
+    # Patch _db_session_factory to return an async context manager with empty DB
+    loop._db_session_factory = lambda: _AsyncCM()
+
+    return loop
+
+
+@pytest.mark.asyncio
+async def test_deferred_when_no_match_on_first_iteration(loop_with_mocks):
+    """Position disappears, no matching txn → enters pending, no DB write, no alert."""
+    loop = loop_with_mocks
+    prev_pos = {
+        "deal_id": "deal-1",
+        "epic": "WTIUSD",
+        "direction": "BUY",
+        "size": 10.0,
+        "level": 84.50,
+    }
+    loop._previous_positions = {"deal-1": prev_pos}
+    loop._fetch_recent_transactions.return_value = []
+
+    await loop._detect_broker_closed(current_positions=[])
+
+    assert "deal-1" in loop._pending_close_detections
+    pending = loop._pending_close_detections["deal-1"]
+    assert pending.retry_count == 0
+    loop._persist_position_close.assert_not_awaited()
+    loop._on_position_closed.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_unreconciled_after_timeout(loop_with_mocks):
+    """After 10min without match → persist with pnl=None, close_reason=UNRECONCILED."""
+    loop = loop_with_mocks
+    past = datetime.now(timezone.utc) - timedelta(seconds=601)
+    loop._pending_close_detections["deal-1"] = PendingClose(
+        deal_id="deal-1",
+        deal_reference=None,
+        epic="WTIUSD",
+        direction="BUY",
+        size=10.0,
+        entry_price=84.50,
+        prev_pos={"level": 84.50, "deal_id": "deal-1"},
+        first_seen=past,
+        retry_count=120,
+    )
+    loop._fetch_recent_transactions.return_value = []
+
+    await loop._detect_broker_closed(current_positions=[])
+
+    loop._persist_position_close.assert_awaited_once()
+    call_kwargs = loop._persist_position_close.await_args.kwargs
+    assert call_kwargs["pnl"] is None
+    assert call_kwargs["close_reason"] == "UNRECONCILED"
+    loop._on_position_closed.assert_not_called()
+    assert "deal-1" not in loop._pending_close_detections
+
+
+@pytest.mark.asyncio
+async def test_reconciled_on_retry(loop_with_mocks):
+    """Pending position gets matched on next iteration → persists real pnl."""
+    loop = loop_with_mocks
+    loop._pending_close_detections["deal-1"] = PendingClose(
+        deal_id="deal-1",
+        deal_reference="ref-1",
+        epic="WTIUSD",
+        direction="BUY",
+        size=10.0,
+        entry_price=84.50,
+        prev_pos={"level": 84.50, "deal_id": "deal-1"},
+        first_seen=datetime.now(timezone.utc),
+        retry_count=2,
+    )
+    loop._fetch_recent_transactions.return_value = [
+        _txn(reference="ref-1", openLevel=84.50, closeLevel=85.60, profitAndLoss="USD246.86")
+    ]
+
+    await loop._detect_broker_closed(current_positions=[])
+
+    loop._persist_position_close.assert_awaited_once()
+    kwargs = loop._persist_position_close.await_args.kwargs
+    assert kwargs["pnl"] == pytest.approx(246.86)
+    assert kwargs["close_reason"] == "TP"
+    loop._on_position_closed.assert_called_once()
+    assert "deal-1" not in loop._pending_close_detections
