@@ -1057,6 +1057,11 @@ class PaperTradingLoop:
                     f"[{epic}] Close detected but no broker transaction match for "
                     f"{deal_id} — deferring (timeout {timeout_sec}s)"
                 )
+                try:
+                    from src.monitoring.metrics import MetricsCollector
+                    MetricsCollector.record_close_detection(path="deferred", epic=epic)
+                except Exception:
+                    pass
                 self._pending_close_detections[deal_id] = PendingClose(
                     deal_id=deal_id,
                     deal_reference=deal_reference,
@@ -1094,6 +1099,12 @@ class PaperTradingLoop:
             f"(reason={close_reason}, exit={exit_price:.6f}, P&L=${pnl:.2f}, "
             f"retry={retry_count})"
         )
+
+        try:
+            from src.monitoring.metrics import MetricsCollector
+            MetricsCollector.record_close_detection(path=metric_path, epic=epic, retry_count=retry_count)
+        except Exception:
+            pass
 
         self._broker_closed_deals.add(deal_id)
         self._on_position_closed(deal_id, pnl, epic=epic, close_reason=close_reason)
@@ -1165,6 +1176,14 @@ class PaperTradingLoop:
             f"[{pending.epic}] UNRECONCILED close after {pending.retry_count} "
             f"retries: deal_id={pending.deal_id}, prev_pos={pending.prev_pos}"
         )
+
+        try:
+            from src.monitoring.metrics import MetricsCollector
+            MetricsCollector.record_close_detection(
+                path="unreconciled", epic=pending.epic, retry_count=pending.retry_count
+            )
+        except Exception:
+            pass
 
         self._broker_closed_deals.add(pending.deal_id)
         exit_price = float(pending.prev_pos.get("level") or pending.entry_price)
