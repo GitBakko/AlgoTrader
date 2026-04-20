@@ -1205,22 +1205,30 @@ class PaperTradingLoop:
         if self._log_source in ("demo_trading", "live_trading"):
             try:
                 from src.monitoring.alerting.alert_manager import get_alert_manager
+                from src.monitoring.alerting.schemas import Alert, AlertSeverity, AlertType
                 from src.utils.config import get_settings
 
                 if getattr(get_settings(), "alerts_enabled", False):
                     am = get_alert_manager()
-                    await am.alert_trade_closed(
-                        epic=pending.epic,
-                        direction=pending.direction,
-                        deal_id=pending.deal_id,
-                        exit_price=exit_price,
-                        pnl=0.0,
-                        reason=(
-                            "UNRECONCILED — P&L not confirmed by broker. "
+                    alert = Alert(
+                        alert_type=AlertType.POSITION_STUCK,
+                        severity=AlertSeverity.WARNING,
+                        title=f"UNRECONCILED CLOSE: {pending.epic}",
+                        message=(
+                            f"Position {pending.deal_id} closed by broker but P&L not confirmed "
+                            f"after {pending.retry_count} retries. "
                             f"Run: python scripts/reconcile_position.py "
                             f"--deal-id {pending.deal_id}"
                         ),
+                        epic=pending.epic,
+                        details={
+                            "direction": pending.direction,
+                            "deal_id": pending.deal_id,
+                            "exit_price": exit_price,
+                            "retry_count": pending.retry_count,
+                        },
                     )
+                    await am.send_alert(alert)
             except Exception as alert_err:
                 logger.warning(f"Unreconciled close alert failed: {alert_err}")
 
