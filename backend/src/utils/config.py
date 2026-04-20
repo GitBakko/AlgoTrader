@@ -241,6 +241,9 @@ class Settings(BaseSettings):
     max_total_open_positions: int = Field(default=5, alias="MAX_TOTAL_OPEN_POSITIONS")
     max_total_exposure: float = Field(default=1.0, alias="MAX_TOTAL_EXPOSURE")
 
+    # ===== Close Detection (State Recovery) =====
+    orphan_reinject_max_age_days: int = Field(default=2, alias="ORPHAN_REINJECT_MAX_AGE_DAYS")
+
     # ===== Scalp Strategy =====
     scalp_mode_enabled: bool = Field(default=False, alias="SCALP_MODE_ENABLED")
     scalp_candle_resolution: str = Field(default="15min", alias="SCALP_CANDLE_RESOLUTION")

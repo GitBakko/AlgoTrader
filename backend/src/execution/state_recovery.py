@@ -8,7 +8,7 @@ Recovery Strategy:
 """
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from loguru import logger
 
@@ -17,6 +17,7 @@ from src.execution.execution_engine import ExecutionEngine
 from src.execution.schemas import ExecutionMode
 from src.risk.risk_manager import RiskManager
 from src.risk.trailing_stop_manager import TrailingStopManager
+from src.utils.config import get_settings
 
 
 @dataclass
@@ -591,10 +592,16 @@ class StateRecoveryService:
             if getattr(p, "deal_id", None) is not None
         }
 
-        # Step 2: fetch all DB-OPEN positions
+        # Step 2: fetch all DB-OPEN positions opened within max age
+        max_age_days = get_settings().orphan_reinject_max_age_days
+        cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=max_age_days)
+
         try:
             async with self.db_session_factory() as session:
-                stmt = select(Position).where(Position.status == "OPEN")
+                stmt = select(Position).where(
+                    Position.status == "OPEN",
+                    Position.opened_at >= cutoff,
+                )
                 db_open = (await session.execute(stmt)).scalars().all()
         except Exception as e:
             logger.error(f"reinject_orphans: DB query failed: {e}")
@@ -610,7 +617,10 @@ class StateRecoveryService:
         ]
 
         if not orphans:
-            logger.info("reinject_orphans: no orphans to reinject")
+            logger.info(
+                f"reinject_orphans: no orphans to reinject "
+                f"(cutoff={cutoff.isoformat()}, {max_age_days} days)"
+            )
             return 0
 
         now = datetime.now(UTC)

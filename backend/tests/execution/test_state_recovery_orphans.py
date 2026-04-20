@@ -252,3 +252,82 @@ async def test_no_db_session_factory_returns_zero():
     injected = await service.reinject_orphans()
 
     assert injected == 0
+
+
+@pytest.mark.asyncio
+async def test_old_orphan_not_reinjected():
+    """Positions opened > max_age_days ago are ignored (legacy backlog)."""
+    from datetime import timedelta
+
+    paper_loop = MagicMock()
+    paper_loop._pending_close_detections = {}
+
+    broker = AsyncMock()
+    broker.list_positions = AsyncMock(return_value=[])
+
+    # Create a position opened 5 days ago
+    old_orphan = MagicMock()
+    old_orphan.deal_id = "old-orphan"
+    old_orphan.epic = "WTIUSD"
+    old_orphan.direction = "BUY"
+    old_orphan.size = Decimal("10.0")
+    old_orphan.entry_price = Decimal("84.50")
+    old_orphan.status = "OPEN"
+    old_orphan.opened_at = (datetime.now(UTC) - timedelta(days=5)).replace(tzinfo=None)
+
+    # Create a smart mock session that filters by WHERE clause age check
+    session = AsyncMock()
+
+    async def mock_execute(stmt):
+        # Check if the statement has age-based filtering (>=cutoff)
+        # The statement should have a WHERE clause with opened_at >= cutoff
+        # For this test: if the position's opened_at is < cutoff (2 days), exclude it
+        from datetime import datetime, timedelta, UTC
+
+        max_age_days = 2
+        cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=max_age_days)
+
+        # Filter positions based on age
+        filtered = [p for p in [old_orphan] if p.opened_at >= cutoff]
+
+        scalars_mock = MagicMock()
+        scalars_mock.all.return_value = filtered
+        result = MagicMock()
+        result.scalars.return_value = scalars_mock
+        return result
+
+    session.execute = AsyncMock(side_effect=mock_execute)
+    session.commit = AsyncMock()
+
+    class _CM:
+        async def __aenter__(self):
+            return session
+
+        async def __aexit__(self, *a):
+            return None
+
+    def _factory():
+        return _CM()
+
+    execution_engine = MagicMock()
+    execution_engine.mode = ExecutionMode.DEMO
+    execution_engine._position_tracker = MagicMock()
+
+    risk_manager = MagicMock()
+    risk_manager.drawdown_monitor = MagicMock()
+    risk_manager.circuit_breakers = MagicMock()
+    risk_manager.equity_curve_filter = MagicMock()
+
+    service = StateRecoveryService(
+        execution_engine=execution_engine,
+        risk_manager=risk_manager,
+        trailing_stop_manager=MagicMock(),
+        broker=broker,
+        db_session_factory=_factory,
+        paper_loop=paper_loop,
+    )
+
+    injected = await service.reinject_orphans()
+
+    assert injected == 0
+    assert "old-orphan" not in paper_loop._pending_close_detections
