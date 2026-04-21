@@ -649,3 +649,84 @@ class StateRecoveryService:
             )
 
         return len(orphans)
+
+    async def rehydrate_pending_closes(self) -> int:
+        """Restore the close-detection retry queue from the
+        ``pending_close_detections`` table so the 10-minute reconciliation
+        timeout survives backend restarts.
+
+        Without this step, a pending close queued on the previous backend
+        instance is silently forgotten, and the next time the broker
+        reports the position as missing it is re-queued with
+        ``retry_count=0 / first_seen=now`` — the timeout clock restarts
+        from zero indefinitely. That exact silent failure produced
+        tonight's DE40 UNRECONCILED record.
+
+        Returns:
+            Number of pending-close rows rehydrated (0 on any error or
+            guard condition).
+        """
+        if self.paper_loop is None:
+            logger.warning("rehydrate_pending_closes: paper_loop not wired, skipping")
+            return 0
+        if not self.db_session_factory:
+            logger.warning(
+                "rehydrate_pending_closes: no db_session_factory, skipping"
+            )
+            return 0
+
+        # Local imports — avoids a circular dependency with paper_loop which
+        # also imports from state_recovery indirectly via ExecutionEngine.
+        from src.database.repositories.pending_close_repository import (
+            PendingCloseRepository,
+        )
+        from src.trading.paper_loop import PendingClose
+
+        try:
+            async with self.db_session_factory() as session:
+                repo = PendingCloseRepository(session)
+                rows = await repo.list_all()
+        except Exception as exc:  # noqa: BLE001
+            logger.error(f"rehydrate_pending_closes: DB query failed: {exc}")
+            return 0
+
+        if not rows:
+            logger.info("rehydrate_pending_closes: no persisted pending closes")
+            return 0
+
+        pending_map = self.paper_loop._pending_close_detections
+        restored = 0
+        for row in rows:
+            # Do not overwrite an entry the running process has already
+            # created in-memory — should not happen during boot but is the
+            # safe behavior if called again later.
+            if row.deal_id in pending_map:
+                continue
+            first_seen = row.first_seen
+            if first_seen.tzinfo is None:
+                first_seen = first_seen.replace(tzinfo=UTC)
+            pending_map[row.deal_id] = PendingClose(
+                deal_id=row.deal_id,
+                deal_reference=row.deal_reference,
+                epic=row.epic,
+                direction=row.direction,
+                size=float(row.size or 0),
+                entry_price=float(row.entry_price or 0),
+                prev_pos=dict(row.prev_pos or {}),
+                first_seen=first_seen,
+                retry_count=int(row.retry_count or 0),
+            )
+            restored += 1
+            logger.warning(
+                f"[{row.epic}] Rehydrated pending close {row.deal_id} "
+                f"(retry_count={row.retry_count}, "
+                f"first_seen={first_seen.isoformat()}) — reconciliation "
+                f"timeout continues from where the previous process left off"
+            )
+
+        if restored:
+            logger.info(
+                f"rehydrate_pending_closes: restored {restored} pending "
+                f"close(s) from DB"
+            )
+        return restored
