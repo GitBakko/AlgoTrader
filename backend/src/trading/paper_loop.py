@@ -830,7 +830,7 @@ class PaperTradingLoop:
 
             from_date = now - timedelta(hours=24)
             transactions = await self.broker.get_transaction_history(
-                from_date, now, TransactionType.ALL_DEAL
+                from_date, now, TransactionType.TRADE
             )
             setattr(self, cache_attr, transactions)
             setattr(self, cache_ts_attr, now)
@@ -859,10 +859,20 @@ class PaperTradingLoop:
         """Match a closed deal to a broker Transaction using three strategies
         in order of decreasing determinism.
 
-        Strategy 1: deal_reference (deterministic, 1-to-1 with the open)
-        Strategy 2: deal_id (legacy path, still supported for positions
-                   opened before deal_reference was persisted)
-        Strategy 3: normalized instrument name + entry price tolerance (< 0.1%)
+        Strategy 1 (dealId):    `txn.deal_id == deal_id` — current Capital.com
+                                live schema exposes the Position deal_id on
+                                each TRADE row, so this is fully deterministic.
+        Strategy 2 (reference): `txn.reference == deal_reference` or `deal_id`.
+                                Legacy fallback for older response payloads
+                                where the deal_id was stored in `reference`.
+        Strategy 3 (fuzzy):     normalized instrument name + (entry tolerance
+                                if openLevel is present in the payload).
+                                Last-resort fallback for legacy / partial
+                                records.
+
+        Exit price is taken from `closeLevel` when present; otherwise it is
+        unknown and we fall back to `entry_price` so the DB still has a
+        non-NULL value (P&L remains the authoritative figure).
 
         Returns (exit_price, pnl, close_reason) or (None, None, None).
         """
@@ -872,11 +882,14 @@ class PaperTradingLoop:
         norm_epic = self._normalize_instrument_name(epic)
         norm_broker = self._normalize_instrument_name(broker_epic)
 
-        def _finalize(txn) -> tuple[float | None, float | None, str | None]:
-            exit_price = txn.close_level
+        def _finalize(txn, *, strategy: str) -> tuple[float | None, float | None, str | None]:
             pnl = txn.pl_value
-            if exit_price is None or pnl is None:
+            if pnl is None:
                 return None, None, None
+            # Capital.com TRADE rows in the current live schema do not carry
+            # a closeLevel — fall back to entry_price so the DB column stays
+            # populated. The realized P&L is the authoritative figure.
+            exit_price = txn.close_level if txn.close_level is not None else entry_price
             if pnl > 0:
                 reason = "TP"
             elif pnl < 0:
@@ -884,32 +897,46 @@ class PaperTradingLoop:
             else:
                 reason = "EXTERNAL"
             logger.info(
-                f"[{epic}] Matched broker transaction: "
+                f"[{epic}] Matched broker transaction via {strategy}: "
                 f"exit={exit_price:.6f}, P&L=${pnl:.2f}, reason={reason} "
-                f"(ref={txn.reference}, instrument={txn.instrument_name})"
+                f"(deal_id={txn.deal_id}, ref={txn.reference}, "
+                f"instrument={txn.instrument_name})"
             )
             return exit_price, pnl, reason
 
-        # Strategy 1: deal_reference (deterministic)
-        if deal_reference:
-            for txn in transactions:
-                if txn.reference == deal_reference:
-                    result = _finalize(txn)
-                    if result[0] is not None:
-                        return result
-
-        # Strategy 2: deal_id (legacy)
+        # Strategy 1: dealId (deterministic — current schema)
         if deal_id:
             for txn in transactions:
-                if txn.reference == deal_id:
-                    result = _finalize(txn)
+                if txn.deal_id and txn.deal_id == deal_id:
+                    result = _finalize(txn, strategy="dealId")
                     if result[0] is not None:
                         return result
 
-        # Strategy 3: normalized instrument name + entry tolerance
+        # Strategy 2: reference (legacy schema fallback)
+        ref_keys = {k for k in (deal_reference, deal_id) if k}
+        if ref_keys:
+            for txn in transactions:
+                if txn.reference in ref_keys:
+                    result = _finalize(txn, strategy="reference")
+                    if result[0] is not None:
+                        return result
+
+        # Strategy 3: normalized instrument name + entry tolerance (when openLevel present)
         candidates = []
         for txn in transactions:
             if not txn.instrument_name:
+                continue
+            # Skip explicitly non-trade rows (overnight fees, deposits, etc.).
+            # Unknown / legacy types (e.g. "DEAL" in older fixtures) pass through.
+            ttype = (txn.transaction_type or "").upper()
+            if ttype in {"SWAP", "DEPOSIT", "WITHDRAWAL", "REFUND"}:
+                continue
+            # CRITICAL guard — if the broker exposes a dealId on this txn and
+            # it is NOT our deal_id, this transaction belongs to a DIFFERENT
+            # position. Refuse the fuzzy match. Prevents ghost / stale DB
+            # positions with the same epic from stealing P&L from a real
+            # unrelated close on the same instrument.
+            if deal_id and txn.deal_id and txn.deal_id != deal_id:
                 continue
             norm_name = self._normalize_instrument_name(txn.instrument_name)
             name_hit = (
@@ -918,23 +945,29 @@ class PaperTradingLoop:
                 or norm_broker in norm_name
                 or norm_name in norm_broker
             )
-            entry_hit = (
-                txn.open_level is not None
-                and entry_price > 0
-                and abs(txn.open_level - entry_price) / max(entry_price, 1e-9) < 0.001
-            )
-            if name_hit and entry_hit:
-                candidates.append(txn)
+            if not name_hit:
+                continue
+            # When openLevel is present in the payload, use it for tighter
+            # disambiguation. When it is absent (current live schema) we
+            # accept the name match alone — caller controls the time window
+            # via the fetch range.
+            if txn.open_level is not None and entry_price > 0:
+                entry_hit = (
+                    abs(txn.open_level - entry_price) / max(entry_price, 1e-9) < 0.001
+                )
+                if not entry_hit:
+                    continue
+            candidates.append(txn)
 
         if len(candidates) > 1:
             logger.warning(
                 f"[{epic}] Ambiguous match in Strategy 3: {len(candidates)} "
-                f"candidates with same instrument+entry. Picking most recent."
+                f"candidates. Picking most recent by date."
             )
             candidates.sort(key=lambda t: t.date, reverse=True)
 
         if candidates:
-            result = _finalize(candidates[0])
+            result = _finalize(candidates[0], strategy="name+entry")
             if result[0] is not None:
                 return result
 

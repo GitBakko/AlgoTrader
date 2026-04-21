@@ -38,10 +38,25 @@ class OrderType(str, Enum):
 
 
 class TransactionType(str, Enum):
-    """Transaction type for history."""
+    """Transaction type for /history/transactions filter param.
+
+    Capital.com live API accepts these values for the `type` query param:
+      - TRADE      → trade open/close events (only ones carrying P&L)
+      - SWAP       → overnight financing
+      - DEPOSIT    → cash deposit
+      - WITHDRAWAL → cash withdrawal
+
+    `ALL` is a sentinel used by our client to signal "no filter at all"
+    (the broker rejects an explicit type=ALL with empty results).
+    Legacy `ALL_DEAL` is kept for backward compatibility but is treated
+    as TRADE inside the client (the broker silently returns an empty
+    list for it).
+    """
 
     ALL = "ALL"
-    ALL_DEAL = "ALL_DEAL"
+    ALL_DEAL = "ALL_DEAL"  # deprecated, mapped to TRADE
+    TRADE = "TRADE"
+    SWAP = "SWAP"
     DEPOSIT = "DEPOSIT"
     WITHDRAWAL = "WITHDRAWAL"
 
@@ -238,41 +253,61 @@ class Account(BaseModel):
 class Transaction(BaseModel):
     """Transaction history entry from Capital.com /history/transactions API.
 
-    Capital.com returns fields like instrumentName, openLevel, closeLevel,
-    profitAndLoss, size, etc.  We map them here so close detection can use
-    the **real** exit price and P&L instead of guessing from the live price.
+    The live demo API (verified 2026-04-21) returns these fields per record:
+      - date / dateUtc       → broker-local time / UTC time
+      - instrumentName       → broker epic (e.g. "OIL_CRUDE", "DE40")
+      - transactionType      → "TRADE", "SWAP", "DEPOSIT", "WITHDRAWAL"
+      - reference            → INTERNAL transaction id (NOT deal_reference)
+      - dealId               → THE Position deal_id (deterministic match key)
+      - size                 → STRING. For TRADE rows it carries the realized
+                               P&L in account currency (e.g. "79.37", "-17.45").
+                               For SWAP rows it is the financing amount.
+      - currency             → e.g. "USDd"
+      - note                 → "Trade closed", "Overnight fee", etc.
+      - status               → "PROCESSED"
+
+    Some legacy / older accounts may still return openLevel, closeLevel,
+    profitAndLoss — they are kept optional for backward compat.
     """
 
     model_config = {"populate_by_name": True}
 
     date: datetime
-    type: str
-    reference: str  # deal reference (not always deal_id)
+    date_utc: datetime | None = Field(None, alias="dateUtc")
+    transaction_type: str | None = Field(None, alias="transactionType")
+    reference: str  # internal transaction id, NOT a deal_reference
+    deal_id: str | None = Field(None, alias="dealId")
     instrument_name: str | None = Field(None, alias="instrumentName")
-    size: float | None = None
+    size: str | float | None = None  # for TRADE: realized P&L as string
+    note: str | None = None
+    status: str | None = None
     open_level: float | None = Field(None, alias="openLevel")
     close_level: float | None = Field(None, alias="closeLevel")
     profit_and_loss: str | None = Field(None, alias="profitAndLoss")
     currency: str | None = None
-    # Keep legacy "amount" as optional fallback
     amount: float | None = None
+    # Legacy alias support: pre-existing test fixtures emit `type=...`
+    type: str | None = None
 
-    @property
-    def pl_value(self) -> float | None:
-        """Parse the profitAndLoss string (e.g. 'USD21.73' or '-USD6.69') into a float."""
-        raw = self.profit_and_loss
+    @model_validator(mode="after")
+    def _backfill_transaction_type(self) -> "Transaction":
+        if self.transaction_type is None and self.type is not None:
+            self.transaction_type = self.type
+        return self
+
+    @staticmethod
+    def _parse_currency_string(raw: str | None) -> float | None:
+        """Parse a Capital.com money string (e.g. 'USD21.73', '-USD6.69',
+        '79.37', '-17.45') into a signed float."""
         if raw is None:
-            return self.amount  # fallback to amount field if present
-        # Strip currency prefix: "USD21.73" → "21.73", "-USD6.69" → "-6.69"
-        cleaned = raw.strip()
+            return None
+        cleaned = str(raw).strip()
         if not cleaned:
             return None
-        # Handle negative sign before currency code
         sign = 1.0
         if cleaned.startswith("-"):
             sign = -1.0
             cleaned = cleaned[1:]
-        # Strip non-numeric prefix (currency code like "USD", "EUR", etc.)
         i = 0
         while i < len(cleaned) and not (cleaned[i].isdigit() or cleaned[i] == "."):
             i += 1
@@ -284,13 +319,41 @@ class Transaction(BaseModel):
         except ValueError:
             return None
 
+    @property
+    def pl_value(self) -> float | None:
+        """Realized P&L in transaction currency.
+
+        Resolution order:
+          1. Legacy `profitAndLoss` (e.g. "USD21.73") — old schema
+          2. `size` field when transaction_type == "TRADE" (current live schema:
+             size IS the P&L for trade-close rows)
+          3. Legacy `amount` field
+        Returns None if no field can be parsed.
+        """
+        v = self._parse_currency_string(self.profit_and_loss)
+        if v is not None:
+            return v
+
+        if (self.transaction_type or "").upper() == "TRADE":
+            v = self._parse_currency_string(
+                self.size if isinstance(self.size, str) else (
+                    None if self.size is None else f"{self.size}"
+                )
+            )
+            if v is not None:
+                return v
+
+        return self.amount
+
     def pl_value_in(self, account_currency: str) -> float | None:
-        """Return parsed P&L, logging a WARNING if the currency prefix in
-        profitAndLoss differs from account_currency.
+        """Return parsed P&L, logging a WARNING if the transaction currency
+        differs from `account_currency`.
+
+        Currency resolution:
+          1. Prefix on legacy profitAndLoss string ("USD21.73" → "USD")
+          2. The dedicated `currency` field (e.g. "USDd" → "USD")
 
         We DO NOT convert (a reliable FX feed is out of scope).
-        The caller decides what to do with a mismatched value; at minimum
-        the mismatch becomes observable in logs.
         """
         from loguru import logger
 
@@ -300,10 +363,16 @@ class Transaction(BaseModel):
 
         raw = (self.profit_and_loss or "").strip()
         prefix = ""
-        for ch in raw.lstrip("-"):
-            if ch.isdigit() or ch == ".":
-                break
-            prefix += ch
+        if raw:
+            for ch in raw.lstrip("-"):
+                if ch.isdigit() or ch == ".":
+                    break
+                prefix += ch
+        if not prefix and self.currency:
+            # Capital.com sometimes appends a 'd' suffix on demo currencies
+            # (e.g. "USDd" for USD demo). Strip non-letter trailing chars.
+            cur = self.currency.strip()
+            prefix = "".join(ch for ch in cur if ch.isalpha()).rstrip("d") or cur
         prefix = prefix.upper()
         account = (account_currency or "").upper()
 

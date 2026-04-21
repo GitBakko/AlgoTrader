@@ -497,18 +497,23 @@ class CapitalComClient:
         self,
         from_date: datetime,
         to_date: datetime,
-        transaction_type: TransactionType = TransactionType.ALL,
+        transaction_type: TransactionType = TransactionType.TRADE,
     ) -> list[Transaction]:
         """
-        Get transaction history.
+        Get transaction history from Capital.com.
 
         Args:
-            from_date: Start date
-            to_date: End date
-            transaction_type: Type of transactions to retrieve
+            from_date: Start date (inclusive)
+            to_date: End date (inclusive)
+            transaction_type: Filter by transaction type. Defaults to TRADE
+                (the only type that carries realized P&L for close detection).
+                Pass `TransactionType.ALL` (or the deprecated `ALL_DEAL`) to
+                fetch every record without a server-side filter — the broker
+                rejects an explicit `type=ALL` value with empty results, so
+                we drop the param entirely in that case.
 
         Returns:
-            List of transactions
+            List of Transaction objects ordered by date descending.
         """
         # Capital.com history/transactions expects `yyyy-MM-dd'T'HH:mm:ss`
         # WITHOUT any timezone suffix (neither `Z` nor `+00:00`). The server
@@ -516,11 +521,12 @@ class CapitalComClient:
         # UTC here so the serialized string is unambiguous to us, but we
         # must strip the timezone marker before sending or the endpoint
         # returns error.invalid.from (HTTP 400).
-        params = {
+        params: dict[str, Any] = {
             "from": from_date.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S"),
             "to": to_date.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S"),
-            "type": transaction_type.value,
         }
+        if transaction_type not in (TransactionType.ALL, TransactionType.ALL_DEAL):
+            params["type"] = transaction_type.value
         response = await self._request("GET", "/api/v1/history/transactions", params=params)
         transactions_data = response.get("transactions", [])
         return [Transaction(**txn) for txn in transactions_data]

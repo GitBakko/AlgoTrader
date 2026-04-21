@@ -29,6 +29,7 @@ def _make_position(**kwargs) -> MagicMock:
     """Build a mock Position object with sensible defaults."""
     p = MagicMock()
     p.deal_id = kwargs.get("deal_id", "test-deal")
+    p.deal_reference = kwargs.get("deal_reference", None)
     p.epic = kwargs.get("epic", "WTIUSD")
     p.direction = kwargs.get("direction", "BUY")
     p.size = kwargs.get("size", Decimal("10.0"))
@@ -152,3 +153,53 @@ async def test_returns_not_found_when_deal_id_missing():
 
     assert result["status"] == "not_found"
     broker.get_transaction_history.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_reconciles_via_live_capital_com_dealId_schema():
+    """End-to-end check that the script matches a live Capital.com TRADE row
+    (dealId field present, P&L embedded in `size` string) and updates the
+    Position with the right P&L. This is the schema verified against
+    demo-api on 2026-04-21 — the one PR #1 originally missed."""
+    from src.broker.models import Transaction
+
+    deal_id = "00018509-0055-311e-0000-00008262416d"
+    p = _make_position(
+        deal_id=deal_id,
+        epic="WTIUSD",
+        entry_price=Decimal("86.21"),
+        status="CLOSED",
+        profit_loss=None,
+        close_reason="UNRECONCILED",
+    )
+    session = _make_mock_session(position=p)
+
+    broker = AsyncMock()
+    broker.get_transaction_history.return_value = [
+        Transaction(
+            date=datetime(2026, 4, 20, 19, 32, 45),
+            dateUtc=datetime(2026, 4, 20, 17, 32, 45),
+            transactionType="TRADE",
+            note="Trade closed",
+            reference="125579931413917",
+            dealId=deal_id,
+            instrumentName="OIL_CRUDE",
+            size="79.37",
+            currency="USDd",
+            status="PROCESSED",
+        )
+    ]
+
+    result = await reconcile_deal_id(
+        deal_id=deal_id,
+        session=session,
+        broker=broker,
+        assume_yes=True,
+    )
+
+    assert result["status"] == "updated"
+    assert result["profit_loss"] == pytest.approx(79.37)
+    assert result["close_reason"] == "TP"
+    # Live schema has no closeLevel → exit_price falls back to entry_price
+    assert result["current_price"] == pytest.approx(86.21)
+    session.commit.assert_awaited_once()

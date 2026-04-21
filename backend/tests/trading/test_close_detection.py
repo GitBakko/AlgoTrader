@@ -35,9 +35,41 @@ def paper_loop():
     return loop
 
 
-def test_match_strategy_1_deal_reference_deterministic(paper_loop):
-    """When deal_reference matches txn.reference, return that transaction
-    regardless of other fields."""
+def test_match_strategy_1_deal_id_deterministic_live_schema(paper_loop):
+    """Strategy 1 matches via the live Capital.com `dealId` field.
+
+    Verified against demo-api 2026-04-21: TRADE rows expose the Position
+    deal_id under `dealId`; the `reference` field is an internal txn id.
+    """
+    txns = [
+        Transaction(
+            date=datetime(2026, 4, 20, 17, 32, 45),
+            transactionType="TRADE",
+            note="Trade closed",
+            reference="125579931413917",
+            dealId="00018509-0055-311e-0000-00008262416d",
+            instrumentName="OIL_CRUDE",
+            size="79.37",
+            currency="USDd",
+        ),
+    ]
+    exit_price, pnl, reason = paper_loop._match_transaction(
+        transactions=txns,
+        deal_id="00018509-0055-311e-0000-00008262416d",
+        deal_reference=None,
+        epic="WTIUSD",
+        entry_price=86.21,
+    )
+    assert pnl == pytest.approx(79.37)
+    assert reason == "TP"
+    # Live schema has no closeLevel → exit_price falls back to entry_price
+    assert exit_price == pytest.approx(86.21)
+
+
+def test_match_strategy_2_legacy_reference_match(paper_loop):
+    """Strategy 2 matches when `txn.reference == deal_reference` on legacy
+    payloads where the Position deal_reference is stored as the broker
+    transaction reference (pre-2026-04-21 schema)."""
     txns = [
         _txn(reference="wrong-1", closeLevel=99.99, profitAndLoss="USD1.00"),
         _txn(reference="match-ref", closeLevel=84.87, profitAndLoss="USD246.86"),
@@ -56,9 +88,9 @@ def test_match_strategy_1_deal_reference_deterministic(paper_loop):
     assert reason == "TP"
 
 
-def test_match_strategy_1_skips_when_deal_reference_none(paper_loop):
-    """Strategy 1 skipped if deal_reference is None (legacy positions);
-    falls through to Strategy 2/3."""
+def test_match_falls_through_to_reference_when_dealId_absent(paper_loop):
+    """If the broker payload has no `dealId` (legacy schema), Strategy 1
+    skips and Strategy 2 still matches by reference."""
     txns = [_txn(reference="some-ref", openLevel=84.50, profitAndLoss="USD100.00")]
     result = paper_loop._match_transaction(
         transactions=txns,
@@ -127,6 +159,34 @@ def test_match_strategy_3_entry_tolerance_rejects_distant_level(paper_loop):
         deal_reference=None,
         epic="WTIUSD",
         entry_price=84.50,
+    )
+    assert result == (None, None, None)
+
+
+def test_match_strategy_3_rejects_txn_with_mismatched_dealId(paper_loop):
+    """Guard against ghost positions: if the broker txn carries a dealId
+    that differs from ours, Strategy 3 must NOT fuzzy-match it — even if
+    epic + entry_price agree. Otherwise stale DB positions on the same
+    instrument would steal P&L from an unrelated real close."""
+    txns = [
+        Transaction(
+            date=datetime(2026, 4, 20, 19, 32, 45),
+            transactionType="TRADE",
+            note="Trade closed",
+            reference="125579931413917",
+            dealId="00018509-0055-311e-0000-00008262416d",
+            instrumentName="OIL_CRUDE",
+            size="79.37",
+            currency="USDd",
+        ),
+    ]
+    # Ghost position with a DIFFERENT deal_id — same epic + same entry_price.
+    result = paper_loop._match_transaction(
+        transactions=txns,
+        deal_id="00018509-0055-311e-0000-00008262416c",  # ghost, not the real one
+        deal_reference=None,
+        epic="WTIUSD",
+        entry_price=86.21,
     )
     assert result == (None, None, None)
 

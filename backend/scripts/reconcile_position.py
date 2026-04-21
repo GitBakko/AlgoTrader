@@ -80,20 +80,22 @@ async def reconcile_deal_id(
 
     now = datetime.now(UTC)
     from_dt = now - timedelta(days=days)
-    transactions = await broker.get_transaction_history(from_dt, now, TransactionType.ALL_DEAL)
+    transactions = await broker.get_transaction_history(from_dt, now, TransactionType.TRADE)
 
     # Use the same three-strategy matching as paper_loop at runtime.
-    # Position model has no deal_reference field, so Strategy 1 is effectively
-    # bypassed (deal_reference=None). Strategy 2 (deal_id) and Strategy 3
-    # (normalized instrument name + entry price tolerance) carry the load.
+    # Strategy 1 (dealId) is deterministic against the live Capital.com
+    # schema and does not require deal_reference. We still pass any
+    # deal_reference present on the Position row for the legacy fallback.
     class _Stub:
         _normalize_instrument_name = staticmethod(PaperTradingLoop._normalize_instrument_name)
+
+    deal_reference = getattr(position, "deal_reference", None)
 
     exit_price, pnl, reason = PaperTradingLoop._match_transaction(
         _Stub(),
         transactions,
         deal_id,
-        None,  # deal_reference not stored on Position
+        deal_reference,
         position.epic,
         float(position.entry_price or 0),
     )
