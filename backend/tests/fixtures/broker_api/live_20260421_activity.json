@@ -1,0 +1,357 @@
+{
+  "_meta": {
+    "captured_at_utc": "2026-04-21T21:52:43.843890+00:00",
+    "window_hours": 24,
+    "execution_mode": "DEMO",
+    "base_url": "https://demo-api-capital.backend-capital.com"
+  },
+  "response": {
+    "activities": [
+      {
+        "date": "2026-04-21T23:00:00.000",
+        "dateUTC": "2026-04-21T21:00:00.000",
+        "epic": "NVDA",
+        "dealId": "00396101-0055-311e-0000-000080bf4e0d",
+        "source": "SYSTEM",
+        "type": "SWAP",
+        "status": "ACCEPTED",
+        "details": {
+          "dealReference": "p_00396101-0055-311e-0000-000080bf4e0d",
+          "marketName": "NVIDIA Corp",
+          "currency": "USD",
+          "size": 22.2,
+          "direction": "SELL",
+          "level": 200.35,
+          "stopLevel": 204.06,
+          "guaranteedStop": false,
+          "profitLevel": 199.0,
+          "swap": -0.03
+        }
+      },
+      {
+        "date": "2026-04-21T23:00:00.000",
+        "dateUTC": "2026-04-21T21:00:00.000",
+        "epic": "DE40",
+        "dealId": "07101627-0015-549e-0000-0000810441c2",
+        "source": "SYSTEM",
+        "type": "SWAP",
+        "status": "ACCEPTED",
+        "details": {
+          "dealReference": "p_07101627-0015-549e-0000-0000810441c2",
+          "marketName": "Germany 40",
+          "currency": "EUR",
+          "size": 0.183,
+          "direction": "SELL",
+          "level": 24171.3,
+          "stopLevel": 24377.4,
+          "guaranteedStop": false,
+          "profitLevel": 24036.8,
+          "swap": -0.29
+        }
+      },
+      {
+        "date": "2026-04-21T22:57:54.420",
+        "dateUTC": "2026-04-21T20:57:54.420",
+        "epic": "DE40",
+        "dealId": "07101627-0015-549e-0000-0000810441c2",
+        "source": "USER",
+        "type": "EDIT_STOP_AND_LIMIT",
+        "status": "ACCEPTED",
+        "details": {
+          "dealReference": "p_07101627-0015-549e-0000-0000810441c2",
+          "marketName": "Germany 40",
+          "currency": "EUR",
+          "size": 0.183,
+          "direction": "SELL",
+          "level": 24182.8,
+          "stopLevel": 24377.4,
+          "guaranteedStop": false,
+          "profitLevel": 24036.8
+        }
+      },
+      {
+        "date": "2026-04-21T22:57:52.222",
+        "dateUTC": "2026-04-21T20:57:52.222",
+        "epic": "DE40",
+        "dealId": "07101627-0015-549e-0000-0000810441c2",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED",
+        "details": {
+          "dealReference": "p_07101627-0015-549e-0000-0000810441c2",
+          "workingOrderId": "07101627-0015-549e-0000-0000810441c1",
+          "marketName": "Germany 40",
+          "currency": "EUR",
+          "size": 0.183,
+          "direction": "SELL",
+          "level": 24182.8,
+          "stopLevel": 24466.2,
+          "guaranteedStop": false,
+          "profitLevel": 24125.6
+        }
+      },
+      {
+        "date": "2026-04-21T22:57:52.222",
+        "dateUTC": "2026-04-21T20:57:52.222",
+        "epic": "DE40",
+        "dealId": "07101627-0015-549e-0000-0000810441c1",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED",
+        "details": {
+          "dealReference": "o_81415005-a709-4307-a646-741f9704f1d5",
+          "marketName": "Germany 40",
+          "currency": "EUR",
+          "size": 0.183,
+          "direction": "SELL",
+          "level": 0,
+          "stopLevel": 24466.2,
+          "guaranteedStop": false,
+          "profitLevel": 24125.6
+        }
+      },
+      {
+        "date": "2026-04-21T22:57:48.410",
+        "dateUTC": "2026-04-21T20:57:48.410",
+        "epic": "NVDA",
+        "dealId": "00396101-0055-311e-0000-000080bf4e0d",
+        "source": "USER",
+        "type": "EDIT_STOP_AND_LIMIT",
+        "status": "ACCEPTED",
+        "details": {
+          "dealReference": "p_00396101-0055-311e-0000-000080bf4e0d",
+          "marketName": "NVIDIA Corp",
+          "currency": "USD",
+          "size": 22.2,
+          "direction": "SELL",
+          "level": 200.38,
+          "stopLevel": 204.06,
+          "guaranteedStop": false,
+          "profitLevel": 199.0
+        }
+      },
+      {
+        "date": "2026-04-21T22:57:46.079",
+        "dateUTC": "2026-04-21T20:57:46.079",
+        "epic": "NVDA",
+        "dealId": "00396101-0055-311e-0000-000080bf4e0d",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED",
+        "details": {
+          "dealReference": "p_00396101-0055-311e-0000-000080bf4e0d",
+          "workingOrderId": "00396101-0055-311e-0000-000080bf4e0c",
+          "marketName": "NVIDIA Corp",
+          "currency": "USD",
+          "size": 22.2,
+          "direction": "SELL",
+          "level": 200.38,
+          "stopLevel": 204.18,
+          "guaranteedStop": false,
+          "profitLevel": 199.13
+        }
+      },
+      {
+        "date": "2026-04-21T22:57:46.079",
+        "dateUTC": "2026-04-21T20:57:46.079",
+        "epic": "NVDA",
+        "dealId": "00396101-0055-311e-0000-000080bf4e0c",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED",
+        "details": {
+          "dealReference": "o_08e2db73-30d2-4db4-abb8-a0b3ae6f9315",
+          "marketName": "NVIDIA Corp",
+          "currency": "USD",
+          "size": 22.2,
+          "direction": "SELL",
+          "level": 0,
+          "stopLevel": 204.18,
+          "guaranteedStop": false,
+          "profitLevel": 199.13
+        }
+      },
+      {
+        "date": "2026-04-21T21:42:09.791",
+        "dateUTC": "2026-04-21T19:42:09.791",
+        "epic": "DE40",
+        "dealId": "07101627-0015-549e-0000-0000810436be",
+        "source": "TP",
+        "type": "POSITION",
+        "status": "ACCEPTED",
+        "details": {
+          "dealReference": "p_07101627-0015-549e-0000-0000810436be",
+          "workingOrderId": "07101627-0015-549e-0000-000081043f9e",
+          "marketName": "Germany 40",
+          "currency": "EUR",
+          "size": 0.181,
+          "direction": "BUY",
+          "level": 24107.3,
+          "stopLevel": 24427.9,
+          "guaranteedStop": false,
+          "profitLevel": 24108.3,
+          "openPrice": 24245.3
+        }
+      },
+      {
+        "date": "2026-04-21T21:42:09.791",
+        "dateUTC": "2026-04-21T19:42:09.791",
+        "epic": "DE40",
+        "dealId": "07101627-0015-549e-0000-000081043f9e",
+        "source": "TP",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED",
+        "details": {
+          "dealReference": "o_07101627-0015-549e-0000-0000810436be",
+          "marketName": "Germany 40",
+          "currency": "EUR",
+          "size": 0.181,
+          "direction": "BUY",
+          "level": 24108.3,
+          "guaranteedStop": false
+        }
+      },
+      {
+        "date": "2026-04-21T18:24:57.466",
+        "dateUTC": "2026-04-21T16:24:57.466",
+        "epic": "DE40",
+        "dealId": "07101627-0015-549e-0000-0000810436be",
+        "source": "USER",
+        "type": "EDIT_STOP_AND_LIMIT",
+        "status": "ACCEPTED",
+        "details": {
+          "dealReference": "p_07101627-0015-549e-0000-0000810436be",
+          "marketName": "Germany 40",
+          "currency": "EUR",
+          "size": 0.181,
+          "direction": "SELL",
+          "level": 24245.3,
+          "stopLevel": 24427.9,
+          "guaranteedStop": false,
+          "profitLevel": 24108.3
+        }
+      },
+      {
+        "date": "2026-04-21T18:24:55.225",
+        "dateUTC": "2026-04-21T16:24:55.225",
+        "epic": "DE40",
+        "dealId": "07101627-0015-549e-0000-0000810436be",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED",
+        "details": {
+          "dealReference": "p_07101627-0015-549e-0000-0000810436be",
+          "workingOrderId": "07101627-0015-549e-0000-0000810436bd",
+          "marketName": "Germany 40",
+          "currency": "EUR",
+          "size": 0.181,
+          "direction": "SELL",
+          "level": 24245.3,
+          "stopLevel": 24686.3,
+          "guaranteedStop": false,
+          "profitLevel": 24124.0
+        }
+      },
+      {
+        "date": "2026-04-21T18:24:55.225",
+        "dateUTC": "2026-04-21T16:24:55.225",
+        "epic": "DE40",
+        "dealId": "07101627-0015-549e-0000-0000810436bd",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED",
+        "details": {
+          "dealReference": "o_69ef2ecd-0e7c-45a6-9349-846720c1da6a",
+          "marketName": "Germany 40",
+          "currency": "EUR",
+          "size": 0.181,
+          "direction": "SELL",
+          "level": 0,
+          "stopLevel": 24686.3,
+          "guaranteedStop": false,
+          "profitLevel": 24124.0
+        }
+      },
+      {
+        "date": "2026-04-21T12:23:37.901",
+        "dateUTC": "2026-04-21T10:23:37.901",
+        "epic": "OIL_CRUDE",
+        "dealId": "00018509-0055-311e-0000-0000826263d2",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED",
+        "details": {
+          "dealReference": "p_00018509-0055-311e-0000-0000826263d2",
+          "workingOrderId": "00018509-0055-311e-0000-00008262866b",
+          "marketName": "Crude Oil Spot",
+          "currency": "USD",
+          "size": 50.8,
+          "direction": "SELL",
+          "level": 86.525,
+          "stopLevel": 83.5,
+          "guaranteedStop": false,
+          "profitLevel": 88.46,
+          "openPrice": 86.924
+        }
+      },
+      {
+        "date": "2026-04-21T12:23:37.901",
+        "dateUTC": "2026-04-21T10:23:37.901",
+        "epic": "OIL_CRUDE",
+        "dealId": "00018509-0055-311e-0000-00008262866b",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED",
+        "details": {
+          "dealReference": "o_2deccd31-4a23-4bf0-af32-f1c5b0810224",
+          "marketName": "Crude Oil Spot",
+          "currency": "USD",
+          "size": 50.8,
+          "direction": "SELL",
+          "level": 0,
+          "guaranteedStop": false
+        }
+      },
+      {
+        "date": "2026-04-21T04:41:23.525",
+        "dateUTC": "2026-04-21T02:41:23.525",
+        "epic": "DE40",
+        "dealId": "07101627-0015-549e-0000-00008103fe9b",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED",
+        "details": {
+          "dealReference": "p_07101627-0015-549e-0000-00008103fe9b",
+          "workingOrderId": "07101627-0015-549e-0000-000081041100",
+          "marketName": "Germany 40",
+          "currency": "EUR",
+          "size": 0.181,
+          "direction": "BUY",
+          "level": 24512.8,
+          "stopLevel": 24580.6,
+          "guaranteedStop": false,
+          "profitLevel": 24190.0,
+          "openPrice": 24357.4
+        }
+      },
+      {
+        "date": "2026-04-21T04:41:23.525",
+        "dateUTC": "2026-04-21T02:41:23.525",
+        "epic": "DE40",
+        "dealId": "07101627-0015-549e-0000-000081041100",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED",
+        "details": {
+          "dealReference": "o_a2c8bd63-e927-4a29-abda-1dd7d0da745b",
+          "marketName": "Germany 40",
+          "currency": "EUR",
+          "size": 0.181,
+          "direction": "BUY",
+          "level": 0,
+          "guaranteedStop": false
+        }
+      }
+    ]
+  }
+}

@@ -386,6 +386,162 @@ class Transaction(BaseModel):
         return value
 
 
+# ===== Activity History (Capital.com /api/v1/history/activity) =====
+#
+# The activity endpoint is the AUTHORITATIVE source for close-event linkage.
+# Unlike /history/transactions (which only exposes the realized P&L and a
+# close-side dealId that may differ from the Position.dealId — verified
+# 2026-04-21: broker-initiated TP/SL closes emit position_dealId+1), activity
+# events carry:
+#   - `source`        → close reason (TP / SL / USER / SYSTEM / STOP_OUT / …)
+#   - `details.openPrice` → the ORIGINAL position entry price
+#   - `details.direction` → reversed direction on the close event
+# This lets us deterministically link a close event back to our Position row
+# via (epic, openPrice, reverse direction, date > opened_at) WITHOUT relying
+# on stable dealIds. See plan calm-questing-quail.md and project memory
+# `project_capital_com_dealid_mutation.md`.
+
+
+class ActivitySource(str, Enum):
+    """Origin of an activity event. Non-exhaustive — unknown values accepted
+    via the pydantic `use_enum_values` on the model.
+
+    CLOSE sources (mark a closed position):
+      - TP          → take-profit hit
+      - SL          → stop-loss hit
+      - STOP_OUT    → liquidation / forced close
+      - MARGIN_CALL → margin-call close
+      - USER        → closed by the user (e.g. our close API call)
+      - SYSTEM      → closed by broker system logic
+      - DEALER      → manual dealer intervention
+
+    NON-CLOSE sources (create / amend / fund):
+      - CLOSE_POSITION is a user close in some docs; treated as USER
+    """
+
+    TP = "TP"
+    SL = "SL"
+    STOP_OUT = "STOP_OUT"
+    MARGIN_CALL = "MARGIN_CALL"
+    USER = "USER"
+    SYSTEM = "SYSTEM"
+    DEALER = "DEALER"
+    CLOSE_POSITION = "CLOSE_POSITION"
+
+
+CLOSE_SOURCES: set[str] = {
+    ActivitySource.TP.value,
+    ActivitySource.SL.value,
+    ActivitySource.STOP_OUT.value,
+    ActivitySource.MARGIN_CALL.value,
+    ActivitySource.USER.value,
+    ActivitySource.SYSTEM.value,
+    ActivitySource.DEALER.value,
+    ActivitySource.CLOSE_POSITION.value,
+}
+
+
+class ActivityType(str, Enum):
+    """Activity event type."""
+
+    POSITION = "POSITION"
+    WORKING_ORDER = "WORKING_ORDER"
+    EDIT_STOP_AND_LIMIT = "EDIT_STOP_AND_LIMIT"
+    SWAP = "SWAP"
+
+
+class ActivityStatus(str, Enum):
+    """Activity event status."""
+
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
+    EXECUTED = "EXECUTED"
+
+
+class ActivityEventDetails(BaseModel):
+    """Nested `details` object on an activity event.
+
+    Only the fields we use are typed strictly; unknown keys are ignored.
+    """
+
+    model_config = {"populate_by_name": True, "extra": "ignore"}
+
+    deal_reference: str | None = Field(None, alias="dealReference")
+    working_order_id: str | None = Field(None, alias="workingOrderId")
+    market_name: str | None = Field(None, alias="marketName")
+    currency: str | None = None
+    size: float | None = None
+    direction: Direction | None = None
+    level: float | None = None
+    stop_level: float | None = Field(None, alias="stopLevel")
+    profit_level: float | None = Field(None, alias="profitLevel")
+    guaranteed_stop: bool | None = Field(None, alias="guaranteedStop")
+    # Present on close-side POSITION events — this is the ORIGINAL entry
+    # price of the position being closed. Our strongest, most portable link
+    # from a close event back to our Position row.
+    open_price: float | None = Field(None, alias="openPrice")
+    swap: float | None = None
+
+
+class ActivityEvent(BaseModel):
+    """A single event from `/api/v1/history/activity`.
+
+    Schema is intentionally permissive: Capital.com occasionally adds new
+    source / type values without warning. We accept unknown strings for
+    `source`, `type`, `status` and defer classification to helper methods so
+    a broker-side enum extension never breaks ingestion.
+    """
+
+    model_config = {"populate_by_name": True, "extra": "ignore"}
+
+    date: datetime
+    date_utc: datetime | None = Field(None, alias="dateUTC")
+    epic: str
+    # Keep as raw strings so unknown new values do not blow up parsing.
+    source: str
+    type: str
+    status: str
+    # Close-side dealId (e.g. the TP/SL-generated id); equal to the
+    # Position.dealId only for user-initiated closes.
+    deal_id: str = Field(alias="dealId")
+    details: ActivityEventDetails = Field(default_factory=ActivityEventDetails)
+
+    def is_close_event(self) -> bool:
+        """True if this event represents a position close we should reconcile.
+
+        The invariant is that close-side POSITION events carry
+        ``details.openPrice`` (the original entry price). OPEN-side POSITION
+        events emitted at position creation time have the same
+        ``type=POSITION / status=ACCEPTED`` shape but do NOT carry
+        ``openPrice``. Requiring it here is what cleanly separates the two
+        and is exactly the field we rely on to link the close back to our
+        Position row in v2 close detection.
+        """
+        return (
+            self.type == ActivityType.POSITION.value
+            and self.status == ActivityStatus.ACCEPTED.value
+            and self.source.upper() in CLOSE_SOURCES
+            and self.details.open_price is not None
+        )
+
+    def close_reason_label(self) -> str:
+        """Short label used as Position.close_reason."""
+        s = (self.source or "").upper()
+        if s == ActivitySource.TP.value:
+            return "TAKE_PROFIT_HIT"
+        if s == ActivitySource.SL.value:
+            return "STOP_LOSS_HIT"
+        if s in (ActivitySource.STOP_OUT.value, ActivitySource.MARGIN_CALL.value):
+            return "LIQUIDATION"
+        if s in (ActivitySource.USER.value, ActivitySource.CLOSE_POSITION.value):
+            return "USER_CLOSE"
+        if s == ActivitySource.DEALER.value:
+            return "DEALER_CLOSE"
+        if s == ActivitySource.SYSTEM.value:
+            return "SYSTEM_CLOSE"
+        return f"EXTERNAL_{s}"
+
+
 # ===== Trade Confirmation =====
 class DealConfirmation(BaseModel):
     """Trade execution confirmation."""
