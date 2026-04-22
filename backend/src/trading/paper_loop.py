@@ -861,39 +861,37 @@ class PaperTradingLoop:
         epic: str,
         entry_price: float,
     ) -> tuple[float | None, float | None, str | None]:
-        """Match a closed deal to a broker Transaction using three strategies
-        in order of decreasing determinism.
+        """Match a closed deal to a broker Transaction by deterministic keys only.
 
         Strategy 1 (dealId):    `txn.deal_id == deal_id` — current Capital.com
                                 live schema exposes the Position deal_id on
-                                each TRADE row, so this is fully deterministic.
+                                each TRADE row.
         Strategy 2 (reference): `txn.reference == deal_reference` or `deal_id`.
                                 Legacy fallback for older response payloads
                                 where the deal_id was stored in `reference`.
-        Strategy 3 (fuzzy):     normalized instrument name + (entry tolerance
-                                if openLevel is present in the payload).
-                                Last-resort fallback for legacy / partial
-                                records.
+
+        The previous Strategy 3 fuzzy match (normalized instrument name +
+        entry-price tolerance) was deleted in Step 8 of close-detection v2:
+        (1) it routinely matched ghost positions on the same epic — see memory
+        `project_strategy3_display_name_gap.md`; (2) Capital.com emits a NEW
+        dealId on broker-initiated closes (see
+        `project_capital_com_dealid_mutation.md`) so the dealId guard that was
+        protecting Strategy 3 masked the legitimate TP/SL close. Any position
+        that cannot be matched by dealId / reference is now DEFERRED by the
+        caller, and `CloseDetector` (activity-as-SoT, Step 4/5) handles the
+        broker-initiated case deterministically via `/history/activity`.
 
         Exit price is taken from `closeLevel` when present; otherwise it is
-        unknown and we fall back to `entry_price` so the DB still has a
-        non-NULL value (P&L remains the authoritative figure).
+        unknown and we fall back to `entry_price` so the DB column stays
+        populated. The realized P&L is the authoritative figure.
 
         Returns (exit_price, pnl, close_reason) or (None, None, None).
         """
-        from src.broker.client import EPIC_TO_BROKER
-
-        broker_epic = EPIC_TO_BROKER.get(epic, epic)
-        norm_epic = self._normalize_instrument_name(epic)
-        norm_broker = self._normalize_instrument_name(broker_epic)
 
         def _finalize(txn, *, strategy: str) -> tuple[float | None, float | None, str | None]:
             pnl = txn.pl_value
             if pnl is None:
                 return None, None, None
-            # Capital.com TRADE rows in the current live schema do not carry
-            # a closeLevel — fall back to entry_price so the DB column stays
-            # populated. The realized P&L is the authoritative figure.
             exit_price = txn.close_level if txn.close_level is not None else entry_price
             if pnl > 0:
                 reason = "TP"
@@ -925,56 +923,6 @@ class PaperTradingLoop:
                     result = _finalize(txn, strategy="reference")
                     if result[0] is not None:
                         return result
-
-        # Strategy 3: normalized instrument name + entry tolerance (when openLevel present)
-        candidates = []
-        for txn in transactions:
-            if not txn.instrument_name:
-                continue
-            # Skip explicitly non-trade rows (overnight fees, deposits, etc.).
-            # Unknown / legacy types (e.g. "DEAL" in older fixtures) pass through.
-            ttype = (txn.transaction_type or "").upper()
-            if ttype in {"SWAP", "DEPOSIT", "WITHDRAWAL", "REFUND"}:
-                continue
-            # CRITICAL guard — if the broker exposes a dealId on this txn and
-            # it is NOT our deal_id, this transaction belongs to a DIFFERENT
-            # position. Refuse the fuzzy match. Prevents ghost / stale DB
-            # positions with the same epic from stealing P&L from a real
-            # unrelated close on the same instrument.
-            if deal_id and txn.deal_id and txn.deal_id != deal_id:
-                continue
-            norm_name = self._normalize_instrument_name(txn.instrument_name)
-            name_hit = (
-                norm_epic in norm_name
-                or norm_name in norm_epic
-                or norm_broker in norm_name
-                or norm_name in norm_broker
-            )
-            if not name_hit:
-                continue
-            # When openLevel is present in the payload, use it for tighter
-            # disambiguation. When it is absent (current live schema) we
-            # accept the name match alone — caller controls the time window
-            # via the fetch range.
-            if txn.open_level is not None and entry_price > 0:
-                entry_hit = (
-                    abs(txn.open_level - entry_price) / max(entry_price, 1e-9) < 0.001
-                )
-                if not entry_hit:
-                    continue
-            candidates.append(txn)
-
-        if len(candidates) > 1:
-            logger.warning(
-                f"[{epic}] Ambiguous match in Strategy 3: {len(candidates)} "
-                f"candidates. Picking most recent by date."
-            )
-            candidates.sort(key=lambda t: t.date, reverse=True)
-
-        if candidates:
-            result = _finalize(candidates[0], strategy="name+entry")
-            if result[0] is not None:
-                return result
 
         return None, None, None
 

@@ -104,123 +104,48 @@ def test_match_falls_through_to_reference_when_dealId_absent(paper_loop):
     assert pnl == pytest.approx(100.00)
 
 
-def test_match_strategy_3_normalized_oil_crude(paper_loop):
-    """WTIUSD epic matches broker instrument 'Oil - Crude' after normalization."""
-    txns = [_txn(reference="unrelated", instrumentName="Oil - Crude", openLevel=84.50)]
-    exit_price, pnl, _ = paper_loop._match_transaction(
-        transactions=txns,
-        deal_id="d-1",
-        deal_reference=None,
-        epic="WTIUSD",
-        entry_price=84.50,
-    )
-    assert exit_price is not None
+def test_strategy_3_fuzzy_match_is_deleted(paper_loop):
+    """Step 8 of close-detection v2: `_match_transaction` must NOT match on
+    normalized instrument name + entry tolerance. Broker-initiated closes are
+    now resolved by `CloseDetector` via `/history/activity` (activity-as-SoT),
+    and the fuzzy name match was the vector for P&L-to-ghost-position leaks
+    flagged in the 2026-04-21 audit.
 
-
-@pytest.mark.xfail(
-    reason=(
-        "Strategy 3 cannot match DE40 → 'Germany 40' via substring: "
-        "EPIC_TO_BROKER has no DE40 entry, so broker_epic defaults to 'DE40' "
-        "and normalized 'de40' shares no substring with 'germany40'. "
-        "In production, DE40 is handled by Strategy 1 via deal_reference "
-        "(wired in Task 7). This xfail documents the Strategy 3 gap."
-    ),
-    strict=True,
-)
-def test_match_strategy_3_normalized_germany_40_documented_gap(paper_loop):
-    """Documents Strategy 3 limitation on DE40 → Germany 40 mapping."""
+    Regression guard: a TRADE row with matching instrumentName + openLevel
+    but neither dealId nor reference must be rejected.
+    """
     txns = [
         _txn(
-            reference="unrelated",
-            instrumentName="Germany 40",
-            openLevel=24510.0,
-            closeLevel=24532.0,
-            profitAndLoss="EUR44.38",
-            currency="EUR",
+            reference="unrelated-ref",
+            instrumentName="Oil - Crude",
+            openLevel=84.50,
+            closeLevel=84.87,
+            profitAndLoss="USD246.86",
         )
     ]
-    exit_price, pnl, _ = paper_loop._match_transaction(
-        transactions=txns,
-        deal_id="d-1",
-        deal_reference=None,
-        epic="DE40",
-        entry_price=24510.0,
-    )
-    assert exit_price == pytest.approx(24532.0)
-    assert pnl == pytest.approx(44.38)
-
-
-def test_match_strategy_3_entry_tolerance_rejects_distant_level(paper_loop):
-    """Entry level > 0.1% away from txn.open_level is rejected."""
-    txns = [_txn(reference="x", instrumentName="Oil - Crude", openLevel=80.00)]
     result = paper_loop._match_transaction(
         transactions=txns,
-        deal_id="d-1",
-        deal_reference=None,
+        deal_id="deal-not-in-txns",
+        deal_reference="ref-not-in-txns",
         epic="WTIUSD",
         entry_price=84.50,
     )
     assert result == (None, None, None)
 
 
-def test_match_strategy_3_rejects_txn_with_mismatched_dealId(paper_loop):
-    """Guard against ghost positions: if the broker txn carries a dealId
-    that differs from ours, Strategy 3 must NOT fuzzy-match it — even if
-    epic + entry_price agree. Otherwise stale DB positions on the same
-    instrument would steal P&L from an unrelated real close."""
-    txns = [
-        Transaction(
-            date=datetime(2026, 4, 20, 19, 32, 45),
-            transactionType="TRADE",
-            note="Trade closed",
-            reference="125579931413917",
-            dealId="00018509-0055-311e-0000-00008262416d",
-            instrumentName="OIL_CRUDE",
-            size="79.37",
-            currency="USDd",
-        ),
-    ]
-    # Ghost position with a DIFFERENT deal_id — same epic + same entry_price.
-    result = paper_loop._match_transaction(
-        transactions=txns,
-        deal_id="00018509-0055-311e-0000-00008262416c",  # ghost, not the real one
-        deal_reference=None,
-        epic="WTIUSD",
-        entry_price=86.21,
-    )
-    assert result == (None, None, None)
+def test_strategy_3_fuzzy_match_source_is_deleted(paper_loop):
+    """Static guard: source of `_match_transaction` no longer contains the
+    Strategy 3 fuzzy-match code markers. Prevents a quiet revert of Step 8.
+    (Docstring may still reference the historical name — we guard the code,
+    not the prose.)"""
+    import inspect
 
-
-def test_match_strategy_3_ambiguous_picks_most_recent(paper_loop, caplog):
-    """Two txns, same epic + same entry → pick most recent date, log WARNING."""
-    import logging
-
-    older = _txn(
-        reference="r-old",
-        instrumentName="Oil - Crude",
-        openLevel=84.50,
-        closeLevel=84.80,
-        profitAndLoss="USD100.00",
-        date=datetime(2026, 4, 20, 0, 1, 0),
-    )
-    newer = _txn(
-        reference="r-new",
-        instrumentName="Oil - Crude",
-        openLevel=84.50,
-        closeLevel=84.87,
-        profitAndLoss="USD246.86",
-        date=datetime(2026, 4, 20, 0, 2, 0),
-    )
-    with caplog.at_level(logging.WARNING):
-        exit_price, pnl, _ = paper_loop._match_transaction(
-            transactions=[older, newer],
-            deal_id="d-1",
-            deal_reference=None,
-            epic="WTIUSD",
-            entry_price=84.50,
-        )
-    assert exit_price == pytest.approx(84.87)  # newer wins
-    assert pnl == pytest.approx(246.86)
+    src = inspect.getsource(paper_loop._match_transaction)
+    assert "norm_epic" not in src
+    assert "norm_name" not in src
+    assert "name_hit" not in src
+    assert "entry_hit" not in src
+    assert "EPIC_TO_BROKER" not in src  # no longer imported, no epic normalization
 
 
 def test_match_no_match_returns_all_none(paper_loop):

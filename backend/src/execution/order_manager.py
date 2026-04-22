@@ -574,11 +574,16 @@ class OrderManager:
             return fallback_sl, fallback_tp
 
         try:
-            # Capital.com returns different deal_ids for create vs list, so
-            # match by deal_id substring or by listing all positions.
+            # Step 8 (close-detection v2): match only by exact deal_id.
+            # The previous `deal_id in p.deal_id` substring fallback silently
+            # paired our Position with broker-rotated dealIds (see memory
+            # `project_capital_com_dealid_mutation.md`), so SL/TP reads
+            # occasionally landed against a different open position on the
+            # same account. Exact equality is the authoritative match; when
+            # it fails we return the caller's fallbacks rather than guess.
             positions = await asyncio.wait_for(self._broker.list_positions(), timeout=5.0)
             for p in positions:
-                if p.deal_id == deal_id or (deal_id and deal_id in p.deal_id):
+                if p.deal_id == deal_id:
                     sl_val = p.stop_level if p.stop_level else fallback_sl
                     tp_val = p.profit_level if p.profit_level else fallback_tp
                     if sl_val != fallback_sl or tp_val != fallback_tp:
