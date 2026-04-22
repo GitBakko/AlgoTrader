@@ -210,6 +210,9 @@ def loop_with_mocks(monkeypatch):
     loop._previous_positions = {}
     loop._pending_close_detections = {}
     loop._broker_closed_deals = set()
+    # Close-detection v2 shadow-mode attributes (bypassed __init__)
+    loop._close_detector = None
+    loop._account_currency = "USD"
     loop.execution_engine = MagicMock()
 
     class _ModeEnum:
@@ -260,6 +263,38 @@ async def test_deferred_when_no_match_on_first_iteration(loop_with_mocks):
     assert "deal-1" in loop._pending_close_detections
     pending = loop._pending_close_detections["deal-1"]
     assert pending.retry_count == 0
+    loop._persist_position_close.assert_not_awaited()
+    loop._on_position_closed.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_pending_is_removed_when_deal_id_reappears_in_current(loop_with_mocks):
+    """Safety net: if a deal_id already queued in `_pending_close_detections`
+    comes back in `current_positions` (e.g. reinject_orphans queued it on a
+    transient empty list_positions() at startup), remove it from the queue
+    and do NOT fire UNRECONCILED on timeout. No DB write, no alert.
+    """
+    loop = loop_with_mocks
+    past = datetime.now(UTC) - timedelta(seconds=601)  # past the 10-min cap
+    loop._pending_close_detections["deal-live"] = PendingClose(
+        deal_id="deal-live",
+        deal_reference=None,
+        epic="DE40",
+        direction="SELL",
+        size=0.5,
+        entry_price=24000.0,
+        prev_pos={"level": 24000.0, "deal_id": "deal-live"},
+        first_seen=past,
+        retry_count=5,
+    )
+    loop._fetch_recent_transactions.return_value = []
+
+    # Broker still reports the position as open — no real close happened.
+    await loop._detect_broker_closed(
+        current_positions=[{"deal_id": "deal-live", "epic": "DE40"}]
+    )
+
+    assert "deal-live" not in loop._pending_close_detections
     loop._persist_position_close.assert_not_awaited()
     loop._on_position_closed.assert_not_called()
 

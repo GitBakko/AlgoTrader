@@ -1003,6 +1003,23 @@ class PaperTradingLoop:
 
         # ============ Retry previously-deferred closes ============
         for deal_id, pending in retry_pending:
+            # Safety net: if the deal_id is back in the broker's live
+            # positions it was never actually closed — reinject_orphans
+            # pushed it into the pending queue on a transient empty
+            # list_positions() at startup, OR a prior tick saw a stale
+            # snapshot. Either way, removing it here is the correct
+            # action: no spurious UNRECONCILED alert will fire, and the
+            # real close (if any) will go through the normal
+            # newly_disappeared path later.
+            if deal_id in current_deals:
+                logger.warning(
+                    f"[{pending.epic}] Pending close {deal_id} is back "
+                    f"in broker list_positions() — removing from pending "
+                    f"queue (false-positive orphan from state recovery)"
+                )
+                del self._pending_close_detections[deal_id]
+                continue
+
             pending.retry_count += 1
             deal_ref = pending.deal_reference or deal_ref_map.get(deal_id)
             txn_exit, txn_pnl, txn_reason = self._match_transaction(

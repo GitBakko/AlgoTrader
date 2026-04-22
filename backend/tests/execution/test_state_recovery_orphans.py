@@ -186,8 +186,14 @@ async def test_multiple_orphans_all_reinjected():
 
 
 @pytest.mark.asyncio
-async def test_broker_error_returns_zero_no_crash():
-    """If broker.list_positions raises, reinject_orphans returns 0 gracefully."""
+async def test_broker_error_returns_zero_no_crash(monkeypatch):
+    """If broker.list_positions raises on every retry, reinject_orphans
+    returns 0 gracefully."""
+    # Skip the sleep between retries
+    import asyncio
+
+    monkeypatch.setattr(asyncio, "sleep", AsyncMock())
+
     paper_loop = MagicMock()
     paper_loop._pending_close_detections = {}
 
@@ -202,6 +208,43 @@ async def test_broker_error_returns_zero_no_crash():
     # Must not raise; must return 0 and leave pending untouched
     assert injected == 0
     assert "orphan-1" not in paper_loop._pending_close_detections
+    assert broker.list_positions.await_count == 3  # 3 retries before bail-out
+
+
+@pytest.mark.asyncio
+async def test_broker_returns_empty_then_populated_retry_prevents_false_orphans(
+    monkeypatch,
+):
+    """Transient empty list_positions() at startup (auth propagation / rate
+    limit / broker race) MUST NOT cause live positions to be classified as
+    orphans. reinject_orphans retries up to 3 times; if any retry returns
+    the real position list, no false orphan is queued."""
+    import asyncio
+
+    monkeypatch.setattr(asyncio, "sleep", AsyncMock())
+
+    paper_loop = MagicMock()
+    paper_loop._pending_close_detections = {}
+
+    broker = AsyncMock()
+    # First call: empty (transient). Second: the real list.
+    broker.list_positions = AsyncMock(
+        side_effect=[
+            [],
+            [_make_broker_position("still-open-1")],
+            [_make_broker_position("still-open-1")],  # unused but safe
+        ]
+    )
+
+    db_positions = [_make_db_position("still-open-1")]
+
+    service = _make_service(broker, paper_loop, db_positions)
+    injected = await service.reinject_orphans()
+
+    assert injected == 0
+    assert "still-open-1" not in paper_loop._pending_close_detections
+    # At least two calls required to reach the populated response.
+    assert broker.list_positions.await_count >= 2
 
 
 @pytest.mark.asyncio

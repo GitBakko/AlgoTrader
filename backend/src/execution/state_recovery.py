@@ -7,6 +7,7 @@ Recovery Strategy:
 - DEMO/LIVE mode: Broker API → PostgreSQL fallback → Empty state + WARNING
 """
 
+import asyncio
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -579,11 +580,37 @@ class StateRecoveryService:
             logger.warning("reinject_orphans: no db_session_factory, skipping")
             return 0
 
-        # Step 1: fetch broker's live positions
-        try:
-            broker_positions = await self.broker.list_positions() if self.broker else []
-        except Exception as e:
-            logger.warning(f"reinject_orphans: broker.list_positions() failed: {e}")
+        # Step 1: fetch broker's live positions.
+        # Retry up to 3 times with backoff because a single failed call right
+        # after the session auth (or a throttled request) would silently
+        # classify EVERY live position as an orphan and trigger bogus
+        # UNRECONCILED alerts 10 minutes later. If we cannot get a real
+        # non-empty answer after retries, abort rather than false-positive.
+        broker_positions: list = []
+        last_err: Exception | None = None
+        for attempt in range(3):
+            if self.broker is None:
+                break
+            try:
+                broker_positions = await self.broker.list_positions()
+                # Accept empty list only if the account genuinely has no
+                # DB-OPEN positions to match against (handled below).
+                if broker_positions or attempt == 2:
+                    break
+            except Exception as e:
+                last_err = e
+                logger.warning(
+                    f"reinject_orphans: broker.list_positions() attempt "
+                    f"{attempt + 1}/3 failed: {e}"
+                )
+            await asyncio.sleep(0.5 * (attempt + 1))
+
+        if self.broker is not None and not broker_positions and last_err is not None:
+            logger.error(
+                f"reinject_orphans: broker.list_positions() failed after "
+                f"3 attempts ({last_err!r}) — aborting to avoid false "
+                f"orphans. Retry on next backend start."
+            )
             return 0
 
         broker_deal_ids = {
