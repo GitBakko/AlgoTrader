@@ -268,6 +268,46 @@ async def test_deferred_when_no_match_on_first_iteration(loop_with_mocks):
 
 
 @pytest.mark.asyncio
+async def test_pending_is_removed_when_broker_dealid_rotated(loop_with_mocks):
+    """Capital.com rotates the dealId last-nibble between order-open and
+    /positions list (verified 2026-04-22 on BTCUSD + ETHUSD). Safety net
+    must match the pending position via (epic, direction, entry_price)
+    rather than string-equal dealId, otherwise a live position ends up
+    UNRECONCILED after 10 min."""
+    loop = loop_with_mocks
+    past = datetime.now(UTC) - timedelta(seconds=700)
+    loop._pending_close_detections["pos-afc"] = PendingClose(
+        deal_id="pos-afc",  # order-confirmation dealId
+        deal_reference=None,
+        epic="BTCUSD",
+        direction="SELL",
+        size=0.05,
+        entry_price=78085.05,
+        prev_pos={"level": 78085.05, "deal_id": "pos-afc"},
+        first_seen=past,
+        retry_count=7,
+    )
+    loop._fetch_recent_transactions.return_value = []
+
+    # Broker returns the position with the ROTATED dealId (+1 hex nibble).
+    await loop._detect_broker_closed(
+        current_positions=[
+            {
+                "deal_id": "pos-afd",  # rotated
+                "epic": "BTCUSD",
+                "direction": "SELL",
+                "level": 78085.05,
+                "size": 0.05,
+            }
+        ]
+    )
+
+    assert "pos-afc" not in loop._pending_close_detections
+    loop._persist_position_close.assert_not_awaited()
+    loop._on_position_closed.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_pending_is_removed_when_deal_id_reappears_in_current(loop_with_mocks):
     """Safety net: if a deal_id already queued in `_pending_close_detections`
     comes back in `current_positions` (e.g. reinject_orphans queued it on a

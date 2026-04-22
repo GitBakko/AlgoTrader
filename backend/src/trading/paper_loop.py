@@ -1001,21 +1001,46 @@ class PaperTradingLoop:
             except Exception as e:
                 logger.warning(f"deal_reference DB lookup failed: {e}")
 
+        # Build a stable-key index for the live broker positions. Capital.com
+        # rotates the dealId between order-confirmation and /positions (last
+        # hex nibble +1), so a string-equality check on deal_id misses
+        # positions that are in fact still open. Pair by
+        # ``(epic, direction, entry_price ± 0.1%)`` — the triple broker
+        # *never* mutates for the lifetime of a position.
+        def _position_is_live(pending: PendingClose) -> bool:
+            for p in current_positions:
+                if p.get("epic") != pending.epic:
+                    continue
+                pdir = p.get("direction")
+                pdir_str = getattr(pdir, "value", pdir)
+                if (str(pdir_str) or "").upper() != (pending.direction or "").upper():
+                    continue
+                try:
+                    level = float(p.get("level") or 0)
+                except (TypeError, ValueError):
+                    continue
+                if pending.entry_price <= 0:
+                    continue
+                if abs(level - pending.entry_price) / pending.entry_price < 0.001:
+                    return True
+            return False
+
         # ============ Retry previously-deferred closes ============
         for deal_id, pending in retry_pending:
-            # Safety net: if the deal_id is back in the broker's live
-            # positions it was never actually closed — reinject_orphans
-            # pushed it into the pending queue on a transient empty
-            # list_positions() at startup, OR a prior tick saw a stale
-            # snapshot. Either way, removing it here is the correct
-            # action: no spurious UNRECONCILED alert will fire, and the
-            # real close (if any) will go through the normal
-            # newly_disappeared path later.
-            if deal_id in current_deals:
+            # Safety net: if the broker still has this position alive
+            # (match via deal_id OR via the stable
+            # (epic, direction, entry_price) triple), remove it from the
+            # pending queue. reinject_orphans pushed it in on a transient
+            # empty list_positions() at startup or a dealId-rotation hit,
+            # and without this net a spurious UNRECONCILED alert would
+            # fire 10 minutes later on a live position.
+            if deal_id in current_deals or _position_is_live(pending):
                 logger.warning(
-                    f"[{pending.epic}] Pending close {deal_id} is back "
-                    f"in broker list_positions() — removing from pending "
-                    f"queue (false-positive orphan from state recovery)"
+                    f"[{pending.epic}] Pending close {deal_id} still "
+                    f"live at broker (matched by deal_id or "
+                    f"epic+direction+entry_price) — removing from "
+                    f"pending queue (false-positive orphan from state "
+                    f"recovery or broker dealId rotation)"
                 )
                 del self._pending_close_detections[deal_id]
                 continue
