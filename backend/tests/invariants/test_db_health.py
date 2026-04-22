@@ -59,16 +59,23 @@ STALE_UNRECONCILED_GRACE_MINUTES = 15  # a bit above the 10-min retry cap
 
 
 async def _connect_or_skip():
-    """Build an async engine against the configured DB; skip on failure."""
+    """Build an async engine against the configured DB; skip on failure.
+
+    Skips in two scenarios:
+    - Postgres unreachable (developer without docker / CI without service).
+    - `positions` table missing (fresh DB not yet migrated — CI runs these
+      tests before migrations land in a plain postgres service container).
+    """
     settings = get_settings()
     url = settings.database_url.replace("postgresql://", "postgresql+asyncpg://")
     engine = create_async_engine(url, pool_pre_ping=True)
     try:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
-    except (OperationalError, Exception) as exc:
+            await conn.execute(text("SELECT 1 FROM positions LIMIT 1"))
+    except Exception as exc:
         await engine.dispose()
-        pytest.skip(f"Postgres not reachable: {exc!r}")
+        pytest.skip(f"Postgres/positions table unavailable: {exc!r}")
     return engine
 
 
