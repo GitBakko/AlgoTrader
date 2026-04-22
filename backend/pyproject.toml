@@ -203,3 +203,37 @@ exclude_lines = [
     "raise NotImplementedError",
     "if __name__ == .__main__.:",
 ]
+
+# ---------------------------------------------------------------------------
+# Mutation testing — close-detection v2 plan `calm-questing-quail.md` Step 13.
+#
+# Runs on Linux CI only (mutmut has no native Windows support — issue #397
+# on boxed/mutmut). Local runs on Windows must use WSL.
+#
+# Budget: <= 5 surviving mutants across `close_detector.py` + `fx.py`. A
+# higher count blocks merge; kill by widening tests in the close-detection
+# suite (`tests/trading/test_close_detector.py`,
+# `tests/trading/test_close_detection.py`,
+# `tests/broker/test_fx.py`, `tests/property/`).
+#
+# Invoke (Linux / WSL):
+#     pip install "mutmut>=3.5.0"
+#     cd backend
+#     mutmut run
+#     mutmut results  # expect <= 5 survived
+# ---------------------------------------------------------------------------
+[tool.mutmut]
+paths_to_mutate = [
+    "src/trading/close_detector.py",
+    "src/broker/fx.py",
+]
+# Fast inner loop: only the tests that cover the mutated modules.
+tests_dir = [
+    "tests/trading/test_close_detector.py",
+    "tests/trading/test_close_detection.py",
+    "tests/broker/test_fx.py",
+    "tests/property/test_close_matcher_robustness.py",
+]
+# Disable coverage plugin in the inner test run — it fights mutmut's own
+# instrumentation and slows the run by an order of magnitude.
+runner = ".venv/bin/python -m pytest -x --no-cov"

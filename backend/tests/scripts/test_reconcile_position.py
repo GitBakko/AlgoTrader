@@ -77,11 +77,16 @@ async def test_updates_unreconciled_when_match_found():
     session = _make_mock_session(position=p)
 
     broker = AsyncMock()
+    # Step 8 of close-detection v2 deleted Strategy 3 (fuzzy instrument
+    # name + openLevel match). Current Capital.com live schema exposes
+    # the Position.dealId on each TRADE row, so Strategy 1 matches
+    # deterministically.
     broker.get_transaction_history.return_value = [
         Transaction(
             date=datetime(2026, 4, 20, 0, 2, 0),
-            type="DEAL",
+            transactionType="TRADE",
             reference="ref-1",
+            dealId="rec-1",
             instrumentName="Oil - Crude",
             openLevel=84.50,
             closeLevel=85.60,

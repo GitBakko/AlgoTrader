@@ -16,8 +16,13 @@ from src.execution.schemas import ExecutionMode
 def _txn(**kw):
     defaults = {
         "date": datetime(2026, 4, 20, 0, 2, 0),
-        "type": "DEAL",
+        "transactionType": "TRADE",
         "reference": "ref-e2e",
+        # Step 8 (close-detection v2): deterministic dealId match only —
+        # Strategy 3 fuzzy instrumentName matching was removed. The e2e
+        # fixture now mirrors current Capital.com live schema where each
+        # TRADE row carries the Position.dealId on user-initiated closes.
+        "dealId": "deal-e2e",
         "instrumentName": "Oil - Crude",
         "openLevel": 84.50,
         "closeLevel": 85.60,
@@ -46,7 +51,8 @@ def loop_for_e2e():
     }
     loop._pending_close_detections = {}
     loop._broker_closed_deals = set()
-    # bypass DB bridge — deal_ref_map stays empty, Strategy 3 matches by instrument
+    # bypass DB bridge — deal_ref_map stays empty; Strategy 1 dealId match
+    # does the work post-Step-8 (Strategy 3 fuzzy removed).
     loop._db_session_factory = None
 
     loop.execution_engine = MagicMock()

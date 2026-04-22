@@ -197,6 +197,11 @@ class PaperTradingLoop:
         # Positions that disappeared from broker but whose close transaction has not
         # yet been matched — keyed by deal_id, held until reconciliation or timeout.
         self._pending_close_detections: dict[str, PendingClose] = {}
+        # Close-detection v2 (shadow mode). Instantiated lazily on first tick
+        # where CLOSE_DETECTION_V2_ENABLED is True so test suites and PAPER
+        # mode paths never pay the FX/broker construction cost.
+        self._close_detector = None
+        self._account_currency: str = "USD"
         # Asset momentum rotation
         self._active_assets: set[str] | None = None  # None = all assets
         self._asset_rotation_ts: float = 0.0
@@ -856,39 +861,37 @@ class PaperTradingLoop:
         epic: str,
         entry_price: float,
     ) -> tuple[float | None, float | None, str | None]:
-        """Match a closed deal to a broker Transaction using three strategies
-        in order of decreasing determinism.
+        """Match a closed deal to a broker Transaction by deterministic keys only.
 
         Strategy 1 (dealId):    `txn.deal_id == deal_id` — current Capital.com
                                 live schema exposes the Position deal_id on
-                                each TRADE row, so this is fully deterministic.
+                                each TRADE row.
         Strategy 2 (reference): `txn.reference == deal_reference` or `deal_id`.
                                 Legacy fallback for older response payloads
                                 where the deal_id was stored in `reference`.
-        Strategy 3 (fuzzy):     normalized instrument name + (entry tolerance
-                                if openLevel is present in the payload).
-                                Last-resort fallback for legacy / partial
-                                records.
+
+        The previous Strategy 3 fuzzy match (normalized instrument name +
+        entry-price tolerance) was deleted in Step 8 of close-detection v2:
+        (1) it routinely matched ghost positions on the same epic — see memory
+        `project_strategy3_display_name_gap.md`; (2) Capital.com emits a NEW
+        dealId on broker-initiated closes (see
+        `project_capital_com_dealid_mutation.md`) so the dealId guard that was
+        protecting Strategy 3 masked the legitimate TP/SL close. Any position
+        that cannot be matched by dealId / reference is now DEFERRED by the
+        caller, and `CloseDetector` (activity-as-SoT, Step 4/5) handles the
+        broker-initiated case deterministically via `/history/activity`.
 
         Exit price is taken from `closeLevel` when present; otherwise it is
-        unknown and we fall back to `entry_price` so the DB still has a
-        non-NULL value (P&L remains the authoritative figure).
+        unknown and we fall back to `entry_price` so the DB column stays
+        populated. The realized P&L is the authoritative figure.
 
         Returns (exit_price, pnl, close_reason) or (None, None, None).
         """
-        from src.broker.client import EPIC_TO_BROKER
-
-        broker_epic = EPIC_TO_BROKER.get(epic, epic)
-        norm_epic = self._normalize_instrument_name(epic)
-        norm_broker = self._normalize_instrument_name(broker_epic)
 
         def _finalize(txn, *, strategy: str) -> tuple[float | None, float | None, str | None]:
             pnl = txn.pl_value
             if pnl is None:
                 return None, None, None
-            # Capital.com TRADE rows in the current live schema do not carry
-            # a closeLevel — fall back to entry_price so the DB column stays
-            # populated. The realized P&L is the authoritative figure.
             exit_price = txn.close_level if txn.close_level is not None else entry_price
             if pnl > 0:
                 reason = "TP"
@@ -921,56 +924,6 @@ class PaperTradingLoop:
                     if result[0] is not None:
                         return result
 
-        # Strategy 3: normalized instrument name + entry tolerance (when openLevel present)
-        candidates = []
-        for txn in transactions:
-            if not txn.instrument_name:
-                continue
-            # Skip explicitly non-trade rows (overnight fees, deposits, etc.).
-            # Unknown / legacy types (e.g. "DEAL" in older fixtures) pass through.
-            ttype = (txn.transaction_type or "").upper()
-            if ttype in {"SWAP", "DEPOSIT", "WITHDRAWAL", "REFUND"}:
-                continue
-            # CRITICAL guard — if the broker exposes a dealId on this txn and
-            # it is NOT our deal_id, this transaction belongs to a DIFFERENT
-            # position. Refuse the fuzzy match. Prevents ghost / stale DB
-            # positions with the same epic from stealing P&L from a real
-            # unrelated close on the same instrument.
-            if deal_id and txn.deal_id and txn.deal_id != deal_id:
-                continue
-            norm_name = self._normalize_instrument_name(txn.instrument_name)
-            name_hit = (
-                norm_epic in norm_name
-                or norm_name in norm_epic
-                or norm_broker in norm_name
-                or norm_name in norm_broker
-            )
-            if not name_hit:
-                continue
-            # When openLevel is present in the payload, use it for tighter
-            # disambiguation. When it is absent (current live schema) we
-            # accept the name match alone — caller controls the time window
-            # via the fetch range.
-            if txn.open_level is not None and entry_price > 0:
-                entry_hit = (
-                    abs(txn.open_level - entry_price) / max(entry_price, 1e-9) < 0.001
-                )
-                if not entry_hit:
-                    continue
-            candidates.append(txn)
-
-        if len(candidates) > 1:
-            logger.warning(
-                f"[{epic}] Ambiguous match in Strategy 3: {len(candidates)} "
-                f"candidates. Picking most recent by date."
-            )
-            candidates.sort(key=lambda t: t.date, reverse=True)
-
-        if candidates:
-            result = _finalize(candidates[0], strategy="name+entry")
-            if result[0] is not None:
-                return result
-
         return None, None, None
 
     async def _detect_broker_closed(self, current_positions: list[dict]) -> None:
@@ -980,17 +933,26 @@ class PaperTradingLoop:
         Tier 2 (deferred):  no match → keep in _pending_close_detections,
                             retry on next loop iteration.
         Tier 3 (timeout):   10min without match → write UNRECONCILED record.
-        """
-        from src.utils.config import get_settings
 
+        Close-detection v2 (activity-as-source-of-truth) runs in SHADOW MODE
+        when CLOSE_DETECTION_V2_ENABLED is set. v1 remains authoritative; v2
+        outcomes are logged + emitted as Prometheus counters so disagreements
+        surface before the flag is promoted to primary.
+        """
         if self.execution_engine.mode == ExecutionMode.PAPER:
             return
 
         self._broker_closed_deals = set()
         now = datetime.now(UTC)
-        timeout_sec = get_settings().close_reconciliation_timeout_seconds
+        _settings = get_settings()
+        timeout_sec = _settings.close_reconciliation_timeout_seconds
+        v2_enabled = bool(getattr(_settings, "close_detection_v2_enabled", False))
 
         current_deals = {p.get("deal_id") for p in current_positions if p.get("deal_id")}
+
+        # Snapshot BEFORE any mutation so the shadow detector sees the same
+        # "previous" view that v1 saw at the start of this tick.
+        previous_snapshot: dict[str, dict] = dict(self._previous_positions) if v2_enabled else {}
 
         if not self._previous_positions and not self._pending_close_detections:
             self._previous_positions = {
@@ -1017,6 +979,9 @@ class PaperTradingLoop:
                 f"Fetched {len(transactions)} recent transactions for "
                 f"{len(newly_disappeared)} new + {len(retry_pending)} pending"
             )
+
+        # v1 per-deal outcome trace; fed to shadow comparator at end.
+        v1_outcomes: dict[str, str] = {}
 
         # Bridge deal_reference from DB for all disappeared ids
         deal_ref_map: dict[str, str | None] = {}
@@ -1066,12 +1031,16 @@ class PaperTradingLoop:
                     retry_count=pending.retry_count,
                 )
                 del self._pending_close_detections[deal_id]
+                v1_outcomes[deal_id] = "primary"
                 continue
 
             age = (now - pending.first_seen).total_seconds()
             if age > timeout_sec:
                 await self._emit_unreconciled_close(pending)
                 del self._pending_close_detections[deal_id]
+                v1_outcomes[deal_id] = "unreconciled"
+            else:
+                v1_outcomes[deal_id] = "deferred"
 
         # ============ Newly-disappeared positions ============
         for deal_id, prev_pos in newly_disappeared:
@@ -1103,6 +1072,7 @@ class PaperTradingLoop:
                     metric_path="primary",
                     retry_count=0,
                 )
+                v1_outcomes[deal_id] = "primary"
             else:
                 logger.warning(
                     f"[{epic}] Close detected but no broker transaction match for "
@@ -1125,10 +1095,125 @@ class PaperTradingLoop:
                     first_seen=now,
                     retry_count=0,
                 )
+                v1_outcomes[deal_id] = "deferred"
+
+        # Shadow v2 — non-authoritative, observe + compare only.
+        if v2_enabled:
+            await self._run_shadow_close_detection(
+                previous_snapshot=previous_snapshot,
+                current_positions=current_positions,
+                transactions=transactions,
+                v1_outcomes=v1_outcomes,
+            )
 
         self._previous_positions = {
             p.get("deal_id"): p for p in current_positions if p.get("deal_id")
         }
+
+    def _get_close_detector(self):
+        """Lazy CloseDetector constructor for shadow-mode comparisons.
+
+        Returns ``None`` when we cannot build one (e.g. no broker injected in
+        unit-test paths). Instantiation is deferred so tests and PAPER mode
+        never pay the FX / FRED construction cost.
+        """
+        if self._close_detector is not None:
+            return self._close_detector
+        if self.broker is None:
+            return None
+        try:
+            from src.broker.fx import FxConverter
+            from src.trading.close_detector import CloseDetector
+
+            self._close_detector = CloseDetector(
+                broker=self.broker,
+                fx_converter=FxConverter(),
+                account_currency=self._account_currency,
+            )
+            logger.info(
+                f"[v2-shadow] CloseDetector initialized (account_currency="
+                f"{self._account_currency!r})"
+            )
+        except Exception as e:
+            logger.warning(f"[v2-shadow] CloseDetector init failed: {e!r}")
+            self._close_detector = None
+        return self._close_detector
+
+    async def _run_shadow_close_detection(
+        self,
+        *,
+        previous_snapshot: dict[str, dict],
+        current_positions: list[dict],
+        transactions: list,
+        v1_outcomes: dict[str, str],
+    ) -> None:
+        """Invoke v2 CloseDetector in shadow mode and record disagreements.
+
+        Non-authoritative: nothing here writes to the DB, the pending queue,
+        alerts, or trade history. Purpose is purely observability during the
+        24h shadow window described in the plan.
+        """
+        detector = self._get_close_detector()
+        if detector is None:
+            return
+
+        try:
+            from src.monitoring.metrics import MetricsCollector
+            from src.trading.close_detector import Deferred, Reconciled, Unreconciled
+        except Exception as e:
+            logger.warning(f"[v2-shadow] import failed: {e!r}")
+            return
+
+        try:
+            outcomes = await detector.detect(
+                previous=previous_snapshot,
+                current=current_positions,
+                transactions=transactions,
+            )
+        except Exception as e:
+            logger.warning(f"[v2-shadow] detect raised: {e!r}")
+            for deal_id, prev_pos in previous_snapshot.items():
+                if deal_id in v1_outcomes:
+                    MetricsCollector.record_close_detection_v2_shadow(
+                        outcome="error", epic=prev_pos.get("epic", "UNKNOWN")
+                    )
+            return
+
+        for outcome in outcomes:
+            deal_id = outcome.deal_id
+            prev_pos = previous_snapshot.get(deal_id, {})
+            epic = prev_pos.get("epic", "UNKNOWN")
+            if isinstance(outcome, Reconciled):
+                v2_label = "reconciled"
+                logger.info(
+                    f"[v2-shadow] {deal_id} → Reconciled "
+                    f"(close_dealid={outcome.close_dealid}, pnl=${outcome.pnl:.2f}, "
+                    f"exit={outcome.exit_price:.6f}, reason={outcome.close_reason})"
+                )
+            elif isinstance(outcome, Deferred):
+                v2_label = "deferred"
+                logger.info(f"[v2-shadow] {deal_id} → Deferred (reason={outcome.reason})")
+            elif isinstance(outcome, Unreconciled):
+                v2_label = "unreconciled"
+                logger.warning(f"[v2-shadow] {deal_id} → Unreconciled (reason={outcome.reason})")
+            else:  # pragma: no cover — defensive
+                v2_label = "error"
+
+            MetricsCollector.record_close_detection_v2_shadow(outcome=v2_label, epic=epic)
+
+            v1_label = v1_outcomes.get(deal_id, "unobserved")
+            # v1 uses "primary" for successful reconciliation; v2 calls that
+            # "reconciled". Normalize so the disagreement metric only fires on
+            # genuine decision divergence.
+            v1_equivalent = "reconciled" if v1_label == "primary" else v1_label
+            if v1_equivalent != v2_label:
+                MetricsCollector.record_close_shadow_disagreement(
+                    v1_path=v1_label, v2_outcome=v2_label, epic=epic
+                )
+                logger.warning(
+                    f"[v2-shadow] DISAGREEMENT {deal_id} epic={epic} "
+                    f"v1={v1_label} v2={v2_label}"
+                )
 
     async def _finalize_close(
         self,
@@ -2774,31 +2859,15 @@ class PaperTradingLoop:
                                 reason="TIME_STOP",
                             )
                             if result.success:
-                                entry_price = position.get("level") or position.get(
-                                    "entry_price", 0
-                                )
-                                size = position.get("size", 0)
-                                latest = self.data_access.get_latest_price(epic, timeframe="1h")
-                                current_price = latest.get("close", 0) if latest else 0
-                                if direction == "BUY":
-                                    pnl = (current_price - entry_price) * size
-                                else:
-                                    pnl = (entry_price - current_price) * size
+                                # Close-detection v2 (Step 7): do NOT compute
+                                # synthetic P&L or persist here. Position will
+                                # disappear from broker.list_positions on the
+                                # next tick; _detect_broker_closed enqueues it
+                                # and CloseDetector reconciles with the real
+                                # broker TRADE row + FX.
                                 logger.info(
-                                    f"✅ [{epic}] Time stop closed: "
-                                    f"P&L = ${pnl:.2f} (held {age_hours:.1f}h)"
-                                )
-                                self._on_position_closed(deal_id, pnl, epic=epic)
-                                await self._persist_position_close(
-                                    deal_id=deal_id,
-                                    epic=epic,
-                                    direction=direction,
-                                    size=size,
-                                    entry_price=entry_price,
-                                    exit_price=current_price,
-                                    pnl=pnl,
-                                    close_reason="TIME_STOP",
-                                    opened_at=position.get("opened_at"),
+                                    f"[{epic}] Time stop close submitted — awaiting "
+                                    f"broker reconciliation (held {age_hours:.1f}h)"
                                 )
                             continue  # Skip SL/TP checks for this position
                         except Exception as e:
@@ -2885,59 +2954,17 @@ class PaperTradingLoop:
                         )
 
                         if result.success:
-                            entry_price = position.get("level") or position.get("entry_price", 0)
-                            size = position.get("size", 0)
-                            if direction == "BUY":
-                                pnl = (current_price - entry_price) * size
-                            else:
-                                pnl = (entry_price - current_price) * size
+                            # Close-detection v2 (Step 7): no synthetic P&L
+                            # here. Position disappears from broker on the
+                            # next tick; CloseDetector reconciles real P&L
+                            # from /history/transactions + FX. _on_position_closed
+                            # + _persist_position_close + ws broadcast all fire
+                            # from _finalize_close once reconciled.
                             logger.info(
-                                f"✅ [{epic}] Position closed at {reason_label}: "
-                                f"P&L = ${pnl:.2f}"
+                                f"[{epic}] Position close submitted at "
+                                f"{reason_label} — awaiting broker reconciliation "
+                                f"(trigger price {current_price:.5f})"
                             )
-
-                            self._on_position_closed(
-                                deal_id,
-                                pnl,
-                                epic=epic,
-                                close_reason=reason_label,
-                            )
-
-                            # Persist closed position to database
-                            await self._persist_position_close(
-                                deal_id=deal_id,
-                                epic=epic,
-                                direction=direction,
-                                size=size,
-                                entry_price=entry_price,
-                                exit_price=current_price,
-                                pnl=pnl,
-                                close_reason=close_reason,
-                                opened_at=position.get("opened_at"),
-                            )
-
-                            # Broadcast trade_closed event to frontend via WebSocket
-                            try:
-                                from src.api.websocket import ws_manager
-
-                                await ws_manager.broadcast(
-                                    "trades",
-                                    {
-                                        "type": "trade_closed",
-                                        "deal_id": deal_id,
-                                        "epic": epic,
-                                        "direction": direction,
-                                        "pnl": round(pnl, 2),
-                                        "close_reason": close_reason,
-                                        "timestamp": datetime.now(UTC).isoformat(),
-                                    },
-                                )
-                            except Exception as e:
-                                logger.debug(f"WS broadcast trade_closed failed: {e}")
-
-                            # NOTE: Do NOT call log_execution() here — it fires
-                            # alert_trade_opened() which sends a misleading alert.
-
                             status = "sl_hit" if stop_violated else "tp_hit"
                             self._signal_history.append(
                                 {
@@ -2948,7 +2975,7 @@ class PaperTradingLoop:
                                     "status": status,
                                     "reason": f"{reason_label} hit at {current_price:.5f}",
                                     "deal_id": deal_id,
-                                    "pnl": pnl,
+                                    "pnl": None,  # pending reconciliation
                                 }
                             )
                         else:

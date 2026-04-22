@@ -514,3 +514,46 @@ class Notification(SQLModel, table=True):
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
+
+
+class PendingCloseDetection(SQLModel, table=True):
+    """Persisted state for close-detection reconciliation retries.
+
+    Mirrors the in-memory ``PaperTradingLoop._pending_close_detections``
+    dict so the retry counter and ``first_seen`` timestamp survive
+    backend restarts. Without this, a pending close whose broker activity
+    / transaction is slow to materialize is silently reset to retry 0 /
+    first_seen=now on every process restart, and the 10-minute
+    reconciliation window never fires — the exact silent failure that
+    caused tonight's DE40 TP close to land UNRECONCILED after a restart.
+
+    Rows are created by CloseDetector when a position disappears from the
+    broker without an immediate match, and deleted once reconciliation
+    succeeds (Tier 1 / Tier 2) or the UNRECONCILED timeout fires (Tier 3).
+
+    See migration ``a910f5d6e7b2`` and plan calm-questing-quail.md.
+    """
+
+    __tablename__ = "pending_close_detections"
+
+    deal_id: str = Field(max_length=100, primary_key=True)
+    deal_reference: str | None = Field(default=None, max_length=100, nullable=True)
+    epic: str = Field(max_length=32, nullable=False, index=True)
+    direction: str = Field(max_length=8, nullable=False)
+    size: Decimal = Field(max_digits=20, decimal_places=8, nullable=False)
+    entry_price: Decimal = Field(max_digits=20, decimal_places=8, nullable=False)
+    prev_pos: dict = Field(sa_column=Column(JSONB, nullable=False))
+    first_seen: datetime = Field(nullable=False, index=True)
+    retry_count: int = Field(default=0, nullable=False)
+    last_activity_snapshot: dict | None = Field(default=None, sa_column=Column(JSONB))
+    last_transaction_snapshot: dict | None = Field(default=None, sa_column=Column(JSONB))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
+        nullable=False,
+        sa_column_kwargs={"server_default": text("NOW()")},
+    )
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
+        nullable=False,
+        sa_column_kwargs={"server_default": text("NOW()"), "onupdate": text("NOW()")},
+    )

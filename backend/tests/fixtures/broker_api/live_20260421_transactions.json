@@ -1,0 +1,48 @@
+{
+  "_meta": {
+    "captured_at_utc": "2026-04-21T21:52:43.843890+00:00",
+    "window_hours": 24,
+    "execution_mode": "DEMO",
+    "base_url": "https://demo-api-capital.backend-capital.com"
+  },
+  "response": {
+    "transactions": [
+      {
+        "date": "2026-04-21T21:42:09.834",
+        "dateUtc": "2026-04-21T19:42:09.834",
+        "instrumentName": "DE40",
+        "transactionType": "TRADE",
+        "note": "Trade closed",
+        "reference": "125678669418985",
+        "size": "29.28",
+        "currency": "USDd",
+        "status": "PROCESSED",
+        "dealId": "07101627-0015-549e-0000-0000810436be"
+      },
+      {
+        "date": "2026-04-21T12:23:37.934",
+        "dateUtc": "2026-04-21T10:23:37.934",
+        "instrumentName": "OIL_CRUDE",
+        "transactionType": "TRADE",
+        "note": "Trade closed",
+        "reference": "125643529567506",
+        "size": "-20.27",
+        "currency": "USDd",
+        "status": "PROCESSED",
+        "dealId": "00018509-0055-311e-0000-0000826263d2"
+      },
+      {
+        "date": "2026-04-21T04:41:23.571",
+        "dateUtc": "2026-04-21T02:41:23.571",
+        "instrumentName": "DE40",
+        "transactionType": "TRADE",
+        "note": "Trade closed",
+        "reference": "125614448319076",
+        "size": "-33.13",
+        "currency": "USDd",
+        "status": "PROCESSED",
+        "dealId": "07101627-0015-549e-0000-00008103fe9b"
+      }
+    ]
+  }
+}

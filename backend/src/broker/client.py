@@ -12,6 +12,7 @@ from loguru import logger
 from src.broker.exceptions import CapitalComError, map_error
 from src.broker.models import (
     Account,
+    ActivityEvent,
     ClientSentiment,
     CreatePositionRequest,
     CreateWorkingOrderRequest,
@@ -530,6 +531,51 @@ class CapitalComClient:
         response = await self._request("GET", "/api/v1/history/transactions", params=params)
         transactions_data = response.get("transactions", [])
         return [Transaction(**txn) for txn in transactions_data]
+
+    async def get_activity_history(
+        self,
+        from_date: datetime,
+        to_date: datetime,
+        detailed: bool = True,
+    ) -> list[ActivityEvent]:
+        """Fetch activity history from Capital.com `/api/v1/history/activity`.
+
+        This is the authoritative source for close-event linkage in
+        MANTIS v2 close detection. Each broker-initiated close (TP / SL /
+        STOP_OUT / MARGIN_CALL) emits a POSITION event with:
+
+        - `source` = close reason (TP, SL, STOP_OUT, MARGIN_CALL, USER, …)
+        - `details.openPrice` = original position entry price
+        - `details.direction` = the reverse direction on the close
+        - `dealId` = the close-side dealId (matches the TRADE row in
+          `/history/transactions` for P&L lookup)
+
+        Together those fields let the close detector deterministically
+        link a broker close to our Position row without depending on
+        stable `dealId` equality, which Capital.com mutates on broker-
+        initiated closes (verified 2026-04-21).
+
+        Args:
+            from_date: Start of the activity window (inclusive).
+            to_date:   End of the activity window (inclusive).
+            detailed:  Whether to request the detailed payload (required
+                for `details.openPrice` / `stopLevel` / etc.). Defaults
+                to True — the un-detailed payload is useless for us.
+
+        Returns:
+            List of ActivityEvent objects ordered by date descending.
+        """
+        # Same timestamp rules as /history/transactions: naive
+        # `yyyy-MM-dd'T'HH:mm:ss`, no timezone suffix. Server rejects tz
+        # suffix with `error.invalid.from`.
+        params: dict[str, Any] = {
+            "from": from_date.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S"),
+            "to": to_date.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S"),
+            "detailed": "true" if detailed else "false",
+        }
+        response = await self._request("GET", "/api/v1/history/activity", params=params)
+        activities_data = response.get("activities", [])
+        return [ActivityEvent(**act) for act in activities_data]
 
     async def top_up_demo_account(self, amount: float) -> dict[str, Any]:
         """

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from loguru import logger
 
 from src.utils.config import get_settings
-from src.utils.constants import CRYPTO_ASSETS, COMMODITY_ASSETS
+from src.utils.constants import COMMODITY_ASSETS, CRYPTO_ASSETS
 
 # ATR multipliers per asset class.
 # Target: SL between 1-2.5% for all classes regardless of per-asset volatility.
@@ -20,11 +20,11 @@ _INDEX_ASSETS = {"US500", "DE40", "NAS100"}
 
 # (SL_ATR_MULT, TP_MAX_ATR) — TP = SL * 0.75 for consistent R:R across classes
 _CLASS_ATR_PARAMS: dict[str, tuple[float, float]] = {
-    "forex":     (2.0, 1.5),   # ATR% ~0.2-0.3% -> SL ~0.5%
-    "index":     (2.0, 1.5),   # ATR% ~0.7-1.0% -> SL ~1.5-2.0%
-    "commodity": (1.2, 0.9),   # ATR% ~1.4-3.2% -> SL ~1.7-3.8%
-    "crypto":    (1.2, 0.9),   # ATR% ~1.4-1.9% -> SL ~1.7-2.3%
-    "stock":     (1.0, 0.75),  # ATR% ~1.4-2.2% -> SL ~1.4-2.2%
+    "forex": (2.0, 1.5),  # ATR% ~0.2-0.3% -> SL ~0.5%
+    "index": (2.0, 1.5),  # ATR% ~0.7-1.0% -> SL ~1.5-2.0%
+    "commodity": (1.2, 0.9),  # ATR% ~1.4-3.2% -> SL ~1.7-3.8%
+    "crypto": (1.2, 0.9),  # ATR% ~1.4-1.9% -> SL ~1.7-2.3%
+    "stock": (1.0, 0.75),  # ATR% ~1.4-2.2% -> SL ~1.4-2.2%
 }
 
 

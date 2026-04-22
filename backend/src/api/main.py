@@ -93,13 +93,13 @@ async def _connect_broker_with_retry(
         try:
             await broker.connect()
             if attempt > 1:
-                logger.info(
-                    f"Broker connect succeeded on attempt {attempt}/{max_attempts}"
-                )
+                logger.info(f"Broker connect succeeded on attempt {attempt}/{max_attempts}")
             return
         except Exception as e:
             msg = str(e)
-            is_rate_limited = "429" in msg or "rate limit" in msg.lower() or "too many" in msg.lower()
+            is_rate_limited = (
+                "429" in msg or "rate limit" in msg.lower() or "too many" in msg.lower()
+            )
             if attempt == max_attempts or not is_rate_limited:
                 raise
             logger.warning(
