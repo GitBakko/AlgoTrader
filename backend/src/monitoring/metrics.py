@@ -306,9 +306,7 @@ class MetricsCollector:
             pass
 
     @classmethod
-    def record_close_shadow_disagreement(
-        cls, *, v1_path: str, v2_outcome: str, epic: str
-    ) -> None:
+    def record_close_shadow_disagreement(cls, *, v1_path: str, v2_outcome: str, epic: str) -> None:
         """Record a per-deal disagreement between v1 (authoritative) and v2 (shadow)."""
         try:
             close_detection_shadow_disagreement_counter.labels(

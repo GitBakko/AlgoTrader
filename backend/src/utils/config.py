@@ -224,9 +224,7 @@ class Settings(BaseSettings):
     # activity-first CloseDetector in shadow mode (v1 remains authoritative for
     # DB writes and alerting). Promotion to primary happens after 24h of
     # zero-disagreement shadow traffic.
-    close_detection_v2_enabled: bool = Field(
-        default=False, alias="CLOSE_DETECTION_V2_ENABLED"
-    )
+    close_detection_v2_enabled: bool = Field(default=False, alias="CLOSE_DETECTION_V2_ENABLED")
 
     # Mean Reversion Strategy
     mr_primary_enabled: bool = Field(default=False, alias="MR_PRIMARY_ENABLED")

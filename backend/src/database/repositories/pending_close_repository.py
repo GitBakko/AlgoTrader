@@ -29,9 +29,7 @@ class PendingCloseRepository:
 
     async def get(self, deal_id: str) -> PendingCloseDetection | None:
         result = await self.session.execute(
-            select(PendingCloseDetection).where(
-                PendingCloseDetection.deal_id == deal_id
-            )
+            select(PendingCloseDetection).where(PendingCloseDetection.deal_id == deal_id)
         )
         return result.scalar_one_or_none()
 
@@ -84,8 +82,7 @@ class PendingCloseRepository:
         self.session.add(row)
         await self.session.flush()
         logger.info(
-            f"Queued pending close for {deal_id} (epic={epic}, "
-            f"retry_count={retry_count})"
+            f"Queued pending close for {deal_id} (epic={epic}, " f"retry_count={retry_count})"
         )
         return row
 

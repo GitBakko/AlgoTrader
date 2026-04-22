@@ -152,9 +152,7 @@ class FxConverter:
         dst = normalize_currency(to_ccy)
 
         if not src or not dst:
-            raise FxUnavailableError(
-                f"FX normalize failed — from={from_ccy!r} to={to_ccy!r}"
-            )
+            raise FxUnavailableError(f"FX normalize failed — from={from_ccy!r} to={to_ccy!r}")
         if src == dst:
             return amount
 
@@ -175,8 +173,7 @@ class FxConverter:
             rate = 1.0 / rate
         converted = amount * rate
         logger.info(
-            f"FX {src}->{dst}: {amount:.4f} * {rate:.6f} = {converted:.4f} "
-            f"(series={series_id})"
+            f"FX {src}->{dst}: {amount:.4f} * {rate:.6f} = {converted:.4f} " f"(series={series_id})"
         )
         return converted
 
@@ -189,9 +186,7 @@ class FxConverter:
         try:
             raw = await self._fred.fetch_single(series_id)
         except Exception as exc:  # noqa: BLE001 — surface as FX failure
-            raise FxUnavailableError(
-                f"FRED fetch_single({series_id!r}) raised: {exc}"
-            ) from exc
+            raise FxUnavailableError(f"FRED fetch_single({series_id!r}) raised: {exc}") from exc
 
         if raw is None:
             raise FxUnavailableError(

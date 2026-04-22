@@ -670,9 +670,7 @@ class StateRecoveryService:
             logger.warning("rehydrate_pending_closes: paper_loop not wired, skipping")
             return 0
         if not self.db_session_factory:
-            logger.warning(
-                "rehydrate_pending_closes: no db_session_factory, skipping"
-            )
+            logger.warning("rehydrate_pending_closes: no db_session_factory, skipping")
             return 0
 
         # Local imports — avoids a circular dependency with paper_loop which
@@ -726,7 +724,6 @@ class StateRecoveryService:
 
         if restored:
             logger.info(
-                f"rehydrate_pending_closes: restored {restored} pending "
-                f"close(s) from DB"
+                f"rehydrate_pending_closes: restored {restored} pending " f"close(s) from DB"
             )
         return restored

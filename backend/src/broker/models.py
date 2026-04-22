@@ -336,9 +336,9 @@ class Transaction(BaseModel):
 
         if (self.transaction_type or "").upper() == "TRADE":
             v = self._parse_currency_string(
-                self.size if isinstance(self.size, str) else (
-                    None if self.size is None else f"{self.size}"
-                )
+                self.size
+                if isinstance(self.size, str)
+                else (None if self.size is None else f"{self.size}")
             )
             if v is not None:
                 return v

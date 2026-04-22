@@ -36,13 +36,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any, Union
+from typing import Any
 
 from loguru import logger
 
 from src.broker.fx import FxConverter, FxUnavailableError
 from src.broker.models import ActivityEvent, Transaction
-
 
 # ===== Outcome types =====
 
@@ -76,7 +75,7 @@ class Unreconciled:
     reason: str  # "fx_unavailable" | "txn_pnl_missing" | "activity_level_missing"
 
 
-CloseOutcome = Union[Reconciled, Deferred, Unreconciled]
+CloseOutcome = Reconciled | Deferred | Unreconciled
 
 
 # ===== Defaults =====
@@ -162,9 +161,7 @@ class CloseDetector:
         """
         current_deals = {p.get("deal_id") for p in current if p.get("deal_id")}
         disappeared = [
-            (did, ppos)
-            for did, ppos in previous.items()
-            if did and did not in current_deals
+            (did, ppos) for did, ppos in previous.items() if did and did not in current_deals
         ]
         if not disappeared:
             return []
@@ -185,9 +182,7 @@ class CloseDetector:
 
         outcomes: list[CloseOutcome] = []
         for deal_id, prev_pos in disappeared:
-            outcomes.append(
-                await self._resolve_one(deal_id, prev_pos, activities, transactions)
-            )
+            outcomes.append(await self._resolve_one(deal_id, prev_pos, activities, transactions))
         return outcomes
 
     # ----- internals -----

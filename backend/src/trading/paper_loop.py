@@ -952,9 +952,7 @@ class PaperTradingLoop:
 
         # Snapshot BEFORE any mutation so the shadow detector sees the same
         # "previous" view that v1 saw at the start of this tick.
-        previous_snapshot: dict[str, dict] = (
-            dict(self._previous_positions) if v2_enabled else {}
-        )
+        previous_snapshot: dict[str, dict] = dict(self._previous_positions) if v2_enabled else {}
 
         if not self._previous_positions and not self._pending_close_detections:
             self._previous_positions = {
@@ -1194,20 +1192,14 @@ class PaperTradingLoop:
                 )
             elif isinstance(outcome, Deferred):
                 v2_label = "deferred"
-                logger.info(
-                    f"[v2-shadow] {deal_id} → Deferred (reason={outcome.reason})"
-                )
+                logger.info(f"[v2-shadow] {deal_id} → Deferred (reason={outcome.reason})")
             elif isinstance(outcome, Unreconciled):
                 v2_label = "unreconciled"
-                logger.warning(
-                    f"[v2-shadow] {deal_id} → Unreconciled (reason={outcome.reason})"
-                )
+                logger.warning(f"[v2-shadow] {deal_id} → Unreconciled (reason={outcome.reason})")
             else:  # pragma: no cover — defensive
                 v2_label = "error"
 
-            MetricsCollector.record_close_detection_v2_shadow(
-                outcome=v2_label, epic=epic
-            )
+            MetricsCollector.record_close_detection_v2_shadow(outcome=v2_label, epic=epic)
 
             v1_label = v1_outcomes.get(deal_id, "unobserved")
             # v1 uses "primary" for successful reconciliation; v2 calls that
