@@ -275,6 +275,10 @@ class TestParseArgs:
         args = parse_args(["--account-currency", "EUR"])
         assert args.account_currency == "EUR"
 
+    def test_window_minutes_default_and_override(self):
+        assert parse_args([]).window_minutes == 10
+        assert parse_args(["--window-minutes", "2880"]).window_minutes == 2880
+
 
 class TestMainSafetyGate:
     def test_apply_without_yes_refused(self):

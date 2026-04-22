@@ -265,6 +265,27 @@ async def test_epic_mismatch_is_ignored():
 
 
 @pytest.mark.asyncio
+async def test_broker_epic_mapping_matches_display_epic():
+    """Position stores display epic ('WTIUSD'); Capital.com activity reports
+    broker epic ('OIL_CRUDE'). EPIC_TO_BROKER mapping must bridge them so
+    the match succeeds."""
+    prev = _make_position_dict(epic="WTIUSD", level=86.21)
+    activity = _make_close_activity(
+        epic="OIL_CRUDE", open_price=86.21, deal_id="close-oil"
+    )
+    txn = _make_trade_txn(deal_id="close-oil", size="-20.27")
+    detector = _mk()
+    outcomes = await detector.detect(
+        previous={prev["deal_id"]: prev},
+        current=[],
+        activities=[activity],
+        transactions=[txn],
+    )
+    assert isinstance(outcomes[0], Reconciled)
+    assert outcomes[0].pnl == -20.27
+
+
+@pytest.mark.asyncio
 async def test_entry_price_outside_tolerance_is_ignored():
     prev = _make_position_dict(level=24245.3)
     # 24500 is ~1% off — well beyond the default 0.1% tolerance

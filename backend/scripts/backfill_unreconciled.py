@@ -145,19 +145,25 @@ async def backfill_one(
     session: AsyncSession,
     report: BackfillReport,
     apply_writes: bool,
-    window_extra_minutes: int = 10,
+    window_minutes: int = 10,
 ) -> None:
-    """Run CloseDetector on a single DB row and (optionally) update it."""
+    """Run CloseDetector on a single DB row and (optionally) update it.
+
+    The activity window is ``closed_at ± window_minutes``. For fresh rows
+    the default (10 min) is enough; for historical backfill, pass a larger
+    value via --window-minutes (Capital.com keeps ~7d of activity).
+    """
     prev_pos = _position_to_prev_pos(row)
 
-    # Widen the activity window around the recorded closed_at so we still
-    # find the matching event even if the row was written minutes after
-    # the real broker close.
     closed_at = row.closed_at or row.opened_at or datetime.now(UTC)
     if closed_at.tzinfo is None:
         closed_at = closed_at.replace(tzinfo=UTC)
-    from_dt = closed_at - timedelta(minutes=window_extra_minutes)
-    to_dt = closed_at + timedelta(minutes=window_extra_minutes)
+    from_dt = closed_at - timedelta(minutes=window_minutes)
+    to_dt = closed_at + timedelta(minutes=window_minutes)
+    logger.info(
+        f"[{row.epic}] {row.deal_id} closed_at={closed_at.isoformat()} "
+        f"window=±{window_minutes}min"
+    )
 
     activities = await detector._broker.get_activity_history(from_dt, to_dt)
     transactions = await detector._broker.get_transaction_history(from_dt, to_dt)
@@ -206,6 +212,7 @@ async def run_backfill(
     session: AsyncSession,
     detector: CloseDetector,
     apply_writes: bool,
+    window_minutes: int = 10,
 ) -> BackfillReport:
     """Iterate every eligible row, reconcile, report."""
     rows = await fetch_candidates(session)
@@ -218,6 +225,7 @@ async def run_backfill(
             session=session,
             report=report,
             apply_writes=apply_writes,
+            window_minutes=window_minutes,
         )
     if apply_writes and report.reconciled:
         await session.commit()
@@ -238,17 +246,13 @@ async def _main(args: argparse.Namespace) -> int:
     )
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
-    # Build broker + detector
-    broker = CapitalComClient(
-        api_key=settings.capital_demo_api_key,
-        identifier=settings.capital_demo_email,
-        password=settings.capital_demo_password,
-        base_url=settings.capital_demo_api_url,
-    )
+    # Build broker + detector. CapitalComClient reads credentials from
+    # settings based on USE_DEMO, so no kwargs needed here.
+    broker = CapitalComClient()
     try:
-        await broker.login()
+        await broker.connect()
     except Exception as exc:
-        logger.error(f"Broker login failed: {exc!r}")
+        logger.error(f"Broker connect failed: {exc!r}")
         await engine.dispose()
         return EXIT_ERROR
 
@@ -259,11 +263,14 @@ async def _main(args: argparse.Namespace) -> int:
     try:
         async with session_factory() as session:
             report = await run_backfill(
-                session=session, detector=detector, apply_writes=args.apply
+                session=session,
+                detector=detector,
+                apply_writes=args.apply,
+                window_minutes=args.window_minutes,
             )
     finally:
         try:
-            await broker.logout()
+            await broker.close()
         except Exception:
             pass
         await engine.dispose()
@@ -299,6 +306,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--account-currency",
         default="USD",
         help="Account currency for FX conversion (default: USD).",
+    )
+    parser.add_argument(
+        "--window-minutes",
+        type=int,
+        default=10,
+        help=(
+            "Half-width of the activity fetch window around closed_at "
+            "(default: 10). For historical backfills bump to e.g. 2880 "
+            "(±48h) since closed_at in the DB may be the UNRECONCILED "
+            "timeout moment, not the real broker close."
+        ),
     )
     args = parser.parse_args(argv)
     # --apply and --dry-run default to False/True respectively — normalize.

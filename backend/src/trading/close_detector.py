@@ -40,6 +40,7 @@ from typing import Any
 
 from loguru import logger
 
+from src.broker.client import EPIC_TO_BROKER
 from src.broker.fx import FxConverter, FxUnavailableError
 from src.broker.models import ActivityEvent, Transaction
 
@@ -263,11 +264,17 @@ class CloseDetector:
         expected_reverse = _opposite_direction(direction)
         tolerance = abs(entry) * self._entry_tol_pct
 
+        # Capital.com /history/activity reports `epic` in broker form
+        # (e.g. "OIL_CRUDE") while our Position row stores the display form
+        # ("WTIUSD"). Accept either side via EPIC_TO_BROKER so symbols that
+        # the broker renames still pair.
+        broker_epic = EPIC_TO_BROKER.get(epic, epic)
+
         candidates: list[ActivityEvent] = []
         for act in activities:
             if not act.is_close_event():
                 continue
-            if act.epic != epic:
+            if act.epic != epic and act.epic != broker_epic:
                 continue
             op = act.details.open_price
             if op is None:
