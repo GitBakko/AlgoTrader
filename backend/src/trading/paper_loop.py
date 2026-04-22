@@ -197,6 +197,11 @@ class PaperTradingLoop:
         # Positions that disappeared from broker but whose close transaction has not
         # yet been matched — keyed by deal_id, held until reconciliation or timeout.
         self._pending_close_detections: dict[str, PendingClose] = {}
+        # Close-detection v2 (shadow mode). Instantiated lazily on first tick
+        # where CLOSE_DETECTION_V2_ENABLED is True so test suites and PAPER
+        # mode paths never pay the FX/broker construction cost.
+        self._close_detector = None
+        self._account_currency: str = "USD"
         # Asset momentum rotation
         self._active_assets: set[str] | None = None  # None = all assets
         self._asset_rotation_ts: float = 0.0
@@ -980,17 +985,28 @@ class PaperTradingLoop:
         Tier 2 (deferred):  no match → keep in _pending_close_detections,
                             retry on next loop iteration.
         Tier 3 (timeout):   10min without match → write UNRECONCILED record.
-        """
-        from src.utils.config import get_settings
 
+        Close-detection v2 (activity-as-source-of-truth) runs in SHADOW MODE
+        when CLOSE_DETECTION_V2_ENABLED is set. v1 remains authoritative; v2
+        outcomes are logged + emitted as Prometheus counters so disagreements
+        surface before the flag is promoted to primary.
+        """
         if self.execution_engine.mode == ExecutionMode.PAPER:
             return
 
         self._broker_closed_deals = set()
         now = datetime.now(UTC)
-        timeout_sec = get_settings().close_reconciliation_timeout_seconds
+        _settings = get_settings()
+        timeout_sec = _settings.close_reconciliation_timeout_seconds
+        v2_enabled = bool(getattr(_settings, "close_detection_v2_enabled", False))
 
         current_deals = {p.get("deal_id") for p in current_positions if p.get("deal_id")}
+
+        # Snapshot BEFORE any mutation so the shadow detector sees the same
+        # "previous" view that v1 saw at the start of this tick.
+        previous_snapshot: dict[str, dict] = (
+            dict(self._previous_positions) if v2_enabled else {}
+        )
 
         if not self._previous_positions and not self._pending_close_detections:
             self._previous_positions = {
@@ -1017,6 +1033,9 @@ class PaperTradingLoop:
                 f"Fetched {len(transactions)} recent transactions for "
                 f"{len(newly_disappeared)} new + {len(retry_pending)} pending"
             )
+
+        # v1 per-deal outcome trace; fed to shadow comparator at end.
+        v1_outcomes: dict[str, str] = {}
 
         # Bridge deal_reference from DB for all disappeared ids
         deal_ref_map: dict[str, str | None] = {}
@@ -1066,12 +1085,16 @@ class PaperTradingLoop:
                     retry_count=pending.retry_count,
                 )
                 del self._pending_close_detections[deal_id]
+                v1_outcomes[deal_id] = "primary"
                 continue
 
             age = (now - pending.first_seen).total_seconds()
             if age > timeout_sec:
                 await self._emit_unreconciled_close(pending)
                 del self._pending_close_detections[deal_id]
+                v1_outcomes[deal_id] = "unreconciled"
+            else:
+                v1_outcomes[deal_id] = "deferred"
 
         # ============ Newly-disappeared positions ============
         for deal_id, prev_pos in newly_disappeared:
@@ -1103,6 +1126,7 @@ class PaperTradingLoop:
                     metric_path="primary",
                     retry_count=0,
                 )
+                v1_outcomes[deal_id] = "primary"
             else:
                 logger.warning(
                     f"[{epic}] Close detected but no broker transaction match for "
@@ -1125,10 +1149,131 @@ class PaperTradingLoop:
                     first_seen=now,
                     retry_count=0,
                 )
+                v1_outcomes[deal_id] = "deferred"
+
+        # Shadow v2 — non-authoritative, observe + compare only.
+        if v2_enabled:
+            await self._run_shadow_close_detection(
+                previous_snapshot=previous_snapshot,
+                current_positions=current_positions,
+                transactions=transactions,
+                v1_outcomes=v1_outcomes,
+            )
 
         self._previous_positions = {
             p.get("deal_id"): p for p in current_positions if p.get("deal_id")
         }
+
+    def _get_close_detector(self):
+        """Lazy CloseDetector constructor for shadow-mode comparisons.
+
+        Returns ``None`` when we cannot build one (e.g. no broker injected in
+        unit-test paths). Instantiation is deferred so tests and PAPER mode
+        never pay the FX / FRED construction cost.
+        """
+        if self._close_detector is not None:
+            return self._close_detector
+        if self.broker is None:
+            return None
+        try:
+            from src.broker.fx import FxConverter
+            from src.trading.close_detector import CloseDetector
+
+            self._close_detector = CloseDetector(
+                broker=self.broker,
+                fx_converter=FxConverter(),
+                account_currency=self._account_currency,
+            )
+            logger.info(
+                f"[v2-shadow] CloseDetector initialized (account_currency="
+                f"{self._account_currency!r})"
+            )
+        except Exception as e:
+            logger.warning(f"[v2-shadow] CloseDetector init failed: {e!r}")
+            self._close_detector = None
+        return self._close_detector
+
+    async def _run_shadow_close_detection(
+        self,
+        *,
+        previous_snapshot: dict[str, dict],
+        current_positions: list[dict],
+        transactions: list,
+        v1_outcomes: dict[str, str],
+    ) -> None:
+        """Invoke v2 CloseDetector in shadow mode and record disagreements.
+
+        Non-authoritative: nothing here writes to the DB, the pending queue,
+        alerts, or trade history. Purpose is purely observability during the
+        24h shadow window described in the plan.
+        """
+        detector = self._get_close_detector()
+        if detector is None:
+            return
+
+        try:
+            from src.monitoring.metrics import MetricsCollector
+            from src.trading.close_detector import Deferred, Reconciled, Unreconciled
+        except Exception as e:
+            logger.warning(f"[v2-shadow] import failed: {e!r}")
+            return
+
+        try:
+            outcomes = await detector.detect(
+                previous=previous_snapshot,
+                current=current_positions,
+                transactions=transactions,
+            )
+        except Exception as e:
+            logger.warning(f"[v2-shadow] detect raised: {e!r}")
+            for deal_id, prev_pos in previous_snapshot.items():
+                if deal_id in v1_outcomes:
+                    MetricsCollector.record_close_detection_v2_shadow(
+                        outcome="error", epic=prev_pos.get("epic", "UNKNOWN")
+                    )
+            return
+
+        for outcome in outcomes:
+            deal_id = outcome.deal_id
+            prev_pos = previous_snapshot.get(deal_id, {})
+            epic = prev_pos.get("epic", "UNKNOWN")
+            if isinstance(outcome, Reconciled):
+                v2_label = "reconciled"
+                logger.info(
+                    f"[v2-shadow] {deal_id} → Reconciled "
+                    f"(close_dealid={outcome.close_dealid}, pnl=${outcome.pnl:.2f}, "
+                    f"exit={outcome.exit_price:.6f}, reason={outcome.close_reason})"
+                )
+            elif isinstance(outcome, Deferred):
+                v2_label = "deferred"
+                logger.info(
+                    f"[v2-shadow] {deal_id} → Deferred (reason={outcome.reason})"
+                )
+            elif isinstance(outcome, Unreconciled):
+                v2_label = "unreconciled"
+                logger.warning(
+                    f"[v2-shadow] {deal_id} → Unreconciled (reason={outcome.reason})"
+                )
+            else:  # pragma: no cover — defensive
+                v2_label = "error"
+
+            MetricsCollector.record_close_detection_v2_shadow(
+                outcome=v2_label, epic=epic
+            )
+
+            v1_label = v1_outcomes.get(deal_id, "unobserved")
+            # v1 uses "primary" for successful reconciliation; v2 calls that
+            # "reconciled". Normalize so the disagreement metric only fires on
+            # genuine decision divergence.
+            v1_equivalent = "reconciled" if v1_label == "primary" else v1_label
+            if v1_equivalent != v2_label:
+                MetricsCollector.record_close_shadow_disagreement(
+                    v1_path=v1_label, v2_outcome=v2_label, epic=epic
+                )
+                logger.warning(
+                    f"[v2-shadow] DISAGREEMENT {deal_id} epic={epic} "
+                    f"v1={v1_label} v2={v2_label}"
+                )
 
     async def _finalize_close(
         self,

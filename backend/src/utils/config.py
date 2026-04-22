@@ -219,6 +219,14 @@ class Settings(BaseSettings):
     close_reconciliation_timeout_seconds: int = Field(
         default=600, alias="CLOSE_RECONCILIATION_TIMEOUT_SECONDS"
     )  # 10 minutes
+    # Close-detection v2 rollout flag. When False, paper_loop uses the legacy
+    # transaction-first matcher. When True, paper_loop additionally runs the
+    # activity-first CloseDetector in shadow mode (v1 remains authoritative for
+    # DB writes and alerting). Promotion to primary happens after 24h of
+    # zero-disagreement shadow traffic.
+    close_detection_v2_enabled: bool = Field(
+        default=False, alias="CLOSE_DETECTION_V2_ENABLED"
+    )
 
     # Mean Reversion Strategy
     mr_primary_enabled: bool = Field(default=False, alias="MR_PRIMARY_ENABLED")

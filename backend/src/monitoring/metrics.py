@@ -143,6 +143,20 @@ close_detection_path_counter = Counter(
     ["path", "epic"],
 )
 
+# v2 shadow-mode observability: counts CloseDetector outcomes while v1 remains
+# authoritative. Used to prove v2 agrees with v1 before promoting the flag.
+close_detection_v2_shadow_counter = Counter(
+    "mantis_close_detection_v2_shadow_total",
+    "Close detection v2 outcomes observed in shadow mode (non-authoritative)",
+    ["outcome", "epic"],  # outcome: reconciled|deferred|unreconciled|error
+)
+
+close_detection_shadow_disagreement_counter = Counter(
+    "mantis_close_detection_shadow_disagreement_total",
+    "Shadow disagreements between v1 (authoritative) and v2 (shadow)",
+    ["v1_path", "v2_outcome", "epic"],
+)
+
 
 class MetricsCollector:
     """
@@ -275,6 +289,31 @@ class MetricsCollector:
         """
         try:
             close_detection_path_counter.labels(path=path, epic=epic).inc()
+        except Exception:
+            pass
+
+    @classmethod
+    def record_close_detection_v2_shadow(cls, *, outcome: str, epic: str) -> None:
+        """Record a shadow-mode v2 outcome (not authoritative).
+
+        Args:
+            outcome: 'reconciled' | 'deferred' | 'unreconciled' | 'error'
+            epic: asset epic
+        """
+        try:
+            close_detection_v2_shadow_counter.labels(outcome=outcome, epic=epic).inc()
+        except Exception:
+            pass
+
+    @classmethod
+    def record_close_shadow_disagreement(
+        cls, *, v1_path: str, v2_outcome: str, epic: str
+    ) -> None:
+        """Record a per-deal disagreement between v1 (authoritative) and v2 (shadow)."""
+        try:
+            close_detection_shadow_disagreement_counter.labels(
+                v1_path=v1_path, v2_outcome=v2_outcome, epic=epic
+            ).inc()
         except Exception:
             pass
 
