@@ -2919,31 +2919,15 @@ class PaperTradingLoop:
                                 reason="TIME_STOP",
                             )
                             if result.success:
-                                entry_price = position.get("level") or position.get(
-                                    "entry_price", 0
-                                )
-                                size = position.get("size", 0)
-                                latest = self.data_access.get_latest_price(epic, timeframe="1h")
-                                current_price = latest.get("close", 0) if latest else 0
-                                if direction == "BUY":
-                                    pnl = (current_price - entry_price) * size
-                                else:
-                                    pnl = (entry_price - current_price) * size
+                                # Close-detection v2 (Step 7): do NOT compute
+                                # synthetic P&L or persist here. Position will
+                                # disappear from broker.list_positions on the
+                                # next tick; _detect_broker_closed enqueues it
+                                # and CloseDetector reconciles with the real
+                                # broker TRADE row + FX.
                                 logger.info(
-                                    f"✅ [{epic}] Time stop closed: "
-                                    f"P&L = ${pnl:.2f} (held {age_hours:.1f}h)"
-                                )
-                                self._on_position_closed(deal_id, pnl, epic=epic)
-                                await self._persist_position_close(
-                                    deal_id=deal_id,
-                                    epic=epic,
-                                    direction=direction,
-                                    size=size,
-                                    entry_price=entry_price,
-                                    exit_price=current_price,
-                                    pnl=pnl,
-                                    close_reason="TIME_STOP",
-                                    opened_at=position.get("opened_at"),
+                                    f"[{epic}] Time stop close submitted — awaiting "
+                                    f"broker reconciliation (held {age_hours:.1f}h)"
                                 )
                             continue  # Skip SL/TP checks for this position
                         except Exception as e:
@@ -3030,59 +3014,17 @@ class PaperTradingLoop:
                         )
 
                         if result.success:
-                            entry_price = position.get("level") or position.get("entry_price", 0)
-                            size = position.get("size", 0)
-                            if direction == "BUY":
-                                pnl = (current_price - entry_price) * size
-                            else:
-                                pnl = (entry_price - current_price) * size
+                            # Close-detection v2 (Step 7): no synthetic P&L
+                            # here. Position disappears from broker on the
+                            # next tick; CloseDetector reconciles real P&L
+                            # from /history/transactions + FX. _on_position_closed
+                            # + _persist_position_close + ws broadcast all fire
+                            # from _finalize_close once reconciled.
                             logger.info(
-                                f"✅ [{epic}] Position closed at {reason_label}: "
-                                f"P&L = ${pnl:.2f}"
+                                f"[{epic}] Position close submitted at "
+                                f"{reason_label} — awaiting broker reconciliation "
+                                f"(trigger price {current_price:.5f})"
                             )
-
-                            self._on_position_closed(
-                                deal_id,
-                                pnl,
-                                epic=epic,
-                                close_reason=reason_label,
-                            )
-
-                            # Persist closed position to database
-                            await self._persist_position_close(
-                                deal_id=deal_id,
-                                epic=epic,
-                                direction=direction,
-                                size=size,
-                                entry_price=entry_price,
-                                exit_price=current_price,
-                                pnl=pnl,
-                                close_reason=close_reason,
-                                opened_at=position.get("opened_at"),
-                            )
-
-                            # Broadcast trade_closed event to frontend via WebSocket
-                            try:
-                                from src.api.websocket import ws_manager
-
-                                await ws_manager.broadcast(
-                                    "trades",
-                                    {
-                                        "type": "trade_closed",
-                                        "deal_id": deal_id,
-                                        "epic": epic,
-                                        "direction": direction,
-                                        "pnl": round(pnl, 2),
-                                        "close_reason": close_reason,
-                                        "timestamp": datetime.now(UTC).isoformat(),
-                                    },
-                                )
-                            except Exception as e:
-                                logger.debug(f"WS broadcast trade_closed failed: {e}")
-
-                            # NOTE: Do NOT call log_execution() here — it fires
-                            # alert_trade_opened() which sends a misleading alert.
-
                             status = "sl_hit" if stop_violated else "tp_hit"
                             self._signal_history.append(
                                 {
@@ -3093,7 +3035,7 @@ class PaperTradingLoop:
                                     "status": status,
                                     "reason": f"{reason_label} hit at {current_price:.5f}",
                                     "deal_id": deal_id,
-                                    "pnl": pnl,
+                                    "pnl": None,  # pending reconciliation
                                 }
                             )
                         else:

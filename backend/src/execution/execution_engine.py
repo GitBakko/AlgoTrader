@@ -211,14 +211,12 @@ class ExecutionEngine:
                 entry_price = pos_info.get("level") or pos_info.get("entry_price", 0)
                 size = pos_info.get("size", 0)
 
-            # Calculate P&L
-            if result.fill_price and entry_price and size:
-                if direction == "BUY":
-                    pnl = (result.fill_price - entry_price) * size
-                else:
-                    pnl = (entry_price - result.fill_price) * size
-
-            # Update database: use session factory (preferred) or injected repos
+            # Close-detection v2 (Step 7): NO arithmetic (fill-entry)*size
+            # fallback here. Authoritative P&L comes from the broker TRADE
+            # row reconciled by CloseDetector (paper_loop._detect_broker_closed
+            # → _finalize_close) on a subsequent tick. The `pnl` value below
+            # is only a best-effort read from the DB for the immediate log /
+            # broadcast; it stays 0.0 if the DB path cannot supply one.
             db_result = await self._persist_close_to_db(
                 deal_id, reason, result.fill_price, epic, direction, size, entry_price
             )
