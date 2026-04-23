@@ -31,6 +31,11 @@ export const routes: Routes = [
         loadChildren: () => import('./views/dashboard/routes').then(m => m.routes)
       },
       {
+        path: 'dashboard-v2',
+        loadChildren: () => import('./views/dashboard/dashboard-v2/routes').then(m => m.routes),
+        data: { title: 'Dashboard v2' }
+      },
+      {
         path: 'profile',
         loadChildren: () => import('./views/user-profile/routes').then(m => m.routes)
       },
