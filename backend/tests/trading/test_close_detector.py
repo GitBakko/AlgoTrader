@@ -435,12 +435,58 @@ async def test_detect_fetches_windows_from_broker_when_not_injected():
         now=now,
     )
     assert isinstance(outcomes[0], Reconciled)
-    # Window: from = opened_at - 5min, to = now + 1min
+    # Window: from = opened_at - 240min (default lookback widened to absorb
+    # Capital.com's naive-Berlin createdDate offset), to = now + 1min.
     assert broker.activity_called_with == (
-        datetime(2026, 4, 21, 15, 55, tzinfo=UTC),
+        datetime(2026, 4, 21, 12, 0, tzinfo=UTC),
         datetime(2026, 4, 21, 20, 1, tzinfo=UTC),
     )
     assert broker.transactions_called_with == broker.activity_called_with
+
+
+@pytest.mark.asyncio
+async def test_naive_opened_at_parsed_as_europe_berlin():
+    """Capital.com /positions returns createdDate as a naive wall-clock
+    string in Europe/Berlin. Prior behaviour treated the naive value as
+    UTC and pushed the activity window 2h into the future, silently
+    missing every real close event. Regression guard: a naive opened_at
+    must still match an activity whose dateUTC is 2h earlier."""
+    # Open in Europe/Berlin 14:16 (summer time) == 12:16 UTC.
+    prev = _make_position_dict(
+        epic="NATGAS",
+        level=2.8455,
+        direction="SELL",
+    )
+    prev["opened_at"] = "2026-04-22T14:16:50"  # naive Berlin
+
+    # Close activity emitted at 13:02 UTC — before the fake "14:16 UTC"
+    # but after the real 12:16 UTC open.
+    close_act = ActivityEvent(
+        date=datetime(2026, 4, 22, 15, 2, 0),  # naive Berlin
+        dateUTC=datetime(2026, 4, 22, 13, 2, 0, tzinfo=UTC),
+        epic="NATGAS",
+        source="SL",
+        type="POSITION",
+        status="ACCEPTED",
+        dealId="close-natgas",
+        details=ActivityEventDetails(
+            openPrice=2.8455,
+            level=2.8600,
+            direction=Direction.BUY,  # opposite of SELL position
+            currency="USD",
+        ),
+    )
+    txn = _make_trade_txn(deal_id="close-natgas", size="-60.90")
+
+    detector = _mk()
+    outcomes = await detector.detect(
+        previous={prev["deal_id"]: prev},
+        current=[],
+        activities=[close_act],
+        transactions=[txn],
+    )
+    assert isinstance(outcomes[0], Reconciled), outcomes[0]
+    assert outcomes[0].pnl == pytest.approx(-60.90)
 
 
 @pytest.mark.asyncio
