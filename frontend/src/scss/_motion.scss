@@ -3,9 +3,10 @@
 // ============================================================
 @use "palette" as *;
 
-// ── Easing ──
-$ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-$ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+// Easing curves live in _palette.scss:
+//   $mantis-ease-out-expo  — reveals
+//   $mantis-ease-out-back  — pops
+//   $mantis-ease-ripple    — header-button ripples
 
 // ── Keyframes ──
 
@@ -65,7 +66,7 @@ $ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
 
 @media (prefers-reduced-motion: no-preference) {
   .animate-in {
-    animation: fadeSlideUp 0.4s $ease-out-expo both;
+    animation: fadeSlideUp 0.4s $mantis-ease-out-expo both;
   }
 
   .fade-in {
@@ -101,7 +102,7 @@ $ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
   .bell-shake {
-    animation: bellShake 0.5s $ease-out-back;
+    animation: bellShake 0.5s $mantis-ease-out-back;
     transform-origin: top center;
   }
 

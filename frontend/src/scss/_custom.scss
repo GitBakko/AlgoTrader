@@ -7,12 +7,118 @@
 @use "charts";
 
 // ═══════════════════════════════════════════════════════════
-// 1. FONTS & TYPOGRAPHY
+// 1. ROOT TOKENS — theme-independent + dark-as-default
 // ═══════════════════════════════════════════════════════════
+// Mantis tokens live in :root so they resolve without [data-coreui-theme].
+// Light theme overrides colored tokens via [data-coreui-theme="light"]
+// selector (see _light-theme.scss).
 
 :root {
-  --mantis-font-ui: #{$mantis-font-ui};
+  // Fonts
+  --mantis-font-ui:   #{$mantis-font-ui};
   --mantis-font-mono: #{$mantis-font-mono};
+
+  // Brand / semantic colors (dark defaults)
+  --mantis-neon:    #{$mantis-neon};
+  --mantis-green:   #{$mantis-green};
+  --mantis-cyan:    #{$mantis-cyan};
+  --mantis-profit:  #{$mantis-profit};
+  --mantis-loss:    #{$mantis-loss};
+  --mantis-warning: #{$mantis-warning};
+  --mantis-neutral: #{$mantis-neutral};
+
+  // Surface elevation (dark defaults)
+  --mantis-bg:        #{$mantis-bg};
+  --mantis-surface-0: #{$mantis-surface-0};
+  --mantis-surface-1: #{$mantis-surface-1};
+  --mantis-surface-2: #{$mantis-surface-2};
+  --mantis-surface-3: #{$mantis-surface-3};
+  --mantis-surface-4: #{$mantis-surface-4};
+  --mantis-surface-5: #{$mantis-surface-5};
+
+  // Text colors (dark defaults)
+  --mantis-text-primary:   #{$mantis-text-primary};
+  --mantis-text-secondary: #{$mantis-text-secondary};
+  --mantis-text-muted:     #{$mantis-text-muted};
+  --mantis-text-disabled:  #{$mantis-text-disabled};
+
+  // Borders (dark defaults)
+  --mantis-border-subtle:  #{$mantis-border-subtle};
+  --mantis-border-default: #{$mantis-border-default};
+  --mantis-border-accent:  #{$mantis-border-accent};
+  --mantis-border-strong:  #{$mantis-border-strong};
+
+  // Glass / tint backgrounds
+  --mantis-glass-bg:    rgba(22, 27, 34, 0.6);
+  --mantis-tint-subtle: rgba(255, 255, 255, 0.04);
+
+  // Shadows (dark defaults)
+  --mantis-shadow-sm: #{$mantis-shadow-sm};
+  --mantis-shadow-md: #{$mantis-shadow-md};
+  --mantis-shadow-lg: #{$mantis-shadow-lg};
+
+  // Glows (dark-only; nulled in light theme)
+  --mantis-glow-green: #{$mantis-glow-green};
+  --mantis-glow-neon:  #{$mantis-glow-neon};
+
+  // Corner radii (theme-independent)
+  --mantis-radius-sm:   #{$mantis-radius-sm};
+  --mantis-radius-md:   #{$mantis-radius-md};
+  --mantis-radius-lg:   #{$mantis-radius-lg};
+  --mantis-radius-xl:   #{$mantis-radius-xl};
+  --mantis-radius-pill: #{$mantis-radius-pill};
+
+  // Spacing scale (theme-independent)
+  --mantis-space-0:  #{$mantis-space-0};
+  --mantis-space-1:  #{$mantis-space-1};
+  --mantis-space-2:  #{$mantis-space-2};
+  --mantis-space-3:  #{$mantis-space-3};
+  --mantis-space-4:  #{$mantis-space-4};
+  --mantis-space-5:  #{$mantis-space-5};
+  --mantis-space-6:  #{$mantis-space-6};
+  --mantis-space-8:  #{$mantis-space-8};
+  --mantis-space-10: #{$mantis-space-10};
+  --mantis-space-12: #{$mantis-space-12};
+
+  // Type scale (theme-independent)
+  --mantis-fs-xxs:   #{$mantis-fs-xxs};
+  --mantis-fs-xs:    #{$mantis-fs-xs};
+  --mantis-fs-sm:    #{$mantis-fs-sm};
+  --mantis-fs-md:    #{$mantis-fs-md};
+  --mantis-fs-base:  #{$mantis-fs-base};
+  --mantis-fs-body:  #{$mantis-fs-body};
+  --mantis-fs-md-lg: #{$mantis-fs-md-lg};
+  --mantis-fs-lg:    #{$mantis-fs-lg};
+  --mantis-fs-xl:    #{$mantis-fs-xl};
+  --mantis-fs-2xl:   #{$mantis-fs-2xl};
+  --mantis-fs-3xl:   #{$mantis-fs-3xl};
+  --mantis-fs-4xl:   #{$mantis-fs-4xl};
+  --mantis-fs-5xl:   #{$mantis-fs-5xl};
+  --mono-feat: "tnum" 1, "zero" 1;
+
+  // Motion / timing (theme-independent)
+  --mantis-dur-fast:   #{$mantis-duration-fast};
+  --mantis-dur-normal: #{$mantis-duration-normal};
+  --mantis-dur-slow:   #{$mantis-duration-slow};
+  --mantis-dur-reveal: #{$mantis-duration-reveal};
+
+  // Motion / easing (theme-independent)
+  --mantis-ease-out-expo: #{$mantis-ease-out-expo};
+  --mantis-ease-out-back: #{$mantis-ease-out-back};
+  --mantis-ease-ripple:   #{$mantis-ease-ripple};
+
+  // ── Semantic role aliases (convenient, theme-aware via the vars above) ──
+  --fg1: var(--mantis-text-primary);
+  --fg2: var(--mantis-text-secondary);
+  --fg3: var(--mantis-text-muted);
+  --fg-disabled: var(--mantis-text-disabled);
+  --fg-accent:   var(--mantis-neon);
+
+  --bg1: var(--mantis-surface-1);
+  --bg2: var(--mantis-surface-2);
+  --bg3: var(--mantis-surface-3);
+  --bg4: var(--mantis-surface-4);
+  --bg5: var(--mantis-surface-5);
 }
 
 body {
@@ -50,56 +156,15 @@ h1, h2, h3, h4, h5, h6,
 }
 
 // ═══════════════════════════════════════════════════════════
-// 2. DARK THEME VARIABLES
+// 2. DARK THEME — CoreUI variable overrides
 // ═══════════════════════════════════════════════════════════
+// Scoped to [data-coreui-theme="dark"] so attribute specificity wins over
+// CoreUI's built-in defaults. Mantis tokens themselves live in :root above.
 
 [data-coreui-theme="dark"] {
   // CoreUI Primary
   --cui-primary: #{$mantis-green};
   --cui-primary-rgb: #{$mantis-green-rgb};
-
-  // MANTIS Extended Palette
-  --mantis-neon: #{$mantis-neon};
-  --mantis-green: #{$mantis-green};
-  --mantis-cyan: #{$mantis-cyan};
-  --mantis-profit: #{$mantis-profit};
-  --mantis-loss: #{$mantis-loss};
-  --mantis-warning: #{$mantis-warning};
-  --mantis-neutral: #{$mantis-neutral};
-
-  // Surface Elevation
-  --mantis-surface-0: #{$mantis-surface-0};
-  --mantis-surface-1: #{$mantis-surface-1};
-  --mantis-surface-2: #{$mantis-surface-2};
-  --mantis-surface-3: #{$mantis-surface-3};
-  --mantis-surface-4: #{$mantis-surface-4};
-  --mantis-surface-5: #{$mantis-surface-5};
-
-  // Text Colors
-  --mantis-text-primary: rgba(255, 255, 255, 0.92);
-  --mantis-text-secondary: rgba(255, 255, 255, 0.65);
-  --mantis-text-muted: rgba(255, 255, 255, 0.45);
-  --mantis-text-disabled: rgba(255, 255, 255, 0.25);
-
-  // Borders
-  --mantis-border-subtle: #{$mantis-border-subtle};
-  --mantis-border-default: #{$mantis-border-default};
-  --mantis-border-accent: #{$mantis-border-accent};
-  --mantis-border-strong: #{$mantis-border-strong};
-
-  // Glass / tint backgrounds (for components)
-  --mantis-glass-bg: rgba(22, 27, 34, 0.6);
-  --mantis-tint-subtle: rgba(255, 255, 255, 0.04);
-
-  // Shadows
-  --mantis-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
-  --mantis-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
-  --mantis-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
-
-  // Radii
-  --mantis-radius-sm: 4px;
-  --mantis-radius-md: 8px;
-  --mantis-radius-lg: 12px;
 
   // CoreUI Background Overrides
   --cui-body-bg: #{$mantis-bg};

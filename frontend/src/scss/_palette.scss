@@ -2,6 +2,7 @@
 // MANTIS AI — Color Palette & Design Tokens
 // ═══════════════════════════════════════════════════════════
 // Pure variables file — no CSS output. Used by all other partials.
+// Canonical source: mantis-ai-design-system/project/colors_and_type.css
 
 // ── Hero Accent: Neon Green ──
 $mantis-neon:        #39FF14;
@@ -44,15 +45,68 @@ $mantis-border-strong:  rgba($mantis-green, 0.30);
 $mantis-green-ghost: rgba(57, 255, 20, 0.08);
 $mantis-cyan-ghost:  rgba(0, 229, 255, 0.08);
 
+// ── Text Colors (dark baseline) ──
+$mantis-text-primary:   rgba(255, 255, 255, 0.92);
+$mantis-text-secondary: rgba(255, 255, 255, 0.65);
+$mantis-text-muted:     rgba(255, 255, 255, 0.45);
+$mantis-text-disabled:  rgba(255, 255, 255, 0.25);
+
 // ── Font Stacks ──
 $mantis-font-ui:      'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 $mantis-font-mono:    'IBM Plex Mono', 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
 
-// ── Timing ──
+// ── Type Scale ──
+// Base body = 14px (0.875rem). Headings 600 weight UI sans.
+$mantis-fs-xxs:   0.5625rem;  //  9px — micro tags
+$mantis-fs-xs:    0.625rem;   // 10px — nav title, badge
+$mantis-fs-sm:    0.6875rem;  // 11px — footer, label
+$mantis-fs-md:    0.75rem;    // 12px — helper
+$mantis-fs-base:  0.8125rem;  // 13px — nav link
+$mantis-fs-body:  0.875rem;   // 14px — default body
+$mantis-fs-md-lg: 0.9375rem;  // 15px — auth form
+$mantis-fs-lg:    1rem;       // 16px — ui primary
+$mantis-fs-xl:    1.125rem;   // 18px — h4
+$mantis-fs-2xl:   1.25rem;    // 20px — h3
+$mantis-fs-3xl:   1.5rem;     // 24px — h2
+$mantis-fs-4xl:   2rem;       // 32px — h1 (auth)
+$mantis-fs-5xl:   3rem;       // 48px — hero
+
+// ── Spacing Scale (Bootstrap-aligned, 0.25rem step) ──
+$mantis-space-0:  0;
+$mantis-space-1:  0.25rem;   //  4px
+$mantis-space-2:  0.5rem;    //  8px
+$mantis-space-3:  0.75rem;   // 12px
+$mantis-space-4:  1rem;      // 16px
+$mantis-space-5:  1.25rem;   // 20px
+$mantis-space-6:  1.5rem;    // 24px
+$mantis-space-8:  2rem;      // 32px
+$mantis-space-10: 2.5rem;    // 40px
+$mantis-space-12: 3rem;      // 48px
+
+// ── Corner Radii ──
+$mantis-radius-sm:   4px;     // badges, status pills, nav links, form controls
+$mantis-radius-md:   8px;     // cards, buttons, auth feature chips
+$mantis-radius-lg:   12px;    // reserved
+$mantis-radius-xl:   24px;    // auth glass containers
+$mantis-radius-pill: 100px;   // P&L pills, WS status pills
+
+// ── Shadows (dark) ──
+$mantis-shadow-sm:   0 1px 3px  rgba(0, 0, 0, 0.20);
+$mantis-shadow-md:   0 4px 12px rgba(0, 0, 0, 0.30);
+$mantis-shadow-lg:   0 8px 24px rgba(0, 0, 0, 0.40);
+$mantis-glow-green:  0 0 8px  rgba(0, 217, 126, 0.30);
+$mantis-glow-neon:   0 0 12px rgba(57, 255, 20, 0.45);
+
+// ── Motion / Timing ──
 $mantis-duration-fast:    120ms;
 $mantis-duration-normal:  250ms;
 $mantis-duration-slow:    400ms;
 $mantis-duration-reveal:  600ms;
+
+// ── Motion / Easing ──
+$mantis-ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);     // reveals
+$mantis-ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1); // pops
+$mantis-ease-ripple:   cubic-bezier(0.37, 0.24, 0.53, 0.99); // header-button ripples
 
 // ── Touch targets ──
 $touch-target-min: 44px;

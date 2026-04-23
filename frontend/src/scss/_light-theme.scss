@@ -63,10 +63,11 @@ $light-neutral: #6b7280;
   --mantis-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
   --mantis-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
 
-  // Radii (same)
-  --mantis-radius-sm: 4px;
-  --mantis-radius-md: 8px;
-  --mantis-radius-lg: 12px;
+  // Glows: disabled in light mode (design spec)
+  --mantis-glow-green: none;
+  --mantis-glow-neon:  none;
+
+  // Radii inherited from :root (theme-independent).
 
   // CoreUI Background Overrides
   --cui-body-bg: #f6f8fa;
