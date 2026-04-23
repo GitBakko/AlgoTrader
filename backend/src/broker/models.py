@@ -2,11 +2,54 @@
 Pydantic models for Capital.com API requests and responses.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+
+
+# ===== Timezone helpers =====
+# Capital.com ``/positions`` returns ``createdDate`` as a naive wall-clock
+# string in Europe/Berlin (verified live 2026-04-22: a position opened at
+# 12:16 UTC carries ``createdDate="2026-04-22T14:16:50"`` — broker-local
+# CEST). Downstream code (CloseDetector window / match, DB writes,
+# analytics) assumes UTC-aware datetimes, so naive broker timestamps get
+# normalised here at the ingest boundary.
+_BROKER_LOCAL_TZ_NAME = "Europe/Berlin"
+
+
+def _normalize_broker_datetime(v: Any) -> Any:
+    """Pydantic ``mode='before'`` validator helper.
+
+    - ``None`` / empty / non-datetime values pass through unchanged.
+    - Strings are parsed via ``datetime.fromisoformat``; on failure the
+      raw value is returned so pydantic's own parser can raise the usual
+      validation error.
+    - Naive datetimes are interpreted as broker-local (Europe/Berlin)
+      and converted to UTC.
+    - tz-aware datetimes are converted to UTC.
+    """
+    if v is None or v == "":
+        return v
+    dt: datetime | None = None
+    if isinstance(v, datetime):
+        dt = v
+    elif isinstance(v, str):
+        try:
+            dt = datetime.fromisoformat(v)
+        except ValueError:
+            return v  # let pydantic complain
+    else:
+        return v
+    if dt.tzinfo is None:
+        try:
+            from zoneinfo import ZoneInfo
+
+            dt = dt.replace(tzinfo=ZoneInfo(_BROKER_LOCAL_TZ_NAME))
+        except Exception:
+            dt = dt.replace(tzinfo=UTC)  # safest fallback
+    return dt.astimezone(UTC)
 
 
 # ===== Enums =====
@@ -189,6 +232,18 @@ class Position(BaseModel):
     profit_level: float | None = Field(None, alias="profitLevel")
     upl: float | None = None  # Unrealized P&L from broker
     market_status: str | None = None  # TRADEABLE, CLOSED, etc.
+
+    @field_validator("created_date", mode="before")
+    @classmethod
+    def _normalize_created_date(cls, v: Any) -> Any:
+        """Normalise the naive-Berlin ``createdDate`` to UTC-aware.
+
+        See module-level ``_normalize_broker_datetime`` for the rationale.
+        Once this runs, every downstream consumer of ``Position.created_date``
+        (paper_loop._previous_positions, CloseDetector activity window /
+        ``date > opened_at`` guard, DB writes) gets a correct UTC value.
+        """
+        return _normalize_broker_datetime(v)
 
 
 # ===== Working Order Models =====
