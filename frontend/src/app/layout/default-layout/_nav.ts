@@ -83,10 +83,5 @@ export const navItems: INavData[] = [
     name: 'System Logs',
     url: '/system-logs',
     iconComponent: { name: 'cil-clipboard' }
-  },
-  {
-    name: 'Design System',
-    url: '/design-system',
-    iconComponent: { name: 'cil-drop' }
   }
 ];
