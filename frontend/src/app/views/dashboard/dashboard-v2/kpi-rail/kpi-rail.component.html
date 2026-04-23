@@ -1,0 +1,22 @@
+<ul class="kpi-rail" role="list" aria-label="Key performance indicators">
+  @for (row of rows(); track row.label) {
+    @if (row.routerLink) {
+      <li class="kpi-rail__row"
+          [attr.data-accent]="row.accent">
+        <a [routerLink]="row.routerLink" class="kpi-rail__link">
+          <span class="kpi-rail__label mantis-mono">{{ row.label }}</span>
+          <span class="kpi-rail__value mantis-kpi">{{ row.value }}</span>
+          <span class="kpi-rail__sub mantis-mono">{{ row.sub }}</span>
+        </a>
+      </li>
+    } @else {
+      <li class="kpi-rail__row"
+          [class.is-todo]="row.todo"
+          [attr.data-accent]="row.accent">
+        <span class="kpi-rail__label mantis-mono">{{ row.label }}</span>
+        <span class="kpi-rail__value mantis-kpi">{{ row.value }}</span>
+        <span class="kpi-rail__sub mantis-mono">{{ row.sub }}</span>
+      </li>
+    }
+  }
+</ul>

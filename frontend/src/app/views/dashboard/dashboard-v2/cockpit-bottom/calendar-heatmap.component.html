@@ -1,0 +1,57 @@
+<section class="ch-card" role="region" aria-label="Daily P&L heatmap last 90 days">
+  <header class="ch-head">
+    <span class="ch-label mantis-mono">Daily Heatmap · 90d</span>
+    <div class="ch-meta mantis-mono">
+      <span>best <span class="ch-meta__pos">{{ formatMoney(best()) }}</span></span>
+      <span>worst <span class="ch-meta__neg">{{ formatMoney(worst()) }}</span></span>
+    </div>
+  </header>
+
+  <div class="ch-body">
+    <div class="ch-grid" (mouseleave)="clearFocus()">
+      <div class="ch-dow mantis-mono" aria-hidden="true">
+        <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+      </div>
+
+      <div class="ch-weeks">
+        @for (w of weeks(); track $index) {
+          <div class="ch-week">
+            @for (cell of w.cells; track $index) {
+              @if (cell) {
+                <button type="button"
+                        class="ch-cell"
+                        [class.is-focus]="focused()?.date === cell.date"
+                        [style.background]="cellColor(cell)"
+                        (mouseenter)="setFocus(cell)"
+                        (focus)="setFocus(cell)"
+                        [attr.aria-label]="cell.date + ' ' + formatMoney(cell.pnl)">
+                </button>
+              } @else {
+                <span class="ch-cell ch-cell--empty" aria-hidden="true"></span>
+              }
+            }
+          </div>
+        } @empty {
+          <div class="ch-empty mantis-mono">Waiting for equity curve feed…</div>
+        }
+      </div>
+    </div>
+
+    <aside class="ch-focus mantis-mono" role="status">
+      <span class="ch-focus__label">Focus</span>
+      @if (focused(); as f) {
+        <span class="ch-focus__date">{{ formatFocusDate(f.date) }}</span>
+        <span class="ch-focus__pnl"
+              [class.is-positive]="f.pnl > 0"
+              [class.is-negative]="f.pnl < 0">
+          {{ f.pnl === 0 ? '— flat' : formatMoney(f.pnl) }}
+        </span>
+        <span class="ch-focus__detail">
+          {{ f.tradeCount === 0 ? 'no trades' : (f.tradeCount + ' trade · ' + f.winCount + 'W ' + (f.tradeCount - f.winCount) + 'L') }}
+        </span>
+      } @else {
+        <span class="ch-focus__detail">—</span>
+      }
+    </aside>
+  </div>
+</section>

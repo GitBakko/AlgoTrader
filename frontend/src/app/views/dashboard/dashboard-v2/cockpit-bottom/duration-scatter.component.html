@@ -1,0 +1,63 @@
+<section class="dur-card" role="region" aria-label="Duration vs PnL scatter">
+  <header class="dur-head">
+    <span class="dur-label mantis-mono">Duration × PnL</span>
+    <span class="dur-meta mantis-mono">
+      @if (hasData()) {
+        {{ tradeCount() }} trade · €/h axis
+      } @else {
+        no closed trades in window
+      }
+    </span>
+  </header>
+
+  <div class="dur-plot" [class.is-empty]="!hasData()">
+    <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="dur-svg">
+      <!-- zero baseline -->
+      <line x1="0" x2="100" y1="50" y2="50" stroke="rgba(255,255,255,0.15)" stroke-dasharray="1 1"/>
+
+      @if (winMedianX() != null) {
+        <line [attr.x1]="winMedianX()! * 100" [attr.x2]="winMedianX()! * 100"
+              y1="50" y2="15"
+              stroke="var(--mantis-neon)" stroke-dasharray="1 1" opacity="0.4"/>
+      }
+      @if (lossMedianX() != null) {
+        <line [attr.x1]="lossMedianX()! * 100" [attr.x2]="lossMedianX()! * 100"
+              y1="50" y2="85"
+              stroke="var(--mantis-loss)" stroke-dasharray="1 1" opacity="0.4"/>
+      }
+
+      @for (p of points(); track $index) {
+        <circle [attr.cx]="p.x * 100"
+                [attr.cy]="50 - p.y * 45"
+                r="0.9"
+                [class.is-win]="p.win"
+                [class.is-loss]="!p.win"
+                [class.is-highlight]="p.highlight"/>
+      }
+    </svg>
+
+    @if (!hasData()) {
+      <div class="dur-empty mantis-mono">
+        Waiting for closed positions feed…
+      </div>
+    }
+  </div>
+
+  @if (bias(); as b) {
+    <footer class="dur-footer">
+      <span class="dur-stat mantis-mono is-win">
+        <span class="dur-stat__dot"></span>
+        win <span class="dur-stat__detail">{{ formatDuration(b.winAvg) }}</span>
+      </span>
+      <span class="dur-stat mantis-mono is-loss">
+        <span class="dur-stat__dot"></span>
+        loss <span class="dur-stat__detail">{{ formatDuration(b.lossAvg) }}</span>
+      </span>
+      @if (b.bias) {
+        <span class="dur-alert mantis-mono">
+          ⚠ loss dura {{ b.biasPctOver | number: '1.0-0' }}% più del win · late-exit bias
+        </span>
+      }
+    </footer>
+  }
+</section>

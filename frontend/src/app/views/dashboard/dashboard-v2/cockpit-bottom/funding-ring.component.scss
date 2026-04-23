@@ -1,0 +1,115 @@
+@use "../../../../../scss/palette" as *;
+
+:host {
+  display: block;
+  height: 100%;
+}
+
+.fr-card {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantis-space-2);
+  padding: var(--mantis-space-2) var(--mantis-space-3);
+  background: var(--mantis-surface-2);
+  border: 1px solid rgba(255, 176, 32, 0.25);
+  border-radius: var(--mantis-radius-md);
+  overflow: hidden;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 2px;
+    background: var(--mantis-warning);
+    opacity: 0.6;
+  }
+}
+
+.fr-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.fr-label {
+  font-size: var(--mantis-fs-sm);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--mantis-text-muted);
+  font-weight: 700;
+}
+
+.fr-badge {
+  font-size: var(--mantis-fs-xxs);
+  letter-spacing: 0.08em;
+  color: var(--mantis-warning);
+  font-weight: 700;
+}
+
+.fr-body {
+  display: flex;
+  align-items: center;
+  gap: var(--mantis-space-2);
+  flex: 1 1 auto;
+  opacity: 0.55; // dimmed until backend lands
+}
+
+.fr-ring {
+  flex: 0 0 auto;
+
+  &__placeholder {
+    stroke-dasharray: 4 6;
+    opacity: 0.35;
+  }
+
+  &__text {
+    font-size: 11px;
+    fill: var(--mantis-text-primary);
+    font-weight: 700;
+  }
+
+  &__subtext {
+    font-size: 8px;
+    fill: var(--mantis-text-muted);
+  }
+}
+
+.fr-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  &__value {
+    font-size: var(--mantis-fs-xl);
+    font-weight: 700;
+    color: var(--mantis-text-secondary);
+  }
+
+  &__label {
+    font-size: var(--mantis-fs-xxs);
+    color: var(--mantis-text-muted);
+  }
+
+  &__detail {
+    font-size: var(--mantis-fs-xxs);
+    color: var(--mantis-warning);
+    margin-top: var(--mantis-space-1);
+  }
+}
+
+.fr-todo {
+  font-size: var(--mantis-fs-xxs);
+  color: var(--mantis-text-secondary);
+  background: rgba(255, 176, 32, 0.06);
+  border-left: 2px solid var(--mantis-warning);
+  padding: 4px 6px;
+  border-radius: 2px;
+
+  strong { color: var(--mantis-warning); }
+  code {
+    font-family: var(--mantis-font-mono);
+    color: var(--mantis-neon);
+  }
+}

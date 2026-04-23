@@ -1,0 +1,122 @@
+@use "../../../../../scss/palette" as *;
+
+:host {
+  display: block;
+  height: 100%;
+}
+
+.dur-card {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantis-space-2);
+  padding: var(--mantis-space-2) var(--mantis-space-3);
+  background: var(--mantis-surface-2);
+  border: 1px solid var(--mantis-border-accent);
+  border-radius: var(--mantis-radius-md);
+  overflow: hidden;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 2px;
+    background: var(--mantis-neon);
+    opacity: 0.85;
+  }
+}
+
+.dur-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--mantis-space-2);
+}
+
+.dur-label {
+  font-size: var(--mantis-fs-sm);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--mantis-text-muted);
+  font-weight: 700;
+}
+
+.dur-meta {
+  font-size: var(--mantis-fs-xxs);
+  color: var(--mantis-text-secondary);
+}
+
+.dur-plot {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 140px;
+  background: var(--mantis-surface-1);
+  border-radius: var(--mantis-radius-sm);
+  border: 1px solid var(--mantis-border-subtle);
+  overflow: hidden;
+
+  &.is-empty { display: flex; align-items: center; justify-content: center; }
+}
+
+.dur-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+
+  circle {
+    opacity: 0.6;
+
+    &.is-win  { fill: var(--mantis-neon); }
+    &.is-loss { fill: var(--mantis-loss); }
+    &.is-highlight {
+      opacity: 0.95;
+      filter: drop-shadow(0 0 1px currentColor);
+    }
+  }
+}
+
+.dur-empty {
+  font-size: var(--mantis-fs-xs);
+  color: var(--mantis-text-muted);
+}
+
+.dur-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mantis-space-2);
+  align-items: center;
+  font-size: var(--mantis-fs-xs);
+}
+
+.dur-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--mantis-text-secondary);
+
+  &.is-win  { color: var(--mantis-neon); }
+  &.is-loss { color: var(--mantis-loss); }
+
+  &__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: var(--mantis-radius-pill);
+    background: currentColor;
+  }
+
+  &__detail {
+    color: var(--mantis-text-secondary);
+    margin-left: 2px;
+  }
+}
+
+.dur-alert {
+  flex: 1 1 100%;
+  font-size: var(--mantis-fs-xxs);
+  color: var(--mantis-warning);
+  background: rgba(255, 176, 32, 0.08);
+  border-left: 2px solid var(--mantis-warning);
+  border-radius: 2px;
+  padding: 3px 6px;
+}

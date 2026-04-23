@@ -1,0 +1,80 @@
+@use "../../../../../scss/palette" as *;
+
+:host {
+  display: block;
+}
+
+.kpi-rail {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  &__row {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--mantis-space-2) var(--mantis-space-3);
+    min-height: 50px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--mantis-border-subtle);
+    border-left: 2px solid var(--mantis-neutral);
+    border-radius: var(--mantis-radius-sm);
+    transition: background var(--mantis-dur-fast) var(--mantis-ease-out-expo);
+
+    &[data-accent="profit"]  { border-left-color: var(--mantis-neon); }
+    &[data-accent="loss"]    { border-left-color: var(--mantis-loss); }
+    &[data-accent="warning"] { border-left-color: var(--mantis-warning); }
+    &[data-accent="cyan"]    { border-left-color: var(--mantis-cyan); }
+    &[data-accent="todo"]    { border-left-color: rgba(255, 176, 32, 0.4); border-style: dashed; }
+
+    &:hover { background: rgba(255, 255, 255, 0.035); }
+
+    &.is-todo {
+      opacity: 0.65;
+    }
+  }
+
+  &__link {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    text-decoration: none;
+    color: inherit;
+
+    &:hover { text-decoration: none; }
+  }
+
+  &__label {
+    font-size: var(--mantis-fs-xxs);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--mantis-text-muted);
+    font-weight: 700;
+  }
+
+  &__value {
+    font-size: var(--mantis-fs-lg);
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--mantis-text-primary);
+
+    .kpi-rail__row[data-accent="profit"] & { color: var(--mantis-neon); }
+    .kpi-rail__row[data-accent="loss"]   & { color: var(--mantis-loss); }
+    .kpi-rail__row[data-accent="warning"] & { color: var(--mantis-warning); }
+    .kpi-rail__row[data-accent="cyan"]   & { color: var(--mantis-cyan); }
+  }
+
+  &__sub {
+    font-size: var(--mantis-fs-xxs);
+    color: var(--mantis-text-secondary);
+    opacity: 0.75;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kpi-rail__row { transition: none !important; }
+}
