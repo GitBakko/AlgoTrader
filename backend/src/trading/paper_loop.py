@@ -540,6 +540,29 @@ class PaperTradingLoop:
                 repo = PositionRepository(session)
                 pos = await repo.get_by_deal_id(deal_id)
 
+                # Fallback: Capital.com rotates the dealId between the
+                # order-confirmation response and /positions / close
+                # events (last hex nibble +1). When the close-side dealId
+                # does not match any row, look up the still-OPEN row by
+                # the stable triple (epic, direction, entry_price ±
+                # 0.1%). Without this the original OPEN row stays OPEN
+                # forever → false UNRECONCILED orphan on next restart.
+                if pos is None and epic and entry_price:
+                    matched = await repo.find_open_by_epic_direction_entry(
+                        epic=epic,
+                        direction=direction,
+                        entry_price=float(entry_price),
+                    )
+                    if matched is not None:
+                        logger.info(
+                            f"[{epic}] Close dealId {deal_id} not in DB — "
+                            f"matched open row {matched.deal_id} by "
+                            f"(epic, direction, entry_price) fallback "
+                            f"(broker dealId rotation)"
+                        )
+                        matched.deal_id = deal_id
+                        pos = matched
+
                 if pos is None:
                     # Position was never persisted at open — create it as CLOSED
                     now = datetime.now(UTC).replace(tzinfo=None)
