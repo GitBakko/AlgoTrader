@@ -7,12 +7,20 @@ Sends initial price snapshot on connect so closed markets have prices too.
 
 import asyncio
 import random
+import time
 from datetime import UTC, datetime
 
 from fastapi import WebSocket, WebSocketDisconnect
 from loguru import logger
 
 from src.utils.constants import ALL_ASSETS
+
+# Dashboard v2 (D2:A) — per-connection round-trip latency, ms.
+# Populated by _latency_tracker on pong reply; read by the price streams
+# to piggyback a {type: 'ws_status', latency_ms: ...} message.
+ws_latency_state: dict[int, int] = {}
+# Interval between server-initiated ping frames on /ws/prices.
+_WS_PING_INTERVAL_SECONDS = 10
 
 
 class _BrokerDisconnected(Exception):
@@ -105,6 +113,73 @@ _BASE_PRICES = {
 _RECONNECT_INTERVAL = 30
 
 
+async def _latency_tracker(websocket: WebSocket) -> None:
+    """
+    Reads pong replies from the frontend on /ws/prices and records the
+    measured round-trip latency in ws_latency_state, keyed by the
+    WebSocket identity. Price streams piggyback the latest value on
+    their periodic ws_status broadcasts.
+    """
+    conn_id = id(websocket)
+    try:
+        while True:
+            msg = await websocket.receive_json()
+            if not isinstance(msg, dict):
+                continue
+            mtype = msg.get("type")
+            if mtype == "pong":
+                server_ts = msg.get("server_ts")
+                if isinstance(server_ts, (int, float)):
+                    rtt = int(time.time() * 1000 - float(server_ts))
+                    if 0 <= rtt < 60_000:  # discard impossible/stale values
+                        ws_latency_state[conn_id] = rtt
+            # "ping" from client also treated as keepalive — reply pong
+            elif mtype == "ping":
+                try:
+                    await websocket.send_json({"type": "pong"})
+                except Exception:
+                    pass
+    except WebSocketDisconnect:
+        return
+    except Exception as e:
+        logger.debug(f"latency tracker ended: {e}")
+    finally:
+        ws_latency_state.pop(conn_id, None)
+
+
+async def _ping_broadcaster(websocket: WebSocket) -> None:
+    """
+    Emits a server-initiated ping every _WS_PING_INTERVAL_SECONDS on
+    /ws/prices, then rebroadcasts ws_status with the latest latency_ms
+    so every live client always sees fresh timing.
+    """
+    conn_id = id(websocket)
+    try:
+        while True:
+            server_ts = int(time.time() * 1000)
+            try:
+                await websocket.send_json({"type": "ping", "server_ts": server_ts})
+            except Exception:
+                return
+            await asyncio.sleep(0.5)  # let client reply before broadcasting status
+            latency = ws_latency_state.get(conn_id)
+            try:
+                await websocket.send_json({
+                    "type": "ws_status",
+                    "price_source": ws_price_status.get("source", "unknown"),
+                    "reconnect_attempts": ws_price_status.get("reconnect_attempts", 0),
+                    "max_reconnect_attempts": ws_price_status.get("max_reconnect_attempts", 12),
+                    "latency_ms": latency,
+                })
+            except Exception:
+                return
+            await asyncio.sleep(_WS_PING_INTERVAL_SECONDS - 0.5)
+    except asyncio.CancelledError:
+        raise
+    except Exception as e:
+        logger.debug(f"ping broadcaster ended: {e}")
+
+
 async def _mock_price_stream(websocket: WebSocket) -> None:
     """Generate mock price ticks for paper trading mode."""
     prices = dict(_BASE_PRICES)
@@ -181,6 +256,7 @@ async def _mock_price_stream_with_reconnect(websocket: WebSocket, app_state) -> 
                             "price_source": "mock",
                             "reconnect_attempts": attempt,
                             "max_reconnect_attempts": max_attempts,
+                            "latency_ms": ws_latency_state.get(id(websocket)),
                         }
                     )
 
@@ -202,6 +278,7 @@ async def _mock_price_stream_with_reconnect(websocket: WebSocket, app_state) -> 
                                         "price_source": "broker",
                                         "reconnect_attempts": 0,
                                         "max_reconnect_attempts": max_attempts,
+                                        "latency_ms": ws_latency_state.get(id(websocket)),
                                     }
                                 )
                                 return  # Exit mock → caller switches to broker stream
@@ -267,13 +344,14 @@ async def _broker_price_stream(websocket: WebSocket, broker_ws) -> None:
     ws_price_status["source"] = "broker"
     ws_price_status["reconnect_attempts"] = 0
 
-    # Send initial status
+    # Send initial status (include latency if we already have a reading).
     await websocket.send_json(
         {
             "type": "ws_status",
             "price_source": "broker",
             "reconnect_attempts": 0,
             "max_reconnect_attempts": ws_price_status["max_reconnect_attempts"],
+            "latency_ms": ws_latency_state.get(id(websocket)),
         }
     )
 
@@ -357,8 +435,14 @@ async def prices_endpoint(websocket: WebSocket) -> None:
     Sends initial price snapshot via REST API, then streams live ticks.
     Tries broker WS first; if it disconnects, falls back to mock with
     automatic reconnection attempts. Loops between broker → mock → broker.
+
+    Dashboard v2 (D2:A): spawns two background tasks per connection —
+    `_latency_tracker` reads pong replies, `_ping_broadcaster` emits
+    periodic pings + ws_status with latency_ms piggybacked.
     """
     await ws_manager.connect(websocket, "prices")
+    tracker_task = asyncio.create_task(_latency_tracker(websocket))
+    pinger_task = asyncio.create_task(_ping_broadcaster(websocket))
     try:
         # Send initial prices for ALL assets (including closed markets)
         try:
@@ -388,6 +472,9 @@ async def prices_endpoint(websocket: WebSocket) -> None:
                 break  # Max retries exhausted or client disconnected
 
     finally:
+        for task in (tracker_task, pinger_task):
+            if not task.done():
+                task.cancel()
         ws_manager.disconnect(websocket, "prices")
 
 

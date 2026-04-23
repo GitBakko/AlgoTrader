@@ -148,6 +148,21 @@ async def trading_performance(
                 date_from=date_from,
                 epic=epic,
             )
+            # Dashboard v2: enrich with "trades opened today" count.
+            try:
+                stats["daily_trade_count"] = await position_repo.get_opened_today_count()
+            except Exception as e:
+                logger.debug(f"daily_trade_count query failed: {e}")
+                stats["daily_trade_count"] = 0
+            # Dashboard v2 (D4): duration-medians aggregate for the scatter card.
+            try:
+                stats["duration_medians"] = await position_repo.get_duration_medians(
+                    date_from=date_from,
+                    epic=epic,
+                )
+            except Exception as e:
+                logger.debug(f"duration_medians query failed: {e}")
+                stats["duration_medians"] = None
             stats["source"] = "database"
             return success_response(stats)
         except Exception as e:
@@ -169,6 +184,9 @@ async def trading_performance(
             "win_count": len(wins),
             "loss_count": len(losses),
             "win_rate": round(len(wins) / len(pnls), 4) if pnls else 0,
+            "tp_hit_rate": 0.0,
+            "tp_count": 0,
+            "daily_trade_count": 0,
             "total_pnl": round(sum(pnls), 2),
             "avg_win": round(sum(wins) / len(wins), 2) if wins else 0,
             "avg_loss": round(sum(losses) / len(losses), 2) if losses else 0,
@@ -182,6 +200,82 @@ async def trading_performance(
             "source": "in_memory",
         }
     )
+
+
+@router.get("/performance/breakdown")
+async def performance_breakdown(
+    request: Request,
+    tf: str = Query(default="30D"),
+    date_from: str | None = Query(default=None, alias="from"),
+    date_to: str | None = Query(default=None, alias="to"),
+    position_repo=Depends(get_position_repo),
+):
+    """
+    Per-day BUY/SELL × TP/SL/Going breakdown for Dashboard v2 Deliverable C.
+
+    Query params:
+        tf    — preset timeframe ("1D", "7D", "30D", "90D", "YTD", "ALL", "CUSTOM")
+        from  — ISO date (YYYY-MM-DD) — required only when tf=CUSTOM
+        to    — ISO date (YYYY-MM-DD) — required only when tf=CUSTOM
+
+    Response:
+        {
+            "success": true,
+            "data": {
+                "timeframe": "30D",
+                "days": [{ date, buy{tp,sl,going,pnl}, sell{tp,sl,going,pnl} }]
+            }
+        }
+    """
+    now = datetime.now(UTC)
+    tf_upper = (tf or "").upper()
+
+    # Resolve window.
+    if tf_upper == "CUSTOM":
+        if not date_from or not date_to:
+            return error_response("CUSTOM timeframe requires both `from` and `to`", 400)
+        try:
+            d_from = datetime.fromisoformat(date_from).replace(tzinfo=UTC)
+            d_to = datetime.fromisoformat(date_to).replace(
+                hour=23, minute=59, second=59, tzinfo=UTC
+            )
+        except ValueError:
+            return error_response("Invalid date format (expected YYYY-MM-DD)", 400)
+    else:
+        tf_days = {
+            "1D": 1, "7D": 7, "30D": 30, "90D": 90, "ALL": 3650,
+        }
+        if tf_upper == "YTD":
+            d_from = datetime(now.year, 1, 1, tzinfo=UTC)
+            d_to = now
+        elif tf_upper in tf_days:
+            d_from = now - timedelta(days=tf_days[tf_upper])
+            d_to = now
+        else:
+            return error_response(
+                f"Unknown timeframe '{tf}' (expected 1D|7D|30D|90D|YTD|ALL|CUSTOM)", 400
+            )
+
+    if position_repo is None:
+        return success_response({
+            "timeframe": tf_upper,
+            "days": [],
+            "source": "none",
+        })
+
+    try:
+        days = await position_repo.get_breakdown_by_day(d_from, d_to)
+    except Exception as e:
+        logger.error(f"breakdown query failed: {e}")
+        return error_response(f"breakdown query failed: {e}", 500)
+
+    return success_response({
+        "timeframe": tf_upper,
+        "from": d_from.strftime("%Y-%m-%d"),
+        "to": d_to.strftime("%Y-%m-%d"),
+        "days": days,
+        "source": "database",
+    })
 
 
 @router.post("/emergency-stop")

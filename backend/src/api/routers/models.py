@@ -298,6 +298,53 @@ async def list_models(
     return success_response(_MODEL_REGISTRY)
 
 
+@router.get("/current")
+async def get_current_models(
+    prediction_service=Depends(get_prediction_service),
+):
+    """
+    Currently-loaded models in the trading loop.
+
+    Consumed by Dashboard v2 OperationalStrip tile #6 — shows a short
+    banner like `ML-Primary · v2.3 · trained 2d ago`.
+
+    Response:
+      {
+        "count": N,
+        "by_epic": { epic: {model_id, model_type, version, last_trained, num_features} },
+        "primary": { epic, model_id, model_type, version, last_trained } | None,
+      }
+    `primary` is the most recently created loaded model; useful as the
+    single representative value for the operational-strip tile.
+    """
+    if prediction_service is None or not prediction_service.has_models:
+        return success_response({"count": 0, "by_epic": {}, "primary": None})
+
+    loaded = prediction_service.get_loaded_models()
+    by_epic: dict[str, dict] = {}
+    primary: dict | None = None
+    for epic, info in loaded.items():
+        entry = {
+            "model_id":     info.get("model_id"),
+            "model_type":   info.get("model_type"),
+            "num_features": info.get("num_features"),
+            "version":      info.get("version"),
+            "last_trained": info.get("created_at"),
+        }
+        by_epic[epic] = entry
+        # Pick the most-recently-created loaded model as the "primary".
+        if primary is None or (
+            entry["last_trained"] and entry["last_trained"] > (primary.get("last_trained") or "")
+        ):
+            primary = {"epic": epic, **entry}
+
+    return success_response({
+        "count": len(by_epic),
+        "by_epic": by_epic,
+        "primary": primary,
+    })
+
+
 @router.get("/{model_id}/metrics")
 async def get_model_metrics(
     model_id: str = Path(...),

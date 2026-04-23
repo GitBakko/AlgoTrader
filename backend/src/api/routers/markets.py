@@ -181,6 +181,101 @@ async def get_market_prices(
     return success_response([])
 
 
+@router.get("/{epic}/overnight-swap")
+async def get_overnight_swap(
+    epic: str = Path(...),
+    broker=Depends(get_broker_client),
+):
+    """
+    Overnight / rollover swap info for a Capital.com CFD epic.
+
+    Dashboard v2 (D1:B) — replaces the Bybit-funding design that did not
+    match our stack. Returns the broker-reported overnight financing
+    rates when available, falling back to the backtest static table
+    (src.backtest.costs.OVERNIGHT_RATES) so the tile always has a
+    value to display.
+
+    Response:
+      {
+        epic, currency,
+        long_rate_daily, short_rate_daily,               # fractions of notional
+        long_rate_pct, short_rate_pct,                   # human-readable %
+        weekend_multiplier,                              # Capital.com 3x on Wed-night
+        next_charge_utc,                                 # typical 22:00 UTC rollover
+        source: "broker" | "static_fallback"
+      }
+    """
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
+    from datetime import timedelta as _td
+
+    from src.backtest.costs import OVERNIGHT_RATES
+
+    epic_upper = epic.upper()
+    long_rate: float | None = None
+    short_rate: float | None = None
+    currency: str | None = None
+    source = "static_fallback"
+    raw_instrument: dict | None = None
+
+    if broker is not None:
+        try:
+            details = await broker.get_market_details(epic_upper)
+            if isinstance(details, dict):
+                instrument = details.get("instrument") or {}
+                raw_instrument = instrument
+                currency = instrument.get("currency")
+                # Capital.com market detail fields — names vary by asset
+                # class, so probe the common spellings.
+                for long_key in (
+                    "overnightBuy", "swapLong", "longOvernightRate",
+                    "overnightLongRate",
+                ):
+                    val = instrument.get(long_key)
+                    if isinstance(val, (int, float)):
+                        long_rate = float(val)
+                        break
+                for short_key in (
+                    "overnightSell", "swapShort", "shortOvernightRate",
+                    "overnightShortRate",
+                ):
+                    val = instrument.get(short_key)
+                    if isinstance(val, (int, float)):
+                        short_rate = float(val)
+                        break
+                if long_rate is not None or short_rate is not None:
+                    source = "broker"
+        except Exception as e:
+            logger.debug(f"overnight swap broker lookup failed for {epic_upper}: {e}")
+
+    # Fallback: use the static table backed by the backtest cost model.
+    if long_rate is None or short_rate is None:
+        static = OVERNIGHT_RATES.get(
+            epic_upper, {"long": -0.000015, "short": -0.000010}
+        )
+        long_rate = long_rate if long_rate is not None else static["long"]
+        short_rate = short_rate if short_rate is not None else static["short"]
+
+    # Next charge: Capital.com charges rollover at 22:00 UTC.
+    now = _dt.now(_UTC)
+    next_charge = now.replace(hour=22, minute=0, second=0, microsecond=0)
+    if now >= next_charge:
+        next_charge = next_charge + _td(days=1)
+
+    return success_response({
+        "epic": epic_upper,
+        "currency": currency or "USD",
+        "long_rate_daily": round(long_rate, 8),
+        "short_rate_daily": round(short_rate, 8),
+        "long_rate_pct": round(long_rate * 100, 4),
+        "short_rate_pct": round(short_rate * 100, 4),
+        "weekend_multiplier": 3,
+        "next_charge_utc": next_charge.isoformat(),
+        "source": source,
+        "instrument_raw": raw_instrument if source == "broker" else None,
+    })
+
+
 @router.get("/status/{epic}")
 async def get_market_status(
     epic: str = Path(..., description="Asset symbol (e.g., XAUUSD, BTCUSD)"),
