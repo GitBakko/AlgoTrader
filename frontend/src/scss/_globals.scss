@@ -10,6 +10,12 @@
   font-weight: 600;
 }
 
+.badge-xs {
+  font-size: var(--mantis-fs-xs);
+  padding: 0.1em 0.4em;
+  font-weight: 600;
+}
+
 // Utility classes
 .glow-green {
   box-shadow: 0 0 8px rgba($mantis-green, 0.3);

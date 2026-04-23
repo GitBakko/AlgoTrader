@@ -139,6 +139,12 @@
       color: var(--fg3);
     }
 
+    &__value-sub {
+      font-size: var(--mantis-fs-lg);
+      font-weight: 400;
+      opacity: 0.5;
+    }
+
     &__accent {
       position: absolute;
       top: 0;
@@ -376,6 +382,11 @@
         transform: rotate(90deg);
       }
     }
+  }
+
+  // Compact warning alert (market closed banner)
+  .pt-alert-compact {
+    font-size: var(--mantis-fs-base);
   }
 
   // Emergency stop button

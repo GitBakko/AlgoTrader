@@ -79,7 +79,7 @@ const TIMEFRAMES = [
                     <div class="text-body-secondary small">
                       Spread: {{ p.spread | priceFormat:p.epic }}
                       @if (p.spreadBlocked) {
-                        <span class="badge bg-danger ms-1" style="font-size: 0.6rem"
+                        <span class="badge badge-xs bg-danger ms-1"
                               [cTooltip]="'Spread ' + p.spreadPct + '% del TP — trading bloccato'">
                           SPREAD
                         </span>

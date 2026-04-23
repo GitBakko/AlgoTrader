@@ -118,7 +118,7 @@ interface GroupedPosition {
     <!-- Market Closed Alert -->
     @if (currentMarketStatus(); as mktStatus) {
       @if (!mktStatus.is_open) {
-        <c-alert color="warning" class="mb-3 py-2" style="font-size: 0.8125rem;">
+        <c-alert color="warning" class="mb-3 py-2 pt-alert-compact">
           <strong>Dati precedenti</strong> — Mercato chiuso, mostro le ultime posizioni e segnali disponibili.
         </c-alert>
       }
@@ -152,7 +152,7 @@ interface GroupedPosition {
             <div class="pt-kpi-card__label">Segnali / Trade</div>
             <div class="pt-kpi-card__value">
               {{ status()?.signal_count ?? 0 }}
-              <span style="font-size: 1rem; font-weight: 400; opacity: 0.5;">/ {{ status()?.trade_count ?? 0 }}</span>
+              <span class="pt-kpi-card__value-sub">/ {{ status()?.trade_count ?? 0 }}</span>
             </div>
             <div class="pt-kpi-card__detail">
               Conversione: {{ conversionRate() }}%

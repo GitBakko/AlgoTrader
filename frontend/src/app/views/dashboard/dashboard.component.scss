@@ -156,6 +156,20 @@
     border-radius: var(--mantis-radius-md);
   }
 
+  // Sort-by mini buttons (above pnl bars)
+  .dash-mini-btn {
+    font-size: var(--mantis-fs-sm);
+    line-height: 1.4;
+  }
+
+  // Price grid: value + meta line
+  .dash-price-value {
+    font-size: 1.05rem; // off-scale mid-price emphasis
+  }
+  .dash-price-meta {
+    font-size: var(--mantis-fs-xs);
+  }
+
   // ═══════════════════════════════════════════════════════
   // KPI Cards
   // ═══════════════════════════════════════════════════════

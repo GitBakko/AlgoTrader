@@ -298,16 +298,14 @@
           <div class="d-flex align-items-center gap-2">
             <span class="fw-semibold small text-body-secondary">P&amp;L per Asset (30g)</span>
             <div class="btn-group btn-group-sm" role="group">
-              <button type="button" class="btn btn-sm py-0 px-2"
+              <button type="button" class="btn btn-sm py-0 px-2 dash-mini-btn"
                       [class.btn-primary]="pnlSortMode() === 'pnl'"
                       [class.btn-outline-secondary]="pnlSortMode() !== 'pnl'"
-                      (click)="pnlSortMode.set('pnl')"
-                      style="font-size: 0.7rem; line-height: 1.4">P&amp;L</button>
-              <button type="button" class="btn btn-sm py-0 px-2"
+                      (click)="pnlSortMode.set('pnl')">P&amp;L</button>
+              <button type="button" class="btn btn-sm py-0 px-2 dash-mini-btn"
                       [class.btn-primary]="pnlSortMode() === 'time'"
                       [class.btn-outline-secondary]="pnlSortMode() !== 'time'"
-                      (click)="pnlSortMode.set('time')"
-                      style="font-size: 0.7rem; line-height: 1.4">Recenti</button>
+                      (click)="pnlSortMode.set('time')">Recenti</button>
             </div>
           </div>
           <span class="text-body-secondary small mantis-mono"
@@ -365,7 +363,7 @@
                 <div class="small fw-medium text-truncate">{{ n.title }}</div>
                 <div class="small text-body-secondary text-truncate">{{ n.message }}</div>
               </div>
-              <c-badge [color]="n.severity === 'CRITICAL' ? 'danger' : n.severity === 'WARNING' ? 'warning' : 'info'" class="text-uppercase" style="font-size: 0.6rem">
+              <c-badge [color]="n.severity === 'CRITICAL' ? 'danger' : n.severity === 'WARNING' ? 'warning' : 'info'" class="text-uppercase badge-xs">
                 {{ n.severity }}
               </c-badge>
             </div>
@@ -422,8 +420,8 @@
               <app-epic-logo [epic]="t.epic" [size]="22" [rounded]="true" />
               <span class="fw-semibold small">{{ t.epic }}</span>
             </div>
-            <div class="mantis-kpi" style="font-size: 1.05rem;">{{ t.bid | priceFormat:t.epic }}</div>
-            <div class="text-body-secondary" style="font-size: 0.65rem;">
+            <div class="mantis-kpi dash-price-value">{{ t.bid | priceFormat:t.epic }}</div>
+            <div class="text-body-secondary dash-price-meta">
               spread: <span class="mantis-mono">{{ t.spread | number:'1.2-5' }}</span>
             </div>
           </div>
