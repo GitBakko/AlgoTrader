@@ -1,6 +1,6 @@
 # MANTIS AI — Claude Instructions
 
-AI-powered algo trading platform. Capital.com (demo). Python 3.12 backend + Angular 21 frontend. Repo: `GitBakko/AlgoTrader`, main branch `master`, UI branch `ui/mantis-template-integration`.
+AI-powered algo trading platform. Capital.com (demo). Python 3.12 backend + Angular 21 frontend. Repo: `GitBakko/AlgoTrader`, default branch `main` (renamed from `master` 2026-04-23).
 
 ## Prime Directive
 
@@ -15,7 +15,7 @@ AI-powered algo trading platform. Capital.com (demo). Python 3.12 backend + Angu
 - **Auth** (guards, interceptors, JWT handling) — production-tested, don't touch.
 - **`*.spec.ts`** — don't delete or alter unless fixing a broken test.
 
-Free to edit: SCSS (`_custom.scss`, `_palette.scss`, component `.scss`), `.component.html`, component TS display logic only, `layout/default-layout/*`, `shared/components/*` (except tv-chart logic), new presentational components.
+Free to edit: SCSS (`_palette.scss`, `_custom.scss` entry + themed partials `_sidebar/_header/_footer/_globals/_components/_auth/_mobile/_tables.scss`, component `.scss`), `.component.html`, component TS display logic only, `layout/default-layout/*`, `shared/components/*` (except tv-chart logic), new presentational components.
 
 ## Trading Invariants
 
@@ -76,14 +76,21 @@ Free to edit: SCSS (`_custom.scss`, `_palette.scss`, component `.scss`), `.compo
 - Accent: `$mantis-neon` `#39FF14` (CTAs, active, hero), `$mantis-green` `#00d97e` (primary UI), `$mantis-cyan` `#00E5FF` (info).
 - Semantic: profit=neon, loss=`#FF3D57`, warning=`#FFB020`, neutral=`#8B949E`.
 - Surface elevation 0–5 (`#010409` → `#2d333b`). Use elevation for depth, not borders.
-- 8px spacing grid via Bootstrap utilities. Min card body `p-3`, min grid gap `gap-3`.
+- Spacing scale tokens `var(--mantis-space-0..12)` (0, 4, 8, 12, 16, 20, 24, 32, 40, 48 px) — prefer over literal rem/px.
+- Type scale tokens `var(--mantis-fs-xxs..5xl)` (9→48 px). Body 14 px = `fs-body`. Never inline `font-size: 0.875rem`.
+- Radius tokens `var(--mantis-radius-sm|md|lg|xl|pill)` (4, 8, 12, 24, 100 px).
+- Shadow tokens `var(--mantis-shadow-sm|md|lg)` + glows `var(--mantis-glow-green|neon)` (nulled in light theme).
+- Easing tokens `var(--mantis-ease-out-expo|out-back|ripple)`, duration `var(--mantis-dur-fast|normal|slow|reveal)`.
+- Semantic role aliases `var(--fg1|fg2|fg3|fg-accent|fg-disabled|bg1..bg5)` re-resolve per theme via the vars above.
 - Card pattern: `<c-card class="border-top border-top-3 border-top-primary">` (green accent line). Header `py-2 small text-body-secondary`. Body `p-3` (or `p-0` only when chart fills the card).
+- KPI card pattern: `.xxx-kpi-card` wrapper + absolute `__accent` **top bar** (3 px height, full width) with `--primary`/`--profit`/`--loss`/`--warning` variant — **never** a left-bar (flipped 2026-04-23). See `dashboard.component.scss`, `paper-trading.component.scss` for reference.
 - Mobile: bottom-nav <768px, sidebar hidden <992px, 44px touch targets, 16px min input font (iOS zoom guard), `.table-responsive-mobile` on every data table.
+- Internal `/design-system` route renders live token values + all badge / pill / KPI / form previews for dev reference (not in sidebar).
 
 ## Git / CI
 
 - Branch prefixes: `feature/ fix/ refactor/ docs/ ui/`. UI work on `ui/mantis-template-integration`.
-- Commit prefix matches branch: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `style:`, `ui:`. Never push directly to `master`.
+- Commit prefix matches branch: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `style:`, `ui:`. Never force-push to `main`; direct push without PR is OK while pre-production (repo still <10 users, 0 external stakeholders).
 - Never commit: `.env`, `data/historical/`, `data/models/`, `__pycache__/`, `node_modules/`.
 - CI (`.github/workflows/ci.yml`): ruff + black → pytest (coverage floor 80%) → docker build. Pre-commit: ruff, black, mypy, bandit.
 - After frontend change: `cd frontend && npx ng build --configuration=development 2>&1 | tail -20`. If red, fix before moving on. One task fully done → commit → next.
