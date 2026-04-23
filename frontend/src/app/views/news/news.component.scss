@@ -79,10 +79,10 @@
 
 .sentiment-badge {
   font-weight: 600;
-  font-size: 0.75rem;
+  font-size: var(--mantis-fs-md);
   padding: 0.25rem 0.5rem;
   border: none;
-  color: white !important;
+  color: #fff !important; // overrides CoreUI badge default color on bg-success/bg-danger parent
 }
 
 .sentiment-indicator {
@@ -95,7 +95,7 @@
 }
 
 .badge-sm {
-  font-size: 0.7rem;
+  font-size: var(--mantis-fs-sm);
   padding: 0.2rem 0.4rem;
 }
 

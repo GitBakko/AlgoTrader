@@ -37,14 +37,14 @@
     }
 
     .score-value {
-      font-size: 2.5rem;
+      font-size: var(--mantis-fs-4xl);
       font-weight: 700;
       line-height: 1;
       color: var(--mantis-green, #39FF14);
     }
 
     .score-max {
-      font-size: 0.875rem;
+      font-size: var(--mantis-fs-body);
       color: var(--mantis-text-muted, rgba(255, 255, 255, 0.5));
     }
   }
@@ -63,13 +63,13 @@
   }
 
   h3 {
-    font-size: 2rem;
+    font-size: var(--mantis-fs-4xl);
     font-weight: 700;
     color: var(--mantis-text-primary, white);
   }
 
   .metric-detail {
-    font-size: 0.875rem;
+    font-size: var(--mantis-fs-body);
   }
 }
 
@@ -82,7 +82,7 @@
   text-align: center;
 
   .metric-label {
-    font-size: 0.75rem;
+    font-size: var(--mantis-fs-md);
     color: var(--mantis-text-secondary, rgba(255, 255, 255, 0.6));
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -90,7 +90,7 @@
   }
 
   .metric-value {
-    font-size: 1.5rem;
+    font-size: var(--mantis-fs-3xl);
     font-weight: 700;
     color: var(--mantis-text-primary, white);
   }
@@ -101,7 +101,7 @@ table {
   th {
     color: var(--mantis-text-secondary, rgba(255, 255, 255, 0.7));
     font-weight: 600;
-    font-size: 0.875rem;
+    font-size: var(--mantis-fs-body);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     border-color: var(--mantis-border-default, rgba(255, 255, 255, 0.1));
@@ -169,16 +169,16 @@ c-alert {
     height: 100px;
 
     .score-value {
-      font-size: 2rem;
+      font-size: var(--mantis-fs-4xl);
     }
   }
 
   .metric-card h3 {
-    font-size: 1.5rem;
+    font-size: var(--mantis-fs-3xl);
   }
 
   .metric-box .metric-value {
-    font-size: 1.25rem;
+    font-size: var(--mantis-fs-2xl);
   }
 }
 

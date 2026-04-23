@@ -8,7 +8,7 @@
 }
 
 .empty-state__icon {
-  font-size: 2rem;
+  font-size: var(--mantis-fs-4xl);
   margin-bottom: 0.5rem;
 }
 
@@ -18,6 +18,6 @@
 }
 
 .empty-state__hint {
-  font-size: 0.8125rem;
+  font-size: var(--mantis-fs-base);
   color: var(--cui-body-color-secondary);
 }
