@@ -38,7 +38,7 @@
     align-items: center;
     gap: 0.375rem;
     padding: 0.25rem 0.75rem;
-    border-radius: 100px;
+    border-radius: var(--mantis-radius-pill);
     font-size: 0.75rem;
     font-weight: 600;
     min-width: 120px;
@@ -89,7 +89,7 @@
     align-items: center;
     gap: 0.375rem;
     padding: 0.25rem 0.625rem;
-    border-radius: 100px;
+    border-radius: var(--mantis-radius-pill);
     font-size: 0.6875rem;
     font-weight: 600;
     letter-spacing: 0.02em;
@@ -117,10 +117,10 @@
   .ws-retry-badge {
     font-size: 0.5625rem;
     font-weight: 700;
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: var(--mantis-font-mono);
     background: rgba(255, 176, 32, 0.15);
     padding: 0.0625rem 0.3125rem;
-    border-radius: 4px;
+    border-radius: var(--mantis-radius-sm);
     line-height: 1;
   }
 

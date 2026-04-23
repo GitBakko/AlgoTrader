@@ -33,7 +33,7 @@
     align-items: center;
     gap: 0.25rem;
     padding: 0.2rem 0.5rem;
-    border-radius: 100px;
+    border-radius: var(--mantis-radius-pill);
     font-size: 0.625rem;
     font-weight: 700;
     letter-spacing: 0.06em;
@@ -126,7 +126,7 @@
     align-items: center;
     gap: 0.25rem;
     padding: 0.15rem 0.5rem;
-    border-radius: 100px;
+    border-radius: var(--mantis-radius-pill);
     font-size: 0.75rem;
     background: rgba(255, 61, 87, 0.15);
     border: 1px solid rgba(255, 61, 87, 0.25);
