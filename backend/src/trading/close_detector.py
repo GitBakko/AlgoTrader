@@ -82,7 +82,17 @@ CloseOutcome = Reconciled | Deferred | Unreconciled
 # ===== Defaults =====
 
 DEFAULT_ENTRY_PRICE_TOLERANCE_PCT = 0.001  # 0.1%
-DEFAULT_ACTIVITY_WINDOW_LOOKBACK_MINUTES = 5
+# Capital.com /positions returns ``createdDate`` in naive Europe/Berlin time
+# (observed 2026-04-22: a position opened at 12:16 UTC carries
+# ``createdDate=2026-04-22 14:16:50`` — broker wall clock, CEST). Treating
+# that naive string as UTC pushes the computed activity window into the
+# future and makes the real close event fall outside it. The 240-min
+# default lookback absorbs a 2-hour DST-era offset plus the intraday
+# lifetime of every scalp / MR / ORB-FVG position. A tighter value risks
+# the disagreement we observed on NATGAS + NVDA during the 2026-04-22
+# shadow window; broaden it until Position.opened_at is normalised to UTC
+# at the broker-model layer.
+DEFAULT_ACTIVITY_WINDOW_LOOKBACK_MINUTES = 240
 DEFAULT_ACTIVITY_WINDOW_FUTURE_MINUTES = 1
 
 
@@ -90,7 +100,14 @@ DEFAULT_ACTIVITY_WINDOW_FUTURE_MINUTES = 1
 
 
 def _parse_opened_at(value: Any) -> datetime | None:
-    """Accept either datetime or ISO string, always return UTC-aware."""
+    """Accept either datetime or ISO string, always return UTC-aware.
+
+    Capital.com ``/positions`` returns ``createdDate`` as a naive wall-clock
+    string in Europe/Berlin (verified 2026-04-22: open at 12:16 UTC carries
+    ``createdDate=2026-04-22 14:16:50``). Naive values are interpreted as
+    Europe/Berlin and converted to UTC. tz-aware values pass through
+    unchanged (astimezone UTC).
+    """
     if value is None:
         return None
     if isinstance(value, datetime):
@@ -101,7 +118,13 @@ def _parse_opened_at(value: Any) -> datetime | None:
         except ValueError:
             return None
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=UTC)
+        try:
+            from zoneinfo import ZoneInfo
+
+            dt = dt.replace(tzinfo=ZoneInfo("Europe/Berlin"))
+        except Exception:
+            # Fallback: assume UTC if zoneinfo unavailable for any reason.
+            dt = dt.replace(tzinfo=UTC)
     return dt.astimezone(UTC)
 
 
