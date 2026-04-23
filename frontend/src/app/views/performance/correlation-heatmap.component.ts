@@ -28,8 +28,8 @@ export interface CorrelationData {
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 0.6rem;
-      font-family: 'IBM Plex Mono', monospace;
+      font-size: var(--mantis-fs-xs);
+      font-family: var(--mantis-font-mono);
       cursor: default;
       border-radius: 2px;
       position: relative;
@@ -45,9 +45,9 @@ export interface CorrelationData {
       align-items: center;
       justify-content: flex-end;
       padding-right: 6px;
-      font-size: 0.625rem;
+      font-size: var(--mantis-fs-xs);
       font-weight: 600;
-      color: rgba(255,255,255,0.7);
+      color: var(--fg2);
     }
     .heatmap-label-row {
       width: 36px;
@@ -55,9 +55,9 @@ export interface CorrelationData {
       display: flex;
       align-items: flex-end;
       justify-content: center;
-      font-size: 0.5625rem;
+      font-size: var(--mantis-fs-xxs);
       font-weight: 600;
-      color: rgba(255,255,255,0.7);
+      color: var(--fg2);
       writing-mode: vertical-lr;
       transform: rotate(180deg);
       padding-bottom: 4px;
@@ -67,8 +67,8 @@ export interface CorrelationData {
       height: 40px;
     }
     .heatmap-info {
-      font-size: 0.6875rem;
-      color: rgba(255,255,255,0.5);
+      font-size: var(--mantis-fs-sm);
+      color: var(--fg3);
     }
   `],
   template: `
@@ -96,11 +96,11 @@ export interface CorrelationData {
       </div>
       <div class="heatmap-info mt-2">
         {{ data()!.data_points }} punti dati | {{ data()!.period_days }}g | Scala:
-        <span style="color: #FF3D57">-1.0</span>
+        <span class="text-danger">-1.0</span>
         <span> ... </span>
-        <span style="color: rgba(255,255,255,0.5)">0.0</span>
+        <span class="text-body-secondary">0.0</span>
         <span> ... </span>
-        <span style="color: #39FF14">+1.0</span>
+        <span class="text-success">+1.0</span>
       </div>
     } @else {
       <div class="text-center py-4 text-body-secondary small">

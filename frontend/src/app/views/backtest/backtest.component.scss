@@ -17,15 +17,15 @@
   // Hero return value
   .bt-hero-value {
     font-family: var(--mantis-font-mono);
-    font-feature-settings: "tnum" 1;
-    font-size: 1.6rem;
+    font-feature-settings: var(--mono-feat);
+    font-size: 1.625rem; // 26px — off-scale hero value (between 3xl/4xl)
     font-weight: 700;
     line-height: 1;
   }
 
   // Stat labels (repeated small labels in metric cards / MC)
   .bt-stat-label {
-    font-size: 0.7rem;
+    font-size: var(--mantis-fs-sm);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.06em;
