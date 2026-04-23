@@ -121,10 +121,10 @@ export class KpiRailComponent {
       },
       {
         label: 'Hit rate TP',
-        value: '—',
-        sub: 'needs perf.tp_hit_rate',
-        accent: 'todo',
-        todo: true,
+        value: perf?.tp_hit_rate != null ? (perf.tp_hit_rate * 100).toFixed(1) + '%' : '—',
+        sub: perf?.tp_count != null ? `${perf.tp_count} TP hits` : 'awaiting closed trades',
+        accent: perf?.tp_hit_rate != null ? 'profit' : 'todo',
+        todo: perf?.tp_hit_rate == null,
       },
     ];
   });

@@ -226,6 +226,10 @@ export interface PaperTradingStatus {
   iteration_count: number;
   check_count: number;
   last_run: string | null;
+  /** ISO timestamp of the last successful loop start (Dashboard v2 uptime). */
+  started_at?: string | null;
+  /** Seconds since the loop started (Dashboard v2 uptime). */
+  uptime_seconds?: number;
   signal_count: number;
   trade_count: number;
   error_count: number;
@@ -387,6 +391,71 @@ export interface TradingPerformance {
   sortino_ratio?: number;
   calmar_ratio?: number;
   max_drawdown?: number;
+  // Dashboard v2 extensions
+  tp_hit_rate?: number;
+  tp_count?: number;
+  daily_trade_count?: number;
+  duration_medians?: DurationMedians | null;
+}
+
+export interface DurationMedians {
+  win_avg_min: number;
+  loss_avg_min: number;
+  win_count: number;
+  loss_count: number;
+  late_exit_bias: boolean;
+  bias_pct_over: number;
+}
+
+// Dashboard v2 — /api/trading/performance/breakdown
+export interface TradeBreakdownOutcome {
+  tp: number;
+  sl: number;
+  going: number;
+  pnl: number;
+}
+
+export interface TradeBreakdownDay {
+  date: string;
+  buy: TradeBreakdownOutcome;
+  sell: TradeBreakdownOutcome;
+}
+
+export interface TradeBreakdownResponse {
+  timeframe: string;
+  from?: string;
+  to?: string;
+  days: TradeBreakdownDay[];
+  source: string;
+}
+
+// Dashboard v2 — /api/models/current
+export interface CurrentModelInfo {
+  model_id: string;
+  model_type: string;
+  num_features: number;
+  version: string;
+  last_trained: string | null;
+}
+
+export interface CurrentModelsResponse {
+  count: number;
+  by_epic: Record<string, CurrentModelInfo>;
+  primary: (CurrentModelInfo & { epic: string }) | null;
+}
+
+// Dashboard v2 — /api/markets/{epic}/overnight-swap
+export interface OvernightSwapResponse {
+  epic: string;
+  currency: string;
+  long_rate_daily: number;
+  short_rate_daily: number;
+  long_rate_pct: number;
+  short_rate_pct: number;
+  weekend_multiplier: number;
+  next_charge_utc: string;
+  source: 'broker' | 'static_fallback';
+  instrument_raw?: Record<string, unknown> | null;
 }
 
 // --- Signal Audit Trail ---

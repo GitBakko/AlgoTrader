@@ -98,10 +98,10 @@
     </div>
   </section>
 
-  <!-- 4. BOTTOM ROW: duration · funding · heatmap -->
+  <!-- 4. BOTTOM ROW: duration · overnight-swap · heatmap -->
   <section class="dv2-bottom" aria-label="Secondary metrics">
     <app-duration-scatter></app-duration-scatter>
-    <app-funding-ring></app-funding-ring>
+    <app-overnight-swap [epic]="swapEpic()"></app-overnight-swap>
     <app-calendar-heatmap></app-calendar-heatmap>
   </section>
 

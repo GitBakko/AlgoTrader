@@ -29,6 +29,9 @@ export class WebSocketService {
   // Timestamp of the last received price tick (any epic)
   readonly lastPriceUpdate = signal<number>(0);
 
+  /** Round-trip latency to the server in ms (Dashboard v2 operational strip). */
+  readonly latencyMs = signal<number | null>(null);
+
   /** True when prices are real broker data AND received within the last 90 seconds. */
   readonly pricesAreFresh = computed(() => {
     if (this.isMockPrices()) return false;
@@ -54,12 +57,30 @@ export class WebSocketService {
     this.priceWs.onmessage = (event) => {
       const data = JSON.parse(event.data);
 
-      // Handle ws_status messages (reconnection status updates)
+      // Handle ws_status messages (reconnection status + latency updates)
       if (data.type === 'ws_status') {
-        const status = data as WsStatus;
+        const status = data as WsStatus & { latency_ms?: number | null };
         this.priceSource.set(status.price_source);
         this.brokerReconnectAttempts.set(status.reconnect_attempts);
         this.brokerMaxReconnectAttempts.set(status.max_reconnect_attempts);
+        if (typeof status.latency_ms === 'number') {
+          this.latencyMs.set(status.latency_ms);
+        }
+        return;
+      }
+
+      // Dashboard v2: server-initiated ping → echo pong so server can
+      // measure the round-trip. Payload carries the server timestamp.
+      if (data.type === 'ping') {
+        try {
+          this.priceWs?.send(JSON.stringify({
+            type: 'pong',
+            server_ts: data.server_ts,
+            client_ts: Date.now(),
+          }));
+        } catch {
+          // socket closed before echo — harmless
+        }
         return;
       }
 
@@ -171,6 +192,7 @@ export class WebSocketService {
     this.connected.set(false);
     this.priceSource.set('unknown');
     this.brokerReconnectAttempts.set(0);
+    this.latencyMs.set(null);
     this.priceReconnectAttempts = 0;
     this.tradeReconnectAttempts = 0;
     this.trainingReconnectAttempts = 0;

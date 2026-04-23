@@ -13,22 +13,20 @@ import { TvChartComponent, LineDataPoint, EquityTooltipPoint } from '../../../sh
 import { OperationalStripComponent } from './operational-strip/operational-strip.component';
 import { KpiRailComponent } from './kpi-rail/kpi-rail.component';
 import { DurationScatterComponent } from './cockpit-bottom/duration-scatter.component';
-import { FundingRingComponent } from './cockpit-bottom/funding-ring.component';
+import { OvernightSwapComponent } from './cockpit-bottom/overnight-swap.component';
 import { CalendarHeatmapComponent } from './cockpit-bottom/calendar-heatmap.component';
 import { TradeBreakdownComponent } from './trade-breakdown/trade-breakdown.component';
-import { TradeBreakdownDay } from './trade-breakdown/trade-breakdown.types';
 
 /**
  * DASHBOARD v2 — Deliverable A (Variant B "Cockpit")
- * Route: `/dashboard-v2` — affianco a `/dashboard` legacy finché non si
- * decide il cutover finale.
+ * Route: `/dashboard-v2` — affianco a `/dashboard` legacy.
  *
- * TODO — BACKEND (next sprint, MANDATORIO, sprint plan §2):
- *   - /api/trading/performance/breakdown (alimenta TradeBreakdown)
- *   - /api/funding/current (alimenta FundingRing)
- *   - /api/models/current (alimenta OperationalStrip tile 6)
- *   - performance.tp_hit_rate + performance.daily_trade_count
- *   - WS /ws/prices ping/pong per latency
+ * Tutti i tile ora sono wired a endpoint backend live:
+ *   - /api/trading/performance/breakdown       → TradeBreakdown
+ *   - /api/trading/performance (+ extensions)  → KPI rail + OperationalStrip
+ *   - /api/markets/{epic}/overnight-swap       → OvernightSwap (replaces Bybit)
+ *   - /api/models/current                      → OperationalStrip tile 6
+ *   - /ws/prices ping/pong                     → OperationalStrip tile 2 latency
  */
 @Component({
   selector: 'app-dashboard-v2',
@@ -39,7 +37,7 @@ import { TradeBreakdownDay } from './trade-breakdown/trade-breakdown.types';
     OperationalStripComponent,
     KpiRailComponent,
     DurationScatterComponent,
-    FundingRingComponent,
+    OvernightSwapComponent,
     CalendarHeatmapComponent,
     TradeBreakdownComponent,
   ],
@@ -67,11 +65,18 @@ export class DashboardV2Component implements OnInit, OnDestroy {
   readonly customFrom = signal<string>(this.isoDaysAgo(30));
   readonly customTo   = signal<string>(this.today());
 
-  /**
-   * Trade breakdown data source. `null` until the backend endpoint
-   * from sprint plan §2.1 lands. Child renders TODO banner when null.
-   */
-  readonly breakdownDays = signal<TradeBreakdownDay[] | null>(null);
+  /** Pulls breakdown days straight from the TradingService signal so the
+   *  child stays a dumb presenter. */
+  readonly breakdownDays = computed(
+    () => this.trading.tradeBreakdown()?.days ?? null,
+  );
+
+  /** Epic displayed in the overnight-swap tile — defaults to the first
+   *  open paper position, falls back to XAUUSD. */
+  readonly swapEpic = computed<string>(() => {
+    const positions = this.trading.paperPositions();
+    return positions[0]?.epic ?? 'XAUUSD';
+  });
 
   readonly now = computed(() => {
     this.clockTick();
@@ -144,9 +149,10 @@ export class DashboardV2Component implements OnInit, OnDestroy {
   constructor() {
     // Re-fetch timeframe-sensitive data whenever the user switches tabs.
     effect(() => {
+      const tf = this.timeframeSvc.current();
       const days = this.timeframeSvc.days();
-      // 90d heatmap needs at least 90 points; force ≥ 90 when tf is short so
-      // the bottom-row heatmap always has 90d worth of history.
+      // 90d heatmap needs at least 90 points; force ≥ 90 when tf is short
+      // so the bottom-row heatmap always has 90d worth of history.
       const curveDays = Math.max(days, 90);
       this.trading.loadEquityCurve(curveDays);
       this.trading.loadPerformance(days);
@@ -155,6 +161,18 @@ export class DashboardV2Component implements OnInit, OnDestroy {
         page_size: 200,
         date_from: this.isoDaysAgo(days),
       });
+
+      // Dashboard v2 breakdown — uses the active timeframe directly.
+      const range = this.timeframeSvc.customRange();
+      if (tf === 'CUSTOM' && range) {
+        this.trading.loadPerformanceBreakdown(
+          'CUSTOM',
+          range.from.toISOString().slice(0, 10),
+          range.to.toISOString().slice(0, 10),
+        );
+      } else {
+        this.trading.loadPerformanceBreakdown(tf);
+      }
     });
   }
 
@@ -163,6 +181,7 @@ export class DashboardV2Component implements OnInit, OnDestroy {
     this.startPolling();
     this.ws.connectPrices();
     this.news.getNews('US500', 5, 7);
+    this.trading.loadCurrentModels();
   }
 
   ngOnDestroy(): void {
