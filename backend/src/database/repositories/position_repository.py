@@ -49,6 +49,44 @@ class PositionRepository(BaseRepository[Position]):
         result = await self.session.execute(select(Position).where(Position.deal_id == deal_id))
         return result.scalar_one_or_none()
 
+    async def find_open_by_epic_direction_entry(
+        self,
+        epic: str,
+        direction: str,
+        entry_price: float,
+        tolerance_pct: float = 0.001,
+    ) -> Position | None:
+        """Fallback lookup for a still-OPEN position by its stable triple
+        ``(epic, direction, entry_price ± tolerance)``.
+
+        Capital.com rotates the ``dealId`` between the order-confirmation
+        response and subsequent ``/positions`` / close events (last hex
+        nibble +1). After rotation, ``get_by_deal_id`` with the new dealId
+        misses the original OPEN row, which otherwise sits there forever
+        and triggers false UNRECONCILED orphans on the next restart.
+
+        Returns the most recently-opened matching OPEN row, or None.
+        """
+        if entry_price is None or entry_price <= 0:
+            return None
+        tol = abs(entry_price) * tolerance_pct
+        lo = entry_price - tol
+        hi = entry_price + tol
+        stmt = (
+            select(Position)
+            .where(
+                Position.status == "OPEN",
+                Position.epic == epic,
+                Position.direction == direction,
+                Position.entry_price >= lo,
+                Position.entry_price <= hi,
+            )
+            .order_by(Position.opened_at.desc())
+            .limit(1)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def get_by_epic(
         self, epic: str, status: str | None = None, limit: int = 500
     ) -> list[Position]:

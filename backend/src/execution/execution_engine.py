@@ -282,6 +282,29 @@ class ExecutionEngine:
                     repo = PositionRepository(session)
                     position_db = await repo.get_by_deal_id(deal_id)
 
+                    # Fallback: Capital.com rotates the dealId (last hex
+                    # nibble +1) between order-confirmation and /positions
+                    # / close events. When the close-side dealId does not
+                    # match any row, look up the still-OPEN row by the
+                    # stable triple (epic, direction, entry_price ± 0.1%).
+                    # Without this, the original OPEN row stays OPEN
+                    # forever → false UNRECONCILED orphan on next restart.
+                    if position_db is None and epic != "UNKNOWN" and entry_price:
+                        matched = await repo.find_open_by_epic_direction_entry(
+                            epic=epic,
+                            direction=direction,
+                            entry_price=float(entry_price),
+                        )
+                        if matched is not None:
+                            logger.info(
+                                f"[{epic}] Close dealId {deal_id} not in DB — "
+                                f"matched open row {matched.deal_id} by "
+                                f"(epic, direction, entry_price) fallback "
+                                f"(broker dealId rotation)"
+                            )
+                            matched.deal_id = deal_id
+                            position_db = matched
+
                     if position_db:
                         # Update existing position to CLOSED
                         position_db.status = "CLOSED"
