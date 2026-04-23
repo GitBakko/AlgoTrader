@@ -1,0 +1,53 @@
+// ═══════════════════════════════════════════════════════════
+// MANTIS AI — Table overrides (dark-mode readability fixes)
+// ═══════════════════════════════════════════════════════════
+// Bootstrap's default table-danger / table-secondary use light bg + dark
+// text which is unreadable on our dark surfaces. Override with tinted
+// semantic colors that preserve contrast.
+@use "palette" as *;
+
+[data-coreui-theme="dark"] {
+  .table-danger,
+  .table > tbody > tr.table-danger {
+    --cui-table-bg: rgba(255, 61, 87, 0.08) !important;
+    --cui-table-hover-bg: rgba(255, 61, 87, 0.14) !important;
+    --cui-table-color: rgba(255, 255, 255, 0.87) !important;
+    --cui-table-border-color: rgba(255, 61, 87, 0.12) !important;
+    color: rgba(255, 255, 255, 0.87) !important;
+    background-color: rgba(255, 61, 87, 0.08) !important;
+    border-left: 2px solid rgba(255, 61, 87, 0.4);
+
+    td, td * { color: inherit !important; }
+
+    &:hover, &:hover td, &:hover td * {
+      color: rgba(255, 255, 255, 0.87) !important;
+      background-color: rgba(255, 61, 87, 0.14) !important;
+    }
+  }
+
+  .table-secondary,
+  .table > tbody > tr.table-secondary {
+    --cui-table-bg: rgba(139, 148, 158, 0.06) !important;
+    --cui-table-hover-bg: rgba(139, 148, 158, 0.10) !important;
+    --cui-table-color: rgba(255, 255, 255, 0.6) !important;
+    color: rgba(255, 255, 255, 0.6) !important;
+    background-color: rgba(139, 148, 158, 0.06) !important;
+
+    td, td * { color: inherit !important; }
+
+    &:hover, &:hover td, &:hover td * {
+      color: rgba(255, 255, 255, 0.6) !important;
+      background-color: rgba(139, 148, 158, 0.10) !important;
+    }
+  }
+}
+
+// Responsive Tables
+.table-responsive-mobile {
+  @media (max-width: 767.98px) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+
+    table { min-width: 600px; }
+  }
+}

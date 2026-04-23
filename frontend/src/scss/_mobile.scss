@@ -1,0 +1,140 @@
+// ═══════════════════════════════════════════════════════════
+// MANTIS AI — Mobile, Bottom Navigation, Touch Targets
+// ═══════════════════════════════════════════════════════════
+@use "palette" as *;
+
+// ── BOTTOM NAVIGATION ──
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1030;
+  display: flex;
+  align-items: stretch;
+  background: rgba(12, 16, 21, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid rgba($mantis-green, 0.1);
+  padding-bottom: env(safe-area-inset-bottom);
+  height: calc(#{$bottom-nav-height} + env(safe-area-inset-bottom));
+
+  &__item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 0;
+    min-height: $bottom-nav-height;
+    color: rgba(255, 255, 255, 0.5);
+    text-decoration: none;
+    font-size: 0.625rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    transition: color 0.15s ease;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+
+    svg, c-icon { width: 22px; height: 22px; }
+
+    &--active, &:active { color: $mantis-neon; }
+  }
+
+  &__label {
+    font-size: 0.625rem;
+  }
+}
+
+// ── TOUCH TARGETS ──
+@media (max-width: 991.98px) {
+  .btn, button[cButton], [cDropdownToggle] {
+    min-height: $touch-target-min;
+  }
+
+  .sidebar-nav .nav-link {
+    padding: 0.75rem 1rem;
+    min-height: $touch-target-min;
+  }
+
+  .dropdown-item, [cDropdownItem] {
+    padding: 0.625rem 1rem;
+    min-height: $touch-target-min;
+  }
+}
+
+// ── iOS ZOOM PREVENTION ──
+@media (max-width: 991.98px) {
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  select,
+  textarea,
+  .form-control,
+  .form-select {
+    font-size: 16px !important;
+  }
+}
+
+// ── BOTTOM NAV: body padding on mobile ──
+@media (max-width: 767.98px) {
+  .wrapper > .body {
+    padding-bottom: calc(#{$bottom-nav-height} + env(safe-area-inset-bottom) + 0.5rem);
+  }
+}
+
+// ── SCROLL STRIPS (KPI, Asset cards) ──
+.kpi-scroll-strip,
+.asset-scroll-strip {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-bottom: 0.5rem;
+
+  &::-webkit-scrollbar { display: none; }
+}
+
+.kpi-mobile-card {
+  scroll-snap-align: start;
+  min-width: calc(50vw - 24px);
+  padding: 1rem;
+  background: var(--cui-card-bg);
+  border-radius: var(--mantis-radius-md);
+  border: 1px solid var(--cui-card-border-color);
+  border-top: 3px solid $mantis-green;
+}
+
+.price-card-mobile {
+  scroll-snap-align: start;
+  min-width: 140px;
+  max-width: 160px;
+  background: var(--cui-card-bg);
+}
+
+// ── MOBILE COLUMN HIDING ──
+.d-mobile-none {
+  @media (max-width: 767.98px) { display: none !important; }
+}
+
+// ── LANDSCAPE MOBILE ──
+@media (max-height: 500px) and (orientation: landscape) {
+  .header.header-sticky { position: relative !important; }
+
+  .bottom-nav {
+    height: 44px;
+    padding-bottom: 0;
+
+    &__item {
+      min-height: 44px;
+      span { display: none; }
+    }
+  }
+}

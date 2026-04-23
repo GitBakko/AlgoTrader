@@ -1,0 +1,119 @@
+// ═══════════════════════════════════════════════════════════
+// MANTIS AI — Global utilities, scrollbars, animations, pulse dots
+// ═══════════════════════════════════════════════════════════
+@use "palette" as *;
+
+// Badge sizes
+.badge-sm {
+  font-size: 0.65rem;
+  padding: 0.2em 0.5em;
+  font-weight: 600;
+}
+
+// Utility classes
+.glow-green {
+  box-shadow: 0 0 8px rgba($mantis-green, 0.3);
+}
+
+.border-mantis {
+  border-color: rgba($mantis-green, 0.2) !important;
+}
+
+.border-start-3 {
+  border-left-width: 3px !important;
+}
+
+[data-coreui-theme="dark"] .border-top-primary {
+  border-top-color: #{$mantis-green} !important;
+}
+
+// Table row hover (universal)
+[data-coreui-theme="dark"] {
+  table tbody tr {
+    transition: background-color 0.15s ease;
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.03) !important;
+    }
+  }
+}
+
+// Pulse dot (live indicators)
+.pulse-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #{$mantis-neon};
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.pulse-dot--danger {
+  background-color: var(--cui-danger);
+  animation: pulse-glow-red 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 4px rgba($mantis-green, 0.5); }
+  50% { box-shadow: 0 0 12px rgba($mantis-green, 0.9); }
+}
+
+@keyframes pulse-glow-red {
+  0%, 100% { box-shadow: 0 0 4px rgba(229, 83, 83, 0.5); }
+  50% { box-shadow: 0 0 12px rgba(229, 83, 83, 0.9); }
+}
+
+// Animated badge
+.mantis-badge-animated {
+  animation: badge-pop 0.3s $mantis-ease-out-back forwards;
+}
+
+@keyframes badge-pop {
+  0%   { transform: scale(0.5); opacity: 0; }
+  70%  { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+// Scrollbar theming
+@supports (scrollbar-width: thin) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba($mantis-green, 0.25) transparent;
+  }
+}
+
+::-webkit-scrollbar-track {
+  background: var(--cui-body-bg, #0d1117);
+  border-radius: 100vw;
+  margin-block: .2em;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba($mantis-green, 0.3);
+  border: .15em solid var(--cui-body-bg, #0d1117);
+  border-radius: 100vw;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba($mantis-green, 0.5);
+}
+
+// Calendar/select inherited from CoreUI template
+.calendar-cell.today {
+  --cui-calendar-cell-today-color: var(--cui-primary) !important;
+}
+
+.select-week .calendar-row.current {
+  cursor: pointer;
+}
+
+// Reduced motion
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

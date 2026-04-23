@@ -1,0 +1,22 @@
+// ═══════════════════════════════════════════════════════════
+// MANTIS AI — Footer
+// ═══════════════════════════════════════════════════════════
+@use "palette" as *;
+
+[data-coreui-theme="dark"] .footer {
+  padding: 0.5rem 1.5rem;
+  font-size: 0.6875rem;
+  color: rgba(255, 255, 255, 0.3);
+  border-top: 1px solid $mantis-border-subtle;
+}
+
+.footer-brand {
+  color: rgba($mantis-neon, 0.5);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.footer-separator {
+  margin: 0 0.5rem;
+  opacity: 0.3;
+}
