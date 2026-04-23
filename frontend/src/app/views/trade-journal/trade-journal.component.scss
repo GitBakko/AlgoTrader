@@ -108,7 +108,7 @@
       background: none;
       border: none;
       color: var(--mantis-text-muted, rgba(255, 255, 255, 0.5));
-      font-size: 1.25rem;
+      font-size: var(--mantis-fs-2xl);
       cursor: pointer;
       padding: 0.25rem;
       line-height: 1;
@@ -118,6 +118,11 @@
         color: var(--mantis-text-primary, white);
       }
     }
+  }
+
+  // Error sub-detail text
+  .tj-error-sub {
+    font-size: var(--mantis-fs-sm);
   }
 
   // Signal row status highlights (readable in both themes)

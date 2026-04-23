@@ -238,7 +238,7 @@ type SortDir = 'asc' | 'desc';
                         <span class="text-danger" [cTooltip]="errorTooltip(sig.error_detail)">
                           {{ sig.error_detail.summary }}
                           @if (sig.error_detail.details) {
-                            <br><span class="text-body-secondary" style="font-size: 0.7rem">{{ sig.error_detail.details }}</span>
+                            <br><span class="text-body-secondary tj-error-sub">{{ sig.error_detail.details }}</span>
                           }
                         </span>
                       } @else if (sig.rejection_reason) {
