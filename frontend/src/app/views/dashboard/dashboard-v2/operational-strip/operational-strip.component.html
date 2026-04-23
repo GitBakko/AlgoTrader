@@ -1,0 +1,77 @@
+<div class="op-strip" role="group" aria-label="Operational status">
+
+  <!-- 1. SESSION -->
+  <div class="op-tile op-tile--session"
+       [class.is-closed]="!sessionOpen()">
+    <span class="op-tile__label">Session</span>
+    <span class="op-tile__value mantis-mono">{{ sessionLabel() }}</span>
+    <span class="op-tile__sub">
+      <span class="op-dot"
+            [class.op-dot--live]="sessionOpen()"
+            [class.op-dot--closed]="!sessionOpen()"
+            aria-hidden="true"></span>
+      {{ sessionOpen() ? 'open' : 'closed' }}
+    </span>
+  </div>
+
+  <!-- 2. BROKER WS -->
+  <div class="op-tile" [class.is-off]="!ws$.connected()">
+    <span class="op-tile__label">Broker WS</span>
+    <span class="op-tile__value mantis-mono">
+      {{ ws$.connected() ? (ws$.isMockPrices() ? 'MOCK' : 'LIVE') : 'OFF' }}
+    </span>
+    <span class="op-tile__sub mantis-mono">
+      <span class="op-dot"
+            [class.op-dot--live]="ws$.connected() && !ws$.isMockPrices()"
+            [class.op-dot--warn]="ws$.isMockPrices()"
+            [class.op-dot--closed]="!ws$.connected()"
+            aria-hidden="true"></span>
+      <!-- latency TODO: ws.latencyMs backend ping/pong not implemented -->
+      {{ ws$.pricesAreFresh() ? 'fresh' : 'stale' }}
+    </span>
+  </div>
+
+  <!-- 3. TRADES TODAY -->
+  <div class="op-tile">
+    <span class="op-tile__label">Trades today</span>
+    <span class="op-tile__value mantis-mono">
+      {{ tradesToday() === null ? '—' : tradesToday() }}
+    </span>
+    <span class="op-tile__sub mantis-mono">UTC day</span>
+  </div>
+
+  <!-- 4. CIRCUIT BREAKERS -->
+  <div class="op-tile"
+       [class.is-alert]="circuitBreakersTrippedCount() > 0">
+    <span class="op-tile__label">Circuit breakers</span>
+    <span class="op-tile__value mantis-mono">
+      {{ circuitBreakersTrippedCount() }}/{{ circuitBreakersTotal }} tripped
+    </span>
+    <span class="op-tile__sub mantis-mono">
+      {{ circuitBreakersTrippedCount() === 0 ? 'all green' : 'action required' }}
+    </span>
+  </div>
+
+  <!-- 5. PAPER BOT -->
+  <div class="op-tile" [class.is-off]="!paperBotRunning()">
+    <span class="op-tile__label">Paper bot</span>
+    <span class="op-tile__value mantis-mono">
+      <span class="op-dot"
+            [class.op-dot--live]="paperBotRunning()"
+            [class.op-dot--closed]="!paperBotRunning()"
+            aria-hidden="true"></span>
+      {{ paperBotRunning() ? 'RUNNING' : 'IDLE' }}
+    </span>
+    <span class="op-tile__sub mantis-mono">
+      {{ paperBotRunning() ? ('uptime ' + paperBotUptimeText()) : (executionMode() + ' · stopped') }}
+    </span>
+  </div>
+
+  <!-- 6. MODEL -->
+  <div class="op-tile is-todo">
+    <span class="op-tile__label">Model</span>
+    <span class="op-tile__value mantis-mono">—</span>
+    <span class="op-tile__sub mantis-mono">needs /api/models/current</span>
+  </div>
+
+</div>
