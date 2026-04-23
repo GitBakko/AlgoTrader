@@ -176,7 +176,7 @@ type Tab = 'open' | 'history';
                       <td class="mantis-mono">
                         {{ pos.stop_level != null ? (pos.stop_level | priceFormat:pos.epic) : '—' }}
                         @if (pos.level_deviation && pos.level_deviation.sl_deviation !== 0) {
-                          <span class="badge bg-warning text-dark ms-1" style="font-size: 0.65rem;"
+                          <span class="badge badge-sm bg-warning text-dark ms-1"
                                 [cTooltip]="'Richiesto: ' + (pos.level_deviation.requested_sl | priceFormat:pos.epic) + ' | Scost.: ' + pos.level_deviation.sl_deviation_pct.toFixed(2) + '%'">
                             adj
                           </span>
@@ -185,7 +185,7 @@ type Tab = 'open' | 'history';
                       <td class="mantis-mono">
                         {{ pos.profit_level != null ? (pos.profit_level | priceFormat:pos.epic) : '—' }}
                         @if (pos.level_deviation && pos.level_deviation.tp_deviation !== 0) {
-                          <span class="badge bg-warning text-dark ms-1" style="font-size: 0.65rem;"
+                          <span class="badge badge-sm bg-warning text-dark ms-1"
                                 [cTooltip]="'Richiesto: ' + (pos.level_deviation.requested_tp | priceFormat:pos.epic) + ' | Scost.: ' + pos.level_deviation.tp_deviation_pct.toFixed(2) + '%'">
                             adj
                           </span>
