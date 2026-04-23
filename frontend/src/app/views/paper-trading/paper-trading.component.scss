@@ -35,7 +35,7 @@
     gap: 0.25rem;
     padding: 0.2rem 0.5rem;
     border-radius: var(--mantis-radius-pill);
-    font-size: 0.625rem;
+    font-size: var(--mantis-fs-xs);
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -102,12 +102,12 @@
     50% { opacity: 0.7; }
   }
 
-  // KPI Cards (left accent bar pattern - matches dashboard)
+  // KPI Cards (top-accent pattern — matches dashboard + canonical spec)
   .pt-kpi-card {
     position: relative;
     overflow: hidden;
     border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.1));
-    border-radius: var(--mantis-radius-md, 8px);
+    border-radius: var(--mantis-radius-md);
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
     &:hover {
@@ -116,35 +116,35 @@
     }
 
     &__label {
-      font-size: 0.6875rem;
-      font-weight: 600;
+      font-size: var(--mantis-fs-xs);
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--mantis-text-secondary, rgba(255, 255, 255, 0.5));
-      margin-bottom: 0.375rem;
+      letter-spacing: 0.18em;
+      color: var(--fg3);
+      margin-bottom: var(--mantis-space-2);
     }
 
     &__value {
       font-family: var(--mantis-font-mono);
-      font-feature-settings: "tnum" 1;
-      font-size: 1.5rem;
+      font-feature-settings: var(--mono-feat);
+      font-size: var(--mantis-fs-3xl);
       font-weight: 700;
       letter-spacing: 0.02em;
       line-height: 1.2;
-      margin-bottom: 0.375rem;
+      margin-bottom: var(--mantis-space-2);
     }
 
     &__detail {
-      font-size: 0.75rem;
-      color: var(--mantis-text-muted, rgba(255, 255, 255, 0.4));
+      font-size: var(--mantis-fs-md);
+      color: var(--fg3);
     }
 
     &__accent {
       position: absolute;
-      left: 0;
       top: 0;
-      bottom: 0;
-      width: 3px;
+      left: 0;
+      right: 0;
+      height: 3px;
 
       &--primary {
         background: var(--mantis-green, #00d97e);
@@ -210,12 +210,12 @@
 
   // Error sub text
   .error-sub {
-    font-size: 0.7rem;
+    font-size: var(--mantis-fs-sm);
   }
 
   // RAW toggle button
   .raw-toggle-btn {
-    font-size: 0.65rem;
+    font-size: var(--mantis-fs-xs);
     padding: 0;
     border: none;
     background: none;
@@ -230,7 +230,7 @@
 
   // RAW error pre
   .raw-error-pre {
-    font-size: 0.65rem;
+    font-size: var(--mantis-fs-xs);
     max-height: 80px;
     overflow: auto;
   }
@@ -257,7 +257,7 @@
 
   // Kelly detail text
   .kelly-detail {
-    font-size: 0.75rem;
+    font-size: var(--mantis-fs-md);
   }
 
   // Clickable epic links
@@ -321,7 +321,7 @@
       background: none;
       border: none;
       color: var(--mantis-text-muted, rgba(255, 255, 255, 0.5));
-      font-size: 1.25rem;
+      font-size: var(--mantis-fs-2xl);
       cursor: pointer;
       padding: 0.25rem;
       line-height: 1;
@@ -349,7 +349,7 @@
       }
 
       td {
-        font-size: 0.95rem;
+        font-size: var(--mantis-fs-md-lg);
         padding: 0.75rem 0.5rem;
       }
     }
@@ -357,7 +357,7 @@
     .detail-row {
       background-color: rgba(var(--cui-emphasis-color-rgb), 0.02);
       border-left: 3px solid var(--cui-primary);
-      font-size: 0.875rem;
+      font-size: var(--mantis-fs-body);
 
       td {
         padding: 0.5rem 0.5rem;
@@ -383,7 +383,7 @@
     font-weight: 700;
     letter-spacing: 0.05em;
     text-transform: uppercase;
-    font-size: 0.75rem;
+    font-size: var(--mantis-fs-md);
   }
 
   // Mobile table min-width
