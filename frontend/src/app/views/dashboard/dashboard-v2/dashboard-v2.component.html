@@ -1,0 +1,111 @@
+<main class="dv2" role="main" aria-label="Dashboard v2 cockpit">
+
+  <!-- 1. TOP COMMAND BAR -->
+  <nav class="dv2-bar" aria-label="Timeframe and emergency controls">
+    <div class="dv2-bar__tabs" role="tablist" aria-label="Timeframe">
+      @for (tf of timeframes; track tf) {
+        <button type="button"
+                class="dv2-tab mantis-mono"
+                role="tab"
+                [attr.aria-selected]="activeTimeframe() === tf"
+                [class.is-active]="activeTimeframe() === tf"
+                (click)="setTimeframe(tf)">
+          {{ tf }}
+        </button>
+      }
+    </div>
+
+    <span class="dv2-bar__wordmark mantis-mono" aria-hidden="true">MANTIS · DASHBOARD</span>
+
+    <div class="dv2-bar__right">
+      <span class="dv2-clock mantis-mono" aria-label="Current time">{{ clockLabel() }} CET</span>
+      <button type="button"
+              class="dv2-kill mantis-mono"
+              [disabled]="killSwitchBusy()"
+              (click)="killSwitch()">
+        @if (killSwitchBusy()) {
+          <span>Stopping…</span>
+        } @else {
+          <span>KILL SWITCH</span>
+        }
+      </button>
+    </div>
+  </nav>
+
+  @if (customOpen()) {
+    <div class="dv2-custom-panel mantis-mono" role="dialog" aria-label="Custom timeframe range">
+      <label class="dv2-custom-panel__field">
+        From
+        <input type="date"
+               [value]="customFrom()"
+               (change)="customFrom.set($any($event.target).value)">
+      </label>
+      <label class="dv2-custom-panel__field">
+        To
+        <input type="date"
+               [value]="customTo()"
+               (change)="customTo.set($any($event.target).value)">
+      </label>
+      <button type="button" class="dv2-btn dv2-btn--primary" (click)="applyCustomRange()">Apply</button>
+      <button type="button" class="dv2-btn" (click)="cancelCustom()">Cancel</button>
+    </div>
+  }
+
+  <!-- 2. OPERATIONAL STRIP (Deliverable B) -->
+  <app-operational-strip></app-operational-strip>
+
+  <!-- 3. COCKPIT SPINE: equity (2fr) + KPI rail (1fr) -->
+  <section class="dv2-spine" aria-label="Equity cockpit">
+    <div class="dv2-chart">
+      <header class="dv2-chart__head">
+        <span class="dv2-chart__title mantis-mono">
+          Equity · {{ timeframeSvc.label() }}
+        </span>
+        @if (headlineEquity() != null) {
+          <span class="dv2-chart__hero">
+            €{{ headlineEquity() | number: '1.2-2':'it-IT' }}
+            @if (headlineDailyPct() != null) {
+              <span class="dv2-chart__delta mantis-mono"
+                    [class.is-positive]="(headlineDailyPct() ?? 0) > 0"
+                    [class.is-negative]="(headlineDailyPct() ?? 0) < 0">
+                {{ (headlineDailyPct() ?? 0) > 0 ? '▲' : (headlineDailyPct() ?? 0) < 0 ? '▼' : '' }}
+                {{ (headlineDailyPct() ?? 0) | number: '1.2-2' }}%
+              </span>
+            }
+          </span>
+        }
+      </header>
+      <div class="dv2-chart__canvas">
+        @if (equityLineData().length > 0) {
+          <app-tv-chart
+            mode="area"
+            [lineData]="equityLineData()"
+            [drawdownData]="drawdownLineData()"
+            [equityTooltipData]="equityTooltipData()"
+            [height]="340"
+            lineColor="#00d97e"
+            areaTopColor="rgba(57, 255, 20, 0.25)"
+            areaBottomColor="rgba(57, 255, 20, 0.01)">
+          </app-tv-chart>
+        } @else {
+          <div class="dv2-empty mantis-mono">Waiting for equity curve…</div>
+        }
+      </div>
+    </div>
+
+    <div class="dv2-rail">
+      <app-kpi-rail></app-kpi-rail>
+    </div>
+  </section>
+
+  <!-- 4. BOTTOM ROW: duration · funding · heatmap -->
+  <section class="dv2-bottom" aria-label="Secondary metrics">
+    <app-duration-scatter></app-duration-scatter>
+    <app-funding-ring></app-funding-ring>
+    <app-calendar-heatmap></app-calendar-heatmap>
+  </section>
+
+  <!-- 5. TRADE BREAKDOWN (Deliverable C) -->
+  <app-trade-breakdown [days]="breakdownDays()"></app-trade-breakdown>
+
+</main>

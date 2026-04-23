@@ -1,0 +1,143 @@
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideRouter } from '@angular/router';
+import { signal } from '@angular/core';
+import { of } from 'rxjs';
+
+import { DashboardV2Component } from './dashboard-v2.component';
+import { TradingService } from '../../../core/services/trading.service';
+import { WebSocketService } from '../../../core/services/websocket.service';
+import { NewsService } from '../../../core/services/news.service';
+import { MarketStatusService } from '../../../core/services/market-status.service';
+import { ConfirmDialogService } from '../../../shared/services/confirm-dialog.service';
+import { ToastService } from '../../../shared/services/toast.service';
+import { TimeframeService } from '../../../core/services/timeframe.service';
+
+describe('DashboardV2Component', () => {
+  let fixture: ComponentFixture<DashboardV2Component>;
+  let component: DashboardV2Component;
+  let tradingStub: any;
+  let wsStub: any;
+  let confirmStub: any;
+  let toastStub: any;
+
+  beforeEach(async () => {
+    tradingStub = {
+      overview: signal({ equity: 11000, daily_pnl: 120.5, today_realized_pnl: 0, total_pnl: 0, open_positions_count: 0, win_rate: 0.6, sharpe_ratio: 1.4, circuit_breaker_active: false, trading_mode: 'PAPER' }),
+      equityCurve: signal([]),
+      closedPositions: signal([]),
+      paperPositions: signal([]),
+      paperStatus: signal({ running: true, execution_mode: 'PAPER', iteration_count: 10, interval_seconds: 10, circuit_breakers_tripped: {} }),
+      riskStatus: signal({ peak_equity: 12000, current_equity: 11500, current_drawdown_pct: 0.04, daily_pnl: 120, circuit_breaker_active: false, circuit_breaker_reason: null }),
+      performance: signal({ trade_count: 10, win_count: 6, loss_count: 4, win_rate: 0.6, total_pnl: 500, avg_win: 100, avg_loss: -50, profit_factor: 2, max_consecutive_wins: 3, max_consecutive_losses: 2, best_trade: 200, worst_trade: -80, pnl_by_epic: {}, equity_curve: [], source: 'paper' }),
+      loadOverview: jasmine.createSpy('loadOverview'),
+      loadEquityCurve: jasmine.createSpy('loadEquityCurve'),
+      loadRiskStatus: jasmine.createSpy('loadRiskStatus'),
+      loadPaperStatus: jasmine.createSpy('loadPaperStatus'),
+      loadPaperPositions: jasmine.createSpy('loadPaperPositions'),
+      loadClosedPositions: jasmine.createSpy('loadClosedPositions'),
+      loadPerformance: jasmine.createSpy('loadPerformance'),
+      emergencyStop: jasmine.createSpy('emergencyStop').and.returnValue(of({ message: 'ok', loop_stopped: true, positions_closed: [], errors: [] })),
+    };
+
+    wsStub = {
+      connected: signal(true),
+      isMockPrices: signal(false),
+      pricesAreFresh: signal(true),
+      prices: signal({}),
+      connectPrices: jasmine.createSpy('connectPrices'),
+    };
+
+    confirmStub = {
+      confirm: jasmine.createSpy('confirm').and.resolveTo(true),
+    };
+
+    toastStub = {
+      success: jasmine.createSpy('success'),
+      error: jasmine.createSpy('error'),
+    };
+
+    const newsStub = {
+      news: signal([]),
+      getNews: jasmine.createSpy('getNews'),
+    };
+
+    const marketStatusStub = {
+      getMarketStatus: jasmine.createSpy('getMarketStatus').and.resolveTo({
+        epic: 'XAUUSD', is_open: true, status: 'TRADEABLE', next_open: null,
+        session: { open: '00:00', close: '23:59', timezone: 'UTC' },
+      }),
+    };
+
+    await TestBed.configureTestingModule({
+      imports: [DashboardV2Component],
+      providers: [
+        provideHttpClient(),
+        provideRouter([]),
+        TimeframeService,
+        { provide: TradingService, useValue: tradingStub },
+        { provide: WebSocketService, useValue: wsStub },
+        { provide: NewsService, useValue: newsStub },
+        { provide: MarketStatusService, useValue: marketStatusStub },
+        { provide: ConfirmDialogService, useValue: confirmStub },
+        { provide: ToastService, useValue: toastStub },
+      ],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(DashboardV2Component);
+    component = fixture.componentInstance;
+  });
+
+  afterEach(() => {
+    component.ngOnDestroy();
+  });
+
+  it('creates', () => {
+    fixture.detectChanges();
+    expect(component).toBeTruthy();
+  });
+
+  it('triggers timeframe-sensitive loads on init', () => {
+    fixture.detectChanges();
+    expect(tradingStub.loadEquityCurve).toHaveBeenCalled();
+    expect(tradingStub.loadPerformance).toHaveBeenCalled();
+    expect(tradingStub.loadClosedPositions).toHaveBeenCalled();
+  });
+
+  it('forces equity curve to at least 90 days for heatmap', () => {
+    fixture.detectChanges();
+    TestBed.inject(TimeframeService).set('7D');
+    fixture.detectChanges();
+    const calls = tradingStub.loadEquityCurve.calls.allArgs() as number[][];
+    for (const args of calls) {
+      expect(args[0]).toBeGreaterThanOrEqual(90);
+    }
+  });
+
+  it('kill switch asks confirmation then calls emergencyStop', fakeAsync(() => {
+    fixture.detectChanges();
+    component.killSwitch();
+    tick();
+    expect(confirmStub.confirm).toHaveBeenCalled();
+    expect(tradingStub.emergencyStop).toHaveBeenCalled();
+    expect(toastStub.success).toHaveBeenCalled();
+  }));
+
+  it('kill switch aborts when user cancels', fakeAsync(() => {
+    confirmStub.confirm.and.resolveTo(false);
+    fixture.detectChanges();
+    component.killSwitch();
+    tick();
+    expect(tradingStub.emergencyStop).not.toHaveBeenCalled();
+  }));
+
+  it('custom range switches timeframe to CUSTOM', () => {
+    fixture.detectChanges();
+    component.customFrom.set('2026-03-01');
+    component.customTo.set('2026-04-01');
+    component.applyCustomRange();
+    const tf = TestBed.inject(TimeframeService);
+    expect(tf.current()).toBe('CUSTOM');
+    expect(component.customOpen()).toBeFalse();
+  });
+});

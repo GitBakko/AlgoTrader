@@ -1,0 +1,129 @@
+<section class="trade-breakdown" role="region" aria-label="Trade breakdown per day">
+
+  <header class="tb-head">
+    <span class="tb-label mantis-mono">Trade Breakdown · per day · BUY ▲ / SELL ▼</span>
+    <div class="tb-meta mantis-mono">
+      <span>{{ timeframeLabel() }} · {{ daysCount() }} days</span>
+      <span class="tb-legend">
+        <span class="tb-legend__chip tb-legend__chip--tp"></span>TP
+      </span>
+      <span class="tb-legend">
+        <span class="tb-legend__chip tb-legend__chip--going"></span>Going
+      </span>
+      <span class="tb-legend">
+        <span class="tb-legend__chip tb-legend__chip--sl"></span>SL
+      </span>
+    </div>
+  </header>
+
+  @if (isBackendMissing()) {
+    <div class="tb-todo mantis-mono" role="note">
+      <strong>Backend endpoint pending.</strong>
+      <span>
+        <code>GET /api/trading/performance/breakdown?tf=&hellip;</code>
+        &mdash; vedi <code>docs/plans/2026-04-23_dashboard-v2-sprint.md</code> §2.1.
+      </span>
+    </div>
+  }
+
+  <div class="tb-body">
+    <div class="tb-chart" (mouseleave)="clearFocus()">
+
+      <div class="tb-chart__half tb-chart__half--buy">
+        @for (d of activeDays(); track d.date; let i = $index) {
+          <div class="tb-col"
+               [class.is-focus]="focusedIndex() === i"
+               (mouseenter)="setFocus(i)"
+               (focus)="setFocus(i)"
+               tabindex="0"
+               [attr.aria-label]="'BUY ' + sideTotal(d.buy) + ' on ' + d.date">
+            @if (d.buy.sl > 0) {
+              <span class="tb-seg tb-seg--sl"
+                    [style.height.%]="segmentHeightPct(d.buy.sl)"></span>
+            }
+            @if (d.buy.going > 0) {
+              <span class="tb-seg tb-seg--going"
+                    [style.height.%]="segmentHeightPct(d.buy.going)"></span>
+            }
+            @if (d.buy.tp > 0) {
+              <span class="tb-seg tb-seg--tp"
+                    [style.height.%]="segmentHeightPct(d.buy.tp)"></span>
+            }
+          </div>
+        } @empty {
+          <div class="tb-empty-side"></div>
+        }
+      </div>
+
+      <div class="tb-axis" aria-hidden="true"></div>
+
+      <div class="tb-chart__half tb-chart__half--sell">
+        @for (d of activeDays(); track d.date; let i = $index) {
+          <div class="tb-col"
+               [class.is-focus]="focusedIndex() === i"
+               (mouseenter)="setFocus(i)"
+               (focus)="setFocus(i)"
+               tabindex="0"
+               [attr.aria-label]="'SELL ' + sideTotal(d.sell) + ' on ' + d.date">
+            @if (d.sell.tp > 0) {
+              <span class="tb-seg tb-seg--tp"
+                    [style.height.%]="segmentHeightPct(d.sell.tp)"></span>
+            }
+            @if (d.sell.going > 0) {
+              <span class="tb-seg tb-seg--going"
+                    [style.height.%]="segmentHeightPct(d.sell.going)"></span>
+            }
+            @if (d.sell.sl > 0) {
+              <span class="tb-seg tb-seg--sl"
+                    [style.height.%]="segmentHeightPct(d.sell.sl)"></span>
+            }
+          </div>
+        } @empty {
+          <div class="tb-empty-side"></div>
+        }
+      </div>
+
+      @if (hasData()) {
+        <div class="tb-axis-labels mantis-mono" aria-hidden="true">
+          <span>{{ formatShortDate(firstDate()) }}</span>
+          @if (midDate()) {
+            <span>{{ formatShortDate(midDate()) }}</span>
+          }
+          <span>{{ formatShortDate(lastDate()) }} · today</span>
+        </div>
+      }
+    </div>
+
+    <aside class="tb-focus mantis-mono" role="status">
+      <span class="tb-focus__label">Focus day</span>
+      @if (focused(); as f) {
+        <span class="tb-focus__date">{{ formatFocusDate(f.date) }}</span>
+        <div class="tb-focus__row">
+          <span class="tb-focus__side tb-focus__side--buy">▲ BUY {{ sideTotal(f.buy) }}</span>
+          <span class="tb-focus__detail">TP {{ f.buy.tp }} · Go {{ f.buy.going }} · SL {{ f.buy.sl }}</span>
+        </div>
+        <div class="tb-focus__row">
+          <span class="tb-focus__side tb-focus__side--sell">▼ SELL {{ sideTotal(f.sell) }}</span>
+          <span class="tb-focus__detail">TP {{ f.sell.tp }} · Go {{ f.sell.going }} · SL {{ f.sell.sl }}</span>
+        </div>
+        <div class="tb-focus__pnl"
+             [class.is-positive]="focusedDayPnl() > 0"
+             [class.is-negative]="focusedDayPnl() < 0">
+          <span class="tb-focus__pnl-label">Day P&amp;L</span>
+          <span class="tb-focus__pnl-value">{{ formatMoney(focusedDayPnl()) }}</span>
+        </div>
+        @if (focusedStillOpen() > 0) {
+          <div class="tb-focus__open">⏱ {{ focusedStillOpen() }} trade ancora aperte</div>
+        }
+      } @else {
+        <span class="tb-focus__empty">
+          @if (isBackendMissing()) {
+            — endpoint mancante
+          } @else {
+            — no trades
+          }
+        </span>
+      }
+    </aside>
+  </div>
+</section>
