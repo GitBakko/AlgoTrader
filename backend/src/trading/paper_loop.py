@@ -162,6 +162,11 @@ class PaperTradingLoop:
         self._running = False
         self._task: asyncio.Task | None = None
         self._last_run: datetime | None = None
+        # Timestamp of the most recent successful start() — surfaced in
+        # get_status() as "started_at"/"uptime_seconds" so the Dashboard v2
+        # operational-strip tile can show real uptime (replaces the
+        # iteration_count × interval_seconds approximation).
+        self._started_at: datetime | None = None
         self._iteration_count = 0
         self._check_count = 0
         self._trade_count = 0
@@ -1510,6 +1515,7 @@ class PaperTradingLoop:
         self.risk_manager.circuit_breakers.heartbeat()
 
         self._running = True
+        self._started_at = datetime.now(UTC)
         self._task = asyncio.create_task(self._run_loop(), name="paper_trading_loop")
         self._task.add_done_callback(self._on_task_done)
         logger.info(
@@ -3212,6 +3218,12 @@ class PaperTradingLoop:
         trailing_tracked = self.trailing_stop_manager.tracked_positions
         eq_below_sma = self.risk_manager.equity_curve_filter.is_below_sma
 
+        uptime_seconds = (
+            int((datetime.now(UTC) - self._started_at).total_seconds())
+            if (self._running and self._started_at is not None)
+            else 0
+        )
+
         return {
             "running": self._running,
             "execution_mode": self.execution_engine.mode.value,
@@ -3220,6 +3232,8 @@ class PaperTradingLoop:
             "iteration_count": self._iteration_count,
             "check_count": self._check_count,
             "last_run": self._last_run.isoformat() if self._last_run else None,
+            "started_at": self._started_at.isoformat() if self._started_at else None,
+            "uptime_seconds": uptime_seconds,
             "signal_count": self._signal_count,
             "trade_count": self._trade_count,
             "error_count": self._error_count,
