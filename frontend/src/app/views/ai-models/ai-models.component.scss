@@ -45,7 +45,7 @@
     width: 90%;
     max-width: 800px;
     max-height: 80vh;
-    border-radius: 8px;
+    border-radius: var(--mantis-radius-md);
     border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.1));
     background: var(--cui-card-bg, var(--mantis-surface-1, #0d1117));
     overflow: hidden;
@@ -112,7 +112,7 @@
     z-index: 1040;
     min-width: 210px;
     padding: 0.5rem 0.75rem;
-    border-radius: 8px;
+    border-radius: var(--mantis-radius-md);
     background: var(--mantis-surface-4, #21262d);
     border: 1px solid var(--mantis-border-accent, rgba(0, 217, 126, 0.15));
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
@@ -164,7 +164,7 @@
   // ── Training job cards ────────────────────
   .training-job-card {
     padding: 0.75rem;
-    border-radius: 8px;
+    border-radius: var(--mantis-radius-md);
     border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.10));
     background: var(--cui-card-bg);
     transition: border-color 0.2s ease;
@@ -192,7 +192,7 @@
     align-items: center;
     gap: 0.25rem;
     padding: 0.25rem 0.5rem;
-    border-radius: 4px;
+    border-radius: var(--mantis-radius-sm);
     border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.10));
     background: var(--cui-card-bg, var(--mantis-surface-2, #161b22));
     cursor: pointer;

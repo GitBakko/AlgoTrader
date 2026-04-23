@@ -183,7 +183,7 @@
   align-items: center;
   gap: 8px;
   padding: 6px 8px;
-  border-radius: 4px;
+  border-radius: var(--mantis-radius-sm);
   transition: background 150ms ease;
 
   &:hover {

@@ -77,7 +77,7 @@
 .metric-box {
   padding: 1rem;
   background: var(--mantis-surface-2, #161b22);
-  border-radius: 8px;
+  border-radius: var(--mantis-radius-md);
   border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.1));
   text-align: center;
 
@@ -159,7 +159,7 @@ button[cButton] {
 
 // Alert
 c-alert {
-  border-radius: 8px;
+  border-radius: var(--mantis-radius-md);
 }
 
 // Responsive
