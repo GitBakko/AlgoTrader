@@ -91,6 +91,11 @@ export const routes: Routes = [
       {
         path: 'system-logs',
         loadChildren: () => import('./views/system-logs/routes').then(m => m.routes)
+      },
+      {
+        path: 'design-system',
+        loadChildren: () => import('./views/design-system/routes').then(m => m.routes),
+        data: { title: 'Design System' }
       }
     ]
   },

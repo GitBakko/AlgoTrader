@@ -1,0 +1,164 @@
+// ═══════════════════════════════════════════════════════════
+// Design System — layout only (content reuses global tokens)
+// ═══════════════════════════════════════════════════════════
+
+:host {
+  display: block;
+}
+
+.ds-wrapper {
+  padding-bottom: var(--mantis-space-8);
+}
+
+.ds-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--mantis-space-4);
+  flex-wrap: wrap;
+
+  h2 {
+    color: var(--fg-accent);
+    letter-spacing: 0.04em;
+    font-weight: 700;
+  }
+
+  code {
+    font-family: var(--mantis-font-mono);
+    color: var(--mantis-green);
+    padding: 0 4px;
+    border-radius: var(--mantis-radius-sm);
+    background: var(--mantis-tint-subtle);
+  }
+}
+
+// ── Swatch (colour + surface) ──
+.ds-swatch {
+  position: relative;
+  border-radius: var(--mantis-radius-md);
+  padding: var(--mantis-space-3);
+  min-height: 110px;
+  border: 1px solid var(--mantis-border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantis-space-1);
+  color: #fff; // high-contrast label; swatch bg varies
+
+  &__name {
+    font-family: var(--mantis-font-ui);
+    font-weight: 700;
+    font-size: var(--mantis-fs-lg);
+    letter-spacing: 0.02em;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+
+  &__hex {
+    font-family: var(--mantis-font-mono);
+    font-size: var(--mantis-fs-sm);
+    color: rgba(255, 255, 255, 0.75);
+  }
+
+  &__desc {
+    margin-top: auto;
+    font-size: var(--mantis-fs-xs);
+    color: rgba(255, 255, 255, 0.65);
+  }
+
+  // Surface swatches need a subtle inner border for legibility
+  &--surface {
+    border: 1px solid var(--mantis-border-default);
+    color: var(--fg1);
+    text-shadow: none;
+
+    .ds-swatch__hex,
+    .ds-swatch__desc {
+      color: var(--fg3);
+    }
+  }
+}
+
+// ── Type scale row ──
+.ds-type-row {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: var(--mantis-space-4);
+  align-items: baseline;
+  padding: var(--mantis-space-1) 0;
+  border-bottom: 1px dashed var(--mantis-border-subtle);
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &__meta {
+    color: var(--fg3);
+    font-size: var(--mantis-fs-sm);
+  }
+
+  &__sample {
+    color: var(--fg1);
+  }
+}
+
+// ── Spacing / radii / shadow rows ──
+.ds-row {
+  display: flex;
+  align-items: center;
+  gap: var(--mantis-space-3);
+  margin: var(--mantis-space-1) 0;
+  font-size: var(--mantis-fs-sm);
+
+  &__box {
+    display: inline-block;
+    background: rgba(57, 255, 20, 0.2);
+    border: 1px solid var(--mantis-border-strong);
+    flex-shrink: 0;
+
+    &--radius {
+      background: rgba(57, 255, 20, 0.15);
+    }
+
+    &--shadow {
+      width: 22px;
+      height: 22px;
+      background: var(--mantis-surface-4);
+      border: none;
+      border-radius: var(--mantis-radius-sm);
+    }
+  }
+
+  &__label {
+    color: var(--fg2);
+  }
+
+  &__aside {
+    margin-left: auto;
+    text-align: right;
+    opacity: 0.7;
+  }
+}
+
+// ── Groups (badges, buttons) ──
+.ds-group {
+  display: flex;
+  align-items: center;
+  gap: var(--mantis-space-3);
+  flex-wrap: wrap;
+  min-height: 40px;
+
+  &__label {
+    font-size: var(--mantis-fs-xs);
+    color: var(--fg3);
+    min-width: 140px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+  }
+}
+
+.ds-form {
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantis-space-3);
+}

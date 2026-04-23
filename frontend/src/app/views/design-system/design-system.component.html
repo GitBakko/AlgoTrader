@@ -1,0 +1,420 @@
+<!--
+  Design System Reference — internal dev tool.
+  Mirrors mantis-ai-design-system/project/preview/*.html inside the app,
+  so devs can inspect the live token resolution without leaving the SPA.
+-->
+
+<div class="ds-wrapper">
+  <header class="ds-header mb-4">
+    <div>
+      <h2 class="mb-1">Design System</h2>
+      <p class="text-body-secondary mb-0">
+        Canonical tokens + component previews. Values below read live from
+        <code>:root</code> via <code>getComputedStyle</code>.
+      </p>
+    </div>
+  </header>
+
+  <!-- ═══════ TOKENS: BRAND COLOURS ═══════ -->
+  <div class="section-divider">
+    <span class="section-divider__label">Brand Colours</span>
+    <div class="section-divider__line"></div>
+  </div>
+  <c-row class="g-3 mb-4">
+    @for (tok of brandColors; track tok.cssVar) {
+      <c-col xs="6" md="4" xl="3">
+        <div class="ds-swatch" [style.background]="'var(' + tok.cssVar + ')'">
+          <div class="ds-swatch__name">{{ tok.name }}</div>
+          <div class="ds-swatch__hex">{{ resolvedValues()[tok.cssVar] || tok.cssVar }}</div>
+          @if (tok.description) {
+            <div class="ds-swatch__desc">{{ tok.description }}</div>
+          }
+        </div>
+      </c-col>
+    }
+  </c-row>
+
+  <!-- ═══════ TOKENS: SURFACE ELEVATION ═══════ -->
+  <div class="section-divider">
+    <span class="section-divider__label">Surface Elevation</span>
+    <div class="section-divider__line"></div>
+  </div>
+  <c-row class="g-3 mb-4">
+    @for (surf of surfaces; track surf.cssVar) {
+      <c-col xs="6" md="4" xl="2">
+        <div class="ds-swatch ds-swatch--surface" [style.background]="'var(' + surf.cssVar + ')'">
+          <div class="ds-swatch__name">{{ surf.name }}</div>
+          <div class="ds-swatch__hex">{{ resolvedValues()[surf.cssVar] }}</div>
+          <div class="ds-swatch__desc">{{ surf.description }}</div>
+        </div>
+      </c-col>
+    }
+  </c-row>
+
+  <!-- ═══════ TOKENS: TYPE SCALE ═══════ -->
+  <div class="section-divider">
+    <span class="section-divider__label">Type Scale</span>
+    <div class="section-divider__line"></div>
+  </div>
+  <c-card class="mb-4 border-top border-top-3 border-top-primary">
+    <c-card-body class="p-3">
+      @for (t of typeScale; track t.cssVar) {
+        <div class="ds-type-row">
+          <span class="ds-type-row__meta mantis-mono">{{ t.name }}</span>
+          <span class="ds-type-row__sample" [style.font-size]="'var(' + t.cssVar + ')'">
+            ML decides direction. ScalpScore gates quality.
+          </span>
+        </div>
+      }
+      <div class="ds-type-row">
+        <span class="ds-type-row__meta mantis-mono">mono · tabular</span>
+        <span class="ds-type-row__sample mantis-kpi" style="font-size: var(--mantis-fs-2xl); color: var(--mantis-neon)">
+          +12,487.32
+        </span>
+      </div>
+      <div class="ds-type-row">
+        <span class="ds-type-row__meta mantis-mono">mono · loss</span>
+        <span class="ds-type-row__sample mantis-kpi" style="font-size: var(--mantis-fs-2xl); color: var(--mantis-loss)">
+          -358.70
+        </span>
+      </div>
+    </c-card-body>
+  </c-card>
+
+  <!-- ═══════ TOKENS: SPACING / RADII / SHADOW ═══════ -->
+  <div class="section-divider">
+    <span class="section-divider__label">Spacing · Radii · Shadow</span>
+    <div class="section-divider__line"></div>
+  </div>
+  <c-row class="g-3 mb-4">
+    <c-col md="4">
+      <c-card class="h-100 border-top border-top-3 border-top-primary">
+        <c-card-header class="py-2 small text-body-secondary">Spacing scale</c-card-header>
+        <c-card-body class="p-3">
+          @for (s of spacingScale; track s.name) {
+            <div class="ds-row">
+              <span class="ds-row__box" [style.width]="s.value" [style.height]="s.value"></span>
+              <span class="mantis-mono ds-row__label">{{ s.name }} · {{ s.value }}</span>
+            </div>
+          }
+        </c-card-body>
+      </c-card>
+    </c-col>
+    <c-col md="4">
+      <c-card class="h-100 border-top border-top-3 border-top-primary">
+        <c-card-header class="py-2 small text-body-secondary">Corner radii</c-card-header>
+        <c-card-body class="p-3">
+          @for (r of radii; track r.name) {
+            <div class="ds-row">
+              <span class="ds-row__box ds-row__box--radius"
+                    [style.border-radius]="'var(--mantis-radius-' + r.name + ')'"
+                    [style.width]="r.name === 'pill' ? '36px' : '20px'"
+                    [style.height]="r.name === 'pill' ? '14px' : '20px'"></span>
+              <span class="mantis-mono ds-row__label">{{ r.name }} · {{ r.value }}</span>
+              <span class="ds-row__aside small text-body-secondary">{{ r.usage }}</span>
+            </div>
+          }
+        </c-card-body>
+      </c-card>
+    </c-col>
+    <c-col md="4">
+      <c-card class="h-100 border-top border-top-3 border-top-primary">
+        <c-card-header class="py-2 small text-body-secondary">Shadow · Glow</c-card-header>
+        <c-card-body class="p-3">
+          @for (sh of shadows; track sh.name) {
+            <div class="ds-row">
+              <span class="ds-row__box ds-row__box--shadow"
+                    [style.box-shadow]="'var(--mantis-' + sh.name + ')'"></span>
+              <span class="mantis-mono ds-row__label">{{ sh.name }}</span>
+              <span class="ds-row__aside small text-body-secondary">{{ sh.description }}</span>
+            </div>
+          }
+        </c-card-body>
+      </c-card>
+    </c-col>
+  </c-row>
+
+  <!-- ═══════ COMPONENTS: BUTTONS ═══════ -->
+  <div class="section-divider">
+    <span class="section-divider__label">Buttons</span>
+    <div class="section-divider__line"></div>
+  </div>
+  <c-card class="mb-4 border-top border-top-3 border-top-primary">
+    <c-card-body class="p-3 d-flex flex-column gap-3">
+      <div class="ds-group">
+        <span class="ds-group__label mantis-mono">Primary</span>
+        <button cButton color="primary" class="mantis-btn-primary">Start Trading</button>
+        <button cButton color="primary" class="mantis-btn-primary" disabled>Disabled</button>
+      </div>
+      <div class="ds-group">
+        <span class="ds-group__label mantis-mono">Secondary</span>
+        <button cButton class="mantis-btn-secondary">Cancel</button>
+      </div>
+      <div class="ds-group">
+        <span class="ds-group__label mantis-mono">Auth hero (gradient)</span>
+        <button class="auth-btn-primary" style="max-width: 180px">Login</button>
+      </div>
+      <div class="ds-group">
+        <span class="ds-group__label mantis-mono">Danger / emergency</span>
+        <button cButton color="danger" variant="outline">
+          <svg cIcon name="cilMediaRecord" size="sm" class="me-1"></svg>Stop All
+        </button>
+      </div>
+      <div class="ds-group">
+        <span class="ds-group__label mantis-mono">Header icon</span>
+        <button class="header-action-btn" type="button"><svg cIcon name="cilMenu" size="lg"></svg></button>
+        <button class="header-action-btn" type="button"><svg cIcon name="cilBell" size="lg"></svg></button>
+      </div>
+    </c-card-body>
+  </c-card>
+
+  <!-- ═══════ COMPONENTS: BADGES ═══════ -->
+  <div class="section-divider">
+    <span class="section-divider__label">Badges</span>
+    <div class="section-divider__line"></div>
+  </div>
+  <c-card class="mb-4 border-top border-top-3 border-top-primary">
+    <c-card-body class="p-3 d-flex flex-column gap-3">
+      <div class="ds-group">
+        <span class="ds-group__label mantis-mono">Direction</span>
+        <span class="dir-indicator dir-indicator--buy">▲ BUY</span>
+        <span class="dir-indicator dir-indicator--sell">▼ SELL</span>
+      </div>
+      <div class="ds-group">
+        <span class="ds-group__label mantis-mono">Signal status</span>
+        @for (s of signalStatuses; track s.cls) {
+          <span class="signal-status signal-status--{{ s.cls }}">
+            <span class="signal-status__dot"></span>{{ s.label }}
+          </span>
+        }
+      </div>
+      <div class="ds-group">
+        <span class="ds-group__label mantis-mono">Regime</span>
+        @for (r of regimes; track r.cls) {
+          <span class="regime-badge regime-badge--{{ r.cls }}">{{ r.label }}</span>
+        }
+      </div>
+      <div class="ds-group">
+        <span class="ds-group__label mantis-mono">Trading mode</span>
+        @for (m of tradingModes; track m.cls) {
+          <span class="mode-badge mode-badge--{{ m.cls }} dash-status-chip dash-status-chip--{{ m.cls }}">
+            {{ m.label }}
+          </span>
+        }
+      </div>
+      <div class="ds-group">
+        <span class="ds-group__label mantis-mono">Risk</span>
+        <span class="risk-badge risk-badge--broker">Broker</span>
+        <span class="risk-badge risk-badge--local">Local</span>
+        <span class="risk-badge risk-badge--none">None</span>
+      </div>
+      <div class="ds-group">
+        <span class="ds-group__label mantis-mono">SL cooldown</span>
+        <span class="sl-cooldown-badge sl-cooldown-badge--warning">SL 3/5</span>
+        <span class="sl-cooldown-badge sl-cooldown-badge--blocked">SL 5/5</span>
+      </div>
+    </c-card-body>
+  </c-card>
+
+  <!-- ═══════ COMPONENTS: KPI CARDS ═══════ -->
+  <div class="section-divider">
+    <span class="section-divider__label">KPI Cards</span>
+    <div class="section-divider__line"></div>
+  </div>
+  <c-row class="g-3 mb-4 ds-preview-root">
+    <c-col sm="6" xl="3">
+      <c-card class="dash-kpi-card h-100">
+        <c-card-body class="p-3">
+          <div class="dash-kpi-card__label">Daily P&amp;L</div>
+          <div class="dash-kpi-card__value text-success">+$1,287.32</div>
+          <div class="dash-kpi-card__detail">▲ +2.34% · 14 trades</div>
+        </c-card-body>
+        <div class="dash-kpi-card__accent dash-kpi-card__accent--profit"></div>
+      </c-card>
+    </c-col>
+    <c-col sm="6" xl="3">
+      <c-card class="dash-kpi-card h-100">
+        <c-card-body class="p-3">
+          <div class="dash-kpi-card__label">Equity</div>
+          <div class="dash-kpi-card__value">$54,812.09</div>
+          <div class="dash-kpi-card__detail">Kelly size · half-Kelly active</div>
+        </c-card-body>
+        <div class="dash-kpi-card__accent dash-kpi-card__accent--primary"></div>
+      </c-card>
+    </c-col>
+    <c-col sm="6" xl="3">
+      <c-card class="dash-kpi-card h-100">
+        <c-card-body class="p-3">
+          <div class="dash-kpi-card__label">Win Rate</div>
+          <div class="dash-kpi-card__value">62.4<span class="text-body-secondary fs-6">%</span></div>
+          <div class="dash-kpi-card__detail">28 / 45 last 30d</div>
+        </c-card-body>
+        <div class="dash-kpi-card__accent dash-kpi-card__accent--primary"></div>
+      </c-card>
+    </c-col>
+    <c-col sm="6" xl="3">
+      <c-card class="dash-kpi-card h-100">
+        <c-card-body class="p-3">
+          <div class="dash-kpi-card__label">Open / Max</div>
+          <div class="dash-kpi-card__value">3 <span class="text-body-secondary fs-6">/ 8</span></div>
+          <div class="dash-kpi-card__detail text-warning">⚠ 1 SL cooldown</div>
+        </c-card-body>
+        <div class="dash-kpi-card__accent dash-kpi-card__accent--warning"></div>
+      </c-card>
+    </c-col>
+  </c-row>
+
+  <!-- ═══════ COMPONENTS: P&L PILLS / WS STATUS ═══════ -->
+  <div class="section-divider">
+    <span class="section-divider__label">P&amp;L Pills · WS Status</span>
+    <div class="section-divider__line"></div>
+  </div>
+  <c-card class="mb-4 border-top border-top-3 border-top-primary">
+    <c-card-body class="p-3 d-flex flex-column gap-3 ds-preview-pnl">
+      <div class="ds-group">
+        <span class="ds-group__label mantis-mono">Profit</span>
+        <span class="pnl-pill pnl-pill--profit">
+          <span class="pnl-pill__label">Oggi</span>
+          <span class="pnl-pill__value">+1,287.32</span>
+        </span>
+      </div>
+      <div class="ds-group">
+        <span class="ds-group__label mantis-mono">Loss</span>
+        <span class="pnl-pill pnl-pill--loss">
+          <span class="pnl-pill__label">Live</span>
+          <span class="pnl-pill__value">-358.70</span>
+        </span>
+      </div>
+      <div class="ds-group">
+        <span class="ds-group__label mantis-mono">Stale</span>
+        <span class="pnl-pill pnl-pill--stale">
+          <span class="pnl-pill__label">Live</span>
+          <span class="pnl-pill__value">~+12.40</span>
+        </span>
+      </div>
+      <div class="ds-group">
+        <span class="ds-group__label mantis-mono">WS status</span>
+        <span class="ws-status-pill ws-status-pill--connected">
+          <span class="pulse-dot"></span>Live
+        </span>
+        <span class="ws-status-pill ws-status-pill--mock">
+          <span class="pulse-dot pulse-dot--warning"></span>Mock
+          <span class="ws-retry-badge">2/5</span>
+        </span>
+        <span class="ws-status-pill ws-status-pill--disconnected">
+          <span class="pulse-dot pulse-dot--danger"></span>Offline
+        </span>
+      </div>
+      <div class="ds-group">
+        <button cButton color="primary" size="sm" (click)="togglePulse()">
+          {{ pulseActive() ? 'Pause' : 'Resume' }} pulse
+        </button>
+      </div>
+    </c-card-body>
+  </c-card>
+
+  <!-- ═══════ COMPONENTS: FORMS ═══════ -->
+  <div class="section-divider">
+    <span class="section-divider__label">Forms</span>
+    <div class="section-divider__line"></div>
+  </div>
+  <c-card class="mb-4 border-top border-top-3 border-top-primary">
+    <c-card-body class="p-3">
+      <form cForm class="ds-form">
+        <div class="auth-input-group">
+          <div class="input-group">
+            <span class="input-group-text">
+              <svg cIcon name="cilEnvelopeClosed" size="sm"></svg>
+            </span>
+            <input class="form-control" type="email" value="ops@mantis.ai" placeholder="admin@mantis.ai" />
+          </div>
+        </div>
+        <div class="auth-input-group">
+          <div class="input-group">
+            <span class="input-group-text">
+              <svg cIcon name="cilLockLocked" size="sm"></svg>
+            </span>
+            <input class="form-control" type="password" value="●●●●●●●●●●" />
+          </div>
+        </div>
+        <div class="password-strength-meter strong">
+          <div class="password-strength-meter__label">
+            <span>Password Strength</span>
+            <span>Strong</span>
+          </div>
+          <div class="password-strength-meter__bars">
+            <span class="password-strength-meter__bar active"></span>
+            <span class="password-strength-meter__bar active"></span>
+            <span class="password-strength-meter__bar active"></span>
+            <span class="password-strength-meter__bar active"></span>
+          </div>
+        </div>
+      </form>
+    </c-card-body>
+  </c-card>
+
+  <!-- ═══════ COMPONENTS: TABLE ═══════ -->
+  <div class="section-divider">
+    <span class="section-divider__label">Table</span>
+    <div class="section-divider__line"></div>
+  </div>
+  <c-card class="mb-4 border-top border-top-3 border-top-primary">
+    <c-card-body class="p-0">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Asset</th>
+            <th>Dir</th>
+            <th>Risk</th>
+            <th class="text-end">Entry</th>
+            <th class="text-end">Mark</th>
+            <th class="text-end">P&amp;L</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="pnl-row-positive">
+            <td>EURUSD</td>
+            <td><span class="dir-indicator dir-indicator--buy dir-indicator--sm">▲ BUY</span></td>
+            <td><span class="risk-badge risk-badge--broker">Broker</span></td>
+            <td class="text-end mantis-mono">1.08420</td>
+            <td class="text-end mantis-mono">1.08710</td>
+            <td class="text-end mantis-mono text-success">+290.00</td>
+          </tr>
+          <tr class="pnl-row-positive">
+            <td>BTCUSD</td>
+            <td><span class="dir-indicator dir-indicator--buy dir-indicator--sm">▲ BUY</span></td>
+            <td><span class="risk-badge risk-badge--broker">Broker</span></td>
+            <td class="text-end mantis-mono">64,210</td>
+            <td class="text-end mantis-mono">65,480</td>
+            <td class="text-end mantis-mono text-success">+1,270.00</td>
+          </tr>
+          <tr class="pnl-row-negative">
+            <td>XAUUSD</td>
+            <td><span class="dir-indicator dir-indicator--sell dir-indicator--sm">▼ SELL</span></td>
+            <td><span class="risk-badge risk-badge--local">Local</span></td>
+            <td class="text-end mantis-mono">2,418.40</td>
+            <td class="text-end mantis-mono">2,424.10</td>
+            <td class="text-end mantis-mono text-danger">-57.00</td>
+          </tr>
+        </tbody>
+      </table>
+    </c-card-body>
+  </c-card>
+
+  <!-- ═══════ COMPONENTS: EMPTY STATE ═══════ -->
+  <div class="section-divider">
+    <span class="section-divider__label">Empty State</span>
+    <div class="section-divider__line"></div>
+  </div>
+  <c-card class="mb-4 border-top border-top-3 border-top-primary">
+    <c-card-body class="p-0">
+      <div class="empty-state">
+        <div class="empty-state__icon">
+          <svg cIcon name="cilInbox" size="3xl"></svg>
+        </div>
+        <div class="empty-state__text">Nessun segnale attivo</div>
+        <div class="empty-state__hint">Avvia il paper trading per generare segnali ML.</div>
+      </div>
+    </c-card-body>
+  </c-card>
+</div>
