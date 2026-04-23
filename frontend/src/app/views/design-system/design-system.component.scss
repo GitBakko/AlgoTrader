@@ -75,6 +75,21 @@
       color: var(--fg3);
     }
   }
+
+  // Bright-background swatches (neon, green, cyan, profit, warning).
+  // White text is unreadable on these — flip foreground to near-black.
+  &--on-bright {
+    color: #0d1117;
+    text-shadow: none;
+
+    .ds-swatch__hex {
+      color: rgba(13, 17, 23, 0.75);
+    }
+
+    .ds-swatch__desc {
+      color: rgba(13, 17, 23, 0.75);
+    }
+  }
 }
 
 // ── Type scale row ──

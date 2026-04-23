@@ -15,6 +15,7 @@ interface Token {
   readonly name: string;
   readonly cssVar: string;
   readonly description?: string;
+  readonly bright?: boolean; // true → swatch bg is light, use dark fg
 }
 
 @Component({
@@ -38,12 +39,12 @@ export class DesignSystemComponent {
   private readonly doc = inject(DOCUMENT);
 
   readonly brandColors: readonly Token[] = [
-    { name: 'Neon', cssVar: '--mantis-neon', description: 'Hero accent · dark only · profit' },
-    { name: 'Green', cssVar: '--mantis-green', description: 'Primary brand · WCAG-friendlier' },
-    { name: 'Cyan', cssVar: '--mantis-cyan', description: 'Secondary · predicted / info' },
-    { name: 'Profit', cssVar: '--mantis-profit' },
-    { name: 'Loss', cssVar: '--mantis-loss' },
-    { name: 'Warning', cssVar: '--mantis-warning' },
+    { name: 'Neon',    cssVar: '--mantis-neon',    description: 'Hero accent · dark only · profit', bright: true },
+    { name: 'Green',   cssVar: '--mantis-green',   description: 'Primary brand · WCAG-friendlier', bright: true },
+    { name: 'Cyan',    cssVar: '--mantis-cyan',    description: 'Secondary · predicted / info', bright: true },
+    { name: 'Profit',  cssVar: '--mantis-profit',  bright: true },
+    { name: 'Loss',    cssVar: '--mantis-loss' },
+    { name: 'Warning', cssVar: '--mantis-warning', bright: true },
     { name: 'Neutral', cssVar: '--mantis-neutral' },
   ];
 

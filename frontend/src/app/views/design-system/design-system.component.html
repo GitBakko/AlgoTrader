@@ -23,7 +23,9 @@
   <c-row class="g-3 mb-4">
     @for (tok of brandColors; track tok.cssVar) {
       <c-col xs="6" md="4" xl="3">
-        <div class="ds-swatch" [style.background]="'var(' + tok.cssVar + ')'">
+        <div class="ds-swatch"
+             [class.ds-swatch--on-bright]="tok.bright"
+             [style.background]="'var(' + tok.cssVar + ')'">
           <div class="ds-swatch__name">{{ tok.name }}</div>
           <div class="ds-swatch__hex">{{ resolvedValues()[tok.cssVar] || tok.cssVar }}</div>
           @if (tok.description) {
