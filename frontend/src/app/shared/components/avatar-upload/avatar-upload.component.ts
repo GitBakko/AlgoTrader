@@ -84,7 +84,7 @@ import { AuthService } from '../../../core/services/auth.service';
 
     .avatar-upload__zone {
       border: 2px dashed var(--mantis-border-accent);
-      border-radius: 0.5rem;
+      border-radius: var(--mantis-radius-md);
       padding: 2rem;
       text-align: center;
       cursor: pointer;
@@ -132,7 +132,7 @@ import { AuthService } from '../../../core/services/auth.service';
 
     .avatar-upload__text {
       margin: 0;
-      font-size: 1rem;
+      font-size: var(--mantis-fs-lg);
       color: var(--cui-body-color);
     }
 
@@ -142,7 +142,7 @@ import { AuthService } from '../../../core/services/auth.service';
 
     .avatar-upload__hint {
       margin: 0;
-      font-size: 0.875rem;
+      font-size: var(--mantis-fs-body);
       color: var(--cui-secondary-color);
     }
 

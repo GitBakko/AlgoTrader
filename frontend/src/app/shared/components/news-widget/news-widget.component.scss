@@ -28,7 +28,7 @@
 }
 
 .news-title {
-  font-size: 0.95rem;
+  font-size: var(--mantis-fs-md-lg);
   font-weight: 600;
   line-height: 1.4;
   margin-bottom: 0.5rem;
@@ -40,7 +40,7 @@
 }
 
 .news-description {
-  font-size: 0.85rem;
+  font-size: var(--mantis-fs-body);
   line-height: 1.4;
   color: var(--cui-secondary-color);
   display: -webkit-box;
@@ -60,10 +60,10 @@
 .source-badge {
   font-weight: 600;
   text-transform: uppercase;
-  font-size: 0.7rem;
+  font-size: var(--mantis-fs-sm);
   padding: 0.2rem 0.4rem;
   background: var(--cui-dark);
-  border-radius: 0.25rem;
+  border-radius: var(--mantis-radius-sm);
   color: var(--cui-mantis-green, #00d97e);
 }
 

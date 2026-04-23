@@ -40,7 +40,7 @@ import { TableDirective } from '@coreui/angular';
     .skeleton-cell {
       display: inline-block;
       height: 0.625rem;
-      border-radius: 3px;
+      border-radius: var(--mantis-radius-sm);
     }
     .skeleton-header {
       height: 0.5rem;

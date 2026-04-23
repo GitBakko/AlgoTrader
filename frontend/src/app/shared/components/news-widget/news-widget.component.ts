@@ -72,7 +72,7 @@ import { NewsArticle } from '../../../core/models/news.model';
     }
 
     .news-widget-title {
-      font-size: 0.875rem;
+      font-size: var(--mantis-fs-body);
       font-weight: 500;
       line-height: 1.3;
       color: var(--cui-body-color);
@@ -88,7 +88,7 @@ import { NewsArticle } from '../../../core/models/news.model';
     }
 
     .sentiment-mini {
-      font-size: 0.65rem;
+      font-size: var(--mantis-fs-xs);
       padding: 0.15rem 0.35rem;
       font-weight: 600;
       border: none;
@@ -98,7 +98,7 @@ import { NewsArticle } from '../../../core/models/news.model';
     }
 
     .badge-xs {
-      font-size: 0.65rem;
+      font-size: var(--mantis-fs-xs);
       padding: 0.1rem 0.3rem;
     }
 

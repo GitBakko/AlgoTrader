@@ -50,19 +50,19 @@ import { environment } from '../../../../environments/environment';
     }
 
     .avatar--sm {
-      font-size: 0.75rem;
+      font-size: var(--mantis-fs-md);
     }
 
     .avatar--md {
-      font-size: 1rem;
+      font-size: var(--mantis-fs-lg);
     }
 
     .avatar--lg {
-      font-size: 1.25rem;
+      font-size: var(--mantis-fs-2xl);
     }
 
     .avatar--xl {
-      font-size: 1.5rem;
+      font-size: var(--mantis-fs-3xl);
     }
 
     .avatar__image {

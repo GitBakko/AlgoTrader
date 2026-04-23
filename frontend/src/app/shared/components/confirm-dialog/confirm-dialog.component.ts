@@ -57,7 +57,7 @@ import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 
     :host ::ng-deep .confirm-dialog__title {
       font-family: var(--mantis-font-ui);
-      font-size: 1rem;
+      font-size: var(--mantis-fs-lg);
       font-weight: 600;
       color: var(--cui-body-color);
       display: flex;
@@ -66,7 +66,7 @@ import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 
     :host ::ng-deep .confirm-dialog__body {
       background: var(--mantis-surface-2, #161b22);
-      font-size: 0.9375rem;
+      font-size: var(--mantis-fs-md-lg);
       line-height: 1.5;
       padding: 1.25rem;
     }
