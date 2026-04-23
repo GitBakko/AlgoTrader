@@ -148,6 +148,12 @@ async def trading_performance(
                 date_from=date_from,
                 epic=epic,
             )
+            # Dashboard v2: enrich with "trades opened today" count.
+            try:
+                stats["daily_trade_count"] = await position_repo.get_opened_today_count()
+            except Exception as e:
+                logger.debug(f"daily_trade_count query failed: {e}")
+                stats["daily_trade_count"] = 0
             stats["source"] = "database"
             return success_response(stats)
         except Exception as e:
@@ -169,6 +175,9 @@ async def trading_performance(
             "win_count": len(wins),
             "loss_count": len(losses),
             "win_rate": round(len(wins) / len(pnls), 4) if pnls else 0,
+            "tp_hit_rate": 0.0,
+            "tp_count": 0,
+            "daily_trade_count": 0,
             "total_pnl": round(sum(pnls), 2),
             "avg_win": round(sum(wins) / len(wins), 2) if wins else 0,
             "avg_loss": round(sum(losses) / len(losses), 2) if losses else 0,

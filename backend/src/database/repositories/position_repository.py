@@ -270,6 +270,22 @@ class PositionRepository(BaseRepository[Position]):
 
         return positions, total
 
+    async def get_opened_today_count(self, now: datetime | None = None) -> int:
+        """
+        Count positions opened in the current UTC day.
+        Used by the Dashboard v2 operational strip "Trades today" tile.
+        """
+        now = now or datetime.now(UTC)
+        start_of_day = datetime(now.year, now.month, now.day, tzinfo=UTC)
+        # Strip tz for asyncpg on TIMESTAMP WITHOUT TIME ZONE columns.
+        naive_start = start_of_day.replace(tzinfo=None)
+        result = await self.session.execute(
+            select(func.count())
+            .select_from(Position)
+            .where(Position.opened_at >= naive_start)
+        )
+        return int(result.scalar() or 0)
+
     async def get_performance_stats(
         self,
         date_from: datetime | None = None,
@@ -306,6 +322,9 @@ class PositionRepository(BaseRepository[Position]):
         pnls = [float(p.profit_loss) for p in positions]
         wins = [v for v in pnls if v > 0]
         losses = [v for v in pnls if v <= 0]
+        # Dashboard v2: TP hit rate = closed-with-TP / total closed.
+        tp_count = sum(1 for p in positions if (p.close_reason or "").upper() == "TP")
+        tp_hit_rate = tp_count / len(pnls) if pnls else 0.0
 
         # Max consecutive wins/losses
         max_cw = max_cl = cur_w = cur_l = 0
@@ -419,6 +438,8 @@ class PositionRepository(BaseRepository[Position]):
             "win_count": len(wins),
             "loss_count": len(losses),
             "win_rate": len(wins) / len(pnls) if pnls else 0,
+            "tp_hit_rate": round(tp_hit_rate, 4),
+            "tp_count": tp_count,
             "total_pnl": round(sum(pnls), 2),
             "avg_win": round(sum(wins) / len(wins), 2) if wins else 0,
             "avg_loss": round(sum(losses) / len(losses), 2) if losses else 0,
