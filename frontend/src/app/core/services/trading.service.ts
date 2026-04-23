@@ -22,6 +22,9 @@ import {
   PositionAggregates,
   TradingPerformance,
   TrainingStatus,
+  TradeBreakdownResponse,
+  CurrentModelsResponse,
+  OvernightSwapResponse,
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -66,6 +69,11 @@ export class TradingService {
 
   // Training
   readonly trainingStatus = signal<TrainingStatus | null>(null);
+
+  // Dashboard v2
+  readonly tradeBreakdown = signal<TradeBreakdownResponse | null>(null);
+  readonly currentModels = signal<CurrentModelsResponse | null>(null);
+  readonly overnightSwap = signal<Record<string, OvernightSwapResponse>>({});
 
   // Signal Notes (Trade Journal annotations)
   readonly signalNotes = signal<Record<string, string>>({});
@@ -295,6 +303,46 @@ export class TradingService {
     this.api.get<TradingPerformance>('/api/trading/performance', q)
       .subscribe({
         next: data => this.performance.set(data),
+        error: () => {},
+      });
+  }
+
+  // ── Dashboard v2 ──
+
+  /**
+   * GET /api/trading/performance/breakdown?tf=...&from=...&to=...
+   * Populates tradeBreakdown signal for the TradeBreakdown component.
+   */
+  loadPerformanceBreakdown(tf: string, from?: string, to?: string): void {
+    const q: Record<string, string> = { tf };
+    if (from) q['from'] = from;
+    if (to) q['to'] = to;
+    this.api.get<TradeBreakdownResponse>('/api/trading/performance/breakdown', q)
+      .subscribe({
+        next: data => this.tradeBreakdown.set(data),
+        error: () => this.tradeBreakdown.set(null),
+      });
+  }
+
+  /**
+   * GET /api/models/current — currently-loaded models in the trading loop.
+   */
+  loadCurrentModels(): void {
+    this.api.get<CurrentModelsResponse>('/api/models/current')
+      .subscribe({
+        next: data => this.currentModels.set(data),
+        error: () => this.currentModels.set(null),
+      });
+  }
+
+  /**
+   * GET /api/markets/{epic}/overnight-swap — overnight financing rates.
+   * Caches per-epic in the overnightSwap signal.
+   */
+  loadOvernightSwap(epic: string): void {
+    this.api.get<OvernightSwapResponse>(`/api/markets/${epic}/overnight-swap`)
+      .subscribe({
+        next: data => this.overnightSwap.update(cur => ({ ...cur, [epic]: data })),
         error: () => {},
       });
   }

@@ -60,7 +60,23 @@ export class DurationScatterComponent {
   readonly hasData = computed(() => this.points().length > 0);
   readonly tradeCount = computed(() => this.points().length);
 
+  /**
+   * Prefer the backend aggregate (`performance.duration_medians`) added in
+   * §2.6 — avoids recomputing the whole closed-positions list client-side
+   * every tick. Fall back to client-side aggregation when the backend
+   * hasn't shipped yet (old builds / empty response).
+   */
   readonly bias = computed<BiasSummary | null>(() => {
+    const medians = this.trading.performance()?.duration_medians;
+    if (medians && (medians.win_count > 0 || medians.loss_count > 0)) {
+      if (medians.win_count === 0 || medians.loss_count === 0) return null;
+      return {
+        winAvg:  medians.win_avg_min,
+        lossAvg: medians.loss_avg_min,
+        bias:    medians.late_exit_bias,
+        biasPctOver: medians.bias_pct_over,
+      };
+    }
     const arr = this.closed().filter(p => p.duration_minutes != null && p.profit_loss != null);
     if (arr.length < 2) return null;
     const wins = arr.filter(p => (p.profit_loss ?? 0) > 0);

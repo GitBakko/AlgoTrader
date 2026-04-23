@@ -1,0 +1,41 @@
+<section class="os-card" role="region" aria-label="Overnight swap rates">
+  <header class="os-head">
+    <span class="os-label mantis-mono">Overnight Swap</span>
+    <span class="os-badge mantis-mono">{{ epic() }}</span>
+  </header>
+
+  @if (swap(); as s) {
+    <div class="os-body">
+      <div class="os-row">
+        <span class="os-row__key mantis-mono">▲ long</span>
+        <span class="os-row__value mantis-mono"
+              [class.is-positive]="s.long_rate_pct > 0"
+              [class.is-negative]="s.long_rate_pct < 0">
+          {{ s.long_rate_pct | number: '1.4-4' }}%
+        </span>
+        <span class="os-row__ctx mantis-mono">/ day</span>
+      </div>
+      <div class="os-row">
+        <span class="os-row__key mantis-mono">▼ short</span>
+        <span class="os-row__value mantis-mono"
+              [class.is-positive]="s.short_rate_pct > 0"
+              [class.is-negative]="s.short_rate_pct < 0">
+          {{ s.short_rate_pct | number: '1.4-4' }}%
+        </span>
+        <span class="os-row__ctx mantis-mono">/ day</span>
+      </div>
+      <div class="os-footer mantis-mono">
+        <span>{{ s.weekend_multiplier }}× weekend</span>
+        <span>·</span>
+        <span>next charge in {{ nextChargeCountdown() }}</span>
+      </div>
+    </div>
+    @if (s.source === 'static_fallback') {
+      <div class="os-note mantis-mono">
+        Static fallback — broker swap field unavailable.
+      </div>
+    }
+  } @else {
+    <div class="os-empty mantis-mono">Loading rates…</div>
+  }
+</section>

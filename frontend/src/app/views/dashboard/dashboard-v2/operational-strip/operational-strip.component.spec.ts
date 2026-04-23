@@ -16,17 +16,21 @@ describe('OperationalStripComponent', () => {
       execution_mode: 'PAPER',
       iteration_count: 120,
       interval_seconds: 10,
+      uptime_seconds: undefined,
       circuit_breakers_tripped: {},
     }),
     equityCurve: signal<any[]>([
       { date: new Date().toISOString().slice(0, 10), trade_count: 7 },
     ]),
+    performance: signal<any>(null),
+    currentModels: signal<any>(null),
   };
 
   const wsStub = {
     connected: signal(true),
     isMockPrices: signal(false),
     pricesAreFresh: signal(true),
+    latencyMs: signal<number | null>(null),
   };
 
   const marketStatusStub = {
@@ -40,6 +44,19 @@ describe('OperationalStripComponent', () => {
   };
 
   beforeEach(async () => {
+    // Reset shared stubs between tests.
+    tradingStub.performance.set(null);
+    tradingStub.currentModels.set(null);
+    wsStub.latencyMs.set(null);
+    tradingStub.paperStatus.set({
+      running: true,
+      execution_mode: 'PAPER',
+      iteration_count: 120,
+      interval_seconds: 10,
+      uptime_seconds: undefined,
+      circuit_breakers_tripped: {},
+    });
+
     await TestBed.configureTestingModule({
       imports: [OperationalStripComponent],
       providers: [
@@ -77,32 +94,77 @@ describe('OperationalStripComponent', () => {
     expect(component.circuitBreakersTrippedCount()).toBe(2);
   });
 
-  it('derives trades today from equity curve last row', () => {
+  it('falls back to equity curve last row when daily_trade_count missing', () => {
     fixture.detectChanges();
     expect(component.tradesToday()).toBe(7);
   });
 
-  it('renders uptime when bot running', () => {
+  it('prefers performance.daily_trade_count over equity curve', () => {
+    tradingStub.performance.set({ daily_trade_count: 18 });
+    fixture.detectChanges();
+    expect(component.tradesToday()).toBe(18);
+  });
+
+  it('renders uptime from backend uptime_seconds when available', () => {
+    tradingStub.paperStatus.set({
+      running: true,
+      execution_mode: 'PAPER',
+      iteration_count: 0,
+      interval_seconds: 10,
+      uptime_seconds: 7_200, // 2h
+      circuit_breakers_tripped: {},
+    });
+    fixture.detectChanges();
+    expect(component.paperBotUptimeText()).toBe('2h 0m');
+  });
+
+  it('falls back to iteration × interval when uptime_seconds missing', () => {
     tradingStub.paperStatus.set({
       running: true,
       execution_mode: 'PAPER',
       iteration_count: 360,
       interval_seconds: 10,
+      uptime_seconds: undefined,
       circuit_breakers_tripped: {},
     });
     fixture.detectChanges();
     expect(component.paperBotUptimeText()).toBe('1h 0m');
   });
 
-  it('falls back to dash when bot idle', () => {
+  it('dash when bot idle', () => {
     tradingStub.paperStatus.set({
       running: false,
       execution_mode: 'PAPER',
       iteration_count: 0,
       interval_seconds: 10,
+      uptime_seconds: 0,
       circuit_breakers_tripped: {},
     });
     fixture.detectChanges();
     expect(component.paperBotUptimeText()).toBe('—');
+  });
+
+  it('renders primary model label when currentModels populated', () => {
+    tradingStub.currentModels.set({
+      count: 1,
+      by_epic: {},
+      primary: {
+        epic: 'XAUUSD',
+        model_id: 'xgb-gold-v2-3',
+        model_type: 'xgboost',
+        num_features: 412,
+        version: '2.3',
+        last_trained: new Date().toISOString(),
+      },
+    });
+    fixture.detectChanges();
+    expect(component.primaryModelLabel()).toBe('XGBOOST·XAUUSD v2.3');
+    expect(component.primaryModelTrainedAt()).toContain('trained');
+  });
+
+  it('surfaces WS latency from the WebSocketService signal', () => {
+    wsStub.latencyMs.set(42);
+    fixture.detectChanges();
+    expect(wsStub.latencyMs()).toBe(42);
   });
 });
