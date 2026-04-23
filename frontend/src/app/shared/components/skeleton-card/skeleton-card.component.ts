@@ -37,7 +37,7 @@ import { PlaceholderDirective, PlaceholderAnimationDirective } from '@coreui/ang
     .skeleton-line {
       display: block;
       height: 0.75rem;
-      border-radius: 4px;
+      border-radius: var(--mantis-radius-sm);
     }
     :host ::ng-deep .placeholder {
       background-color: var(--mantis-surface-4, #21262d) !important;

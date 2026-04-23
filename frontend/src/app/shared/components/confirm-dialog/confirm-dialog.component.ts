@@ -83,7 +83,7 @@ import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 
     :host ::ng-deep .modal-content {
       border: 1px solid rgba(255, 255, 255, 0.10);
-      border-radius: 8px;
+      border-radius: var(--mantis-radius-md);
       overflow: hidden;
     }
   `],

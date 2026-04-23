@@ -94,7 +94,7 @@ import { NewsArticle } from '../../../core/models/news.model';
       border: none;
       min-width: 32px;
       text-align: center;
-      border-radius: 4px;
+      border-radius: var(--mantis-radius-sm);
     }
 
     .badge-xs {

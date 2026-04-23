@@ -62,7 +62,7 @@ import { LogoService } from '../../../core/services/logo.service';
       );
       background-size: 200% 100%;
       animation: shimmer 1.5s infinite;
-      border-radius: 4px;
+      border-radius: var(--mantis-radius-sm);
     }
 
     @keyframes shimmer {
@@ -79,7 +79,7 @@ import { LogoService } from '../../../core/services/logo.service';
       align-items: center;
       justify-content: center;
       background-color: var(--cui-primary);
-      border-radius: 4px;
+      border-radius: var(--mantis-radius-sm);
 
       .fallback-text {
         color: white;
@@ -95,7 +95,7 @@ import { LogoService } from '../../../core/services/logo.service';
         background-color: var(--mantis-neon, #39ff14);
 
         .fallback-text {
-          color: var(--mantis-text-on-neon, #0d1117);
+          color: var(--mantis-bg);
         }
       }
     }
