@@ -2,7 +2,7 @@
 Position repository with trading-specific queries.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import numpy as np
 from sqlalchemy import func, select
@@ -269,6 +269,199 @@ class PositionRepository(BaseRepository[Position]):
         positions = list((await self.session.execute(query)).scalars().all())
 
         return positions, total
+
+    async def get_breakdown_by_day(
+        self,
+        date_from: datetime,
+        date_to: datetime,
+    ) -> list[dict]:
+        """
+        Per-day BUY/SELL × TP/SL/Going breakdown for Dashboard v2 Deliverable C.
+
+        Returns a list of day-dicts ordered oldest → newest (weekends + idle
+        days included with zero counts). Each day:
+            {
+              "date": "YYYY-MM-DD",
+              "buy":  {"tp": N, "sl": N, "going": N, "pnl": float},
+              "sell": {"tp": N, "sl": N, "going": N, "pnl": float},
+            }
+
+        Close-reason buckets:
+            tp      = close_reason == 'TP'
+            sl      = close_reason == 'SL'
+            other   = anything else (MANUAL, EXTERNAL, TIME, ...) — not
+                      surfaced to the frontend today but counted in pnl.
+            going   = positions still open at 23:59:59 UTC of that day
+                      (i.e. opened_at <= day_end AND
+                       closed_at IS NULL OR closed_at > day_end).
+
+        UNRECONCILED rows are excluded from tp/sl/pnl (their pnl is NULL)
+        but still count in `going` if they were open during that day.
+        """
+        from collections import defaultdict
+
+        # Normalize range: strip tz for asyncpg TIMESTAMP WITHOUT TIME ZONE.
+        naive_from = date_from.replace(tzinfo=None) if date_from.tzinfo else date_from
+        naive_to = date_to.replace(tzinfo=None) if date_to.tzinfo else date_to
+        # Span interesting positions: any position that overlaps the window.
+        # Fetch opened on/before range_end AND (closed is NULL OR closed >= range_start).
+        stmt = (
+            select(Position)
+            .where(Position.opened_at <= naive_to)
+            .where(
+                (Position.closed_at.is_(None))
+                | (Position.closed_at >= naive_from)
+            )
+        )
+        positions = list((await self.session.execute(stmt)).scalars().all())
+
+        # Build empty day buckets covering the whole window (UTC days).
+        start_day = datetime(date_from.year, date_from.month, date_from.day)
+        end_day = datetime(date_to.year, date_to.month, date_to.day)
+        day_cursor = start_day
+        bucket_keys: list[str] = []
+        buckets: dict[str, dict] = {}
+        while day_cursor <= end_day:
+            key = day_cursor.strftime("%Y-%m-%d")
+            bucket_keys.append(key)
+            buckets[key] = {
+                "date": key,
+                "buy":  {"tp": 0, "sl": 0, "going": 0, "pnl": 0.0},
+                "sell": {"tp": 0, "sl": 0, "going": 0, "pnl": 0.0},
+            }
+            day_cursor = day_cursor + timedelta(days=1)
+
+        def _side(direction: str) -> str:
+            return "buy" if (direction or "").upper() == "BUY" else "sell"
+
+        # Fill closed-day outcome + pnl.
+        for p in positions:
+            side = _side(p.direction)
+            # CLOSED with reason: count into tp/sl bucket on closed_at's day.
+            if p.closed_at is not None and (p.close_reason or "").upper() != "UNRECONCILED":
+                close_day_key = p.closed_at.strftime("%Y-%m-%d")
+                if close_day_key in buckets:
+                    reason = (p.close_reason or "").upper()
+                    if reason == "TP":
+                        buckets[close_day_key][side]["tp"] += 1
+                    elif reason == "SL":
+                        buckets[close_day_key][side]["sl"] += 1
+                    # Any close (TP/SL/MANUAL/...) contributes pnl if set.
+                    if p.profit_loss is not None:
+                        buckets[close_day_key][side]["pnl"] += float(p.profit_loss)
+
+        # Fill `going` (positions open at 23:59:59 UTC of each day).
+        # A position is "going" for day D if opened_at <= end_of_day(D)
+        # AND (closed_at is NULL OR closed_at > end_of_day(D)).
+        # To avoid O(days × positions), bucket positions by their
+        # [opened_day, last_open_day] span and increment going counts.
+        going_counters: dict[str, dict[str, int]] = defaultdict(
+            lambda: {"buy": 0, "sell": 0}
+        )
+        for p in positions:
+            if p.opened_at is None:
+                continue
+            start = p.opened_at
+            if p.closed_at is not None:
+                # Position closed at `closed_at`: it was "going" at end-of-day
+                # for every day from opened_at's day up to (closed_at's day − 1).
+                end_last_going = p.closed_at - timedelta(seconds=1)
+                if end_last_going < start:
+                    continue
+            else:
+                # Still open: "going" for every day from opened_at's day
+                # through today (range end).
+                end_last_going = naive_to
+            day_iter = datetime(start.year, start.month, start.day)
+            stop = datetime(
+                end_last_going.year, end_last_going.month, end_last_going.day
+            )
+            side = _side(p.direction)
+            while day_iter <= stop:
+                key = day_iter.strftime("%Y-%m-%d")
+                if key in buckets:
+                    going_counters[key][side] += 1
+                day_iter = day_iter + timedelta(days=1)
+
+        for key, counts in going_counters.items():
+            if key in buckets:
+                buckets[key]["buy"]["going"] = counts["buy"]
+                buckets[key]["sell"]["going"] = counts["sell"]
+
+        # Round pnls; ordered oldest → newest.
+        result = []
+        for key in bucket_keys:
+            b = buckets[key]
+            b["buy"]["pnl"] = round(b["buy"]["pnl"], 2)
+            b["sell"]["pnl"] = round(b["sell"]["pnl"], 2)
+            result.append(b)
+        return result
+
+    async def get_duration_medians(
+        self,
+        date_from: datetime | None = None,
+        epic: str | None = None,
+    ) -> dict:
+        """
+        Aggregate duration statistics for the Dashboard v2 scatter card (D4:A).
+
+        Returns:
+          {
+            "win_avg_min":  float,   # mean duration_minutes of wins
+            "loss_avg_min": float,   # mean duration_minutes of losses
+            "win_count":    int,
+            "loss_count":   int,
+            "late_exit_bias": bool,  # loss_avg > win_avg × 1.3
+            "bias_pct_over": float,  # (loss - win) / win * 100
+          }
+        """
+        stmt = (
+            select(Position)
+            .where(Position.status == "CLOSED")
+            .where(Position.close_reason != "UNRECONCILED")
+            .where(Position.profit_loss.is_not(None))
+            .where(Position.closed_at.is_not(None))
+            .where(Position.opened_at.is_not(None))
+        )
+        if date_from:
+            naive_from = date_from.replace(tzinfo=None) if date_from.tzinfo else date_from
+            stmt = stmt.where(Position.closed_at >= naive_from)
+        if epic:
+            stmt = stmt.where(Position.epic == epic)
+        positions = list((await self.session.execute(stmt)).scalars().all())
+
+        wins_durations: list[float] = []
+        losses_durations: list[float] = []
+        for p in positions:
+            if not p.opened_at or not p.closed_at:
+                continue
+            # Durations: opened_at/closed_at are naive UTC on asyncpg.
+            delta = (p.closed_at - p.opened_at).total_seconds() / 60.0
+            if delta <= 0:
+                continue
+            if float(p.profit_loss) > 0:
+                wins_durations.append(delta)
+            else:
+                losses_durations.append(delta)
+
+        win_avg = (sum(wins_durations) / len(wins_durations)) if wins_durations else 0.0
+        loss_avg = (sum(losses_durations) / len(losses_durations)) if losses_durations else 0.0
+        late_exit_bias = (
+            len(wins_durations) > 0 and len(losses_durations) > 0
+            and loss_avg > win_avg * 1.3
+        )
+        bias_pct_over = (
+            ((loss_avg - win_avg) / win_avg * 100.0)
+            if win_avg > 0 and loss_avg > 0 else 0.0
+        )
+        return {
+            "win_avg_min":    round(win_avg, 2),
+            "loss_avg_min":   round(loss_avg, 2),
+            "win_count":      len(wins_durations),
+            "loss_count":     len(losses_durations),
+            "late_exit_bias": late_exit_bias,
+            "bias_pct_over":  round(bias_pct_over, 2),
+        }
 
     async def get_opened_today_count(self, now: datetime | None = None) -> int:
         """
