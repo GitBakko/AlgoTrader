@@ -122,6 +122,64 @@ class TestPositionModels:
         assert position.direction == Direction.BUY
         assert position.stop_level == 2050.0
 
+    def test_position_naive_created_date_normalised_to_utc(self):
+        """Capital.com /positions returns naive Europe/Berlin strings for
+        ``createdDate``. The field validator must reinterpret the naive
+        value as Berlin and return UTC-aware, so every downstream consumer
+        (paper_loop, CloseDetector, DB writes) sees UTC.
+
+        Regression guard for the 2026-04-22 shadow-mode disagreement: a
+        position opened at 12:16 UTC arrived as ``"2026-04-22T14:16:50"``
+        and was misinterpreted as 14:16 UTC, breaking activity matching.
+        """
+        from datetime import UTC, datetime, timedelta, timezone
+
+        position = Position(
+            dealId="DEAL-BERLIN",
+            epic="NATGAS",
+            direction=Direction.SELL,
+            size=1.0,
+            level=2.8455,
+            currency="USD",
+            createdDate="2026-07-01T14:16:50",  # naive CEST (UTC+2)
+        )
+        assert position.created_date.tzinfo is not None
+        # 14:16 Europe/Berlin summer = 12:16 UTC
+        expected = datetime(2026, 7, 1, 12, 16, 50, tzinfo=UTC)
+        assert position.created_date == expected
+
+    def test_position_naive_winter_created_date_normalised_to_utc(self):
+        """Winter (CET = UTC+1) variant of the above. 14:16 CET = 13:16 UTC."""
+        from datetime import UTC, datetime
+
+        position = Position(
+            dealId="DEAL-BERLIN-WINTER",
+            epic="DE40",
+            direction=Direction.BUY,
+            size=0.5,
+            level=24000.0,
+            currency="EUR",
+            createdDate="2026-01-15T14:16:50",  # naive CET (UTC+1)
+        )
+        assert position.created_date == datetime(2026, 1, 15, 13, 16, 50, tzinfo=UTC)
+
+    def test_position_already_tz_aware_is_unchanged(self):
+        """tz-aware inputs pass through with timezone converted to UTC,
+        never re-tagged as Berlin."""
+        from datetime import UTC, datetime, timedelta, timezone
+
+        source = datetime(2026, 6, 1, 10, 0, 0, tzinfo=timezone(timedelta(hours=5)))
+        position = Position(
+            dealId="D-TZ",
+            epic="XAUUSD",
+            direction=Direction.BUY,
+            size=1.0,
+            level=2100.0,
+            currency="USD",
+            createdDate=source,
+        )
+        assert position.created_date == datetime(2026, 6, 1, 5, 0, 0, tzinfo=UTC)
+
     def test_create_position_request_valid(self):
         """Test valid create position request."""
         request = CreatePositionRequest(
