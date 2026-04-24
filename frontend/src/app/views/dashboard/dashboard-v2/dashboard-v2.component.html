@@ -3,7 +3,9 @@
   <!-- 1. OPERATIONAL STRIP (Live P&L · Open Positions · System) -->
   <app-operational-strip
     [killBusy]="killSwitchBusy()"
-    (killClicked)="killSwitch()">
+    [selectedEpic]="swapEpic()"
+    (killClicked)="killSwitch()"
+    (positionSelected)="selectSwapEpic($event)">
   </app-operational-strip>
 
   <!-- 2. PERFORMANCE COCKPIT HEADER (title + subtitle inline + tabs right) -->

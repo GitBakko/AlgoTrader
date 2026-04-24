@@ -86,12 +86,31 @@ export class DashboardV2Component implements OnInit, OnDestroy {
     () => this.trading.tradeBreakdown()?.days ?? null,
   );
 
-  /** Epic displayed in the overnight-swap tile — defaults to the first
-   *  open paper position, falls back to XAUUSD. */
+  /** User-picked epic for the overnight-swap tile. null = auto (first
+   *  open paper position, then XAUUSD). Set by clicking a position card
+   *  in the operational strip. Reset automatically when the picked epic
+   *  has no live position anymore. */
+  readonly userSwapEpic = signal<string | null>(null);
+
+  /** Epic displayed in the overnight-swap tile. Prefers the user pick
+   *  when it's still open at broker; falls back to the first open paper
+   *  position; finally XAUUSD. */
   readonly swapEpic = computed<string>(() => {
     const positions = this.trading.paperPositions();
+    const pick = this.userSwapEpic();
+    if (pick && positions.some(p => p.epic === pick)) return pick;
     return positions[0]?.epic ?? 'XAUUSD';
   });
+
+  selectSwapEpic(epic: string): void {
+    // Toggle off when re-clicking the current pick so a user can revert
+    // to automatic (first-open) behaviour without refreshing.
+    if (this.userSwapEpic() === epic) {
+      this.userSwapEpic.set(null);
+    } else {
+      this.userSwapEpic.set(epic);
+    }
+  }
 
   readonly headlineEquity = computed(() => this.trading.overview()?.equity ?? null);
   readonly headlineDailyPct = computed(() => {

@@ -99,9 +99,14 @@
     } @else {
       <div class="op-z2__grid">
         @for (p of visiblePositions(); track p.deal_id) {
-          <article class="op-pos mantis-mono"
-                   [class.is-profit]="(p.upl ?? 0) >= 0"
-                   [class.is-loss]="(p.upl ?? 0) < 0">
+          <button type="button"
+                  class="op-pos mantis-mono"
+                  [class.is-profit]="(p.upl ?? 0) >= 0"
+                  [class.is-loss]="(p.upl ?? 0) < 0"
+                  [class.is-selected]="selectedEpic() === p.epic"
+                  (click)="positionSelected.emit(p.epic)"
+                  [attr.aria-pressed]="selectedEpic() === p.epic"
+                  [attr.aria-label]="'Select ' + p.epic + ' for swap card'">
             <header class="op-pos__head">
               <span class="op-pos__sym">{{ p.epic }}</span>
               <span class="op-pos__dir"
@@ -118,7 +123,7 @@
                 </span>
               }
             </div>
-          </article>
+          </button>
         }
         @if (openCount() > 4) {
           <div class="op-pos op-pos--overflow mantis-mono">

@@ -41,6 +41,12 @@ export class OperationalStripComponent {
   readonly circuitBreakersTotal = 6;
   readonly killBusy = input<boolean>(false);
   readonly killClicked = output<void>();
+  /** Emitted when a paper-position card is clicked — parent uses it
+   *  to drive the overnight-swap tile's epic binding. */
+  readonly positionSelected = output<string>();
+  /** Epic currently highlighted as the swap-card source (optional,
+   *  parent-controlled). */
+  readonly selectedEpic = input<string | null>(null);
 
   readonly marketStatusSig = signal<{ is_open: boolean; status: string } | null>(null);
 

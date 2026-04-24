@@ -229,6 +229,21 @@
   border-radius: 4px;
   min-width: 0;
   overflow: hidden;
+  // Button reset (was <article>; now clickable <button>)
+  appearance: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow 120ms var(--mantis-ease-out-expo, ease),
+              transform 120ms var(--mantis-ease-out-expo, ease);
+
+  &:hover { transform: translateY(-1px); }
+  &:focus-visible {
+    outline: 2px solid var(--mantis-cyan);
+    outline-offset: 1px;
+  }
 
   // Mock: background + border tinted by win/loss, 3px colored left edge
   &.is-profit {
@@ -240,6 +255,9 @@
     background: rgba(255, 61, 87, 0.06);
     border: 1px solid rgba(255, 61, 87, 0.2);
     border-left: 3px solid var(--mantis-loss);
+  }
+  &.is-selected {
+    box-shadow: 0 0 0 2px var(--mantis-cyan), 0 0 12px rgba(0, 229, 255, 0.35);
   }
 
   &__head {
