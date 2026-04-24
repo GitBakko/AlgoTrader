@@ -1,35 +1,79 @@
-<section class="os-card" role="region" aria-label="Overnight swap rates">
+<section class="os-card" role="region" aria-label="Commissioni overnight">
   <header class="os-head">
-    <span class="os-label mantis-mono">Overnight Swap</span>
-    <span class="os-badge mantis-mono">{{ epic() }}</span>
+    <span class="os-label mantis-mono">Commissioni overnight</span>
+    <span class="os-badge mantis-mono">CAPITAL · {{ epic() }}</span>
   </header>
 
   @if (swap(); as s) {
     <div class="os-body">
-      <div class="os-row">
-        <span class="os-row__key mantis-mono">▲ long</span>
-        <span class="os-row__value mantis-mono"
-              [class.is-positive]="s.long_rate_pct > 0"
-              [class.is-negative]="s.long_rate_pct < 0">
-          {{ s.long_rate_pct | number: '1.4-4' }}%
-        </span>
-        <span class="os-row__ctx mantis-mono">/ day</span>
+      <div class="os-ring" aria-hidden="true">
+        <svg viewBox="0 0 96 96" class="os-ring__svg">
+          <circle cx="48" cy="48" [attr.r]="RING_RADIUS"
+                  fill="none"
+                  stroke="rgba(255,255,255,0.06)"
+                  stroke-width="8"/>
+          <circle cx="48" cy="48" [attr.r]="RING_RADIUS"
+                  fill="none"
+                  [attr.stroke]="ringColor()"
+                  stroke-width="8"
+                  stroke-linecap="round"
+                  [attr.stroke-dasharray]="ringFillLen() + ' ' + ringGapLen()"
+                  transform="rotate(-90 48 48)"
+                  class="os-ring__fg"/>
+        </svg>
+        <div class="os-ring__center mantis-mono">
+          <span class="os-ring__rate"
+                [class.is-positive]="displayRate() > 0"
+                [class.is-negative]="displayRate() < 0">
+            {{ displayRate() > 0 ? '+' : '' }}{{ displayRate() | number: '1.4-4' }}%
+          </span>
+          <span class="os-ring__sub">per giorno</span>
+        </div>
       </div>
-      <div class="os-row">
-        <span class="os-row__key mantis-mono">▼ short</span>
-        <span class="os-row__value mantis-mono"
-              [class.is-positive]="s.short_rate_pct > 0"
-              [class.is-negative]="s.short_rate_pct < 0">
-          {{ s.short_rate_pct | number: '1.4-4' }}%
+
+      <div class="os-stats mantis-mono">
+        @if (swapPerDay(); as daily) {
+          <span class="os-stats__pnl"
+                [class.is-positive]="daily > 0"
+                [class.is-negative]="daily < 0">
+            {{ formatMoney(daily) }}
+          </span>
+          <span class="os-stats__label">/ giorno</span>
+          @if (swap7dAccum(); as acc) {
+            <span class="os-stats__line">
+              <span class="os-stats__muted">7d accum</span>
+              <span [class.is-positive]="acc > 0" [class.is-negative]="acc < 0">{{ formatMoney(acc) }}</span>
+            </span>
+          }
+        } @else {
+          <span class="os-stats__placeholder">nessuna posizione aperta</span>
+        }
+        @if (openPosition(); as pos) {
+          <span class="os-stats__line">
+            <span class="os-stats__muted">{{ epic() }} {{ pos.direction | lowercase }}</span>
+            <span>{{ pos.size | number: '1.2-4' }}</span>
+          </span>
+          @if (notional(); as not) {
+            <span class="os-stats__line">
+              <span class="os-stats__muted">{{ formatNotional(not) }} notional</span>
+            </span>
+          }
+        }
+        <span class="os-stats__line os-stats__next">
+          <span class="os-stats__muted">prossima</span>
+          <span>{{ nextChargeCountdown() }}</span>
         </span>
-        <span class="os-row__ctx mantis-mono">/ day</span>
-      </div>
-      <div class="os-footer mantis-mono">
-        <span>{{ s.weekend_multiplier }}× weekend</span>
-        <span>·</span>
-        <span>next charge in {{ nextChargeCountdown() }}</span>
       </div>
     </div>
+
+    <div class="os-footer mantis-mono">
+      <span>long {{ s.long_rate_pct | number: '1.4-4' }}%</span>
+      <span>·</span>
+      <span>short {{ s.short_rate_pct | number: '1.4-4' }}%</span>
+      <span>·</span>
+      <span>{{ s.weekend_multiplier }}× weekend</span>
+    </div>
+
     @if (s.source === 'static_fallback') {
       <div class="os-note mantis-mono">
         Static fallback — broker swap field unavailable.

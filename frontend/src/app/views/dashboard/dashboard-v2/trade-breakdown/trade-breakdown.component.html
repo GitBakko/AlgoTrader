@@ -3,7 +3,10 @@
   <header class="tb-head">
     <span class="tb-label mantis-mono">Trade Breakdown · per day · BUY ▲ / SELL ▼</span>
     <div class="tb-meta mantis-mono">
-      <span>{{ timeframeLabel() }} · {{ daysCount() }} days</span>
+      <span>{{ timeframeLabel() }} · {{ daysCount() }} days · Σ {{ tradeTotal() }} trade</span>
+      @if (hasOverflow()) {
+        <span class="tb-meta__overflow">scale p90 · max {{ trueMax() }}</span>
+      }
       <span class="tb-legend">
         <span class="tb-legend__chip tb-legend__chip--tp"></span>TP
       </span>
@@ -29,14 +32,25 @@
   <div class="tb-body">
     <div class="tb-chart" (mouseleave)="clearFocus()">
 
+      <div class="tb-yaxis mantis-mono" aria-hidden="true">
+        <span class="tb-yaxis__tick" style="top: 0%">{{ maxStack() }}</span>
+        <span class="tb-yaxis__tick" style="top: 25%">{{ (maxStack() * 0.75) | number: '1.0-0' }}</span>
+        <span class="tb-yaxis__tick" style="top: 50%">{{ (maxStack() * 0.5) | number: '1.0-0' }}</span>
+        <span class="tb-yaxis__tick" style="top: 75%">{{ (maxStack() * 0.25) | number: '1.0-0' }}</span>
+      </div>
+
       <div class="tb-chart__half tb-chart__half--buy">
         @for (d of activeDays(); track d.date; let i = $index) {
           <div class="tb-col"
                [class.is-focus]="focusedIndex() === i"
+               [class.is-overflow]="isOverflow(d.buy)"
                (mouseenter)="setFocus(i)"
                (focus)="setFocus(i)"
                tabindex="0"
                [attr.aria-label]="'BUY ' + sideTotal(d.buy) + ' on ' + d.date">
+            @if (isOverflow(d.buy)) {
+              <span class="tb-col__overflow mantis-mono">+{{ overflowValue(d.buy) }}</span>
+            }
             @if (d.buy.sl > 0) {
               <span class="tb-seg tb-seg--sl"
                     [style.height.%]="segmentHeightPct(d.buy.sl)"></span>
@@ -55,12 +69,15 @@
         }
       </div>
 
-      <div class="tb-axis" aria-hidden="true"></div>
+      <div class="tb-axis" aria-hidden="true">
+        <span class="tb-axis__label mantis-mono">0</span>
+      </div>
 
       <div class="tb-chart__half tb-chart__half--sell">
         @for (d of activeDays(); track d.date; let i = $index) {
           <div class="tb-col"
                [class.is-focus]="focusedIndex() === i"
+               [class.is-overflow]="isOverflow(d.sell)"
                (mouseenter)="setFocus(i)"
                (focus)="setFocus(i)"
                tabindex="0"
@@ -76,6 +93,9 @@
             @if (d.sell.sl > 0) {
               <span class="tb-seg tb-seg--sl"
                     [style.height.%]="segmentHeightPct(d.sell.sl)"></span>
+            }
+            @if (isOverflow(d.sell)) {
+              <span class="tb-col__overflow tb-col__overflow--sell mantis-mono">+{{ overflowValue(d.sell) }}</span>
             }
           </div>
         } @empty {

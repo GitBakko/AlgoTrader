@@ -19,12 +19,18 @@
             @for (cell of w.cells; track $index) {
               @if (cell) {
                 <button type="button"
-                        class="ch-cell"
+                        class="ch-cell mantis-mono"
                         [class.is-focus]="focused()?.date === cell.date"
+                        [class.is-glow]="cellIntensity(cell) > 0.7"
+                        [class.is-win]="cell.pnl > 0"
+                        [class.is-loss]="cell.pnl < 0"
                         [style.background]="cellColor(cell)"
                         (mouseenter)="setFocus(cell)"
                         (focus)="setFocus(cell)"
                         [attr.aria-label]="cell.date + ' ' + formatMoney(cell.pnl)">
+                  @if (cell.tradeCount > 0 && cell.pnl !== 0) {
+                    <span class="ch-cell__pnl">{{ formatCompact(cell.pnl) }}</span>
+                  }
                 </button>
               } @else {
                 <span class="ch-cell ch-cell--empty" aria-hidden="true"></span>
@@ -49,6 +55,11 @@
         <span class="ch-focus__detail">
           {{ f.tradeCount === 0 ? 'no trades' : (f.tradeCount + ' trade · ' + f.winCount + 'W ' + (f.tradeCount - f.winCount) + 'L') }}
         </span>
+        @if (f.tradeCount > 0) {
+          <span class="ch-focus__extra">
+            {{ focusEquityPct(f) }} equity · {{ focusHitRate(f) }} hit
+          </span>
+        }
       } @else {
         <span class="ch-focus__detail">—</span>
       }

@@ -1,6 +1,7 @@
 import { Component, ChangeDetectionStrategy, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TradingService } from '../../../../core/services/trading.service';
+import { currencySymbol } from '../shared/currency.util';
 
 interface ScatterPoint {
   x: number;       // normalized x 0..1 (duration)
@@ -14,6 +15,8 @@ interface BiasSummary {
   lossAvg: number;
   bias: boolean;
   biasPctOver: number;
+  winEurPerHour: number;
+  lossEurPerHour: number;
 }
 
 /**
@@ -67,7 +70,13 @@ export class DurationScatterComponent {
    * hasn't shipped yet (old builds / empty response).
    */
   readonly bias = computed<BiasSummary | null>(() => {
-    const medians = this.trading.performance()?.duration_medians;
+    const perf = this.trading.performance();
+    const medians = perf?.duration_medians;
+    const avgWinPnl  = perf?.avg_win  ?? 0;
+    const avgLossPnl = perf?.avg_loss ?? 0; // typically negative
+    const eurPerHour = (pnl: number, mins: number) =>
+      mins > 0 ? pnl / (mins / 60) : 0;
+
     if (medians && (medians.win_count > 0 || medians.loss_count > 0)) {
       if (medians.win_count === 0 || medians.loss_count === 0) return null;
       return {
@@ -75,6 +84,8 @@ export class DurationScatterComponent {
         lossAvg: medians.loss_avg_min,
         bias:    medians.late_exit_bias,
         biasPctOver: medians.bias_pct_over,
+        winEurPerHour:  eurPerHour(avgWinPnl,  medians.win_avg_min),
+        lossEurPerHour: eurPerHour(avgLossPnl, medians.loss_avg_min),
       };
     }
     const arr = this.closed().filter(p => p.duration_minutes != null && p.profit_loss != null);
@@ -85,10 +96,25 @@ export class DurationScatterComponent {
     const avg = (xs: number[]) => xs.reduce((s, v) => s + v, 0) / xs.length;
     const winAvg  = avg(wins.map(p => p.duration_minutes ?? 0));
     const lossAvg = avg(losses.map(p => p.duration_minutes ?? 0));
+    const winPnlAvg  = avg(wins.map(p => p.profit_loss ?? 0));
+    const lossPnlAvg = avg(losses.map(p => p.profit_loss ?? 0));
     const bias = lossAvg > winAvg * 1.3;
     const biasPctOver = winAvg > 0 ? ((lossAvg - winAvg) / winAvg) * 100 : 0;
-    return { winAvg, lossAvg, bias, biasPctOver };
+    return {
+      winAvg, lossAvg, bias, biasPctOver,
+      winEurPerHour:  eurPerHour(winPnlAvg,  winAvg),
+      lossEurPerHour: eurPerHour(lossPnlAvg, lossAvg),
+    };
   });
+
+  readonly currency = computed<string>(() => this.trading.overview()?.currency ?? 'USD');
+  readonly currencySym = computed<string>(() => currencySymbol(this.currency()));
+
+  formatEurPerHour(n: number): string {
+    const sign = n > 0 ? '+' : n < 0 ? '−' : '';
+    const abs = Math.abs(n);
+    return `${sign}${this.currencySym()}${abs.toFixed(abs >= 100 ? 0 : 2)}/h`;
+  }
 
   readonly winMedianX = computed(() => {
     const b = this.bias();

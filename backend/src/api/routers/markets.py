@@ -218,6 +218,9 @@ async def get_overnight_swap(
     source = "static_fallback"
     raw_instrument: dict | None = None
 
+    next_charge_ms: int | None = None
+    swap_interval_min: int | None = None
+
     if broker is not None:
         try:
             details = await broker.get_market_details(epic_upper)
@@ -225,50 +228,57 @@ async def get_overnight_swap(
                 instrument = details.get("instrument") or {}
                 raw_instrument = instrument
                 currency = instrument.get("currency")
-                # Capital.com market detail fields — names vary by asset
-                # class, so probe the common spellings.
-                for long_key in (
-                    "overnightBuy", "swapLong", "longOvernightRate",
-                    "overnightLongRate",
-                ):
-                    val = instrument.get(long_key)
-                    if isinstance(val, (int, float)):
-                        long_rate = float(val)
-                        break
-                for short_key in (
-                    "overnightSell", "swapShort", "shortOvernightRate",
-                    "overnightShortRate",
-                ):
-                    val = instrument.get(short_key)
-                    if isinstance(val, (int, float)):
-                        short_rate = float(val)
-                        break
+                # Capital.com market details expose overnight financing under
+                # `overnightFee`: {longRate, shortRate, swapChargeTimestamp, swapChargeInterval}.
+                # `longRate` / `shortRate` are already **percentages per interval**
+                # (interval = swapChargeInterval minutes, typically 1440 = 1 day).
+                fee = instrument.get("overnightFee")
+                if isinstance(fee, dict):
+                    lr = fee.get("longRate")
+                    sr = fee.get("shortRate")
+                    if isinstance(lr, (int, float)):
+                        long_rate = float(lr)
+                    if isinstance(sr, (int, float)):
+                        short_rate = float(sr)
+                    ts = fee.get("swapChargeTimestamp")
+                    if isinstance(ts, (int, float)):
+                        next_charge_ms = int(ts)
+                    iv = fee.get("swapChargeInterval")
+                    if isinstance(iv, (int, float)):
+                        swap_interval_min = int(iv)
                 if long_rate is not None or short_rate is not None:
                     source = "broker"
         except Exception as e:
             logger.debug(f"overnight swap broker lookup failed for {epic_upper}: {e}")
 
-    # Fallback: use the static table backed by the backtest cost model.
+    # Fallback: static table backed by the backtest cost model.
     if long_rate is None or short_rate is None:
         static = OVERNIGHT_RATES.get(
             epic_upper, {"long": -0.000015, "short": -0.000010}
         )
-        long_rate = long_rate if long_rate is not None else static["long"]
-        short_rate = short_rate if short_rate is not None else static["short"]
+        # Static values are stored as fractions; convert to percent to match broker.
+        long_rate = long_rate if long_rate is not None else static["long"] * 100
+        short_rate = short_rate if short_rate is not None else static["short"] * 100
 
-    # Next charge: Capital.com charges rollover at 22:00 UTC.
-    now = _dt.now(_UTC)
-    next_charge = now.replace(hour=22, minute=0, second=0, microsecond=0)
-    if now >= next_charge:
-        next_charge = next_charge + _td(days=1)
+    # Next charge: prefer broker-provided timestamp, fall back to 22:00 UTC.
+    if next_charge_ms:
+        next_charge = _dt.fromtimestamp(next_charge_ms / 1000, tz=_UTC)
+    else:
+        now = _dt.now(_UTC)
+        next_charge = now.replace(hour=22, minute=0, second=0, microsecond=0)
+        if now >= next_charge:
+            next_charge = next_charge + _td(days=1)
 
+    # `long_rate` / `short_rate` are already in percent (per swapChargeInterval).
+    # `*_daily` fields express the fraction equivalent (pct / 100).
     return success_response({
         "epic": epic_upper,
         "currency": currency or "USD",
-        "long_rate_daily": round(long_rate, 8),
-        "short_rate_daily": round(short_rate, 8),
-        "long_rate_pct": round(long_rate * 100, 4),
-        "short_rate_pct": round(short_rate * 100, 4),
+        "long_rate_daily": round(long_rate / 100, 8),
+        "short_rate_daily": round(short_rate / 100, 8),
+        "long_rate_pct": round(long_rate, 6),
+        "short_rate_pct": round(short_rate, 6),
+        "swap_interval_minutes": swap_interval_min or 1440,
         "weekend_multiplier": 3,
         "next_charge_utc": next_charge.isoformat(),
         "source": source,

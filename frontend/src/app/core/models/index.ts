@@ -16,6 +16,11 @@ export interface DashboardOverview {
   sharpe_ratio: number;
   circuit_breaker_active: boolean;
   trading_mode: string;
+  /** today_realized + sum(open.upl) — used for the Live P&L hero. */
+  live_daily_pnl?: number;
+  live_unrealized_pnl?: number;
+  /** ISO 4217 currency code from broker account (e.g. "USD", "EUR"). */
+  currency?: string;
 }
 
 export interface EquityCurvePoint {

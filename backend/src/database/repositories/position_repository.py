@@ -291,12 +291,14 @@ class PositionRepository(BaseRepository[Position]):
             sl      = close_reason == 'SL'
             other   = anything else (MANUAL, EXTERNAL, TIME, ...) — not
                       surfaced to the frontend today but counted in pnl.
-            going   = positions still open at 23:59:59 UTC of that day
-                      (i.e. opened_at <= day_end AND
-                       closed_at IS NULL OR closed_at > day_end).
+            going   = positions that are STILL currently open (status != CLOSED,
+                      closed_at IS NULL), bucketed on their opened_at day.
+                      Historical "was-open-at-moment" counts are not useful
+                      for the dashboard and cause runaway inflation on
+                      low-activity days.
 
-        UNRECONCILED rows are excluded from tp/sl/pnl (their pnl is NULL)
-        but still count in `going` if they were open during that day.
+        UNRECONCILED / STALE_CLEANUP rows are excluded from tp/sl/pnl AND
+        from `going` (they are spurious data, fully filtered out).
         """
         from collections import defaultdict
 
@@ -350,43 +352,20 @@ class PositionRepository(BaseRepository[Position]):
                     if p.profit_loss is not None:
                         buckets[close_day_key][side]["pnl"] += float(p.profit_loss)
 
-        # Fill `going` (positions open at 23:59:59 UTC of each day).
-        # A position is "going" for day D if opened_at <= end_of_day(D)
-        # AND (closed_at is NULL OR closed_at > end_of_day(D)).
-        # To avoid O(days × positions), bucket positions by their
-        # [opened_day, last_open_day] span and increment going counts.
-        going_counters: dict[str, dict[str, int]] = defaultdict(
-            lambda: {"buy": 0, "sell": 0}
-        )
+        # `going` counts positions STILL OPEN RIGHT NOW (status != CLOSED,
+        # closed_at IS NULL), bucketed on their opened_at day. Historical
+        # "was-open-at-that-moment" counts are not useful for the dashboard
+        # and create huge inflated values on quiet days.
         for p in positions:
-            if p.opened_at is None:
+            if p.opened_at is None or p.closed_at is not None:
                 continue
-            start = p.opened_at
-            if p.closed_at is not None:
-                # Position closed at `closed_at`: it was "going" at end-of-day
-                # for every day from opened_at's day up to (closed_at's day − 1).
-                end_last_going = p.closed_at - timedelta(seconds=1)
-                if end_last_going < start:
-                    continue
-            else:
-                # Still open: "going" for every day from opened_at's day
-                # through today (range end).
-                end_last_going = naive_to
-            day_iter = datetime(start.year, start.month, start.day)
-            stop = datetime(
-                end_last_going.year, end_last_going.month, end_last_going.day
-            )
-            side = _side(p.direction)
-            while day_iter <= stop:
-                key = day_iter.strftime("%Y-%m-%d")
-                if key in buckets:
-                    going_counters[key][side] += 1
-                day_iter = day_iter + timedelta(days=1)
-
-        for key, counts in going_counters.items():
-            if key in buckets:
-                buckets[key]["buy"]["going"] = counts["buy"]
-                buckets[key]["sell"]["going"] = counts["sell"]
+            # Ignore ghost rows that somehow never got a closed_at.
+            reason = (p.close_reason or "").upper()
+            if reason in {"UNRECONCILED", "STALE_CLEANUP"}:
+                continue
+            open_day_key = p.opened_at.strftime("%Y-%m-%d")
+            if open_day_key in buckets:
+                buckets[open_day_key][_side(p.direction)]["going"] += 1
 
         # Round pnls; ordered oldest → newest.
         result = []
@@ -608,18 +587,20 @@ class PositionRepository(BaseRepository[Position]):
             sharpe_ratio = (avg_return / std_return * np.sqrt(252)) if std_return > 0 else 0.0
             sortino_ratio = (avg_return / downside_std * np.sqrt(252)) if downside_std > 0 else 0.0
 
-            # Max drawdown from equity curve
-            peak = np.maximum.accumulate(values)
-            drawdowns = (peak - values) / np.maximum(np.abs(peak), 1e-10)
+            # Max drawdown + Calmar — computed on REAL equity (initial + cumulative P&L),
+            # NOT on cumulative P&L alone. The `values` array here is cumulative P&L,
+            # which starts near 0 and can go negative; dividing by peak(cumulative) produces
+            # meaningless ratios (e.g. -5e11 calmar) because the denominator is tiny.
+            equity_values = initial_equity + values  # real equity curve
+            peak_eq = np.maximum.accumulate(equity_values)
+            drawdowns = (peak_eq - equity_values) / np.maximum(peak_eq, 1e-10)
             max_drawdown = float(np.max(drawdowns)) if len(drawdowns) > 0 else 0.0
 
-            # Calmar ratio (annualized return / max drawdown)
             total_days = max(len(equity_points), 1)
-            if values[0] != 0 and total_days > 0:
-                total_return = values[-1] / max(abs(values[0]), 1e-10)
-                annualized_return = (abs(total_return) ** (252 / total_days) - 1) * (
-                    1 if total_return >= 0 else -1
-                )
+            equity_end = float(equity_values[-1])
+            if initial_equity > 0 and equity_end > 0:
+                total_return_factor = equity_end / initial_equity
+                annualized_return = total_return_factor ** (252 / total_days) - 1
             else:
                 annualized_return = 0.0
             calmar_ratio = annualized_return / max_drawdown if max_drawdown > 0 else 0.0

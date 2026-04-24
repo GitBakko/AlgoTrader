@@ -1,8 +1,24 @@
 <main class="dv2" role="main" aria-label="Dashboard v2 cockpit">
 
-  <!-- 1. TOP COMMAND BAR -->
-  <nav class="dv2-bar" aria-label="Timeframe and emergency controls">
-    <div class="dv2-bar__tabs" role="tablist" aria-label="Timeframe">
+  <!-- 1. OPERATIONAL STRIP (Live P&L · Open Positions · System) -->
+  <app-operational-strip
+    [killBusy]="killSwitchBusy()"
+    (killClicked)="killSwitch()">
+  </app-operational-strip>
+
+  <!-- 2. PERFORMANCE COCKPIT HEADER (title + subtitle inline + tabs right) -->
+  <header class="dv2-header" aria-label="Performance Cockpit">
+    <div class="dv2-header__left">
+      <h1 class="dv2-header__title">Performance Cockpit</h1>
+      <span class="dv2-header__subtitle mantis-mono">
+        @if (sinceDate()) {
+          since {{ sinceDate() }} ·
+        }
+        {{ closedTrades() }} closed trades · regime-gated
+      </span>
+    </div>
+
+    <div class="dv2-header__tabs" role="tablist" aria-label="Timeframe">
       @for (tf of timeframes; track tf) {
         <button type="button"
                 class="dv2-tab mantis-mono"
@@ -14,23 +30,7 @@
         </button>
       }
     </div>
-
-    <span class="dv2-bar__wordmark mantis-mono" aria-hidden="true">MANTIS · DASHBOARD</span>
-
-    <div class="dv2-bar__right">
-      <span class="dv2-clock mantis-mono" aria-label="Current time">{{ clockLabel() }} CET</span>
-      <button type="button"
-              class="dv2-kill mantis-mono"
-              [disabled]="killSwitchBusy()"
-              (click)="killSwitch()">
-        @if (killSwitchBusy()) {
-          <span>Stopping…</span>
-        } @else {
-          <span>KILL SWITCH</span>
-        }
-      </button>
-    </div>
-  </nav>
+  </header>
 
   @if (customOpen()) {
     <div class="dv2-custom-panel mantis-mono" role="dialog" aria-label="Custom timeframe range">
@@ -51,28 +51,41 @@
     </div>
   }
 
-  <!-- 2. OPERATIONAL STRIP (Deliverable B) -->
-  <app-operational-strip></app-operational-strip>
-
-  <!-- 3. COCKPIT SPINE: equity (2fr) + KPI rail (1fr) -->
+  <!-- 3. COCKPIT SPINE: left rail + chart + right rail -->
   <section class="dv2-spine" aria-label="Equity cockpit">
+
+    <app-cockpit-left-rail></app-cockpit-left-rail>
+
     <div class="dv2-chart">
       <header class="dv2-chart__head">
-        <span class="dv2-chart__title mantis-mono">
-          Equity · {{ timeframeSvc.label() }}
-        </span>
-        @if (headlineEquity() != null) {
-          <span class="dv2-chart__hero">
-            €{{ headlineEquity() | number: '1.2-2':'it-IT' }}
-            @if (headlineDailyPct() != null) {
-              <span class="dv2-chart__delta mantis-mono"
-                    [class.is-positive]="(headlineDailyPct() ?? 0) > 0"
-                    [class.is-negative]="(headlineDailyPct() ?? 0) < 0">
-                {{ (headlineDailyPct() ?? 0) > 0 ? '▲' : (headlineDailyPct() ?? 0) < 0 ? '▼' : '' }}
-                {{ (headlineDailyPct() ?? 0) | number: '1.2-2' }}%
-              </span>
-            }
+        <div class="dv2-chart__head-left">
+          <span class="dv2-chart__title mantis-mono">
+            Equity spine · {{ timeframeSvc.label() }}
           </span>
+          <span class="dv2-chart__legend mantis-mono" aria-hidden="true">
+            <span class="dv2-chart__legend-item"><span class="dv2-chart__legend-swatch is-equity"></span>equity</span>
+            <span class="dv2-chart__legend-item"><span class="dv2-chart__legend-swatch is-peak"></span>peak</span>
+            <span class="dv2-chart__legend-item"><span class="dv2-chart__legend-swatch is-dd"></span>drawdown</span>
+          </span>
+        </div>
+        @if (headlineEquity() != null) {
+          <div class="dv2-chart__head-right">
+            <span class="dv2-chart__metrics mantis-mono">
+              <span>curr <b>{{ currencySym() }}{{ headlineEquity() | number: '1.0-0':'it-IT' }}</b></span>
+              @if (roiPct() != null) {
+                <span>·</span>
+                <span [class.is-positive]="(roiPct() ?? 0) > 0" [class.is-negative]="(roiPct() ?? 0) < 0">
+                  ROI <b>{{ (roiPct() ?? 0) > 0 ? '+' : '' }}{{ roiPct() | number: '1.1-1' }}%</b>
+                </span>
+              }
+              @if (annualizedPct() != null) {
+                <span>·</span>
+                <span [class.is-positive]="(annualizedPct() ?? 0) > 0" [class.is-negative]="(annualizedPct() ?? 0) < 0">
+                  ann. <b>{{ (annualizedPct() ?? 0) > 0 ? '+' : '' }}{{ annualizedPct() | number: '1.1-1' }}%</b>
+                </span>
+              }
+            </span>
+          </div>
         }
       </header>
       <div class="dv2-chart__canvas">
@@ -82,20 +95,61 @@
             [lineData]="equityLineData()"
             [drawdownData]="drawdownLineData()"
             [equityTooltipData]="equityTooltipData()"
-            [height]="340"
+            [height]="240"
             lineColor="#00d97e"
             areaTopColor="rgba(57, 255, 20, 0.25)"
             areaBottomColor="rgba(57, 255, 20, 0.01)">
           </app-tv-chart>
+
+          <!-- Overlay markers (peak / maxDD / peak-line / breakeven) -->
+          <svg class="dv2-chart__overlay" aria-hidden="true" preserveAspectRatio="none"
+               viewBox="0 0 100 100">
+            @if (breakevenY(); as by) {
+              <line x1="0" [attr.y1]="by" x2="100" [attr.y2]="by"
+                    stroke="rgba(255,255,255,0.18)" stroke-width="0.15"
+                    stroke-dasharray="0.5 0.6" vector-effect="non-scaling-stroke"/>
+            }
+            @if (peakLineY(); as py) {
+              <line x1="0" [attr.y1]="py" x2="100" [attr.y2]="py"
+                    stroke="rgba(255,255,255,0.3)" stroke-width="0.15"
+                    stroke-dasharray="0.4 0.6" vector-effect="non-scaling-stroke"/>
+            }
+            @if (maxDdMarker(); as md) {
+              <circle [attr.cx]="md.xPct" [attr.cy]="md.yPct" r="0.6"
+                      fill="var(--mantis-loss)" class="dv2-chart__marker-dot"
+                      vector-effect="non-scaling-stroke"/>
+            }
+            @if (peakMarker(); as pm) {
+              <circle [attr.cx]="pm.xPct" [attr.cy]="pm.yPct" r="0.6"
+                      fill="var(--mantis-neon)" class="dv2-chart__marker-dot dv2-chart__marker-dot--neon"
+                      vector-effect="non-scaling-stroke"/>
+            }
+          </svg>
+
+          @if (peakMarker(); as pm) {
+            <span class="dv2-chart__marker-label dv2-chart__marker-label--peak mantis-mono"
+                  [style.left.%]="pm.xPct"
+                  [style.top.%]="pm.yPct">
+              PEAK {{ currencySym() }}{{ pm.equity | number: '1.0-0':'it-IT' }}
+            </span>
+          }
+          @if (maxDdMarker(); as md) {
+            <span class="dv2-chart__marker-label dv2-chart__marker-label--dd mantis-mono"
+                  [style.left.%]="md.xPct"
+                  [style.top.%]="md.yPct">
+              MAX DD {{ md.ddPct | number: '1.1-1' }}%
+            </span>
+          }
+
+          <span class="dv2-chart__breakeven-label mantis-mono" aria-hidden="true">BREAKEVEN</span>
         } @else {
           <div class="dv2-empty mantis-mono">Waiting for equity curve…</div>
         }
       </div>
     </div>
 
-    <div class="dv2-rail">
-      <app-kpi-rail></app-kpi-rail>
-    </div>
+    <app-cockpit-right-rail></app-cockpit-right-rail>
+
   </section>
 
   <!-- 4. BOTTOM ROW: duration · overnight-swap · heatmap -->
@@ -105,7 +159,7 @@
     <app-calendar-heatmap></app-calendar-heatmap>
   </section>
 
-  <!-- 5. TRADE BREAKDOWN (Deliverable C) -->
+  <!-- 5. TRADE BREAKDOWN -->
   <app-trade-breakdown [days]="breakdownDays()"></app-trade-breakdown>
 
 </main>

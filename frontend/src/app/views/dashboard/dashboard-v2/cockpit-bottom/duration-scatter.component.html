@@ -11,30 +11,41 @@
   </header>
 
   <div class="dur-plot" [class.is-empty]="!hasData()">
-    <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="dur-svg">
+    <svg viewBox="0 0 280 140" preserveAspectRatio="none" class="dur-svg">
+      <defs>
+        <pattern id="durGrid" width="28" height="20" patternUnits="userSpaceOnUse">
+          <path d="M 28 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
+        </pattern>
+      </defs>
+      <rect x="0" y="0" width="280" height="140" fill="url(#durGrid)"/>
+
       <!-- zero baseline -->
-      <line x1="0" x2="100" y1="50" y2="50" stroke="rgba(255,255,255,0.15)" stroke-dasharray="1 1"/>
+      <line x1="0" x2="280" y1="70" y2="70" stroke="rgba(255,255,255,0.2)" stroke-dasharray="2 2"/>
 
       @if (winMedianX() != null) {
-        <line [attr.x1]="winMedianX()! * 100" [attr.x2]="winMedianX()! * 100"
-              y1="50" y2="15"
-              stroke="var(--mantis-neon)" stroke-dasharray="1 1" opacity="0.4"/>
+        <line [attr.x1]="winMedianX()! * 280" [attr.x2]="winMedianX()! * 280"
+              y1="70" y2="20"
+              stroke="var(--mantis-neon)" stroke-dasharray="2 2" opacity="0.5"/>
       }
       @if (lossMedianX() != null) {
-        <line [attr.x1]="lossMedianX()! * 100" [attr.x2]="lossMedianX()! * 100"
-              y1="50" y2="85"
-              stroke="var(--mantis-loss)" stroke-dasharray="1 1" opacity="0.4"/>
+        <line [attr.x1]="lossMedianX()! * 280" [attr.x2]="lossMedianX()! * 280"
+              y1="70" y2="120"
+              stroke="var(--mantis-loss)" stroke-dasharray="2 2" opacity="0.5"/>
       }
 
       @for (p of points(); track $index) {
-        <circle [attr.cx]="p.x * 100"
-                [attr.cy]="50 - p.y * 45"
-                r="0.9"
+        <circle [attr.cx]="p.x * 280"
+                [attr.cy]="70 - p.y * 60"
+                r="2.2"
                 [class.is-win]="p.win"
                 [class.is-loss]="!p.win"
                 [class.is-highlight]="p.highlight"/>
       }
     </svg>
+
+    <span class="dur-axis dur-axis--top mantis-mono" aria-hidden="true">+{{ currencySym() }}</span>
+    <span class="dur-axis dur-axis--bot mantis-mono" aria-hidden="true">−{{ currencySym() }}</span>
+    <span class="dur-axis dur-axis--x mantis-mono" aria-hidden="true">dur →</span>
 
     @if (!hasData()) {
       <div class="dur-empty mantis-mono">
@@ -47,11 +58,11 @@
     <footer class="dur-footer">
       <span class="dur-stat mantis-mono is-win">
         <span class="dur-stat__dot"></span>
-        win <span class="dur-stat__detail">{{ formatDuration(b.winAvg) }}</span>
+        win <span class="dur-stat__detail">{{ formatDuration(b.winAvg) }} · {{ formatEurPerHour(b.winEurPerHour) }}</span>
       </span>
       <span class="dur-stat mantis-mono is-loss">
         <span class="dur-stat__dot"></span>
-        loss <span class="dur-stat__detail">{{ formatDuration(b.lossAvg) }}</span>
+        loss <span class="dur-stat__detail">{{ formatDuration(b.lossAvg) }} · {{ formatEurPerHour(b.lossEurPerHour) }}</span>
       </span>
       @if (b.bias) {
         <span class="dur-alert mantis-mono">

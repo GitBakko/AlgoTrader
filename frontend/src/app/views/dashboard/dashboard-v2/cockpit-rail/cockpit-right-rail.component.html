@@ -1,0 +1,56 @@
+<aside class="rail rail--right" role="group" aria-label="Drawdown metrics">
+
+  <div class="rail__row rail__row--loss">
+    <span class="rail__label mantis-mono">Max Drawdown</span>
+    <span class="rail__value rail__value--loss mantis-mono">
+      @if (maxDrawdownPct() != null) {
+        −{{ maxDrawdownPct() | number: '1.2-2' }}%
+      } @else {
+        —
+      }
+    </span>
+    <span class="rail__sub mantis-mono">
+      @if (daysSincePeak() != null) {
+        {{ daysSincePeak() }}d dal peak
+      } @else {
+        &nbsp;
+      }
+      @if (recoveryInProgress()) {
+        · rec. in corso
+      } @else if (peakEquity() != null) {
+        · at peak
+      }
+    </span>
+  </div>
+
+  <div class="rail__row rail__row--warn">
+    <span class="rail__label mantis-mono">Current DD</span>
+    <span class="rail__value mantis-mono"
+          [class.rail__value--warn]="(currentDdPct() ?? 0) > 0.5"
+          [class.rail__value--loss]="(currentDdPct() ?? 0) > 5">
+      @if (currentDdPct() != null) {
+        −{{ currentDdPct() | number: '1.2-2' }}%
+      } @else {
+        —
+      }
+    </span>
+    <span class="rail__sub mantis-mono">
+      @if (currentEquity() != null && peakEquity() != null) {
+        {{ formatEquity(currentEquity()!) }} vs peak {{ formatEquity(peakEquity()!) }}
+      } @else {
+        —
+      }
+    </span>
+  </div>
+
+  <div class="rail__row">
+    <span class="rail__label mantis-mono">Win Rate</span>
+    <span class="rail__value rail__value--neon mantis-mono">
+      {{ winRate() | number: '1.1-1' }}%
+    </span>
+    <span class="rail__sub mantis-mono">
+      {{ winCount() }}W · {{ lossCount() }}L
+    </span>
+  </div>
+
+</aside>

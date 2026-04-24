@@ -1,6 +1,8 @@
 import { Component, ChangeDetectionStrategy, computed, inject, input, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { TradingService } from '../../../../core/services/trading.service';
 import { TimeframeService } from '../../../../core/services/timeframe.service';
+import { formatMoneyIt } from '../shared/currency.util';
 import { TradeBreakdownDay, TradeOutcomeSide } from './trade-breakdown.types';
 
 /**
@@ -28,6 +30,8 @@ import { TradeBreakdownDay, TradeOutcomeSide } from './trade-breakdown.types';
 })
 export class TradeBreakdownComponent {
   private readonly timeframe = inject(TimeframeService);
+  private readonly trading = inject(TradingService);
+  readonly currency = computed<string>(() => this.trading.overview()?.currency ?? 'USD');
 
   /** Upstream data from parent. `null` = backend endpoint missing. */
   readonly days = input<TradeBreakdownDay[] | null>(null);
@@ -40,15 +44,41 @@ export class TradeBreakdownComponent {
 
   readonly isBackendMissing = computed<boolean>(() => this.days() === null);
 
+  /**
+   * Chart Y-axis scale = P90 of non-zero CLOSED-outcome side totals
+   * (tp + sl only). `going` is excluded from the scale because it only
+   * reflects the single currently-open position. Days whose tp+sl
+   * exceed the P90 scale get clipped + tagged with an overflow badge.
+   */
   readonly maxStack = computed<number>(() => {
     const arr = this.activeDays();
     if (arr.length === 0) return 1;
-    let max = 1;
+    const vals: number[] = [];
     for (const d of arr) {
-      max = Math.max(max, sideTotal(d.buy), sideTotal(d.sell));
+      const b = d.buy.tp + d.buy.sl;
+      const s = d.sell.tp + d.sell.sl;
+      if (b > 0) vals.push(b);
+      if (s > 0) vals.push(s);
+    }
+    if (vals.length === 0) return 5;
+    vals.sort((a, b) => a - b);
+    const idx = Math.min(vals.length - 1, Math.floor(vals.length * 0.9));
+    const p90 = vals[idx] ?? vals[vals.length - 1];
+    return Math.max(5, Math.ceil(p90 / 5) * 5);
+  });
+
+  /** Absolute max tp+sl — overflow detection + meta. */
+  readonly trueMax = computed<number>(() => {
+    const arr = this.activeDays();
+    if (arr.length === 0) return 0;
+    let max = 0;
+    for (const d of arr) {
+      max = Math.max(max, d.buy.tp + d.buy.sl, d.sell.tp + d.sell.sl);
     }
     return max;
   });
+
+  readonly hasOverflow = computed<boolean>(() => this.trueMax() > this.maxStack());
 
   readonly focused = computed<TradeBreakdownDay | null>(() => {
     const arr = this.activeDays();
@@ -71,6 +101,9 @@ export class TradeBreakdownComponent {
 
   readonly timeframeLabel = computed(() => this.timeframe.label());
   readonly daysCount = computed(() => this.activeDays().filter(d => sideTotal(d.buy) + sideTotal(d.sell) > 0).length);
+  readonly tradeTotal = computed(() =>
+    this.activeDays().reduce((sum, d) => sum + sideTotal(d.buy) + sideTotal(d.sell), 0),
+  );
 
   readonly firstDate = computed<string>(() => this.activeDays()[0]?.date ?? '');
   readonly lastDate  = computed<string>(() => {
@@ -91,11 +124,22 @@ export class TradeBreakdownComponent {
     this.focusedIndex.set(null);
   }
 
-  /** Percentage height for a stacked segment, rounded to the nearest 0.1%. */
+  /** Percentage height for a stacked segment, capped at 100% (overflow-safe). */
   segmentHeightPct(value: number): number {
     const max = this.maxStack();
     if (max <= 0) return 0;
-    return Math.round((value / max) * 1000) / 10;
+    const pct = (value / max) * 100;
+    return Math.round(Math.min(100, pct) * 10) / 10;
+  }
+
+  /** True if tp+sl for a side exceeds the chart's P75 scale. */
+  isOverflow(side: TradeOutcomeSide): boolean {
+    return (side.tp + side.sl) > this.maxStack();
+  }
+
+  /** Label displayed on overflow badge — total tp+sl for the overflowing side. */
+  overflowValue(side: TradeOutcomeSide): number {
+    return side.tp + side.sl;
   }
 
   sideTotal = sideTotal;
@@ -117,8 +161,7 @@ export class TradeBreakdownComponent {
   }
 
   formatMoney(value: number): string {
-    const sign = value > 0 ? '+' : value < 0 ? '−' : '';
-    return `${sign}€${Math.abs(value).toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+    return formatMoneyIt(value, this.currency(), { minDec: 0, maxDec: 2 });
   }
 }
 

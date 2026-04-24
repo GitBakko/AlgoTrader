@@ -1,0 +1,53 @@
+<aside class="rail rail--left" role="group" aria-label="Performance metrics">
+
+  <div class="rail__row"
+       [class.rail__row--loss]="!profitFactorMeetsThreshold() && profitFactor() != null">
+    <span class="rail__label mantis-mono">Profit Factor</span>
+    <span class="rail__value mantis-mono"
+          [class.is-positive]="profitFactorMeetsThreshold()"
+          [class.is-negative]="!profitFactorMeetsThreshold() && profitFactor() != null">
+      {{ formatRatio(profitFactor()) }}
+    </span>
+    <span class="rail__sub mantis-mono">
+      @if (perf()) {
+        gross {{ formatCompactMoney(grossProfit()) }} / {{ formatCompactMoney(grossLoss()) }}
+        · soglia 1.3 {{ profitFactorMeetsThreshold() ? '✓' : '✗' }}
+      } @else {
+        —
+      }
+    </span>
+  </div>
+
+  <div class="rail__row"
+       [class.rail__row--cyan]="(calmar() ?? 0) >= 0"
+       [class.rail__row--loss]="(calmar() ?? 0) < 0">
+    <span class="rail__label mantis-mono">Calmar</span>
+    <span class="rail__value mantis-mono"
+          [class.is-positive]="(calmar() ?? 0) > 0"
+          [class.is-negative]="(calmar() ?? 0) < 0">
+      {{ formatRatio(calmar()) }}
+    </span>
+    <span class="rail__sub mantis-mono">
+      Sharpe {{ formatRatio(sharpe()) }} · Sortino {{ formatRatio(sortino()) }}
+    </span>
+  </div>
+
+  <div class="rail__row"
+       [class.rail__row--green]="(expectancy() ?? 0) >= 0"
+       [class.rail__row--loss]="(expectancy() ?? 0) < 0">
+    <span class="rail__label mantis-mono">Expectancy</span>
+    <span class="rail__value mantis-mono"
+          [class.is-positive]="(expectancy() ?? 0) > 0"
+          [class.is-negative]="(expectancy() ?? 0) < 0">
+      @if (expectancy() != null) {
+        {{ formatMoney(expectancy()!) }}
+      } @else {
+        —
+      }
+    </span>
+    <span class="rail__sub mantis-mono">
+      per trade · {{ tradeCount() }} closed
+    </span>
+  </div>
+
+</aside>

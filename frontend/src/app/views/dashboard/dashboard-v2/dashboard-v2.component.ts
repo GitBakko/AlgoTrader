@@ -11,11 +11,13 @@ import { ToastService } from '../../../shared/services/toast.service';
 import { TvChartComponent, LineDataPoint, EquityTooltipPoint } from '../../../shared/components/tv-chart/tv-chart.component';
 
 import { OperationalStripComponent } from './operational-strip/operational-strip.component';
-import { KpiRailComponent } from './kpi-rail/kpi-rail.component';
+import { CockpitLeftRailComponent } from './cockpit-rail/cockpit-left-rail.component';
+import { CockpitRightRailComponent } from './cockpit-rail/cockpit-right-rail.component';
 import { DurationScatterComponent } from './cockpit-bottom/duration-scatter.component';
 import { OvernightSwapComponent } from './cockpit-bottom/overnight-swap.component';
 import { CalendarHeatmapComponent } from './cockpit-bottom/calendar-heatmap.component';
 import { TradeBreakdownComponent } from './trade-breakdown/trade-breakdown.component';
+import { currencySymbol } from './shared/currency.util';
 
 /**
  * DASHBOARD v2 — Deliverable A (Variant B "Cockpit")
@@ -35,7 +37,8 @@ import { TradeBreakdownComponent } from './trade-breakdown/trade-breakdown.compo
     CommonModule,
     TvChartComponent,
     OperationalStripComponent,
-    KpiRailComponent,
+    CockpitLeftRailComponent,
+    CockpitRightRailComponent,
     DurationScatterComponent,
     OvernightSwapComponent,
     CalendarHeatmapComponent,
@@ -56,14 +59,26 @@ export class DashboardV2Component implements OnInit, OnDestroy {
   readonly timeframes: readonly Timeframe[] = TIMEFRAME_OPTIONS;
   readonly activeTimeframe = this.timeframeSvc.current;
 
-  readonly clockTick = signal<number>(Date.now());
-  private clockTimer: ReturnType<typeof setInterval> | null = null;
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly killSwitchBusy = signal(false);
   readonly customOpen = signal(false);
   readonly customFrom = signal<string>(this.isoDaysAgo(30));
   readonly customTo   = signal<string>(this.today());
+
+  /** Earliest date visible in the current equity curve — header subtitle. */
+  readonly sinceDate = computed<string | null>(() => {
+    const curve = this.trading.equityCurve();
+    if (curve.length === 0) return null;
+    const first = curve[0].date ?? '';
+    return first.slice(0, 10) || null;
+  });
+
+  /** Total closed trades in the current timeframe — header subtitle. */
+  readonly closedTrades = computed<number>(() => this.trading.performance()?.trade_count ?? 0);
+
+  /** Broker-sourced currency symbol for the whole dashboard. */
+  readonly currencySym = computed<string>(() => currencySymbol(this.trading.overview()?.currency ?? 'USD'));
 
   /** Pulls breakdown days straight from the TradingService signal so the
    *  child stays a dumb presenter. */
@@ -78,20 +93,102 @@ export class DashboardV2Component implements OnInit, OnDestroy {
     return positions[0]?.epic ?? 'XAUUSD';
   });
 
-  readonly now = computed(() => {
-    this.clockTick();
-    return new Date();
-  });
-
-  readonly clockLabel = computed(() =>
-    this.now().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-  );
-
   readonly headlineEquity = computed(() => this.trading.overview()?.equity ?? null);
   readonly headlineDailyPct = computed(() => {
     const ov = this.trading.overview();
     if (!ov || ov.equity === 0) return null;
     return (ov.daily_pnl / ov.equity) * 100;
+  });
+
+  /** Cumulative ROI % since the earliest point of the current equity curve. */
+  readonly roiPct = computed<number | null>(() => {
+    const curve = this.trading.equityCurve();
+    const eq = this.headlineEquity();
+    if (curve.length === 0 || eq == null) return null;
+    const initial = curve[0].equity;
+    if (!initial) return null;
+    return ((eq - initial) / initial) * 100;
+  });
+
+  /**
+   * Peak / Max-DD overlay markers for the equity spine.
+   * Coords are percentages relative to the chart canvas, approximating
+   * tv-chart's rendering (linear X by index, linear Y by equity range).
+   */
+  readonly chartRange = computed<{ min: number; max: number; n: number } | null>(() => {
+    const curve = this.trading.equityCurve();
+    if (curve.length < 2) return null;
+    let min = Infinity;
+    let max = -Infinity;
+    for (const p of curve) {
+      if (p.equity < min) min = p.equity;
+      if (p.equity > max) max = p.equity;
+    }
+    if (min === max) return null;
+    return { min, max, n: curve.length };
+  });
+
+  readonly peakMarker = computed<{ xPct: number; yPct: number; equity: number; date: string } | null>(() => {
+    const curve = this.trading.equityCurve();
+    const range = this.chartRange();
+    if (!range || curve.length < 2) return null;
+    let idx = 0;
+    for (let i = 1; i < curve.length; i++) {
+      if (curve[i].equity > curve[idx].equity) idx = i;
+    }
+    const p = curve[idx];
+    return {
+      xPct: (idx / (range.n - 1)) * 100,
+      yPct: (1 - (p.equity - range.min) / (range.max - range.min)) * 100,
+      equity: p.equity,
+      date: (p.date ?? '').slice(0, 10),
+    };
+  });
+
+  readonly maxDdMarker = computed<{ xPct: number; yPct: number; ddPct: number; date: string } | null>(() => {
+    const curve = this.trading.equityCurve();
+    const range = this.chartRange();
+    if (!range || curve.length < 2) return null;
+    let idx = 0;
+    for (let i = 1; i < curve.length; i++) {
+      if (curve[i].drawdown_pct < curve[idx].drawdown_pct) idx = i;
+    }
+    const p = curve[idx];
+    if (p.drawdown_pct >= 0) return null; // no drawdown → no marker
+    return {
+      xPct: (idx / (range.n - 1)) * 100,
+      yPct: (1 - (p.equity - range.min) / (range.max - range.min)) * 100,
+      ddPct: p.drawdown_pct,
+      date: (p.date ?? '').slice(0, 10),
+    };
+  });
+
+  /** Horizontal dashed peak-line y-position (pct from top). */
+  readonly peakLineY = computed<number | null>(() => {
+    const peak = this.peakMarker();
+    return peak ? peak.yPct : null;
+  });
+
+  /** Breakeven line (initial equity) — only if in chart range. */
+  readonly breakevenY = computed<number | null>(() => {
+    const curve = this.trading.equityCurve();
+    const range = this.chartRange();
+    if (!range || curve.length === 0) return null;
+    const initial = curve[0].equity;
+    if (initial < range.min || initial > range.max) return null;
+    return (1 - (initial - range.min) / (range.max - range.min)) * 100;
+  });
+
+  /** Annualized return, geometric: (1 + roi) ^ (365/days) - 1 */
+  readonly annualizedPct = computed<number | null>(() => {
+    const curve = this.trading.equityCurve();
+    const roi = this.roiPct();
+    if (curve.length < 2 || roi == null) return null;
+    const days = Math.max(1, curve.length);
+    const factor = 1 + roi / 100;
+    if (factor <= 0) return null;
+    const ann = Math.pow(factor, 365 / days) - 1;
+    return ann * 100;
   });
 
   readonly equityLineData = computed<LineDataPoint[]>(() => {
@@ -177,7 +274,6 @@ export class DashboardV2Component implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.clockTimer = setInterval(() => this.clockTick.set(Date.now()), 1_000);
     this.startPolling();
     this.ws.connectPrices();
     this.news.getNews('US500', 5, 7);
@@ -185,7 +281,6 @@ export class DashboardV2Component implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    if (this.clockTimer) { clearInterval(this.clockTimer); this.clockTimer = null; }
     if (this.pollTimer)  { clearTimeout(this.pollTimer);   this.pollTimer = null; }
   }
 

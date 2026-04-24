@@ -7,93 +7,309 @@
 
 .op-strip {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: var(--mantis-space-2);
-  min-height: 86px;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 8px 14px;
+  background:
+    linear-gradient(180deg, rgba(22, 27, 34, 0.9) 0%, rgba(13, 17, 23, 0.6) 100%);
+  border: 1px solid rgba(57, 255, 20, 0.18);
+  border-radius: var(--mantis-radius-sm);
+  align-items: start;
 }
 
-.op-tile {
-  position: relative;
+// ── ZONE 1 — Live P&L hero ───────────────────────────────────
+.op-z1 {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: var(--mantis-space-1);
-  padding: var(--mantis-space-2) var(--mantis-space-3);
-  background: var(--mantis-surface-2);
-  border: 1px solid var(--mantis-border-accent);
-  border-radius: var(--mantis-radius-sm);
-  overflow: hidden;
+  gap: 2px;
+  padding-right: 14px;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
 
-  // Top accent line (neon-green) — standard KPI card pattern
-  &::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: 2px;
-    background: var(--mantis-neon);
-    opacity: 0.85;
+  &__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--mantis-space-2);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
   }
 
-  &.is-todo::before { opacity: 0.25; }
-  &.is-off::before  { background: var(--mantis-neutral); opacity: 0.4; }
+  // Mock alignment: rounded pill chips for session / live badges.
+  &__label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 700;
+    color: var(--mantis-neon);
+    padding: 3px 8px;
+    background: rgba(57, 255, 20, 0.08);
+    border: 1px solid rgba(57, 255, 20, 0.2);
+    border-radius: var(--mantis-radius-pill);
+  }
 
-  &.is-alert {
-    border-color: rgba(255, 61, 87, 0.45);
-    &::before { background: var(--mantis-loss); animation: opStripEmergency 2s ease-in-out infinite; }
+  &__session {
+    display: inline-flex;
+    align-items: center;
+    font-weight: 600;
+    color: var(--mantis-text-muted);
+    padding: 3px 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--mantis-radius-pill);
+  }
+
+  &__hero {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--mantis-text-primary);
+    line-height: 1.05;
+    display: inline-flex;
+    gap: var(--mantis-space-2);
+    align-items: baseline;
+
+    &.is-positive {
+      color: var(--mantis-neon);
+      text-shadow: 0 0 12px rgba(57, 255, 20, 0.45);
+    }
+    &.is-negative { color: var(--mantis-loss); }
+  }
+
+  &__delta {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  &__foot {
+    display: inline-flex;
+    gap: 6px;
+    font-size: 10px;
+    color: var(--mantis-text-muted);
+    letter-spacing: 0.04em;
+  }
+}
+
+// ── ZONE 2 — Open Positions ──────────────────────────────────
+.op-z2 {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+
+  &__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--mantis-space-2);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--mantis-text-muted);
   }
 
   &__label {
-    font-family: var(--mantis-font-mono);
-    font-size: var(--mantis-fs-xxs);
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    font-weight: 700;
+    color: var(--mantis-neon);
+    padding: 3px 8px;
+    background: rgba(57, 255, 20, 0.08);
+    border: 1px solid rgba(57, 255, 20, 0.2);
+    border-radius: var(--mantis-radius-pill);
+  }
+
+  &__meta {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
     color: var(--mantis-text-muted);
+  }
+
+  &__empty {
+    font-size: 10px;
+    color: var(--mantis-text-muted);
+    letter-spacing: 0.04em;
+    padding: var(--mantis-space-2) 0;
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 180px));
+    gap: 6px;
+    min-width: 0;
+  }
+}
+
+.op-kill {
+  background: rgba(255, 61, 87, 0.12);
+  border: 1px solid rgba(255, 61, 87, 0.5);
+  color: var(--mantis-loss);
+  padding: 3px 10px;
+  border-radius: var(--mantis-radius-sm);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-size: 9px;
+  cursor: pointer;
+  margin-left: 4px;
+  animation: opKillPulse 2s ease-in-out infinite;
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 61, 87, 0.2);
+    box-shadow: 0 0 10px rgba(255, 61, 87, 0.5);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    animation: none;
+  }
+}
+
+@keyframes opKillPulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(255, 61, 87, 0.45); }
+  50%      { box-shadow: 0 0 10px rgba(255, 61, 87, 0.55); }
+}
+
+.op-pos {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  min-width: 0;
+  overflow: hidden;
+
+  // Mock: background + border tinted by win/loss, 3px colored left edge
+  &.is-profit {
+    background: rgba(57, 255, 20, 0.06);
+    border: 1px solid rgba(57, 255, 20, 0.2);
+    border-left: 3px solid var(--mantis-neon);
+  }
+  &.is-loss {
+    background: rgba(255, 61, 87, 0.06);
+    border: 1px solid rgba(255, 61, 87, 0.2);
+    border-left: 3px solid var(--mantis-loss);
+  }
+
+  &__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  &__sym {
+    font-size: 13px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.92);
+    letter-spacing: 0.02em;
+  }
+
+  &__dir {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+
+    &.is-buy  { color: var(--mantis-neon); }
+    &.is-sell { color: var(--mantis-loss); }
+  }
+
+  &__pnl {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 700;
+
+    &-abs {
+      .is-profit & {
+        color: var(--mantis-neon);
+        text-shadow: 0 0 8px rgba(57, 255, 20, 0.3);
+      }
+      .is-loss & { color: var(--mantis-loss); }
+    }
+
+    &-pct {
+      font-size: 11px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.55);
+    }
+  }
+
+  &--overflow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--mantis-text-muted);
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.02);
+  }
+}
+
+// ── ZONE 3 — System (mock: 2-col grid, inline key/value) ────
+.op-z3 {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 200px;
+  padding-left: 14px;
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+
+  &__head {
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.45);
     font-weight: 700;
   }
 
-  &__value {
+  &__label {
     display: inline-flex;
     align-items: center;
-    gap: var(--mantis-space-1);
-    font-family: var(--mantis-font-ui);
-    font-size: var(--mantis-fs-2xl);
     font-weight: 700;
-    line-height: 1.1;
-    color: var(--mantis-text-primary);
+    color: var(--mantis-neon);
+    padding: 3px 8px;
+    background: rgba(57, 255, 20, 0.08);
+    border: 1px solid rgba(57, 255, 20, 0.2);
+    border-radius: var(--mantis-radius-pill);
   }
 
-  &__value-sub {
-    font-size: var(--mantis-fs-xs);
-    color: var(--mantis-text-secondary);
-    opacity: 0.75;
-    margin-left: var(--mantis-space-1);
-    font-weight: 500;
+  &__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 10px;
+    font-size: 10px;
   }
 
-  &__sub {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--mantis-space-1);
-    font-size: var(--mantis-fs-xs);
-    color: var(--mantis-text-secondary);
-    opacity: 0.85;
+  &__row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 6px;
+
+    &.is-alert .op-z3__v { color: var(--mantis-loss) !important; }
   }
 
-  // Session tile — red left accent when closed, neon-green when open
-  &--session {
-    border-left: 2px solid var(--mantis-loss);
-    &.is-closed {
-      border-left-color: var(--mantis-loss);
-    }
-    &:not(.is-closed) {
-      border-left-color: var(--mantis-neon);
-    }
+  &__k {
+    color: rgba(255, 255, 255, 0.45);
+  }
+
+  &__v {
+    color: var(--mantis-neon);
+    font-weight: 600;
+
+    &.is-warn    { color: var(--mantis-warning); }
+    &.is-ok      { color: var(--mantis-neon); }
+    &.is-neutral { color: rgba(255, 255, 255, 0.7); }
   }
 }
 
 .op-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: var(--mantis-radius-pill);
   background: var(--mantis-neutral);
   display: inline-block;
@@ -103,14 +319,8 @@
     box-shadow: 0 0 8px rgba(57, 255, 20, 0.6);
     animation: opStripPulse 2s ease-in-out infinite;
   }
-  &--warn {
-    background: var(--mantis-warning);
-    box-shadow: 0 0 8px rgba(255, 176, 32, 0.55);
-  }
-  &--closed {
-    background: var(--mantis-loss);
-    box-shadow: 0 0 6px rgba(255, 61, 87, 0.45);
-  }
+  &--warn   { background: var(--mantis-warning); box-shadow: 0 0 8px rgba(255, 176, 32, 0.55); }
+  &--closed { background: var(--mantis-loss);    box-shadow: 0 0 6px rgba(255, 61, 87, 0.45); }
 }
 
 @keyframes opStripPulse {
@@ -118,25 +328,22 @@
   50%      { opacity: 0.35; }
 }
 
-@keyframes opStripEmergency {
-  0%, 100% { opacity: 0.95; filter: drop-shadow(0 0 4px rgba(255,61,87,0.6)); }
-  50%      { opacity: 0.45; filter: drop-shadow(0 0 2px rgba(255,61,87,0.35)); }
+// Responsive
+@media (max-width: 1279px) {
+  .op-strip {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+  }
+  .op-z3 { grid-column: 1 / -1; }
+}
+
+@media (max-width: 767px) {
+  .op-strip { grid-template-columns: 1fr; }
+  .op-z2__grid { grid-template-columns: repeat(2, 1fr); }
+  .op-z3__grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .op-dot--live,
-  .op-tile.is-alert::before {
-    animation: none !important;
-  }
-}
-
-// Responsive: collapse to 3 columns between 768-1279px, 2 columns below 768px
-@media (max-width: 1279px) {
-  .op-strip { grid-template-columns: repeat(3, 1fr); }
-}
-@media (max-width: 767px) {
-  .op-strip { grid-template-columns: repeat(2, 1fr); }
-}
-@media (max-width: 480px) {
-  .op-strip { grid-template-columns: 1fr; }
+  .op-kill { animation: none !important; }
 }

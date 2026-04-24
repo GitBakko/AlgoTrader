@@ -1,5 +1,9 @@
-import { ApplicationConfig, APP_INITIALIZER } from '@angular/core';
+import { ApplicationConfig, APP_INITIALIZER, LOCALE_ID } from '@angular/core';
+import { registerLocaleData } from '@angular/common';
+import localeIt from '@angular/common/locales/it';
 import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
+
+registerLocaleData(localeIt, 'it-IT');
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import {
   PreloadAllModules,
@@ -42,6 +46,7 @@ export const appConfig: ApplicationConfig = {
       withInterceptors([authInterceptor, errorInterceptor])
     ),
     IconSetService,
+    { provide: LOCALE_ID, useValue: 'it-IT' },
     provideAnimationsAsync(),
     {
       provide: APP_INITIALIZER,

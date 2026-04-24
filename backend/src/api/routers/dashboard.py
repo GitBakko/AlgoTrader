@@ -102,6 +102,31 @@ async def get_overview(
         except Exception as e:
             logger.debug(f"DB today realized P&L query failed: {e}")
 
+    # Live unrealized P&L from open positions (broker authoritative)
+    live_unrealized = 0.0
+    try:
+        open_positions_upl = await engine.get_open_positions()
+        for p in open_positions_upl or []:
+            # p can be dict (tracker) or Position model — handle both.
+            upl = p.get("upl") if isinstance(p, dict) else getattr(p, "upl", None)
+            if upl is not None:
+                live_unrealized += float(upl)
+    except Exception as e:
+        logger.debug(f"Live UPL aggregation failed: {e}")
+
+    # Fetch account currency from broker (one-shot, cached per request)
+    currency = "USD"
+    try:
+        broker_client = getattr(request.app.state, "broker_client", None)
+        if broker_client is not None:
+            accounts = await broker_client.get_accounts()
+            if accounts:
+                currency = accounts[0].currency or "USD"
+    except Exception as e:
+        logger.debug(f"Account currency fetch failed: {e}")
+
+    live_daily_pnl = round(today_realized_pnl + live_unrealized, 2)
+
     overview = DashboardOverview(
         equity=state.current_equity,
         daily_pnl=state.daily_pnl,
@@ -114,6 +139,9 @@ async def get_overview(
     )
 
     data = overview.model_dump()
+    data["live_daily_pnl"] = live_daily_pnl
+    data["live_unrealized_pnl"] = round(live_unrealized, 2)
+    data["currency"] = currency
 
     # Add paper trading loop status
     paper_loop = getattr(request.app.state, "paper_loop", None)

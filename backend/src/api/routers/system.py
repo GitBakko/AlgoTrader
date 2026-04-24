@@ -43,13 +43,25 @@ async def get_system_settings():
 async def get_risk_status(
     risk_mgr: RiskManager = Depends(get_risk_manager),
 ):
-    """Get current risk management status including drawdown and circuit breaker."""
+    """Get current risk management status including drawdown and circuit breaker.
+
+    `current_drawdown_pct` is recomputed inline from peak_equity vs current_equity
+    to avoid stale values after a fresh backend restart where the drawdown
+    monitor has not yet run a full update cycle.
+    """
     state = risk_mgr.drawdown_monitor.state
+
+    peak = float(state.peak_equity or 0.0)
+    current = float(state.current_equity or 0.0)
+    if peak > 0 and current > 0 and peak >= current:
+        live_dd = (peak - current) / peak
+    else:
+        live_dd = float(state.current_drawdown_pct or 0.0)
 
     response = RiskStatusResponse(
         peak_equity=state.peak_equity,
         current_equity=state.current_equity,
-        current_drawdown_pct=state.current_drawdown_pct,
+        current_drawdown_pct=round(live_dd, 6),
         daily_pnl=state.daily_pnl,
         circuit_breaker_active=state.circuit_breaker_active,
         circuit_breaker_reason=state.circuit_breaker_reason,

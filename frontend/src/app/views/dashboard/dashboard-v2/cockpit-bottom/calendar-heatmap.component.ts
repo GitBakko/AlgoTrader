@@ -1,12 +1,14 @@
 import { Component, ChangeDetectionStrategy, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TradingService } from '../../../../core/services/trading.service';
+import { currencySymbol, formatMoneyIt } from '../shared/currency.util';
 
 interface HeatmapCell {
   date: string;        // YYYY-MM-DD
   pnl: number;
   tradeCount: number;
   winCount: number;
+  equity: number;
   isEmpty: boolean;
 }
 
@@ -49,6 +51,7 @@ export class CalendarHeatmapComponent {
         pnl: p.daily_pnl ?? 0,
         tradeCount,
         winCount,
+        equity: p.equity ?? 0,
         isEmpty: tradeCount === 0 && (p.daily_pnl ?? 0) === 0,
       });
     }
@@ -128,9 +131,36 @@ export class CalendarHeatmapComponent {
     return `rgba(255,61,87,${alpha.toFixed(2)})`;
   }
 
+  cellIntensity(cell: HeatmapCell): number {
+    if (cell.isEmpty || cell.pnl === 0) return 0;
+    return Math.min(1, Math.abs(cell.pnl) / this.maxAbsPnl());
+  }
+
+  readonly currency = computed<string>(() => this.trading.overview()?.currency ?? 'USD');
+
+  /** Compact P&L format for in-cell text: +1.4k, -612 (no currency, space-constrained). */
+  formatCompact(n: number): string {
+    if (n === 0) return '';
+    const abs = Math.abs(n);
+    const sign = n > 0 ? '+' : '−';
+    if (abs >= 1000) return `${sign}${(abs / 1000).toFixed(abs >= 10000 ? 0 : 1)}k`;
+    return `${sign}${Math.round(abs)}`;
+  }
+
+  /** % of peak equity (simple proxy: pnl / equity * 100) */
+  focusEquityPct(cell: HeatmapCell): string {
+    if (!cell.equity || cell.pnl === 0) return '0.0%';
+    const pct = (cell.pnl / cell.equity) * 100;
+    return `${pct > 0 ? '+' : ''}${pct.toFixed(2)}%`;
+  }
+
+  focusHitRate(cell: HeatmapCell): string {
+    if (cell.tradeCount === 0) return '0%';
+    return `${Math.round((cell.winCount / cell.tradeCount) * 100)}%`;
+  }
+
   formatMoney(n: number): string {
-    const sign = n > 0 ? '+' : n < 0 ? '−' : '';
-    return `${sign}€${Math.abs(n).toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    return formatMoneyIt(n, this.currency(), { minDec: 0, maxDec: 0 });
   }
 
   formatFocusDate(iso: string): string {

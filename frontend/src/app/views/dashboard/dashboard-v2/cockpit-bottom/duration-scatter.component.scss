@@ -65,15 +65,27 @@
   display: block;
 
   circle {
-    opacity: 0.6;
+    opacity: 0.65;
 
     &.is-win  { fill: var(--mantis-neon); }
     &.is-loss { fill: var(--mantis-loss); }
     &.is-highlight {
       opacity: 0.95;
-      filter: drop-shadow(0 0 1px currentColor);
+      filter: drop-shadow(0 0 3px currentColor);
     }
   }
+}
+
+.dur-axis {
+  position: absolute;
+  font-size: 8px;
+  color: var(--mantis-text-muted);
+  letter-spacing: 0.04em;
+  pointer-events: none;
+
+  &--top { top: 4px;    left: 6px; }
+  &--bot { bottom: 4px; left: 6px; }
+  &--x   { bottom: 4px; right: 6px; }
 }
 
 .dur-empty {

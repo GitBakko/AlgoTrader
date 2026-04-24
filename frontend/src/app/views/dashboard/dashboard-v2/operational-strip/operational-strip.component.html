@@ -1,79 +1,138 @@
 <div class="op-strip" role="group" aria-label="Operational status">
 
-  <!-- 1. SESSION -->
-  <div class="op-tile op-tile--session"
-       [class.is-closed]="!sessionOpen()">
-    <span class="op-tile__label">Session</span>
-    <span class="op-tile__value mantis-mono">{{ sessionLabel() }}</span>
-    <span class="op-tile__sub">
-      <span class="op-dot"
-            [class.op-dot--live]="sessionOpen()"
-            [class.op-dot--closed]="!sessionOpen()"
-            aria-hidden="true"></span>
-      {{ sessionOpen() ? 'open' : 'closed' }}
-    </span>
-  </div>
+  <!-- ZONE 1 — LIVE P&L HERO -->
+  <section class="op-z1" aria-label="Live P&amp;L">
+    <header class="op-z1__head mantis-mono">
+      <span class="op-z1__label">
+        <span class="op-dot"
+              [class.op-dot--live]="sessionOpen()"
+              [class.op-dot--closed]="!sessionOpen()"
+              aria-hidden="true"></span>
+        SESSION · Live P&amp;L
+      </span>
+      <span class="op-z1__session">
+        {{ sessionOpen() ? 'LIVE' : 'CLOSED' }} · {{ sessionLabel() }}
+      </span>
+    </header>
 
-  <!-- 2. BROKER WS -->
-  <div class="op-tile" [class.is-off]="!ws$.connected()">
-    <span class="op-tile__label">Broker WS</span>
-    <span class="op-tile__value mantis-mono">
-      <span class="op-dot"
-            [class.op-dot--live]="ws$.connected() && !ws$.isMockPrices()"
-            [class.op-dot--warn]="ws$.isMockPrices()"
-            [class.op-dot--closed]="!ws$.connected()"
-            aria-hidden="true"></span>
-      {{ ws$.connected() ? (ws$.isMockPrices() ? 'MOCK' : 'LIVE') : 'OFF' }}
-      @if (ws$.latencyMs() != null) {
-        <span class="op-tile__value-sub mantis-mono">· {{ ws$.latencyMs() }}ms</span>
+    <div class="op-z1__hero mantis-mono"
+         [class.is-positive]="dailyPnl() > 0"
+         [class.is-negative]="dailyPnl() < 0">
+      {{ formatMoney(dailyPnl()) }}
+      @if (dailyPct() != null) {
+        <span class="op-z1__delta">
+          {{ (dailyPct() ?? 0) > 0 ? '▲' : (dailyPct() ?? 0) < 0 ? '▼' : '' }}
+          {{ (dailyPct() ?? 0) | number: '1.2-2' }}%
+        </span>
       }
-    </span>
-    <span class="op-tile__sub mantis-mono">
-      {{ ws$.pricesAreFresh() ? 'fresh' : 'stale' }}
-    </span>
-  </div>
+    </div>
 
-  <!-- 3. TRADES TODAY -->
-  <div class="op-tile">
-    <span class="op-tile__label">Trades today</span>
-    <span class="op-tile__value mantis-mono">
-      {{ tradesToday() === null ? '—' : tradesToday() }}
-    </span>
-    <span class="op-tile__sub mantis-mono">UTC day</span>
-  </div>
+    <footer class="op-z1__foot mantis-mono">
+      @if (equity() != null) {
+        <span>Equity {{ formatEquity(equity()!) }}</span>
+      }
+      <span>·</span>
+      <span>Trades {{ tradesToday() }}</span>
+      <span>·</span>
+      <span>Peak {{ formatMoneyCompact(peakIntraday()) }}</span>
+    </footer>
+  </section>
 
-  <!-- 4. CIRCUIT BREAKERS -->
-  <div class="op-tile"
-       [class.is-alert]="circuitBreakersTrippedCount() > 0">
-    <span class="op-tile__label">Circuit breakers</span>
-    <span class="op-tile__value mantis-mono">
-      {{ circuitBreakersTrippedCount() }}/{{ circuitBreakersTotal }} tripped
-    </span>
-    <span class="op-tile__sub mantis-mono">
-      {{ circuitBreakersTrippedCount() === 0 ? 'all green' : 'action required' }}
-    </span>
-  </div>
+  <!-- ZONE 2 — OPEN POSITIONS -->
+  <section class="op-z2" aria-label="Open positions">
+    <header class="op-z2__head mantis-mono">
+      <span class="op-z2__label">Open Positions · {{ openCount() }}/{{ maxSlots }}</span>
+      <span class="op-z2__meta">
+        <span>Kelly {{ kellyLabel() }}</span>
+        <span>·</span>
+        <span>{{ slotsFree() }} slots free</span>
+        @if (openCount() > 0) {
+          <button type="button"
+                  class="op-kill mantis-mono"
+                  [disabled]="killBusy()"
+                  (click)="onKill()"
+                  aria-label="Emergency kill switch">
+            @if (killBusy()) {
+              <span>Stopping…</span>
+            } @else {
+              <span>KILL SWITCH</span>
+            }
+          </button>
+        }
+      </span>
+    </header>
 
-  <!-- 5. PAPER BOT -->
-  <div class="op-tile" [class.is-off]="!paperBotRunning()">
-    <span class="op-tile__label">Paper bot</span>
-    <span class="op-tile__value mantis-mono">
-      <span class="op-dot"
-            [class.op-dot--live]="paperBotRunning()"
-            [class.op-dot--closed]="!paperBotRunning()"
-            aria-hidden="true"></span>
-      {{ paperBotRunning() ? 'RUNNING' : 'IDLE' }}
-    </span>
-    <span class="op-tile__sub mantis-mono">
-      {{ paperBotRunning() ? ('uptime ' + paperBotUptimeText()) : (executionMode() + ' · stopped') }}
-    </span>
-  </div>
+    @if (openCount() === 0) {
+      <div class="op-z2__empty mantis-mono">No open positions · waiting for next signal</div>
+    } @else {
+      <div class="op-z2__grid">
+        @for (p of visiblePositions(); track p.deal_id) {
+          <article class="op-pos mantis-mono"
+                   [class.is-profit]="(p.upl ?? 0) >= 0"
+                   [class.is-loss]="(p.upl ?? 0) < 0">
+            <header class="op-pos__head">
+              <span class="op-pos__sym">{{ p.epic }}</span>
+              <span class="op-pos__dir"
+                    [class.is-buy]="isLong(p.direction)"
+                    [class.is-sell]="!isLong(p.direction)">
+                {{ isLong(p.direction) ? '▲BUY' : '▼SELL' }}
+              </span>
+            </header>
+            <div class="op-pos__pnl">
+              <span class="op-pos__pnl-abs">{{ formatPnlCompact(p.upl ?? 0) }}</span>
+              @if (positionPct(p); as pct) {
+                <span class="op-pos__pnl-pct">
+                  {{ pct > 0 ? '+' : '' }}{{ pct | number: '1.2-2' }}%
+                </span>
+              }
+            </div>
+          </article>
+        }
+        @if (openCount() > 4) {
+          <div class="op-pos op-pos--overflow mantis-mono">
+            +{{ openCount() - 4 }} more
+          </div>
+        }
+      </div>
+    }
+  </section>
 
-  <!-- 6. MODEL -->
-  <div class="op-tile" [class.is-todo]="primaryModel() === null">
-    <span class="op-tile__label">Model</span>
-    <span class="op-tile__value mantis-mono">{{ primaryModelLabel() }}</span>
-    <span class="op-tile__sub mantis-mono">{{ primaryModelTrainedAt() }}</span>
-  </div>
+  <!-- ZONE 3 — SYSTEM (mock: 2-col grid, key left · value right) -->
+  <section class="op-z3" aria-label="System status">
+    <header class="op-z3__head mantis-mono">
+      <span class="op-z3__label">System</span>
+    </header>
+    <div class="op-z3__grid mantis-mono">
+      <div class="op-z3__row" [class.is-alert]="circuitBreakersTripped() > 0">
+        <span class="op-z3__k">Breakers</span>
+        <span class="op-z3__v">{{ breakersLabel() }}</span>
+      </div>
+      <div class="op-z3__row"
+           [class.is-off]="!ws$.connected()"
+           [class.is-warn]="ws$.connected() && ws$.isMockPrices()"
+           [class.is-ok]="ws$.connected() && !ws$.isMockPrices()">
+        <span class="op-z3__k">WS</span>
+        <span class="op-z3__v">
+          {{ ws$.connected() ? (ws$.isMockPrices() ? 'MOCK' : 'Live') : 'OFF' }}
+        </span>
+      </div>
+      <div class="op-z3__row">
+        <span class="op-z3__k">Broker</span>
+        <span class="op-z3__v is-neutral">Capital</span>
+      </div>
+      <div class="op-z3__row">
+        <span class="op-z3__k">Mode</span>
+        <span class="op-z3__v is-warn">{{ executionMode() }}</span>
+      </div>
+      <div class="op-z3__row">
+        <span class="op-z3__k">Swap</span>
+        <span class="op-z3__v is-warn">{{ swapLabel() }}</span>
+      </div>
+      <div class="op-z3__row">
+        <span class="op-z3__k">Regime</span>
+        <span class="op-z3__v is-ok">{{ regimeLabel() }}</span>
+      </div>
+    </div>
+  </section>
 
 </div>
