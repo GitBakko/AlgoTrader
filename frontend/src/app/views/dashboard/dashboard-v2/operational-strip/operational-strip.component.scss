@@ -256,8 +256,14 @@
     border: 1px solid rgba(255, 61, 87, 0.2);
     border-left: 3px solid var(--mantis-loss);
   }
-  &.is-selected {
-    box-shadow: 0 0 0 2px var(--mantis-cyan), 0 0 12px rgba(0, 229, 255, 0.35);
+  // Selected: promote the 3px accent to the full perimeter at full
+  // profit/loss color. Background stays unchanged so the win/loss tint
+  // is preserved.
+  &.is-selected.is-profit {
+    border: 3px solid var(--mantis-neon);
+  }
+  &.is-selected.is-loss {
+    border: 3px solid var(--mantis-loss);
   }
 
   &__head {
