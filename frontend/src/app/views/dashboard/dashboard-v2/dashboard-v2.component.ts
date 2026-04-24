@@ -262,13 +262,13 @@ export class DashboardV2Component implements OnInit, OnDestroy {
       // Dashboard v2 breakdown — uses the active timeframe directly.
       const range = this.timeframeSvc.customRange();
       if (tf === 'CUSTOM' && range) {
-        this.trading.loadPerformanceBreakdown(
-          'CUSTOM',
-          range.from.toISOString().slice(0, 10),
-          range.to.toISOString().slice(0, 10),
-        );
+        const from = range.from.toISOString().slice(0, 10);
+        const to = range.to.toISOString().slice(0, 10);
+        this.trading.loadPerformanceBreakdown('CUSTOM', from, to);
+        this.trading.loadPerformanceDelta('CUSTOM', from, to);
       } else {
         this.trading.loadPerformanceBreakdown(tf);
+        this.trading.loadPerformanceDelta(tf);
       }
     });
   }

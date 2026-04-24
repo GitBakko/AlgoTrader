@@ -25,6 +25,8 @@ import {
   TradeBreakdownResponse,
   CurrentModelsResponse,
   OvernightSwapResponse,
+  PerformanceDeltaResponse,
+  SwapAccumResponse,
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -74,6 +76,8 @@ export class TradingService {
   readonly tradeBreakdown = signal<TradeBreakdownResponse | null>(null);
   readonly currentModels = signal<CurrentModelsResponse | null>(null);
   readonly overnightSwap = signal<Record<string, OvernightSwapResponse>>({});
+  readonly swapAccum = signal<Record<string, SwapAccumResponse>>({});
+  readonly performanceDelta = signal<PerformanceDeltaResponse | null>(null);
 
   // Signal Notes (Trade Journal annotations)
   readonly signalNotes = signal<Record<string, string>>({});
@@ -321,6 +325,33 @@ export class TradingService {
       .subscribe({
         next: data => this.tradeBreakdown.set(data),
         error: () => this.tradeBreakdown.set(null),
+      });
+  }
+
+  /**
+   * GET /api/trading/performance/delta — win-rate delta vs retro-shifted previous period.
+   * Feeds the Win Rate tile sub (▲ +Xpp) in CockpitRightRail.
+   */
+  loadPerformanceDelta(tf: string, from?: string, to?: string): void {
+    const q: Record<string, string> = { tf };
+    if (from) q['from'] = from;
+    if (to) q['to'] = to;
+    this.api.get<PerformanceDeltaResponse>('/api/trading/performance/delta', q)
+      .subscribe({
+        next: data => this.performanceDelta.set(data),
+        error: () => this.performanceDelta.set(null),
+      });
+  }
+
+  /**
+   * GET /api/markets/{epic}/swap-accum — N-day accumulated overnight swap, server-computed.
+   * Caches per-epic in the swapAccum signal.
+   */
+  loadSwapAccum(epic: string, days = 7): void {
+    this.api.get<SwapAccumResponse>(`/api/markets/${epic}/swap-accum`, { days })
+      .subscribe({
+        next: data => this.swapAccum.update(cur => ({ ...cur, [epic]: data })),
+        error: () => {},
       });
   }
 

@@ -9,7 +9,7 @@ from loguru import logger
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from src.api.dependencies import get_broker_client, get_data_access
+from src.api.dependencies import get_broker_client, get_data_access, get_position_repo
 from src.api.schemas import MarketInfo, OHLCResponse, error_response, success_response
 from src.data.utils import calculate_next_market_open
 
@@ -283,6 +283,117 @@ async def get_overnight_swap(
         "next_charge_utc": next_charge.isoformat(),
         "source": source,
         "instrument_raw": raw_instrument if source == "broker" else None,
+    })
+
+
+@router.get("/{epic}/swap-accum")
+async def get_swap_accum(
+    epic: str = Path(...),
+    days: int = Query(default=7, ge=1, le=90),
+    broker=Depends(get_broker_client),
+    position_repo=Depends(get_position_repo),
+):
+    """
+    N-day accumulated overnight swap for an epic (Dashboard v2 Phase 4 §B).
+
+    MINIMAL implementation — no historical snapshot table yet:
+      - rate: current broker overnightFee (or static fallback)
+      - notional: size × entry_price of the OLDEST open position on this epic
+      - per-day expansion: applies Wed 3× multiplier where the rollover date
+        falls on Wednesday UTC (Capital.com triple-swap convention)
+    Returns 0 notional / empty per_day when no open position exists.
+
+    Response:
+      { epic, currency, period_days, total_accum,
+        per_day: [{ date, rate_pct, notional, swap }], source }
+    """
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
+    from datetime import timedelta as _td
+
+    from src.backtest.costs import OVERNIGHT_RATES
+
+    epic_upper = epic.upper()
+
+    long_rate_pct: float | None = None
+    short_rate_pct: float | None = None
+    currency: str | None = None
+    source = "static_fallback"
+
+    if broker is not None:
+        try:
+            details = await broker.get_market_details(epic_upper)
+            if isinstance(details, dict):
+                instrument = details.get("instrument") or {}
+                currency = instrument.get("currency")
+                fee = instrument.get("overnightFee")
+                if isinstance(fee, dict):
+                    lr = fee.get("longRate")
+                    sr = fee.get("shortRate")
+                    if isinstance(lr, (int, float)):
+                        long_rate_pct = float(lr)
+                    if isinstance(sr, (int, float)):
+                        short_rate_pct = float(sr)
+                if long_rate_pct is not None or short_rate_pct is not None:
+                    source = "broker"
+        except Exception as e:
+            logger.debug(f"swap-accum broker lookup failed for {epic_upper}: {e}")
+
+    if long_rate_pct is None or short_rate_pct is None:
+        static = OVERNIGHT_RATES.get(epic_upper, {"long": -0.000015, "short": -0.000010})
+        if long_rate_pct is None:
+            long_rate_pct = static["long"] * 100
+        if short_rate_pct is None:
+            short_rate_pct = static["short"] * 100
+
+    # Resolve position notional + direction from DB (oldest OPEN row on this epic).
+    position_size = 0.0
+    position_entry = 0.0
+    direction = "LONG"
+    if position_repo is not None:
+        try:
+            positions = await position_repo.get_by_epic(epic_upper, status="OPEN")
+            if positions:
+                positions_sorted = sorted(
+                    positions,
+                    key=lambda p: p.opened_at or _dt.min,
+                )
+                pos = positions_sorted[0]
+                position_size = float(pos.size or 0)
+                position_entry = float(pos.entry_price or 0)
+                direction = (pos.direction or "LONG").upper()
+        except Exception as e:
+            logger.debug(f"swap-accum position lookup for {epic_upper} failed: {e}")
+
+    rate_pct = short_rate_pct if direction == "SHORT" else long_rate_pct
+    notional = position_size * position_entry if (position_size and position_entry) else 0.0
+
+    # Build per-day series looking back (today-(days-1) .. today).
+    today = _dt.now(_UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    per_day: list[dict] = []
+    total = 0.0
+    for i in range(days - 1, -1, -1):
+        day = today - _td(days=i)
+        # Capital.com convention: Wed rollover charges 3× (weekend anticipated).
+        multiplier = 3 if day.weekday() == 2 else 1
+        day_swap = (rate_pct / 100.0) * notional * multiplier
+        total += day_swap
+        per_day.append({
+            "date": day.strftime("%Y-%m-%d"),
+            "rate_pct": round(rate_pct, 6),
+            "notional": round(notional, 2),
+            "swap": round(day_swap, 4),
+            "multiplier": multiplier,
+        })
+
+    return success_response({
+        "epic": epic_upper,
+        "currency": currency or "USD",
+        "period_days": days,
+        "total_accum": round(total, 2),
+        "direction": direction if notional > 0 else None,
+        "per_day": per_day,
+        "source": source,
     })
 
 

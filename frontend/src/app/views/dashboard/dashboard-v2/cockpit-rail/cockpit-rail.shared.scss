@@ -70,6 +70,13 @@
     color: rgba(255, 255, 255, 0.5);
     line-height: 1.3;
   }
+
+  &__delta {
+    font-weight: 600;
+
+    &--up   { color: var(--mantis-neon); }
+    &--down { color: var(--mantis-loss); }
+  }
 }
 
 @media (max-width: 1279px) {

@@ -143,6 +143,13 @@
     color: var(--mantis-text-muted);
   }
 
+  &__est {
+    font-style: italic;
+    font-size: 8px;
+    opacity: 0.65;
+    margin-left: 3px;
+  }
+
   &__next {
     color: var(--mantis-warning);
   }

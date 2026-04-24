@@ -67,6 +67,11 @@ export class CockpitRightRailComponent {
   readonly winCount  = computed<number>(() => this.perf()?.win_count  ?? 0);
   readonly lossCount = computed<number>(() => this.perf()?.loss_count ?? 0);
 
+  /** Win-rate delta (pp) vs retro-shifted previous period — Phase 4 §A. */
+  readonly winRateDeltaPp = computed<number | null>(
+    () => this.trading.performanceDelta()?.delta_pp ?? null,
+  );
+
   readonly currency = computed<string>(() => this.trading.overview()?.currency ?? 'USD');
 
   formatEquity(n: number): string {

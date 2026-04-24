@@ -187,6 +187,24 @@ class StrategyConfigResponse(BaseModel):
     oversold_rsi: float
 
 
+class PerformanceDeltaResponse(BaseModel):
+    """Win-rate delta (current vs previous retro-shifted period) for the Win Rate tile."""
+
+    timeframe: str
+    date_from: str
+    date_to: str
+    prev_from: str
+    prev_to: str
+    win_rate_current: float | None = None
+    win_rate_previous: float | None = None
+    delta_pp: float | None = None
+    n_current: int = 0
+    n_previous: int = 0
+    wins_current: int = 0
+    losses_current: int = 0
+    source: str = "db"
+
+
 class RiskLimitsResponse(BaseModel):
     """Risk limits for API responses."""
 

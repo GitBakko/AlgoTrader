@@ -278,6 +278,116 @@ async def performance_breakdown(
     })
 
 
+@router.get("/performance/delta")
+async def performance_delta(
+    request: Request,
+    tf: str = Query(default="30D"),
+    date_from: str | None = Query(default=None, alias="from"),
+    date_to: str | None = Query(default=None, alias="to"),
+    position_repo=Depends(get_position_repo),
+):
+    """
+    Win-rate delta vs retro-shifted previous period (Dashboard v2 Phase 4 §A).
+
+    Calls `get_performance_stats()` twice — once for the current window and
+    once for the previous window of equal length immediately before it —
+    and returns the delta in percentage points.
+
+    Query params: tf (1D|7D|30D|90D|YTD|ALL|CUSTOM), from/to for CUSTOM.
+
+    Response data:
+        timeframe, date_from, date_to, prev_from, prev_to,
+        win_rate_current, win_rate_previous, delta_pp,
+        n_current, n_previous, wins_current, losses_current, source
+    """
+    now = datetime.now(UTC)
+    tf_upper = (tf or "").upper()
+
+    if tf_upper == "CUSTOM":
+        if not date_from or not date_to:
+            return error_response("CUSTOM timeframe requires both `from` and `to`", 400)
+        try:
+            d_from = datetime.fromisoformat(date_from).replace(tzinfo=UTC)
+            d_to = datetime.fromisoformat(date_to).replace(
+                hour=23, minute=59, second=59, tzinfo=UTC
+            )
+        except ValueError:
+            return error_response("Invalid date format (expected YYYY-MM-DD)", 400)
+    else:
+        tf_days = {"1D": 1, "7D": 7, "30D": 30, "90D": 90, "ALL": 3650}
+        if tf_upper == "YTD":
+            d_from = datetime(now.year, 1, 1, tzinfo=UTC)
+            d_to = now
+        elif tf_upper in tf_days:
+            d_from = now - timedelta(days=tf_days[tf_upper])
+            d_to = now
+        else:
+            return error_response(
+                f"Unknown timeframe '{tf}' (expected 1D|7D|30D|90D|YTD|ALL|CUSTOM)", 400
+            )
+
+    window = d_to - d_from
+    prev_to = d_from
+    prev_from = d_from - window
+
+    empty_payload = {
+        "timeframe": tf_upper,
+        "date_from": d_from.strftime("%Y-%m-%d"),
+        "date_to": d_to.strftime("%Y-%m-%d"),
+        "prev_from": prev_from.strftime("%Y-%m-%d"),
+        "prev_to": prev_to.strftime("%Y-%m-%d"),
+        "win_rate_current": None,
+        "win_rate_previous": None,
+        "delta_pp": None,
+        "n_current": 0,
+        "n_previous": 0,
+        "wins_current": 0,
+        "losses_current": 0,
+        "source": "none",
+    }
+
+    if position_repo is None:
+        return success_response(empty_payload)
+
+    try:
+        cur_stats = await position_repo.get_performance_stats(
+            date_from=d_from, date_to=d_to
+        )
+        prev_stats = await position_repo.get_performance_stats(
+            date_from=prev_from, date_to=prev_to
+        )
+    except Exception as e:
+        logger.error(f"performance/delta query failed: {e}")
+        return error_response(f"performance/delta query failed: {e}", 500)
+
+    n_cur = int(cur_stats.get("trade_count", 0))
+    n_prev = int(prev_stats.get("trade_count", 0))
+
+    wr_cur = cur_stats.get("win_rate") if n_cur > 0 else None
+    wr_prev = prev_stats.get("win_rate") if n_prev > 0 else None
+    delta_pp = (
+        round((wr_cur - wr_prev) * 100, 2)
+        if wr_cur is not None and wr_prev is not None
+        else None
+    )
+
+    return success_response({
+        "timeframe": tf_upper,
+        "date_from": d_from.strftime("%Y-%m-%d"),
+        "date_to": d_to.strftime("%Y-%m-%d"),
+        "prev_from": prev_from.strftime("%Y-%m-%d"),
+        "prev_to": prev_to.strftime("%Y-%m-%d"),
+        "win_rate_current": round(wr_cur, 4) if wr_cur is not None else None,
+        "win_rate_previous": round(wr_prev, 4) if wr_prev is not None else None,
+        "delta_pp": delta_pp,
+        "n_current": n_cur,
+        "n_previous": n_prev,
+        "wins_current": int(cur_stats.get("win_count", 0)),
+        "losses_current": int(cur_stats.get("loss_count", 0)),
+        "source": "database",
+    })
+
+
 @router.post("/emergency-stop")
 @limiter.limit("5/minute")
 async def emergency_stop(request: Request):

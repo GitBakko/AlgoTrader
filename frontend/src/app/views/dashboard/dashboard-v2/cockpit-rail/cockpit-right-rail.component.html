@@ -50,6 +50,14 @@
     </span>
     <span class="rail__sub mantis-mono">
       {{ winCount() }}W · {{ lossCount() }}L
+      @if (winRateDeltaPp() != null) {
+        <span class="rail__delta"
+              [class.rail__delta--up]="winRateDeltaPp()! > 0"
+              [class.rail__delta--down]="winRateDeltaPp()! < 0">
+          · {{ winRateDeltaPp()! > 0 ? '▲' : winRateDeltaPp()! < 0 ? '▼' : '■' }}
+          {{ winRateDeltaPp()! > 0 ? '+' : '' }}{{ winRateDeltaPp() | number: '1.1-1' }}pp
+        </span>
+      }
     </span>
   </div>
 

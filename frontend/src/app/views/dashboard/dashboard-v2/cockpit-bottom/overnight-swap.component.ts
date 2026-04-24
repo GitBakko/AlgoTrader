@@ -89,11 +89,26 @@ export class OvernightSwapComponent {
     return (rate / 100) * notional;
   });
 
-  /** 7d accumulated swap stimato (client-side) = swapPerDay × 7. */
+  /**
+   * 7d accumulated swap — server-computed via /api/markets/{epic}/swap-accum.
+   * Falls back to client-side estimate (swapPerDay × 7) if the endpoint
+   * hasn't returned yet or has no data for this epic.
+   */
   readonly swap7dAccum = computed<number | null>(() => {
+    const byEpic = this.trading.swapAccum();
+    const server = byEpic[this.epic()];
+    if (server && typeof server.total_accum === 'number') {
+      return server.total_accum;
+    }
     const daily = this.swapPerDay();
     if (daily == null) return null;
     return daily * 7;
+  });
+
+  /** True when the 7d accum comes from the server (vs client estimate). */
+  readonly swap7dFromServer = computed<boolean>(() => {
+    const byEpic = this.trading.swapAccum();
+    return !!byEpic[this.epic()];
   });
 
   readonly nextChargeCountdown = computed(() => {
@@ -111,10 +126,13 @@ export class OvernightSwapComponent {
   });
 
   constructor() {
-    // Reload swap when epic input changes.
+    // Reload swap + 7d accum when epic input changes.
     effect(() => {
       const e = this.epic();
-      if (e) this.trading.loadOvernightSwap(e);
+      if (e) {
+        this.trading.loadOvernightSwap(e);
+        this.trading.loadSwapAccum(e, 7);
+      }
     });
   }
 

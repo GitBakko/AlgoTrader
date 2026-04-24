@@ -41,7 +41,10 @@
           <span class="os-stats__label">/ giorno</span>
           @if (swap7dAccum(); as acc) {
             <span class="os-stats__line">
-              <span class="os-stats__muted">7d accum</span>
+              <span class="os-stats__muted">
+                7d accum
+                @if (!swap7dFromServer()) { <em class="os-stats__est">est.</em> }
+              </span>
               <span [class.is-positive]="acc > 0" [class.is-negative]="acc < 0">{{ formatMoney(acc) }}</span>
             </span>
           }

@@ -449,6 +449,40 @@ export interface CurrentModelsResponse {
   primary: (CurrentModelInfo & { epic: string }) | null;
 }
 
+// Dashboard v2 — /api/trading/performance/delta (Phase 4 §A)
+export interface PerformanceDeltaResponse {
+  timeframe: string;
+  date_from: string;
+  date_to: string;
+  prev_from: string;
+  prev_to: string;
+  win_rate_current: number | null;
+  win_rate_previous: number | null;
+  delta_pp: number | null;
+  n_current: number;
+  n_previous: number;
+  wins_current: number;
+  losses_current: number;
+  source: string;
+}
+
+// Dashboard v2 — /api/markets/{epic}/swap-accum (Phase 4 §B)
+export interface SwapAccumDay {
+  date: string;
+  rate_pct: number;
+  notional: number;
+  swap: number;
+}
+
+export interface SwapAccumResponse {
+  epic: string;
+  currency: string;
+  period_days: number;
+  total_accum: number;
+  per_day: SwapAccumDay[];
+  source: string;
+}
+
 // Dashboard v2 — /api/markets/{epic}/overnight-swap
 export interface OvernightSwapResponse {
   epic: string;
