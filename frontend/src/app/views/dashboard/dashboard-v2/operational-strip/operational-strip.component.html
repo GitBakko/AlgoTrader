@@ -10,9 +10,7 @@
               aria-hidden="true"></span>
         SESSION · Live P&amp;L
       </span>
-      <span class="op-z1__session">
-        {{ sessionOpen() ? 'LIVE' : 'CLOSED' }} · {{ sessionLabel() }}
-      </span>
+      <span class="op-z1__session">{{ sessionLabel() }}</span>
     </header>
 
     <div class="op-z1__hero mantis-mono"
@@ -27,14 +25,48 @@
       }
     </div>
 
+    <div class="op-z1__split mantis-mono">
+      <span class="op-z1__split-k">Realized</span>
+      <span class="op-z1__split-v"
+            [class.is-positive]="realizedToday() > 0"
+            [class.is-negative]="realizedToday() < 0"
+            [class.is-zero]="realizedToday() === 0">
+        {{ formatMoney(realizedToday()) }}
+      </span>
+      <span class="op-z1__split-sep">·</span>
+      <span class="op-z1__split-k">Unrealized</span>
+      <span class="op-z1__split-v"
+            [class.is-positive]="unrealizedLive() > 0"
+            [class.is-negative]="unrealizedLive() < 0"
+            [class.is-zero]="unrealizedLive() === 0">
+        {{ formatMoney(unrealizedLive()) }}
+      </span>
+    </div>
+
     <footer class="op-z1__foot mantis-mono">
-      @if (equity() != null) {
-        <span>Equity {{ formatEquity(equity()!) }}</span>
+      @if (equityLive() != null) {
+        <span class="op-z1__foot-item">
+          <span class="op-z1__foot-k">Equity</span>
+          <span class="op-z1__foot-v is-neutral">{{ formatEquity(equityLive()!) }}</span>
+        </span>
       }
-      <span>·</span>
-      <span>Trades {{ tradesToday() }}</span>
-      <span>·</span>
-      <span>Peak {{ formatMoneyCompact(peakIntraday()) }}</span>
+      <span class="op-z1__foot-item">
+        <span class="op-z1__foot-k">Trades</span>
+        <span class="op-z1__foot-v"
+              [class.is-positive]="tradesToday() > 0"
+              [class.is-zero]="tradesToday() === 0">
+          {{ tradesToday() }}
+        </span>
+      </span>
+      <span class="op-z1__foot-item">
+        <span class="op-z1__foot-k">Peak</span>
+        <span class="op-z1__foot-v"
+              [class.is-positive]="peakIntraday() > 0"
+              [class.is-negative]="peakIntraday() < 0"
+              [class.is-zero]="peakIntraday() === 0">
+          {{ formatMoney(peakIntraday()) }}
+        </span>
+      </span>
     </footer>
   </section>
 

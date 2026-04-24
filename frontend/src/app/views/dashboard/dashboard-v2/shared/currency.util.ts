@@ -36,7 +36,10 @@ export function formatMoneyIt(
   const abs = Math.abs(n).toLocaleString('it-IT', {
     minimumFractionDigits: minDec,
     maximumFractionDigits: maxDec,
-  });
+    // Force grouping even for 4-digit values — Italian CLDR default
+    // minimumGroupingDigits=2 otherwise leaves "9012,51" ungrouped.
+    useGrouping: 'always',
+  } as unknown as Intl.NumberFormatOptions);
   return `${sign}${sym}${abs}`;
 }
 
@@ -52,5 +55,9 @@ export function formatMoneyCompactIt(
   if (abs >= 1000) {
     return `${sign}${sym}${(abs / 1000).toFixed(abs >= 10000 ? 0 : 1)}k`;
   }
-  return `${sign}${sym}${abs.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  return `${sign}${sym}${abs.toLocaleString('it-IT', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+    useGrouping: 'always',
+  } as unknown as Intl.NumberFormatOptions)}`;
 }

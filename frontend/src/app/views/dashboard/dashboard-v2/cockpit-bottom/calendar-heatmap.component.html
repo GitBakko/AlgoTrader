@@ -1,6 +1,6 @@
-<section class="ch-card" role="region" aria-label="Daily P&L heatmap last 90 days">
+<section class="ch-card" role="region" aria-label="Daily P&L heatmap">
   <header class="ch-head">
-    <span class="ch-label mantis-mono">Daily Heatmap · 90d</span>
+    <span class="ch-label mantis-mono">Daily Heatmap · {{ tfLabel() }}</span>
     <div class="ch-meta mantis-mono">
       <span>best <span class="ch-meta__pos">{{ formatMoney(best()) }}</span></span>
       <span>worst <span class="ch-meta__neg">{{ formatMoney(worst()) }}</span></span>
@@ -10,7 +10,7 @@
   <div class="ch-body">
     <div class="ch-grid" (mouseleave)="clearFocus()">
       <div class="ch-dow mantis-mono" aria-hidden="true">
-        <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+        @for (d of dayInitials; track $index) { <span>{{ d }}</span> }
       </div>
 
       <div class="ch-weeks">

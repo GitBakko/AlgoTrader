@@ -75,6 +75,6 @@ export class CockpitRightRailComponent {
   readonly currency = computed<string>(() => this.trading.overview()?.currency ?? 'USD');
 
   formatEquity(n: number): string {
-    return formatMoneyIt(n, this.currency(), { signed: false, minDec: 0, maxDec: 0 });
+    return formatMoneyIt(n, this.currency(), { signed: false });
   }
 }

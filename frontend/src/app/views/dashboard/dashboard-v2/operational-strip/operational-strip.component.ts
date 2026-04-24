@@ -60,6 +60,25 @@ export class OperationalStripComponent {
   readonly equity   = computed<number | null>(() => this.overview()?.equity ?? null);
   readonly currency = computed<string>(() => this.overview()?.currency ?? 'USD');
 
+  /** Realized P&L today (broker-side closed-trade sum). */
+  readonly realizedToday = computed<number>(() => this.overview()?.today_realized_pnl ?? 0);
+
+  /** Sum of open-position UPL — true live unrealized (recomputed each WS tick). */
+  readonly unrealizedLive = computed<number>(() =>
+    this.positions().reduce((s, p) => s + (p.upl ?? 0), 0),
+  );
+
+  /**
+   * Live equity = broker-side equity + sum(upl).
+   * Backend `overview.equity` is polled (10s / 60s); adding client-computed
+   * UPL keeps the headline in sync with WS price ticks without extra calls.
+   */
+  readonly equityLive = computed<number | null>(() => {
+    const eq = this.overview()?.equity;
+    if (eq == null) return null;
+    return eq + this.unrealizedLive();
+  });
+
   readonly dailyPct = computed<number | null>(() => {
     const ov = this.overview();
     if (!ov || !ov.equity) return null;
@@ -80,21 +99,22 @@ export class OperationalStripComponent {
 
   readonly sessionOpen = computed<boolean>(() => this.marketStatusSig()?.is_open ?? false);
 
-  /** Trades executed today (UTC day). */
-  readonly tradesToday = computed<number>(() => {
-    const perf = this.trading.performance();
-    if (perf?.daily_trade_count != null) return perf.daily_trade_count;
-    const curve = this.trading.equityCurve();
-    const today = new Date().toISOString().slice(0, 10);
-    const todayRow = curve.find(p => (p.date ?? '').slice(0, 10) === today);
-    return todayRow?.trade_count ?? 0;
-  });
+  /** Trades closed in the active timeframe window. */
+  readonly tradesToday = computed<number>(() => this.trading.performance()?.trade_count ?? 0);
 
-  /** Peak intraday P&L — max daily_pnl positive across UPL + realized today. */
+  /** Peak daily P&L across the active timeframe window (from equityCurve). */
   readonly peakIntraday = computed<number>(() => {
-    const daily = this.dailyPnl();
-    const upl = this.trading.paperPositions().reduce((s, p) => s + (p.upl ?? 0), 0);
-    return Math.max(daily, daily + upl, 0);
+    const curve = this.trading.equityCurve();
+    if (curve.length === 0) {
+      const daily = this.dailyPnl();
+      return Math.max(daily, 0);
+    }
+    let peak = -Infinity;
+    for (const p of curve) {
+      const v = p.daily_pnl ?? 0;
+      if (v > peak) peak = v;
+    }
+    return peak === -Infinity ? 0 : peak;
   });
 
   // ── ZONE 2: Open Positions ────────────────────────────────────
@@ -205,6 +225,6 @@ export class OperationalStripComponent {
   }
 
   formatEquity(n: number): string {
-    return formatMoneyIt(n, this.currency(), { signed: false, minDec: 0, maxDec: 0 });
+    return formatMoneyIt(n, this.currency(), { signed: false });
   }
 }

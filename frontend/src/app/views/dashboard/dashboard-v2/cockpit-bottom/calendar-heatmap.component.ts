@@ -1,6 +1,7 @@
-import { Component, ChangeDetectionStrategy, computed, inject, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, computed, inject, LOCALE_ID, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TradingService } from '../../../../core/services/trading.service';
+import { TimeframeService } from '../../../../core/services/timeframe.service';
 import { currencySymbol, formatMoneyIt } from '../shared/currency.util';
 
 interface HeatmapCell {
@@ -31,8 +32,30 @@ interface WeekColumn {
 })
 export class CalendarHeatmapComponent {
   private readonly trading = inject(TradingService);
+  private readonly tf = inject(TimeframeService);
+  private readonly localeId = inject(LOCALE_ID);
 
   readonly equityCurve = this.trading.equityCurve;
+
+  /** Label for the card header — matches active tf (e.g. "7d", "30d", "YTD"). */
+  readonly tfLabel = computed<string>(() => this.tf.label().toLowerCase());
+
+  /**
+   * Mon-Sun narrow weekday initials localized to LOCALE_ID (it-IT → L M M G V S D).
+   * Derived once per instance — locale doesn't change at runtime.
+   */
+  readonly dayInitials: string[] = (() => {
+    const fmt = new Intl.DateTimeFormat(this.localeId, {
+      weekday: 'narrow',
+      timeZone: 'UTC',
+    });
+    const out: string[] = [];
+    // 2024-01-01 was Monday → 01..07 covers Mon-Sun.
+    for (let i = 1; i <= 7; i++) {
+      out.push(fmt.format(new Date(Date.UTC(2024, 0, i))).toUpperCase());
+    }
+    return out;
+  })();
 
   readonly focusIndex = signal<number | null>(null);
 
@@ -160,7 +183,7 @@ export class CalendarHeatmapComponent {
   }
 
   formatMoney(n: number): string {
-    return formatMoneyIt(n, this.currency(), { minDec: 0, maxDec: 0 });
+    return formatMoneyIt(n, this.currency());
   }
 
   formatFocusDate(iso: string): string {

@@ -161,7 +161,7 @@ export class TradeBreakdownComponent {
   }
 
   formatMoney(value: number): string {
-    return formatMoneyIt(value, this.currency(), { minDec: 0, maxDec: 2 });
+    return formatMoneyIt(value, this.currency());
   }
 }
 

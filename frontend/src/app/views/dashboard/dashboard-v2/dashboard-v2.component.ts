@@ -248,10 +248,9 @@ export class DashboardV2Component implements OnInit, OnDestroy {
     effect(() => {
       const tf = this.timeframeSvc.current();
       const days = this.timeframeSvc.days();
-      // 90d heatmap needs at least 90 points; force ≥ 90 when tf is short
-      // so the bottom-row heatmap always has 90d worth of history.
-      const curveDays = Math.max(days, 90);
-      this.trading.loadEquityCurve(curveDays);
+      // Equity spine follows tf exactly — heatmap has its own fixed 90d load
+      // in ngOnInit (see loadHeatmapCurve) so it stays 90d independent of tf.
+      this.trading.loadEquityCurve(days);
       this.trading.loadPerformance(days);
       this.trading.loadClosedPositions({
         page: 1,

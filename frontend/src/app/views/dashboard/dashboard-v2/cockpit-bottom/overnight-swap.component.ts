@@ -146,6 +146,6 @@ export class OvernightSwapComponent {
   }
 
   formatNotional(n: number): string {
-    return formatMoneyIt(n, this.currency(), { signed: false, minDec: 0, maxDec: 0 });
+    return formatMoneyIt(n, this.currency(), { signed: false });
   }
 }
