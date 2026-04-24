@@ -27,13 +27,23 @@ export const routes: Routes = [
     data: { title: 'Home' },
     children: [
       {
+        // Dashboard v2 is now the primary dashboard (promoted 2026-04-24).
         path: 'dashboard',
-        loadChildren: () => import('./views/dashboard/routes').then(m => m.routes)
+        loadChildren: () => import('./views/dashboard/dashboard-v2/routes').then(m => m.routes),
+        data: { title: 'Dashboard' }
       },
       {
+        // Legacy dashboard kept as dead code for reference; route is
+        // undocumented and not linked from the sidebar.
+        path: 'dashboard-old',
+        loadChildren: () => import('./views/dashboard/routes').then(m => m.routes),
+        data: { title: 'Dashboard (legacy)' }
+      },
+      {
+        // Backwards-compat alias for bookmarks / external links to /dashboard-v2.
         path: 'dashboard-v2',
-        loadChildren: () => import('./views/dashboard/dashboard-v2/routes').then(m => m.routes),
-        data: { title: 'Dashboard v2' }
+        redirectTo: 'dashboard',
+        pathMatch: 'full'
       },
       {
         path: 'profile',
