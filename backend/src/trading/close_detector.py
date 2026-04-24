@@ -223,6 +223,13 @@ class CloseDetector:
                 earliest_open = opened
         from_dt = earliest_open - timedelta(minutes=self._window_back_min)
         to_dt = now_utc + timedelta(minutes=self._window_forward_min)
+        # Capital.com /history/activity + /history/transactions reject any
+        # `to` strictly in the future with `error.invalid.daterange`. Even a
+        # 1-minute forward window crosses the cut when the server clock is
+        # a second behind ours. Clamp to now − 60s to absorb drift.
+        cap = now_utc - timedelta(seconds=60)
+        if to_dt > cap:
+            to_dt = cap
         return from_dt, to_dt
 
     async def _resolve_one(

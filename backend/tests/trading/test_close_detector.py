@@ -436,10 +436,12 @@ async def test_detect_fetches_windows_from_broker_when_not_injected():
     )
     assert isinstance(outcomes[0], Reconciled)
     # Window: from = opened_at - 240min (default lookback widened to absorb
-    # Capital.com's naive-Berlin createdDate offset), to = now + 1min.
+    # Capital.com's naive-Berlin createdDate offset), to = now - 60s
+    # (clamped down from now + 1min because Capital.com /history/* rejects
+    # any `to` in the future with `error.invalid.daterange`).
     assert broker.activity_called_with == (
         datetime(2026, 4, 21, 12, 0, tzinfo=UTC),
-        datetime(2026, 4, 21, 20, 1, tzinfo=UTC),
+        datetime(2026, 4, 21, 19, 59, tzinfo=UTC),
     )
     assert broker.transactions_called_with == broker.activity_called_with
 

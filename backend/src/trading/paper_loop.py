@@ -1011,6 +1011,35 @@ class PaperTradingLoop:
         # v1 per-deal outcome trace; fed to shadow comparator at end.
         v1_outcomes: dict[str, str] = {}
 
+        # v2 authoritative: when CLOSE_DETECTION_V2_ENABLED is True, run the
+        # activity-as-SoT CloseDetector upfront and use its Reconciled
+        # outcomes as a second-chance matcher whenever v1 Strategy 1+2
+        # (exact dealId / reference) miss. This breaks the Capital.com
+        # dealId-rotation UNRECONCILED class documented in
+        # `project_capital_com_dealid_mutation.md`: broker-initiated TP/SL
+        # closes emit a TRADE row with `dealId = Position.dealId + 1` in
+        # the last hex nibble, so v1 string-equality always misses them.
+        # v2 falls back to Deferred / Unreconciled for anything activity
+        # cannot resolve — in those cases v1's own deferral + 10-min
+        # timeout path still owns the decision.
+        v2_outcomes_by_deal: dict[str, object] = {}
+        if v2_enabled:
+            detector = self._get_close_detector()
+            if detector is not None:
+                try:
+                    v2_previous: dict[str, dict] = dict(previous_snapshot)
+                    for _did, _pending in retry_pending:
+                        if _did not in v2_previous:
+                            v2_previous[_did] = _pending.prev_pos
+                    v2_outcomes = await detector.detect(
+                        previous=v2_previous,
+                        current=current_positions,
+                    )
+                    for _o in v2_outcomes:
+                        v2_outcomes_by_deal[_o.deal_id] = _o
+                except Exception as _e:
+                    logger.warning(f"[close-v2] authoritative detect raised: {_e!r}")
+
         # Bridge deal_reference from DB for all disappeared ids
         deal_ref_map: dict[str, str | None] = {}
         disappeared_ids = [did for did, _ in newly_disappeared] + [did for did, _ in retry_pending]
@@ -1104,6 +1133,40 @@ class PaperTradingLoop:
                 v1_outcomes[deal_id] = "primary"
                 continue
 
+            # v1 Strategy 1+2 missed. If v2 resolved the same deal_id via
+            # activity-as-SoT, use that — it's the dealId-rotation fix.
+            if v2_enabled:
+                try:
+                    from src.trading.close_detector import Reconciled as _V2Reconciled
+                except Exception:
+                    _V2Reconciled = None  # type: ignore[assignment]
+                v2_outcome = v2_outcomes_by_deal.get(deal_id)
+                if _V2Reconciled is not None and isinstance(v2_outcome, _V2Reconciled):
+                    logger.info(
+                        f"[{pending.epic}] v2 Reconciled after "
+                        f"{pending.retry_count} retries: "
+                        f"close_dealid={v2_outcome.close_dealid}, "
+                        f"exit={v2_outcome.exit_price:.6f}, "
+                        f"P&L=${v2_outcome.pnl:.2f}, "
+                        f"reason={v2_outcome.close_reason}"
+                    )
+                    await self._finalize_close(
+                        deal_id=deal_id,
+                        epic=pending.epic,
+                        direction=pending.direction,
+                        size=pending.size,
+                        entry_price=pending.entry_price,
+                        prev_pos=pending.prev_pos,
+                        exit_price=v2_outcome.exit_price,
+                        pnl=v2_outcome.pnl,
+                        close_reason=v2_outcome.close_reason,
+                        metric_path="v2_primary",
+                        retry_count=pending.retry_count,
+                    )
+                    del self._pending_close_detections[deal_id]
+                    v1_outcomes[deal_id] = "primary"
+                    continue
+
             age = (now - pending.first_seen).total_seconds()
             if age > timeout_sec:
                 await self._emit_unreconciled_close(pending)
@@ -1144,6 +1207,39 @@ class PaperTradingLoop:
                 )
                 v1_outcomes[deal_id] = "primary"
             else:
+                # v1 Strategy 1+2 missed. Try v2 before deferring — catches
+                # Capital.com broker-close dealId rotation on the first tick
+                # so the deal never enters the retry queue.
+                if v2_enabled:
+                    try:
+                        from src.trading.close_detector import Reconciled as _V2Reconciled
+                    except Exception:
+                        _V2Reconciled = None  # type: ignore[assignment]
+                    v2_outcome = v2_outcomes_by_deal.get(deal_id)
+                    if _V2Reconciled is not None and isinstance(v2_outcome, _V2Reconciled):
+                        logger.info(
+                            f"[{epic}] v2 Reconciled on first tick: "
+                            f"close_dealid={v2_outcome.close_dealid}, "
+                            f"exit={v2_outcome.exit_price:.6f}, "
+                            f"P&L=${v2_outcome.pnl:.2f}, "
+                            f"reason={v2_outcome.close_reason}"
+                        )
+                        await self._finalize_close(
+                            deal_id=deal_id,
+                            epic=epic,
+                            direction=direction,
+                            size=size,
+                            entry_price=entry_price,
+                            prev_pos=prev_pos,
+                            exit_price=v2_outcome.exit_price,
+                            pnl=v2_outcome.pnl,
+                            close_reason=v2_outcome.close_reason,
+                            metric_path="v2_primary",
+                            retry_count=0,
+                        )
+                        v1_outcomes[deal_id] = "primary"
+                        continue
+
                 logger.warning(
                     f"[{epic}] Close detected but no broker transaction match for "
                     f"{deal_id} — deferring (timeout {timeout_sec}s)"

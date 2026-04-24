@@ -160,6 +160,10 @@ async def backfill_one(
         closed_at = closed_at.replace(tzinfo=UTC)
     from_dt = closed_at - timedelta(minutes=window_minutes)
     to_dt = closed_at + timedelta(minutes=window_minutes)
+    # Capital.com rejects `to` in the future → clamp to now-60s.
+    now_utc = datetime.now(UTC)
+    if to_dt > now_utc:
+        to_dt = now_utc - timedelta(seconds=60)
     logger.info(
         f"[{row.epic}] {row.deal_id} closed_at={closed_at.isoformat()} "
         f"window=±{window_minutes}min"
