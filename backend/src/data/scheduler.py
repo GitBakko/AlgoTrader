@@ -136,6 +136,19 @@ class DataScheduler:
             replace_existing=True,
         )
 
+        # 6. Daily swap snapshot - 23:07 UTC (after Capital.com rollover window).
+        # Upserts one row per epic into swap_daily_snapshots with the
+        # broker overnightFee rate and the aggregate OPEN-position notional.
+        # Dashboard v2 /swap-accum reads these rows to render real historical
+        # funding exposure.
+        self.scheduler.add_job(
+            self.job_swap_snapshot,
+            CronTrigger(hour=23, minute=7),
+            id="swap_snapshot",
+            name="Daily overnight-swap snapshot",
+            replace_existing=True,
+        )
+
         job_count = len(self.scheduler.get_jobs())
         logger.info(f"Data scheduler configured with {job_count} jobs")
 
@@ -343,3 +356,118 @@ class DataScheduler:
                     logger.error(f"Optimization failed for {epic}/{timeframe}: {e}")
 
         logger.info("Storage optimization job completed")
+
+    async def job_swap_snapshot(self) -> None:
+        """Daily overnight-swap snapshot per epic.
+
+        For every tradable asset: fetch broker ``overnightFee`` rate,
+        query OPEN Position rows on the epic, compute the aggregate
+        notional (summed size × entry_price), and upsert one row per
+        ``(epic, date)`` into ``swap_daily_snapshots``.
+
+        Dashboard v2 ``/swap-accum`` reads rows from this table for the
+        last N days instead of extrapolating today's rate backwards.
+        Missing-day rows are filled from the live endpoint estimate.
+        """
+        from datetime import date as _date
+
+        from src.backtest.costs import OVERNIGHT_RATES
+        from src.database.repositories.position_repository import PositionRepository
+        from src.database.repositories.swap_snapshot_repository import (
+            SwapSnapshotRepository,
+        )
+        from src.database.session import DatabaseManager
+
+        logger.info("Running daily swap-snapshot job...")
+        today = _date.today()
+        ok = 0
+        errors = 0
+
+        try:
+            session_factory = DatabaseManager.get_session_factory()
+        except Exception as e:
+            logger.warning(f"Swap-snapshot job skipped — DB unavailable: {e}")
+            return
+
+        for epic in self._assets:
+            epic_upper = epic.upper()
+
+            long_rate_pct: float | None = None
+            short_rate_pct: float | None = None
+            currency: str | None = None
+            source = "static_fallback"
+
+            try:
+                details = await self.client.get_market_details(epic_upper)
+                if isinstance(details, dict):
+                    instrument = details.get("instrument") or {}
+                    currency = instrument.get("currency")
+                    fee = instrument.get("overnightFee")
+                    if isinstance(fee, dict):
+                        lr = fee.get("longRate")
+                        sr = fee.get("shortRate")
+                        if isinstance(lr, (int, float)):
+                            long_rate_pct = float(lr)
+                        if isinstance(sr, (int, float)):
+                            short_rate_pct = float(sr)
+                    if long_rate_pct is not None or short_rate_pct is not None:
+                        source = "broker"
+            except Exception as e:
+                logger.debug(f"Swap snapshot broker lookup failed for {epic_upper}: {e}")
+
+            if long_rate_pct is None or short_rate_pct is None:
+                static = OVERNIGHT_RATES.get(epic_upper, {"long": -0.000015, "short": -0.000010})
+                if long_rate_pct is None:
+                    long_rate_pct = static["long"] * 100
+                if short_rate_pct is None:
+                    short_rate_pct = static["short"] * 100
+
+            notional = 0.0
+            direction = "NONE"
+            try:
+                async with session_factory() as session:
+                    pos_repo = PositionRepository(session)
+                    positions = await pos_repo.get_by_epic(epic_upper, status="OPEN")
+                    long_notional = 0.0
+                    short_notional = 0.0
+                    for p in positions or []:
+                        size = float(p.size or 0)
+                        entry = float(p.entry_price or 0)
+                        n = abs(size * entry)
+                        dir_up = (p.direction or "").upper()
+                        if dir_up in ("SHORT", "SELL"):
+                            short_notional += n
+                        else:
+                            long_notional += n
+                    if long_notional > short_notional:
+                        notional = long_notional
+                        direction = "LONG"
+                    elif short_notional > 0:
+                        notional = short_notional
+                        direction = "SHORT"
+            except Exception as e:
+                logger.debug(f"Swap snapshot position lookup for {epic_upper} failed: {e}")
+
+            try:
+                async with session_factory() as session:
+                    repo = SwapSnapshotRepository(session)
+                    await repo.upsert(
+                        epic=epic_upper,
+                        snapshot_date=today,
+                        long_rate_pct=long_rate_pct,
+                        short_rate_pct=short_rate_pct,
+                        currency=currency,
+                        source=source,
+                        direction=direction,
+                        notional=notional,
+                    )
+                    await session.commit()
+                ok += 1
+            except Exception as e:
+                logger.warning(f"Swap snapshot upsert failed for {epic_upper}: {e}")
+                errors += 1
+
+        logger.info(
+            f"Swap-snapshot job completed: {ok} upserted, {errors} errors "
+            f"(date={today.isoformat()})"
+        )

@@ -365,26 +365,85 @@ async def get_swap_accum(
         except Exception as e:
             logger.debug(f"swap-accum position lookup for {epic_upper} failed: {e}")
 
-    rate_pct = short_rate_pct if direction == "SHORT" else long_rate_pct
+    # Position.direction is stored as "SELL" / "BUY" on our rows but the
+    # upstream broker model serializes it as "SHORT" / "LONG". Accept both.
+    is_short = direction.upper() in ("SHORT", "SELL")
+    rate_pct = short_rate_pct if is_short else long_rate_pct
     notional = position_size * position_entry if (position_size and position_entry) else 0.0
+
+    # Load historical snapshot rows (one per epic-date) from DB. For any
+    # day in the requested window without a row, fall back to the current
+    # rate+notional computed above — same approximation as the MINIMAL
+    # Phase 4 behaviour, so a fresh epic that has no history yet still
+    # renders something reasonable while the scheduler fills rows over time.
+    snapshot_by_date: dict[str, dict] = {}
+    try:
+        from src.database.repositories.swap_snapshot_repository import (
+            SwapSnapshotRepository,
+        )
+        from src.database.session import DatabaseManager
+
+        session_factory = DatabaseManager.get_session_factory()
+        async with session_factory() as session:
+            snap_repo = SwapSnapshotRepository(session)
+            rows = await snap_repo.get_recent(epic_upper, days)
+            for r in rows:
+                r_dir = (r.direction or "").upper()
+                snap_rate = (
+                    r.short_rate_pct if r_dir in ("SHORT", "SELL")
+                    else r.long_rate_pct
+                )
+                if snap_rate is None:
+                    snap_rate = rate_pct
+                snapshot_by_date[r.snapshot_date.isoformat()] = {
+                    "rate_pct": float(snap_rate),
+                    "notional": float(r.notional or 0),
+                    "source": r.source,
+                }
+    except Exception as e:
+        logger.debug(f"swap-accum snapshot DB lookup failed for {epic_upper}: {e}")
 
     # Build per-day series looking back (today-(days-1) .. today).
     today = _dt.now(_UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     per_day: list[dict] = []
     total = 0.0
+    sources_used: set[str] = set()
     for i in range(days - 1, -1, -1):
         day = today - _td(days=i)
+        day_key = day.strftime("%Y-%m-%d")
         # Capital.com convention: Wed rollover charges 3× (weekend anticipated).
         multiplier = 3 if day.weekday() == 2 else 1
-        day_swap = (rate_pct / 100.0) * notional * multiplier
+
+        snap = snapshot_by_date.get(day_key)
+        if snap is not None:
+            day_rate = snap["rate_pct"]
+            day_notional = snap["notional"]
+            day_source = snap["source"]
+        else:
+            day_rate = rate_pct
+            day_notional = notional
+            day_source = source
+        sources_used.add(day_source)
+
+        day_swap = (day_rate / 100.0) * day_notional * multiplier
         total += day_swap
         per_day.append({
-            "date": day.strftime("%Y-%m-%d"),
-            "rate_pct": round(rate_pct, 6),
-            "notional": round(notional, 2),
+            "date": day_key,
+            "rate_pct": round(day_rate, 6),
+            "notional": round(day_notional, 2),
             "swap": round(day_swap, 4),
             "multiplier": multiplier,
+            "source": day_source,
         })
+
+    # Response-level source: "historical" when at least one day came from
+    # a stored snapshot; otherwise echo the fallback source.
+    if any(s in sources_used for s in ("broker", "static_fallback")) and (
+        len(sources_used - {"broker", "static_fallback"}) == 0
+    ):
+        response_source = source
+    else:
+        response_source = "historical"
 
     return success_response({
         "epic": epic_upper,
@@ -393,7 +452,7 @@ async def get_swap_accum(
         "total_accum": round(total, 2),
         "direction": direction if notional > 0 else None,
         "per_day": per_day,
-        "source": source,
+        "source": response_source,
     })
 
 

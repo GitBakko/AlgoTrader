@@ -557,3 +557,37 @@ class PendingCloseDetection(SQLModel, table=True):
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()"), "onupdate": text("NOW()")},
     )
+
+
+class SwapDailySnapshot(SQLModel, table=True):
+    """Daily snapshot of overnight-swap state per epic.
+
+    Captures broker overnightFee long/short rate (pct per interval) and
+    aggregate net notional of OPEN positions on the epic at snapshot time,
+    by direction. Enables Dashboard v2 /swap-accum to render last N days
+    of realized funding exposure from stored rows instead of extrapolating
+    today's rate across historical days (Phase 4 MINIMAL).
+
+    Upsert key (epic, snapshot_date) — one row per epic-day.
+    """
+
+    __tablename__ = "swap_daily_snapshots"
+    __table_args__ = (
+        UniqueConstraint("epic", "snapshot_date", name="uq_swap_daily_epic_date"),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    epic: str = Field(max_length=32, nullable=False, index=True)
+    snapshot_date: date = Field(nullable=False, index=True)
+    long_rate_pct: float | None = Field(default=None, nullable=True)
+    short_rate_pct: float | None = Field(default=None, nullable=True)
+    currency: str | None = Field(default=None, max_length=8, nullable=True)
+    source: str = Field(max_length=16, nullable=False)
+    direction: str = Field(max_length=8, nullable=False)
+    notional: float = Field(default=0.0, nullable=False)
+    swap_realized: float | None = Field(default=None, nullable=True)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
+        nullable=False,
+        sa_column_kwargs={"server_default": text("NOW()")},
+    )
