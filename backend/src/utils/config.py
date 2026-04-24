@@ -271,6 +271,22 @@ class Settings(BaseSettings):
     # MR trades close within 1-3 bars. 24h was too generous — live data showed
     # positions drifting 16h+ without hitting TP or SL (dead trades).
     mr_max_hold_hours: float = Field(default=12.0, alias="MR_MAX_HOLD_HOURS")
+    # MR Fix #3 (memory project_mr_pending_improvements): when enabled,
+    # paper_loop computes a per-epic OU half-life (AR(1) regression on
+    # 4h close residuals) and uses it as the time-stop ceiling, capped
+    # at mr_max_hold_hours. False → original fixed 12h behaviour.
+    mr_ou_halflife_enabled: bool = Field(
+        default=False, alias="MR_OU_HALFLIFE_ENABLED"
+    )
+    mr_ou_halflife_bar_hours: float = Field(
+        default=4.0, alias="MR_OU_HALFLIFE_BAR_HOURS"
+    )
+    mr_ou_halflife_lookback_bars: int = Field(
+        default=30, alias="MR_OU_HALFLIFE_LOOKBACK_BARS"
+    )
+    mr_ou_halflife_candle_history_bars: int = Field(
+        default=200, alias="MR_OU_HALFLIFE_CANDLE_HISTORY_BARS"
+    )
     scalp_chop_zone_min_confluence: int = Field(default=5, alias="SCALP_CHOP_ZONE_MIN_CONFLUENCE")
     scalp_chop_zone_start: int = Field(default=16, alias="SCALP_CHOP_ZONE_START")
     scalp_chop_zone_end: int = Field(default=20, alias="SCALP_CHOP_ZONE_END")

@@ -3013,10 +3013,56 @@ class PaperTradingLoop:
         # When MR is the primary strategy, use the MR-specific (shorter) time-stop.
         # MR positions stale after ~1*OU half-life (~24h on 4h bars) -> close them.
         if _loop_settings.mr_primary_enabled:
-            max_hold_hours = _loop_settings.mr_max_hold_hours
+            default_max_hold = _loop_settings.mr_max_hold_hours
         else:
-            max_hold_hours = _loop_settings.scalp_max_hold_hours
+            default_max_hold = _loop_settings.scalp_max_hold_hours
         now_utc = datetime.now(UTC)
+
+        # MR Fix #3: if enabled, compute per-epic OU half-life once per
+        # tick and use it as the time-stop ceiling (capped at the global
+        # default). Falls back to the default on any compute miss.
+        mr_ou_enabled = bool(
+            _loop_settings.mr_primary_enabled
+            and getattr(_loop_settings, "mr_ou_halflife_enabled", False)
+        )
+        per_epic_max_hold: dict[str, float] = {}
+        if mr_ou_enabled:
+            try:
+                from src.strategy.ou_halflife import get_halflife_hours
+
+                bar_hours = float(_loop_settings.mr_ou_halflife_bar_hours)
+                lookback = int(_loop_settings.mr_ou_halflife_lookback_bars)
+                history = int(_loop_settings.mr_ou_halflife_candle_history_bars)
+                resolution = (
+                    f"{int(bar_hours)}h" if bar_hours.is_integer() else f"{bar_hours}h"
+                )
+                seen_epics: set[str] = set()
+                for _p in current_positions:
+                    _epic = _p.get("epic")
+                    if not _epic or _epic in seen_epics:
+                        continue
+                    seen_epics.add(_epic)
+                    try:
+                        if self.data_access is None:
+                            continue
+                        df = self.data_access.get_candles(
+                            epic=_epic, timeframe=resolution, limit=history
+                        )
+                        if df is None or len(df) < history // 2:
+                            continue
+                        closes = df["close"].to_numpy()
+                        hl = get_halflife_hours(
+                            _epic,
+                            closes,
+                            bar_hours=bar_hours,
+                            lookback_bars=lookback,
+                        )
+                        if hl is not None:
+                            per_epic_max_hold[_epic] = min(hl, default_max_hold)
+                    except Exception as _e:
+                        logger.debug(f"[{_epic}] OU half-life compute failed: {_e}")
+            except Exception as e:
+                logger.debug(f"MR OU half-life pass failed: {e}")
 
         for position in current_positions:
             deal_id = position.get("deal_id")
@@ -3042,16 +3088,22 @@ class PaperTradingLoop:
                 continue
 
             opened_at_str = position.get("opened_at")
-            if opened_at_str and max_hold_hours < 9000:
+            epic_hold_cap = per_epic_max_hold.get(epic, default_max_hold)
+            if opened_at_str and epic_hold_cap < 9000:
                 try:
                     opened_at = datetime.fromisoformat(str(opened_at_str))
                     if opened_at.tzinfo is None:
                         opened_at = opened_at.replace(tzinfo=UTC)
                     age_hours = (now_utc - opened_at).total_seconds() / 3600
-                    if age_hours >= max_hold_hours:
+                    if age_hours >= epic_hold_cap:
+                        _cap_src = (
+                            "OU half-life"
+                            if epic in per_epic_max_hold
+                            else "default"
+                        )
                         logger.warning(
-                            f"⏰ [{epic}] TIME STOP: position {deal_id} held "
-                            f"{age_hours:.1f}h >= {max_hold_hours}h limit"
+                            f"⏰ [{epic}] TIME STOP ({_cap_src}): position {deal_id} "
+                            f"held {age_hours:.1f}h >= {epic_hold_cap:.1f}h limit"
                         )
                         try:
                             result = await self.execution_engine.close_position(
