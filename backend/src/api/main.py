@@ -41,6 +41,7 @@ from src.api.routers import (
     vision,
 )
 from src.api.websocket import (
+    markets_endpoint,
     notifications_endpoint,
     prices_endpoint,
     trades_endpoint,
@@ -788,6 +789,7 @@ app.websocket("/ws/prices")(prices_endpoint)
 app.websocket("/ws/trades")(trades_endpoint)
 app.websocket("/ws/notifications")(notifications_endpoint)
 app.websocket("/ws/training")(training_endpoint)
+app.websocket("/ws/markets")(markets_endpoint)
 
 
 if __name__ == "__main__":

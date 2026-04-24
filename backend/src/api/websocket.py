@@ -520,3 +520,53 @@ async def training_endpoint(websocket: WebSocket) -> None:
         pass
     finally:
         ws_manager.disconnect(websocket, "training")
+
+
+async def markets_endpoint(websocket: WebSocket) -> None:
+    """WebSocket endpoint for per-epic market state updates (Dashboard v2).
+
+    Broadcasts ``{type: 'swap_update', epic, rate_pct, notional, direction,
+    source, ts}`` when paper_loop opens/closes a position or when the
+    daily snapshot job runs. Frontend replaces the 30-60s polling of
+    ``/api/markets/{epic}/overnight-swap`` with a passive subscription.
+    """
+    await ws_manager.connect(websocket, "markets")
+    try:
+        while True:
+            data = await websocket.receive_text()
+            if data == "ping":
+                await websocket.send_json({"type": "pong"})
+    except WebSocketDisconnect:
+        pass
+    finally:
+        ws_manager.disconnect(websocket, "markets")
+
+
+async def broadcast_swap_update(
+    epic: str,
+    *,
+    rate_pct: float | None,
+    notional: float,
+    direction: str,
+    source: str,
+    currency: str | None = None,
+) -> None:
+    """Push a single swap_update event to every /ws/markets subscriber.
+
+    Safe to call from any async context — a bad channel state just
+    silently drops. Callers do not need to await a response.
+    """
+    payload = {
+        "type": "swap_update",
+        "epic": epic,
+        "rate_pct": rate_pct,
+        "notional": notional,
+        "direction": direction,
+        "source": source,
+        "currency": currency,
+        "ts": datetime.now(UTC).isoformat(),
+    }
+    try:
+        await ws_manager.broadcast("markets", payload)
+    except Exception as e:
+        logger.debug(f"broadcast_swap_update failed for {epic}: {e}")

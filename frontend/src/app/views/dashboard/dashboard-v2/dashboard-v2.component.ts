@@ -275,6 +275,7 @@ export class DashboardV2Component implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.startPolling();
     this.ws.connectPrices();
+    this.ws.connectMarkets();
     this.news.getNews('US500', 5, 7);
     this.trading.loadCurrentModels();
   }

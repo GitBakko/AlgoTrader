@@ -7,11 +7,13 @@ export class WebSocketService {
   private priceWs: WebSocket | null = null;
   private tradeWs: WebSocket | null = null;
   private trainingWs: WebSocket | null = null;
+  private marketsWs: WebSocket | null = null;
 
   // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 32s, max 60s
   private priceReconnectAttempts = 0;
   private tradeReconnectAttempts = 0;
   private trainingReconnectAttempts = 0;
+  private marketsReconnectAttempts = 0;
   private readonly MAX_RECONNECT_DELAY = 60000;
   private readonly BASE_DELAY = 1000;
 
@@ -19,6 +21,16 @@ export class WebSocketService {
   readonly lastTrade = signal<TradeEvent | null>(null);
   readonly connected = signal(false);
   readonly trainingUpdate = signal<any>(null);
+  /** Last swap_update event received from /ws/markets (Dashboard v2). */
+  readonly lastSwapUpdate = signal<{
+    epic: string;
+    rate_pct: number | null;
+    notional: number;
+    direction: string;
+    source: string;
+    currency: string | null;
+    ts: string;
+  } | null>(null);
 
   // Price source tracking — "broker" = real, "mock" = fake random walk
   readonly priceSource = signal<'broker' | 'mock' | 'unknown'>('unknown');
@@ -182,13 +194,54 @@ export class WebSocketService {
     };
   }
 
+  /**
+   * Subscribe to /ws/markets — backend pushes ``swap_update`` events when
+   * paper_loop opens/closes a position or the daily snapshot job runs.
+   * Components listen via ``lastSwapUpdate`` signal + effect and refresh
+   * their /swap-accum cached value without polling.
+   */
+  connectMarkets(): void {
+    if (this.marketsWs) return;
+    const url = `${environment.wsUrl}/ws/markets`;
+    this.marketsWs = new WebSocket(url);
+
+    this.marketsWs.onopen = () => {
+      this.marketsReconnectAttempts = 0;
+    };
+
+    this.marketsWs.onmessage = (event) => {
+      try {
+        const raw = JSON.parse(event.data);
+        if (raw?.type === 'pong') return;
+        if (raw?.type === 'swap_update' && raw.epic) {
+          this.lastSwapUpdate.set(raw);
+        }
+      } catch {
+        // swallow malformed frames
+      }
+    };
+
+    this.marketsWs.onclose = () => {
+      this.marketsWs = null;
+      const delay = this.getReconnectDelay(this.marketsReconnectAttempts);
+      this.marketsReconnectAttempts++;
+      setTimeout(() => this.connectMarkets(), delay);
+    };
+
+    this.marketsWs.onerror = () => {
+      this.marketsWs?.close();
+    };
+  }
+
   disconnect(): void {
     this.priceWs?.close();
     this.tradeWs?.close();
     this.trainingWs?.close();
+    this.marketsWs?.close();
     this.priceWs = null;
     this.tradeWs = null;
     this.trainingWs = null;
+    this.marketsWs = null;
     this.connected.set(false);
     this.priceSource.set('unknown');
     this.brokerReconnectAttempts.set(0);

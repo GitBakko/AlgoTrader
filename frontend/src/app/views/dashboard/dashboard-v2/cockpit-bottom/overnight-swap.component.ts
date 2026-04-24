@@ -1,6 +1,7 @@
 import { Component, ChangeDetectionStrategy, computed, inject, input, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TradingService } from '../../../../core/services/trading.service';
+import { WebSocketService } from '../../../../core/services/websocket.service';
 import { formatMoneyIt } from '../shared/currency.util';
 
 /**
@@ -21,6 +22,7 @@ import { formatMoneyIt } from '../shared/currency.util';
 })
 export class OvernightSwapComponent {
   private readonly trading = inject(TradingService);
+  private readonly ws = inject(WebSocketService);
 
   readonly epic = input<string>('XAUUSD');
 
@@ -130,6 +132,16 @@ export class OvernightSwapComponent {
     effect(() => {
       const e = this.epic();
       if (e) {
+        this.trading.loadOvernightSwap(e);
+        this.trading.loadSwapAccum(e, 7);
+      }
+    });
+
+    // Reload on /ws/markets swap_update for this epic — replaces polling.
+    effect(() => {
+      const upd = this.ws.lastSwapUpdate();
+      const e = this.epic();
+      if (upd && e && upd.epic === e) {
         this.trading.loadOvernightSwap(e);
         this.trading.loadSwapAccum(e, 7);
       }

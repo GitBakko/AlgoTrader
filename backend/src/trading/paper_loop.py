@@ -500,6 +500,22 @@ class PaperTradingLoop:
         except Exception as e:
             logger.warning(f"Position open persistence failed for {deal_id}: {e}")
 
+        # Dashboard v2: push swap-state delta to /ws/markets subscribers so
+        # the OvernightSwap card updates without polling the REST endpoint.
+        try:
+            from src.api.websocket import broadcast_swap_update
+
+            notional = abs(float(size or 0) * float(entry_price or 0))
+            await broadcast_swap_update(
+                epic=epic,
+                rate_pct=None,  # unchanged — frontend keeps cached snapshot rate
+                notional=notional,
+                direction=(direction or "").upper() or "NONE",
+                source="paper_loop_open",
+            )
+        except Exception as e:
+            logger.debug(f"swap_update broadcast on open failed for {epic}: {e}")
+
     async def _persist_position_close(
         self,
         deal_id: str,
@@ -645,6 +661,23 @@ class PaperTradingLoop:
                 )
         except Exception as e:
             logger.warning(f"Position close persistence failed for {deal_id}: {e}")
+
+        # Dashboard v2: notify subscribers that exposure on this epic
+        # changed. If other OPEN rows remain we'd ideally push the residual
+        # notional, but the common case is "last position closed" → zero.
+        # Frontend can call /swap-accum to refresh on any non-zero scenario.
+        try:
+            from src.api.websocket import broadcast_swap_update
+
+            await broadcast_swap_update(
+                epic=epic,
+                rate_pct=None,
+                notional=0.0,
+                direction="NONE",
+                source="paper_loop_close",
+            )
+        except Exception as e:
+            logger.debug(f"swap_update broadcast on close failed for {epic}: {e}")
 
     def _init_regime_gate(self) -> None:
         """Initialize RegimeGate if enabled and not already initialized."""
