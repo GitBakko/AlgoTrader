@@ -297,10 +297,18 @@ class CapitalComClient:
         """
         params: dict[str, Any] = {"resolution": resolution.value}
 
+        # Capital.com historical-prices endpoint expects naive
+        # `yyyy-MM-dd'T'HH:mm:ss` strings in UTC (no `Z`, no offset —
+        # mirrors the /history/transactions contract). Normalise tz-aware
+        # inputs to UTC before formatting so callers passing a local-
+        # tz datetime don't silently skew the window. Naive inputs are
+        # assumed to already be UTC.
         if from_date:
-            params["from"] = from_date.strftime("%Y-%m-%dT%H:%M:%S")
+            f = from_date.astimezone(UTC) if from_date.tzinfo else from_date
+            params["from"] = f.strftime("%Y-%m-%dT%H:%M:%S")
         if to_date:
-            params["to"] = to_date.strftime("%Y-%m-%dT%H:%M:%S")
+            t = to_date.astimezone(UTC) if to_date.tzinfo else to_date
+            params["to"] = t.strftime("%Y-%m-%dT%H:%M:%S")
         if max_candles:
             params["max"] = max_candles
 

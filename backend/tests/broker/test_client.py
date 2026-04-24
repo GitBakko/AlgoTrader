@@ -316,6 +316,47 @@ class TestCapitalComClientMarketData:
 
         assert len(candles) == 0
 
+    @pytest.mark.asyncio
+    async def test_get_historical_prices_tz_aware_normalized_to_utc(self):
+        """Tz-aware datetimes must be converted to UTC before formatting.
+
+        Capital.com /api/v1/prices/ expects naive ``yyyy-MM-dd'T'HH:mm:ss``
+        strings interpreted as UTC — same contract as /history/transactions.
+        Passing a tz-aware local-time datetime must not leak local wall
+        clock into the query; it has to be astimezone'd to UTC first.
+        See memory `project_timezone_followup.md`.
+        """
+        from datetime import timedelta, timezone
+
+        client = CapitalComClient(
+            api_url="https://demo-api.example.com",
+            api_key="test_key",
+            email="test@example.com",
+            password="test_pass",
+        )
+
+        # 10:00 in UTC+2 == 08:00 UTC
+        cest = timezone(timedelta(hours=2))
+        from_date = datetime(2026, 2, 1, 10, 0, 0, tzinfo=cest)
+        to_date = datetime(2026, 2, 1, 12, 0, 0, tzinfo=cest)
+
+        captured: dict = {}
+
+        async def _spy(method, path, params=None, **kwargs):
+            captured["params"] = params
+            return {"prices": [], "instrumentType": "INDICES"}
+
+        with patch.object(client, "_request", side_effect=_spy):
+            await client.get_historical_prices(
+                "GOLD", Resolution.HOUR, from_date=from_date, to_date=to_date
+            )
+
+        assert captured["params"]["from"] == "2026-02-01T08:00:00"
+        assert captured["params"]["to"] == "2026-02-01T10:00:00"
+        # No Z / offset suffix — server rejects those with error.invalid.from.
+        assert "Z" not in captured["params"]["from"]
+        assert "+" not in captured["params"]["from"]
+
 
 @pytest.mark.unit
 @pytest.mark.broker
