@@ -146,11 +146,18 @@ class PredictionService:
             logger.warning(f"No data for {epic}/{timeframe}")
             return None
 
-        # Cache for get_market_data reuse (only fetch if not already cached)
-        # Need 300 bars for VWAP rolling, BB, EMA-50, ADX-14 stabilization
-        if epic not in self._last_candles_cache:
-            df_cache = self.data_access.get_candles(epic, timeframe, limit=300)
-            self._last_candles_cache[epic] = (timeframe, df_cache)
+        # Cache for get_market_data reuse — ALWAYS refresh on every
+        # predict() so the indicator pipeline downstream (MR strategy,
+        # regime gate) sees the same fresh DataFrame predict() just
+        # used. The previous "if epic not in cache" guard turned this
+        # into a write-once dict — after 1 iteration crypto MR was
+        # being fed candles from process startup and z-scores stayed
+        # frozen for days. Verified 2026-04-26: fresh recompute
+        # produced DOG z=2.56 / ICP z=-2.03 (entry triggers) while the
+        # cache served 1.88 / -0.53 (HOLD) for 36+ hours straight.
+        # Need 300 bars for VWAP rolling, BB, EMA-50, ADX-14 stabilization.
+        df_cache = self.data_access.get_candles(epic, timeframe, limit=300)
+        self._last_candles_cache[epic] = (timeframe, df_cache)
 
         if matrix.num_features == 0:
             logger.warning(f"No features built for {epic}/{timeframe}")
