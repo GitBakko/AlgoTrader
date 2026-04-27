@@ -18,6 +18,7 @@ import { RiskGaugeStackComponent } from './components/risk-gauge-stack/risk-gaug
 import { ModelsHealthPanelComponent } from './components/models-health-panel/models-health-panel.component';
 import { KpiStripCompactComponent } from './components/kpi-strip-compact/kpi-strip-compact.component';
 import { ActivePositionsCockpitComponent } from './components/active-positions-cockpit/active-positions-cockpit.component';
+import { PositionDetailDrawerComponent } from './components/position-detail-drawer/position-detail-drawer.component';
 import { WebSocketService } from '../../core/services/websocket.service';
 import type { PaperPosition } from '../../core/models';
 import { epicColor } from '../../shared/constants/epic-colors';
@@ -50,6 +51,7 @@ const POSITION_HISTORY_REFRESH_MS = 30_000;
     ModelsHealthPanelComponent,
     KpiStripCompactComponent,
     ActivePositionsCockpitComponent,
+    PositionDetailDrawerComponent,
   ],
   templateUrl: './paper-trading.component.html',
   styleUrls: ['./paper-trading.component.scss'],
@@ -65,6 +67,12 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
 
   readonly stopBusy = signal(false);
   readonly emergencyBusy = signal(false);
+
+  /** Deal id of the position currently shown in the right-side detail drawer.
+   *  Stored as id (not as the object) so the resolved position computed below
+   *  always reflects the latest live data without us writing back into the
+   *  signal from an effect. `null` keeps the drawer closed. */
+  readonly selectedPositionId = signal<string | null>(null);
 
   /** Wall-clock signal updated every 1s so `lastTickAgo` and dependent
    *  computeds (cockpit-header tick chip, ECG label) re-render every second
@@ -116,6 +124,20 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     if (!s) return 'IDLE';
     if ((s.error_count ?? 0) > 0) return 'ERROR';
     return s.running ? 'RUNNING' : 'IDLE';
+  });
+
+  /** True until /trading/status returns its first response. We use it to
+   *  swap the KPI strip and the active-positions stack for skeleton
+   *  placeholders so the cockpit doesn't flash empty cells on first paint. */
+  readonly isInitialLoading = computed<boolean>(() => this.status() === null);
+
+  /** Position currently bound to the detail drawer. Null while the drawer
+   *  is closed or after the underlying position is gone from the broker
+   *  list (SL hit, TP hit, manual close), which auto-dismisses the drawer. */
+  readonly selectedPosition = computed<PaperTradingPosition | null>(() => {
+    const id = this.selectedPositionId();
+    if (!id) return null;
+    return this.positions().find((p) => p.id === id) ?? null;
   });
 
   readonly mode = computed<CockpitMode>(() => {
@@ -283,6 +305,7 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
         this.priceTickPulse.set(now);
       }
     });
+
   }
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -402,9 +425,11 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   }
 
   onPositionDetails(p: PaperTradingPosition): void {
-    // PR5 wires the audit drawer; for PR3 details are a no-op so the card
-    // remains keyboard-focusable without breaking accessibility.
-    void p;
+    this.selectedPositionId.set(p.id);
+  }
+
+  onDrawerClosed(): void {
+    this.selectedPositionId.set(null);
   }
 
   async onEmergency(): Promise<void> {

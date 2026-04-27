@@ -1,5 +1,16 @@
 <div class="pv-kpi" role="list" aria-label="Paper Trading KPI strip">
 
+@if (loading()) {
+  @for (cell of skeletonCells; track $index) {
+    <div class="pv-kpi__cell pv-kpi__cell--skeleton" role="listitem">
+      <app-skeleton-kpi-cell
+        [accent]="cell.accent"
+        [showSpark]="cell.spark">
+      </app-skeleton-kpi-cell>
+    </div>
+  }
+} @else {
+
   <article class="pv-kpi__cell"
            role="listitem"
            [class.is-positive]="pnlOpenSign() > 0"
@@ -96,5 +107,7 @@
       </div>
     </div>
   </article>
+
+}
 
 </div>

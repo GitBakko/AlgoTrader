@@ -1,6 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
+import { SkeletonKpiCellComponent } from '../../../../shared/components/skeleton-kpi-cell/skeleton-kpi-cell.component';
 import type { KpiStrip } from '../../../../core/models/paper-trading';
+
+interface SkeletonCellSpec {
+  accent: 'profit' | 'loss' | 'info' | 'warn' | 'neutral';
+  spark: boolean;
+}
 
 /**
  * KPI Strip Compact — center hero (HANDOFF §3.5).
@@ -17,13 +23,27 @@ import type { KpiStrip } from '../../../../core/models/paper-trading';
   selector: 'app-kpi-strip-compact',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, DecimalPipe],
+  imports: [CommonModule, DecimalPipe, SkeletonKpiCellComponent],
   templateUrl: './kpi-strip-compact.component.html',
   styleUrls: ['./kpi-strip-compact.component.scss'],
 })
 export class KpiStripCompactComponent {
   readonly kpi = input.required<KpiStrip>();
   readonly currency = input<string>('USD');
+  /** Render six skeleton cells in place of the strip while waiting for the
+   *  first /trading/status response. Layout stays identical so resolved
+   *  data drops in without shifting the cockpit grid. */
+  readonly loading = input<boolean>(false);
+
+  /** Six placeholder specs that mirror the resolved cell accents. */
+  readonly skeletonCells: SkeletonCellSpec[] = [
+    { accent: 'profit',  spark: true  }, // P&L Open
+    { accent: 'profit',  spark: true  }, // P&L Today
+    { accent: 'info',    spark: false }, // Open
+    { accent: 'info',    spark: false }, // Win/Sig
+    { accent: 'info',    spark: false }, // R:R
+    { accent: 'loss',    spark: false }, // DD Live
+  ];
 
   readonly currencySym = computed(() => {
     const code = (this.currency() ?? 'USD').replace(/d$/, '');

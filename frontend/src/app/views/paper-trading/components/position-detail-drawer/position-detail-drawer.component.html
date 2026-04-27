@@ -1,0 +1,163 @@
+@if (position(); as p) {
+  <div class="pdd-backdrop" (click)="onBackdropClick()" aria-hidden="true"></div>
+
+  <aside class="pdd-drawer"
+         role="dialog"
+         aria-modal="true"
+         [attr.aria-label]="'Dettagli posizione ' + p.ticker">
+    <header class="pdd-header">
+      <div class="pdd-header__title">
+        <app-epic-logo [epic]="p.ticker" [size]="22"></app-epic-logo>
+        <div class="pdd-header__title-text">
+          <span class="pdd-header__ticker mantis-mono">{{ p.ticker }}</span>
+          <span class="pdd-header__deal mantis-mono">{{ p.id }}</span>
+        </div>
+      </div>
+
+      <button type="button"
+              class="pdd-close"
+              aria-label="Chiudi dettagli"
+              (click)="close()">
+        ×
+      </button>
+    </header>
+
+    <nav class="pdd-tabs" role="tablist" aria-label="Sezioni dettaglio posizione">
+      @for (tab of ['overview', 'audit', 'history']; track tab) {
+        <button type="button"
+                role="tab"
+                class="pdd-tab"
+                [class.pdd-tab--active]="activeTab() === tab"
+                [attr.aria-selected]="activeTab() === tab"
+                [attr.data-tab]="tab"
+                (click)="setTab($any(tab))">
+          @switch (tab) {
+            @case ('overview') { Overview }
+            @case ('audit')    { Audit }
+            @case ('history')  { History }
+          }
+        </button>
+      }
+    </nav>
+
+    <section class="pdd-body" role="tabpanel" [attr.aria-label]="activeTab()">
+      @switch (activeTab()) {
+
+        @case ('overview') {
+          <div class="pdd-block">
+            <div class="pdd-block__label">P&L</div>
+            <div class="pdd-pnl mantis-mono"
+                 [class.pdd-pnl--profit]="inProfit()"
+                 [class.pdd-pnl--loss]="!inProfit()">
+              {{ inProfit() ? '+' : '' }}{{ p.pnlEur | number:'1.2-2' }} {{ currencySym() }}
+              <span class="pdd-pnl__pct">
+                ({{ inProfit() ? '+' : '' }}{{ p.pnlPct | number:'1.2-2' }}%)
+              </span>
+            </div>
+          </div>
+
+          <div class="pdd-grid">
+            <div class="pdd-cell">
+              <span class="pdd-cell__label">Direzione</span>
+              <span class="pdd-cell__value mantis-mono"
+                    [class.pdd-cell__value--profit]="p.direction === 'BUY'"
+                    [class.pdd-cell__value--loss]="p.direction === 'SELL'">
+                {{ p.direction }}
+              </span>
+            </div>
+            <div class="pdd-cell">
+              <span class="pdd-cell__label">Size</span>
+              <span class="pdd-cell__value mantis-mono">{{ p.size | number:'1.0-2' }}</span>
+            </div>
+            <div class="pdd-cell">
+              <span class="pdd-cell__label">Età</span>
+              <span class="pdd-cell__value mantis-mono">{{ ageLabel() }}</span>
+            </div>
+            <div class="pdd-cell">
+              <span class="pdd-cell__label">R:R</span>
+              <span class="pdd-cell__value mantis-mono">1:{{ p.rr | number:'1.2-2' }}</span>
+            </div>
+          </div>
+
+          <div class="pdd-grid pdd-grid--prices">
+            <div class="pdd-cell">
+              <span class="pdd-cell__label">Entry</span>
+              <span class="pdd-cell__value mantis-mono">{{ p.entry | number:'1.2-5' }}</span>
+            </div>
+            <div class="pdd-cell">
+              <span class="pdd-cell__label">Current</span>
+              <span class="pdd-cell__value mantis-mono">{{ p.current | number:'1.2-5' }}</span>
+            </div>
+            <div class="pdd-cell">
+              <span class="pdd-cell__label">Stop loss</span>
+              <span class="pdd-cell__value pdd-cell__value--loss mantis-mono">{{ p.stopLoss | number:'1.2-5' }}</span>
+              <span class="pdd-cell__sub mantis-mono">→ {{ distToSlPct() | number:'1.2-2' }}%</span>
+            </div>
+            <div class="pdd-cell">
+              <span class="pdd-cell__label">Take profit</span>
+              <span class="pdd-cell__value pdd-cell__value--profit mantis-mono">{{ p.takeProfit | number:'1.2-5' }}</span>
+              <span class="pdd-cell__sub mantis-mono">→ {{ distToTpPct() | number:'1.2-2' }}%</span>
+            </div>
+          </div>
+
+          <div class="pdd-block">
+            <div class="pdd-block__label">Trailing stop</div>
+            <div class="pdd-chip"
+                 [class.pdd-chip--active]="p.trailing"
+                 [class.pdd-chip--idle]="!p.trailing">
+              <span class="pdd-chip__dot" aria-hidden="true"></span>
+              {{ p.trailing ? 'TRAIL ON' : 'TRAIL OFF' }}
+            </div>
+          </div>
+        }
+
+        @case ('audit') {
+          <div class="pdd-block">
+            <div class="pdd-block__label">Audit segnale di apertura</div>
+            <p class="pdd-paragraph">
+              Apri il drawer audit completo per ispezionare votazione modelli,
+              gates, snapshot di mercato e cooldown SL relativi a questa posizione.
+            </p>
+            <button type="button"
+                    class="pdd-btn pdd-btn--primary"
+                    (click)="openFullAudit()">
+              Apri audit completo
+            </button>
+          </div>
+
+          <div class="pdd-block">
+            <div class="pdd-block__label">Identificativi</div>
+            <dl class="pdd-defs mantis-mono">
+              <dt>Deal ID</dt>
+              <dd>{{ p.id }}</dd>
+              <dt>Epic</dt>
+              <dd>{{ p.ticker }}</dd>
+              <dt>Direzione</dt>
+              <dd>{{ p.direction }}</dd>
+            </dl>
+          </div>
+        }
+
+        @case ('history') {
+          <div class="pdd-block">
+            <div class="pdd-block__label">Storia posizione</div>
+            <p class="pdd-paragraph">
+              Cronologia eventi (apertura, modifiche SL/TP, parziali, chiusura)
+              sarà disponibile qui appena il backend espone
+              <code class="mantis-mono">/api/trading/positions/{{ '{' }}deal_id{{ '}' }}/events</code>.
+            </p>
+          </div>
+
+          <div class="pdd-empty">
+            <span class="pdd-empty__icon" aria-hidden="true">⏱</span>
+            <span class="pdd-empty__title">Cronologia non ancora disponibile</span>
+            <span class="pdd-empty__sub">
+              Per ora consulta il <em>System Logs</em> filtrato per
+              <span class="mantis-mono">{{ p.id }}</span>.
+            </span>
+          </div>
+        }
+      }
+    </section>
+  </aside>
+}
