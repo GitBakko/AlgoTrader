@@ -157,6 +157,15 @@ close_detection_shadow_disagreement_counter = Counter(
     ["v1_path", "v2_outcome", "epic"],
 )
 
+# ===== Paper Trading P&L Snapshot Metrics =====
+# 60s scheduler observability — per-tick outcome counter so we can alarm on
+# error spikes (broker dead, DB unreachable, etc.) without tailing logs.
+paper_pnl_snapshot_counter = Counter(
+    "mantis_paper_pnl_snapshot_total",
+    "Paper trading 60s P&L snapshot ticks recorded by outcome",
+    ["outcome"],  # success | empty | error
+)
+
 
 class MetricsCollector:
     """
@@ -312,6 +321,22 @@ class MetricsCollector:
             close_detection_shadow_disagreement_counter.labels(
                 v1_path=v1_path, v2_outcome=v2_outcome, epic=epic
             ).inc()
+        except Exception:
+            pass
+
+    @classmethod
+    def record_paper_pnl_snapshot(cls, *, outcome: str) -> None:
+        """Record the outcome of a 60s paper-trading P&L snapshot tick.
+
+        Args:
+            outcome: 'success' (row written), 'empty' (no broker / no loop)
+                     or 'error' (exception during persist).
+
+        Cardinality is bounded by the three labels above — safe to keep
+        unsampled. Used to alert when the scheduler stops succeeding.
+        """
+        try:
+            paper_pnl_snapshot_counter.labels(outcome=outcome).inc()
         except Exception:
             pass
 

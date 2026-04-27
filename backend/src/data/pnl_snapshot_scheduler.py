@@ -151,14 +151,26 @@ class PnlSnapshotScheduler:
     # ── Snapshot tick ────────────────────────────────────────────────
 
     async def _safe_take_snapshot(self) -> None:
+        # Local import to avoid pulling prometheus_client when the
+        # scheduler is exercised in unit tests that stub the registry.
+        from src.monitoring.metrics import MetricsCollector
+
         try:
-            await self._take_snapshot()
+            wrote_row = await self._take_snapshot()
         except Exception as exc:
             logger.warning(f"P&L snapshot tick failed: {exc}")
-
-    async def _take_snapshot(self) -> None:
-        if self._db_session_factory is None:
+            MetricsCollector.record_paper_pnl_snapshot(outcome="error")
             return
+        MetricsCollector.record_paper_pnl_snapshot(
+            outcome="success" if wrote_row else "empty"
+        )
+
+    async def _take_snapshot(self) -> bool:
+        """Capture one tick. Returns True when a row was persisted, False
+        when the tick exited early (no DB / no broker data). Used by the
+        outer wrapper to feed the Prometheus counter outcome label."""
+        if self._db_session_factory is None:
+            return False
 
         # Lazy WS attach: broker_ws may not be ready when start() runs.
         if not self._ws_listener_attached:
@@ -255,6 +267,7 @@ class PnlSnapshotScheduler:
                 f"pnl_open={pnl_open:.2f} pnl_today={pnl_today:.2f} "
                 f"open={len(positions)}"
             )
+        return True
 
     # ── Prune ────────────────────────────────────────────────────────
 

@@ -16,8 +16,20 @@
  *                  + `cryptoicons.org/api/icon/{symbol}/64`
  *  - Stocks:      `logo.clearbit.com/{domain}` (free tier, returns image)
  *                  + `eodhd.com/img/logos/US/{ticker}.png`
- *  - Forex/idx/   inline SVG emoji (already in the previous impl)
- *    commodities
+ *  - Forex:       `flagcdn.com/w40/{cc}.png` for the quote currency
+ *                  + circle-flags GitHub Pages SVG fallback
+ *  - Commodities: curated inline SVG glyphs (gold bar / silver bar / oil
+ *                  drop / flame / copper coin / platinum) — replaces the
+ *                  emoji-only fallback so XAUUSD / WTIUSD render as
+ *                  proper logos at any size.
+ *  - Final tier:  inline emoji SVG that cannot fail.
+ *
+ * Research note (2026-04-27): no public API exposes pair-of-flag composite
+ * images for FOREX. Composite SVGs with external `<image>` hrefs are
+ * blocked by browsers when served as data: URIs. Single-flag (quote
+ * currency) is the highest-fidelity option achievable without a backend
+ * proxy. Commodity-specific image APIs (commodities-api etc.) only serve
+ * price data, no glyphs — curated inline SVGs are the right answer.
  */
 
 import { Injectable, signal } from '@angular/core';
@@ -26,7 +38,7 @@ import { Injectable, signal } from '@angular/core';
   providedIn: 'root',
 })
 export class LogoService {
-  private readonly CACHE_KEY = 'mantis-logos-v2';
+  private readonly CACHE_KEY = 'mantis-logos-v3';
   private readonly CACHE_TTL_MS = 24 * 60 * 60 * 1000;
   private cache = new Map<string, { urls: string[]; ts: number }>();
 
@@ -45,6 +57,32 @@ export class LogoService {
   private readonly STOCK_MAP: Record<string, string> = {
     NVDA: 'nvidia.com',
     TSLA: 'tesla.com',
+  };
+
+  // FOREX pairs → ISO country code for the quote currency. We render a
+  // single flag (quote-side) from flagcdn.com because composite duo-flag
+  // SVGs cannot reference external images when served as data: URIs.
+  // Indices map to the country whose market they track.
+  private readonly FLAG_MAP: Record<string, string> = {
+    EURUSD: 'us',
+    GBPUSD: 'us',
+    USDJPY: 'jp',
+    DE40:   'de',
+    US500:  'us',
+    NAS100: 'us',
+  };
+
+  // Commodities → curated inline SVG (small, crisp, mantis-tinted) rather
+  // than emoji. Returns full data: URI ready to drop into <img src>.
+  // The svgs are intentionally simple geometric glyphs so they render
+  // well at 16/24/32/40 sizes.
+  private readonly COMMODITY_SVG: Record<string, () => string> = {
+    XAUUSD: () => this.commoditySvg('#FFD700', 'M5 18h22v6H5z M8 11h16v6H8z M11 4h10v6H11z'),
+    XAGUSD: () => this.commoditySvg('#C0C0C0', 'M5 18h22v6H5z M8 11h16v6H8z M11 4h10v6H11z'),
+    WTIUSD: () => this.commoditySvg('#1A1A1A', 'M16 4 C 9 12, 6 17, 6 22 a10 10 0 0 0 20 0 c 0 -5 -3 -10 -10 -18 z', '#39FF14'),
+    NATGAS: () => this.commoditySvg('#FFB020', 'M16 4 c -2 5 -6 7 -6 14 a 6 6 0 0 0 12 0 c 0 -3 -3 -5 -3 -8 c 0 -2 1 -4 -3 -6 z'),
+    COPPER: () => this.commoditySvg('#B87333', null, null, true),
+    PLATINUM: () => this.commoditySvg('#E5E4E2', 'M5 18h22v6H5z M8 11h16v6H8z M11 4h10v6H11z'),
   };
 
   // Inline emoji fallback for forex/commodities/indices and as final tier.
@@ -132,7 +170,51 @@ export class LogoService {
       ];
     }
 
+    // FOREX pairs + indices: try a country flag for the quote-currency
+    // side from flagcdn.com (fast CDN, no API key) and fall back to the
+    // GitHub-hosted circle-flags SVG before the inline emoji glyph.
+    if (this.FLAG_MAP[epic]) {
+      const cc = this.FLAG_MAP[epic];
+      return [
+        `https://flagcdn.com/w40/${cc}.png`,
+        `https://hatscripts.github.io/circle-flags/flags/${cc}.svg`,
+        fallback,
+      ];
+    }
+
+    // Commodities: inline curated SVG ahead of the generic emoji glyph
+    // so XAUUSD / WTIUSD render as proper logos at any size, with no
+    // external dependencies (zero CORS / rate-limit risk).
+    if (this.COMMODITY_SVG[epic]) {
+      return [this.COMMODITY_SVG[epic](), fallback];
+    }
+
     return [fallback];
+  }
+
+  /** Build a small inline SVG for a commodity glyph: a tinted backdrop
+   *  with an optional vector path on top (and optional accent color +
+   *  "coin" mode for COPPER). Output is a `data:image/svg+xml` URI ready
+   *  to use as an <img src>. */
+  private commoditySvg(
+    fill: string,
+    path: string | null = null,
+    accent: string | null = null,
+    coin = false,
+  ): string {
+    const inner = coin
+      ? `<circle cx="16" cy="16" r="11" fill="${fill}" stroke="${accent ?? 'rgba(0,0,0,.25)'}" stroke-width="1.5"/>
+         <text x="50%" y="55%" font-size="13" font-weight="700" text-anchor="middle"
+               dominant-baseline="middle" fill="rgba(0,0,0,.7)" font-family="monospace">Cu</text>`
+      : path
+        ? `<path d="${path}" fill="${fill}" stroke="rgba(0,0,0,.25)" stroke-width=".75"
+                 stroke-linejoin="round"/>`
+        : '';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+      <rect width="32" height="32" rx="6" fill="${fill}1f"/>
+      ${inner}
+    </svg>`;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   }
 
   /** Render an inline SVG containing the emoji + tinted backdrop. */
