@@ -116,29 +116,3 @@
   &--feed      { min-height: 100%; flex: 1 1 auto; }
 }
 
-.pt2-footer {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px 12px;
-  border-top: 1px solid rgba(255, 255, 255, .04);
-  font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
-  font-size: 10px;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, .35);
-
-  &__chip {
-    display: inline-flex;
-    align-items: center;
-    padding: 3px 8px;
-    border-radius: 100px;
-    background: rgba(255, 255, 255, .04);
-    border: 1px solid rgba(255, 255, 255, .08);
-    font-feature-settings: 'tnum' 1;
-  }
-
-  &__spacer {
-    flex: 1 1 auto;
-  }
-}

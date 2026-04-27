@@ -309,6 +309,7 @@ class RiskManager:
                 confidence=signal.confidence,
                 trade_history=trade_history,
                 max_position_pct=self.limits.max_position_pct,
+                min_notional_usd=_risk_settings.min_notional_usd,
             )
             if sizing_method != "fixed_fractional":
                 adjustments.append(f"Sizing: {sizing_method}")
@@ -325,6 +326,7 @@ class RiskManager:
                 stop_loss=stop_loss,
                 confidence=signal.confidence,
                 max_position_pct=self.limits.max_position_pct,
+                min_notional_usd=_risk_settings.min_notional_usd,
             )
 
         # Apply correlation multiplier

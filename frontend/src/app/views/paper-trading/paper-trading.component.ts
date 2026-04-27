@@ -327,9 +327,6 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     };
   });
 
-  /** Build/footer label — extended in PR 5. */
-  readonly buildTag = signal<string>('mantis · v2 shell');
-
   constructor() {
     // WS prices reshuffle on every broker tick (potentially many per second).
     // Throttle to one beat every 1.5s so the ECG visual does not become a

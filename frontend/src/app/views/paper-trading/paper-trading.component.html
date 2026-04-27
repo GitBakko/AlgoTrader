@@ -63,13 +63,4 @@
     (closed)="onDrawerClosed()">
   </app-position-detail-drawer>
 
-  <footer class="pt2-footer" aria-label="Cockpit footer">
-    <span class="pt2-footer__chip">{{ buildTag() }}</span>
-    @if (lastTickAgo() !== null) {
-      <span class="pt2-footer__chip">tick · {{ lastTickAgo()! | number:'1.1-1' }}s ago</span>
-    }
-    <span class="pt2-footer__spacer"></span>
-    <span class="pt2-footer__chip">PR 4 · telemetry</span>
-  </footer>
-
 </main>

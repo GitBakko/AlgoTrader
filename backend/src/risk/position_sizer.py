@@ -17,6 +17,7 @@ class PositionSizer:
         stop_loss: float,
         confidence: float,
         max_position_pct: float = 0.05,
+        min_notional_usd: float | None = None,
     ) -> float:
         """
         Calculate position size using ATR-based risk and confidence scaling.
@@ -28,6 +29,11 @@ class PositionSizer:
             stop_loss: Stop-loss price level
             confidence: Model confidence (0.0-1.0)
             max_position_pct: Max position as fraction of equity (default 5%)
+            min_notional_usd: Optional notional floor — when supplied, the
+                final size is lifted so `size * entry_price >= floor`,
+                still bounded by `max_position_pct`. Without it, FOREX
+                micro-trades get sized to a few units (~$500 notional)
+                where slippage + spread eat the entire edge.
 
         Returns:
             Position size (units of the asset)
@@ -55,5 +61,26 @@ class PositionSizer:
                 f"(max {max_position_pct*100:.0f}% of equity)"
             )
             final_size = max_size
+
+        # Notional floor: lift the size so the trade is worth taking in
+        # the first place. Bounded by max_size so the floor cannot push
+        # past the per-trade exposure cap. Defensive float cast guards
+        # against mocked settings leaking a MagicMock through.
+        try:
+            min_notional = float(min_notional_usd) if min_notional_usd else 0.0
+        except (TypeError, ValueError):
+            min_notional = 0.0
+        if min_notional > 0:
+            min_size = min_notional / entry_price
+            if final_size < min_size:
+                bumped = min(min_size, max_size)
+                if bumped > final_size:
+                    logger.info(
+                        f"Position size raised to notional floor: "
+                        f"{final_size:.4f} → {bumped:.4f} "
+                        f"(min ${min_notional:.0f}, capped at "
+                        f"{max_position_pct * 100:.0f}% of equity)"
+                    )
+                    final_size = bumped
 
         return max(0.0, final_size)

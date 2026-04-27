@@ -117,6 +117,7 @@ class AdaptiveKellySizer:
         confidence: float,
         trade_history: list[dict],
         max_position_pct: float = 0.05,
+        min_notional_usd: float | None = None,
     ) -> tuple[float, str]:
         """
         Calculate position size using Kelly or fixed-fractional fallback.
@@ -181,6 +182,18 @@ class AdaptiveKellySizer:
         max_size = (equity * max_position_pct) / entry_price
         if size > max_size:
             size = max_size
+
+        # Notional floor — same rationale as PositionSizer: lift the size
+        # so the trade isn't dwarfed by spread+slippage on micro-targets.
+        # Bounded by max_size so the floor cannot break the exposure cap.
+        try:
+            min_notional = float(min_notional_usd) if min_notional_usd else 0.0
+        except (TypeError, ValueError):
+            min_notional = 0.0
+        if min_notional > 0 and entry_price > 0:
+            min_size = min(min_notional / entry_price, max_size)
+            if size < min_size:
+                size = min_size
 
         logger.debug(
             f"Kelly sizing: fraction={kelly_frac:.4f}, size={size:.4f} "

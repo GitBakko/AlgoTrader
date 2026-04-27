@@ -232,6 +232,20 @@ class Settings(BaseSettings):
     mr_z_entry: float = Field(default=2.0, alias="MR_Z_ENTRY")
     mr_z_stop: float = Field(default=3.0, alias="MR_Z_STOP")
     mr_adx_max: float = Field(default=30.0, alias="MR_ADX_MAX")
+    # Minimum TP distance as a fraction of entry price. FOREX ATR is so
+    # small (USDJPY ATR ~0.05 on price ~159 = 0.03%) that the
+    # `TP_MAX_ATR * atr` cap drives unrewardable micro-targets. The floor
+    # ensures every trade has at least 0.15% (or 0.20% for forex) of room
+    # to be worth the round-trip cost. SL is widened proportionally so
+    # the realised R:R from `SL_ATR_MULT/TP_MAX_ATR` is preserved.
+    mr_min_tp_pct: float = Field(default=0.0015, alias="MR_MIN_TP_PCT")
+    mr_min_tp_pct_forex: float = Field(default=0.0020, alias="MR_MIN_TP_PCT_FOREX")
+    # Minimum notional position size in USD. Without it the
+    # `max_position_pct` cap shrinks forex micro-trades to a few units
+    # ($500-ish notional) where slippage + spread eat the entire edge.
+    # The floor lifts the size up to a meaningful $200 minimum, still
+    # bounded by `max_position_pct` so it can't blow past the risk cap.
+    min_notional_usd: float = Field(default=200.0, alias="MIN_NOTIONAL_USD")
 
     # Regime Gate (Phase 2)
     regime_gate_enabled: bool = Field(default=False, alias="REGIME_GATE_ENABLED")

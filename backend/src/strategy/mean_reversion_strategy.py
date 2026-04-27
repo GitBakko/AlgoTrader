@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from loguru import logger
 
 from src.utils.config import get_settings
-from src.utils.constants import COMMODITY_ASSETS, CRYPTO_ASSETS
+from src.utils.constants import COMMODITY_ASSETS, CRYPTO_ASSETS, FOREX_ASSETS
 
 # ATR multipliers per asset class.
 # Target: SL between 1-2.5% for all classes regardless of per-asset volatility.
@@ -40,6 +40,52 @@ def _get_atr_params(epic: str) -> tuple[float, float]:
         return _CLASS_ATR_PARAMS["commodity"]
     # Default: forex (lowest vol, widest mult is safe)
     return _CLASS_ATR_PARAMS["forex"]
+
+
+def _enforce_min_tp(
+    epic: str,
+    current_price: float,
+    sl_dist: float | None,
+    tp_dist: float,
+) -> tuple[float | None, float]:
+    """Apply the per-asset-class TP floor and widen SL to keep R:R intact.
+
+    FOREX ATR is so small (USDJPY ATR ~0.05 on price 159 = 0.03%) that
+    `TP_MAX_ATR * atr` shrinks the target to noise level — slippage and
+    half-spread alone wipe out the edge before TP is reached. The
+    `mr_min_tp_pct` floor (0.15% / 0.20% forex) raises the target to
+    where the round-trip cost is recoverable; SL is scaled by the same
+    factor so the strategy's intrinsic R:R is preserved.
+    """
+    if current_price <= 0 or tp_dist <= 0:
+        return sl_dist, tp_dist
+    settings = get_settings()
+    try:
+        raw_pct = (
+            settings.mr_min_tp_pct_forex
+            if epic in FOREX_ASSETS
+            else settings.mr_min_tp_pct
+        )
+        min_pct = float(raw_pct)
+    except (TypeError, ValueError):
+        # Mocked settings (e.g. unit tests) — leave the trade untouched
+        # rather than crashing the strategy on a sentinel value.
+        return sl_dist, tp_dist
+    # Sanity bound — a 100% TP distance is nonsense; treat anything
+    # outside (0, 0.1] as a mock-leaked sentinel and skip the floor.
+    if not (0 < min_pct <= 0.1):
+        return sl_dist, tp_dist
+    min_tp_dist = current_price * min_pct
+    if tp_dist >= min_tp_dist:
+        return sl_dist, tp_dist
+    scale = min_tp_dist / tp_dist
+    new_tp = min_tp_dist
+    new_sl = sl_dist * scale if sl_dist is not None and sl_dist > 0 else sl_dist
+    logger.info(
+        f"[{epic}] TP floor applied: {tp_dist:.5f} → {new_tp:.5f} "
+        f"({min_pct * 100:.2f}% min); SL scaled ×{scale:.2f}"
+    )
+    return new_sl, new_tp
 
 
 @dataclass
@@ -128,6 +174,17 @@ class MeanReversionStrategy:
             # For SELL: TP must be BELOW entry; cap distance to TP_MAX_ATR
             tp = max(raw_tp, min_tp) if raw_tp < current_price else min_tp
 
+            # Enforce min TP distance (forex micro-target guard).
+            sl_dist = (sl - current_price) if sl and sl > current_price else None
+            tp_dist = current_price - tp
+            new_sl_dist, new_tp_dist = _enforce_min_tp(
+                epic, current_price, sl_dist, tp_dist
+            )
+            if new_tp_dist != tp_dist:
+                tp = current_price - new_tp_dist
+                if new_sl_dist is not None:
+                    sl = current_price + new_sl_dist
+
             rr = (
                 (current_price - tp) / (sl - current_price)
                 if sl and tp and sl > current_price
@@ -162,6 +219,17 @@ class MeanReversionStrategy:
             max_tp = current_price + TP_MAX_ATR * atr if atr > 0 else raw_tp
             # For BUY: TP must be ABOVE entry; cap distance
             tp = min(raw_tp, max_tp) if raw_tp > current_price else max_tp
+
+            # Enforce min TP distance (forex micro-target guard).
+            sl_dist = (current_price - sl) if sl and sl < current_price else None
+            tp_dist = tp - current_price
+            new_sl_dist, new_tp_dist = _enforce_min_tp(
+                epic, current_price, sl_dist, tp_dist
+            )
+            if new_tp_dist != tp_dist:
+                tp = current_price + new_tp_dist
+                if new_sl_dist is not None:
+                    sl = current_price - new_sl_dist
 
             rr = (
                 (tp - current_price) / (current_price - sl)
