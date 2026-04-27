@@ -44,14 +44,14 @@
 
   &__title {
     margin: 0;
-    font-size: 14px;
+    font-size: var(--mantis-fs-body);
     font-weight: 600;
     color: rgba(255, 255, 255, 0.85);
     letter-spacing: 0.02em;
   }
 
   &__subtitle {
-    font-size: 10px;
+    font-size: var(--mantis-fs-xs);
     color: var(--mantis-text-muted);
     opacity: 0.75;
     letter-spacing: 0.02em;
@@ -190,7 +190,7 @@
   &__legend {
     display: inline-flex;
     gap: var(--mantis-space-2);
-    font-size: 9px;
+    font-size: var(--mantis-fs-xxs);
     color: var(--mantis-text-muted);
     letter-spacing: 0.04em;
 
@@ -213,7 +213,7 @@
   &__metrics {
     display: inline-flex;
     gap: 6px;
-    font-size: 10px;
+    font-size: var(--mantis-fs-xs);
     color: var(--mantis-text-muted);
     letter-spacing: 0.04em;
 
@@ -250,7 +250,7 @@
 
   &__marker-label {
     position: absolute;
-    font-size: 9px;
+    font-size: var(--mantis-fs-xxs);
     font-weight: 700;
     letter-spacing: 0.04em;
     pointer-events: none;
@@ -274,7 +274,7 @@
     position: absolute;
     left: 6px;
     bottom: 8px;
-    font-size: 9px;
+    font-size: var(--mantis-fs-xxs);
     color: rgba(255, 255, 255, 0.35);
     letter-spacing: 0.04em;
     pointer-events: none;

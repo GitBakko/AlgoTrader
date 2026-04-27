@@ -69,7 +69,7 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  font-size: 8px;
+  font-size: var(--mantis-fs-xxs);
   color: var(--mantis-text-muted);
 
   span { height: 26px; line-height: 26px; }
@@ -103,7 +103,7 @@
   transition: transform var(--mantis-dur-fast) var(--mantis-ease-out-expo);
 
   &__pnl {
-    font-size: 8px;
+    font-size: var(--mantis-fs-xxs);
     font-weight: 700;
     color: rgba(13, 17, 23, 0.92);
     letter-spacing: 0.02em;

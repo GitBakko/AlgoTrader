@@ -78,7 +78,7 @@
 
 .dur-axis {
   position: absolute;
-  font-size: 8px;
+  font-size: var(--mantis-fs-xxs);
   color: var(--mantis-text-muted);
   letter-spacing: 0.04em;
   pointer-events: none;

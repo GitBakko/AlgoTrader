@@ -37,7 +37,7 @@
 }
 
 .pv-feed__title {
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;
@@ -57,7 +57,7 @@
   padding: 1px 6px;
   border-radius: var(--mantis-radius-sm, 4px);
   border: 1px solid transparent;
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   font-weight: 700;
   letter-spacing: .1em;
   text-transform: uppercase;
@@ -137,7 +137,7 @@
 }
 
 .pv-feed__ts {
-  font-size: 10px;
+  font-size: var(--mantis-fs-xs);
   color: rgba(255, 255, 255, .5);
   font-feature-settings: 'tnum' 1;
   letter-spacing: .04em;
@@ -216,15 +216,15 @@
 }
 
 .pv-feed__epic {
-  font-size: 10px;
+  font-size: var(--mantis-fs-xs);
   font-weight: 700;
-  color: #fff;
+  color: var(--fg1);
   letter-spacing: .04em;
   font-feature-settings: 'tnum' 1;
 }
 
 .pv-feed__strategy {
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   letter-spacing: .05em;
   padding: 1px 5px;
   border-radius: 2px;
@@ -240,7 +240,7 @@
 }
 
 .pv-feed__dir {
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   font-weight: 700;
   letter-spacing: .08em;
   padding: 1px 5px;
@@ -256,7 +256,7 @@
 }
 
 .pv-feed__conf {
-  font-size: 10px;
+  font-size: var(--mantis-fs-xs);
   font-weight: 700;
   font-feature-settings: 'tnum' 1;
   width: fit-content;
@@ -270,8 +270,8 @@
 }
 
 .pv-feed__price {
-  font-size: 10px;
-  color: #fff;
+  font-size: var(--mantis-fs-xs);
+  color: var(--fg1);
   font-feature-settings: 'tnum' 1;
   width: fit-content;
 
@@ -279,7 +279,7 @@
 }
 
 .pv-feed__detail {
-  font-size: 10px;
+  font-size: var(--mantis-fs-xs);
   line-height: 1.35;
   color: rgba(255, 255, 255, .55);
   // Allow up to two lines so reasoning strings ("Total exposure 231.5%
@@ -316,13 +316,13 @@
 
   &-title {
     font-family: var(--mantis-font-ui, 'Plus Jakarta Sans', sans-serif);
-    font-size: 13px;
+    font-size: var(--mantis-fs-base);
     font-weight: 600;
     color: rgba(255, 255, 255, .8);
   }
 
   &-sub {
-    font-size: 11px;
+    font-size: var(--mantis-fs-sm);
     line-height: 1.4;
     color: rgba(255, 255, 255, .45);
   }

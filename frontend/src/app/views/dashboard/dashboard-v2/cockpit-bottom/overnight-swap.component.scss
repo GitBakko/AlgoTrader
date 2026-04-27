@@ -85,7 +85,7 @@
   }
 
   &__rate {
-    font-size: 11px;
+    font-size: var(--mantis-fs-sm);
     font-weight: 700;
     color: var(--mantis-text-primary);
 
@@ -97,7 +97,7 @@
   }
 
   &__sub {
-    font-size: 8px;
+    font-size: var(--mantis-fs-xxs);
     color: var(--mantis-text-muted);
     letter-spacing: 0.04em;
   }
@@ -111,7 +111,7 @@
   min-width: 0;
 
   &__pnl {
-    font-size: 20px;
+    font-size: var(--mantis-fs-2xl);
     font-weight: 700;
     color: var(--mantis-text-primary);
     letter-spacing: 0.01em;
@@ -124,7 +124,7 @@
   }
 
   &__label {
-    font-size: 9px;
+    font-size: var(--mantis-fs-xxs);
     color: var(--mantis-text-muted);
     letter-spacing: 0.04em;
     margin-top: -2px;
@@ -145,7 +145,7 @@
 
   &__est {
     font-style: italic;
-    font-size: 8px;
+    font-size: var(--mantis-fs-xxs);
     opacity: 0.65;
     margin-left: 3px;
   }

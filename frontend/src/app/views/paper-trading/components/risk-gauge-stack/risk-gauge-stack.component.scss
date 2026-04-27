@@ -22,7 +22,7 @@
 }
 
 .pv-rg__head-label {
-  font-size: 10px;
+  font-size: var(--mantis-fs-xs);
   font-weight: 700;
   letter-spacing: .22em;
   text-transform: uppercase;
@@ -59,7 +59,7 @@
 }
 
 .pv-rg__row-label {
-  font-size: 11px;
+  font-size: var(--mantis-fs-sm);
   font-weight: 600;
   color: rgba(255, 255, 255, .85);
   letter-spacing: 0;
@@ -67,14 +67,14 @@
 }
 
 .pv-rg__row-value {
-  font-size: 11px;
+  font-size: var(--mantis-fs-sm);
   font-weight: 700;
   font-feature-settings: 'tnum' 1;
   color: rgba(255, 255, 255, .85);
 }
 
 .pv-rg__row-meta {
-  font-size: 10px;
+  font-size: var(--mantis-fs-xs);
   color: rgba(255, 255, 255, .55);
   font-feature-settings: 'tnum' 1;
   letter-spacing: 0;
@@ -90,7 +90,7 @@
   align-items: center;
   padding: 2px 8px;
   border-radius: 100px;
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;

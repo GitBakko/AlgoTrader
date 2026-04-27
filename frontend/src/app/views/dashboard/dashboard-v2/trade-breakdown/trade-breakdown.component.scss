@@ -139,7 +139,7 @@
   &__tick {
     position: absolute;
     right: 0;
-    font-size: 8px;
+    font-size: var(--mantis-fs-xxs);
     color: var(--mantis-text-muted);
     letter-spacing: 0.02em;
     line-height: 1;
@@ -168,7 +168,7 @@
     position: absolute;
     right: 0;
     top: -9px;
-    font-size: 8px;
+    font-size: var(--mantis-fs-xxs);
     color: var(--mantis-text-muted);
     letter-spacing: 0.04em;
     background: var(--mantis-surface-2);
@@ -210,7 +210,7 @@
     top: -11px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 8px;
+    font-size: var(--mantis-fs-xxs);
     font-weight: 700;
     color: var(--mantis-warning);
     letter-spacing: 0.02em;

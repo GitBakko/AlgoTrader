@@ -9,7 +9,7 @@
   min-height: 100vh;
   background: p.$mantis-surface-1;
   font-family: var(--mantis-font-ui, 'Plus Jakarta Sans', sans-serif);
-  color: #fff;
+  color: var(--fg1);
   // Break out of default-layout's c-container horizontal padding + header mb-4
   // (mirrors dashboard-v2.component.scss :host)
   margin-top: -1.5rem;
@@ -89,7 +89,7 @@
   border-radius: 6px;
   color: rgba(255, 255, 255, .35);
   font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
-  font-size: 10px;
+  font-size: var(--mantis-fs-xs);
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;

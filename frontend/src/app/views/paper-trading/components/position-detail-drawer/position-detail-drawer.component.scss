@@ -64,14 +64,14 @@
 }
 
 .pdd-header__ticker {
-  font-size: 14px;
+  font-size: var(--mantis-fs-body);
   font-weight: 700;
-  color: #fff;
+  color: var(--fg1);
   letter-spacing: .04em;
 }
 
 .pdd-header__deal {
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   color: rgba(255, 255, 255, .4);
   letter-spacing: .12em;
   text-transform: uppercase;
@@ -87,7 +87,7 @@
   width: 28px;
   height: 28px;
   border-radius: var(--mantis-radius-sm, 4px);
-  font-size: 18px;
+  font-size: var(--mantis-fs-xl);
   line-height: 1;
   cursor: pointer;
   transition: filter 120ms ease, box-shadow 120ms ease;
@@ -113,7 +113,7 @@
   border: 0;
   color: rgba(255, 255, 255, .5);
   font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
-  font-size: 10px;
+  font-size: var(--mantis-fs-xs);
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;
@@ -167,7 +167,7 @@
 
 .pdd-block__label {
   font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;
@@ -184,7 +184,7 @@
 }
 
 .pdd-pnl__pct {
-  font-size: 13px;
+  font-size: var(--mantis-fs-base);
   font-weight: 600;
   margin-left: 8px;
   opacity: .7;
@@ -192,7 +192,7 @@
 
 .pdd-paragraph {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--mantis-fs-md);
   line-height: 1.5;
   color: rgba(255, 255, 255, .65);
 }
@@ -217,7 +217,7 @@
 
 .pdd-cell__label {
   font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;
@@ -225,9 +225,9 @@
 }
 
 .pdd-cell__value {
-  font-size: 14px;
+  font-size: var(--mantis-fs-body);
   font-weight: 700;
-  color: #fff;
+  color: var(--fg1);
   font-feature-settings: 'tnum' 1;
 
   &--profit { color: p.$mantis-neon; }
@@ -235,7 +235,7 @@
 }
 
 .pdd-cell__sub {
-  font-size: 10px;
+  font-size: var(--mantis-fs-xs);
   color: rgba(255, 255, 255, .4);
   font-feature-settings: 'tnum' 1;
 }
@@ -248,7 +248,7 @@
   padding: 3px 10px;
   border-radius: var(--mantis-radius-pill, 100px);
   font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;
@@ -284,7 +284,7 @@
   padding: 8px 14px;
   border-radius: var(--mantis-radius-sm, 4px);
   font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
-  font-size: 10px;
+  font-size: var(--mantis-fs-xs);
   font-weight: 700;
   letter-spacing: .1em;
   text-transform: uppercase;
@@ -310,7 +310,7 @@
   grid-template-columns: max-content 1fr;
   gap: 4px 12px;
   margin: 0;
-  font-size: 11px;
+  font-size: var(--mantis-fs-sm);
   color: rgba(255, 255, 255, .85);
   font-feature-settings: 'tnum' 1;
 
@@ -318,7 +318,7 @@
     color: rgba(255, 255, 255, .45);
     text-transform: uppercase;
     letter-spacing: .12em;
-    font-size: 9px;
+    font-size: var(--mantis-fs-xxs);
     font-weight: 700;
   }
 
@@ -346,13 +346,13 @@
 
   &__title {
     font-family: var(--mantis-font-ui, 'Plus Jakarta Sans', sans-serif);
-    font-size: 14px;
+    font-size: var(--mantis-fs-body);
     font-weight: 600;
     color: rgba(255, 255, 255, .85);
   }
 
   &__sub {
-    font-size: 12px;
+    font-size: var(--mantis-fs-md);
     color: rgba(255, 255, 255, .55);
     line-height: 1.4;
   }

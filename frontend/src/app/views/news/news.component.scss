@@ -82,7 +82,7 @@
   font-size: var(--mantis-fs-md);
   padding: 0.25rem 0.5rem;
   border: none;
-  color: #fff !important; // overrides CoreUI badge default color on bg-success/bg-danger parent
+  color: var(--fg1) !important; // overrides CoreUI badge default color on bg-success/bg-danger parent
 }
 
 .sentiment-indicator {

@@ -38,7 +38,7 @@
   &--right .rail__row.rail__row--loss { border-right-color: var(--mantis-loss); }
 
   &__label {
-    font-size: 9px;
+    font-size: var(--mantis-fs-xxs);
     letter-spacing: 0.22em;
     text-transform: uppercase;
     color: rgba(255, 255, 255, 0.4);
@@ -46,7 +46,7 @@
   }
 
   &__value {
-    font-size: 18px;
+    font-size: var(--mantis-fs-xl);
     font-weight: 700;
     color: rgba(255, 255, 255, 0.92);
     line-height: 1.05;
@@ -66,7 +66,7 @@
   }
 
   &__sub {
-    font-size: 10px;
+    font-size: var(--mantis-fs-xs);
     color: rgba(255, 255, 255, 0.5);
     line-height: 1.3;
   }

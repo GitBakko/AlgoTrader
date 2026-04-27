@@ -32,7 +32,7 @@
 }
 
 .pv-heatmap__title {
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;
@@ -40,7 +40,7 @@
 }
 
 .pv-heatmap__count {
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   font-weight: 600;
   letter-spacing: .14em;
   color: rgba(255, 255, 255, .35);
@@ -57,7 +57,7 @@
   padding: 2px 8px;
   border-radius: var(--mantis-radius-sm, 4px);
   font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   font-weight: 700;
   letter-spacing: .1em;
   text-transform: uppercase;
@@ -181,9 +181,9 @@
 }
 
 .pv-heatmap__epic {
-  font-size: 10px;
+  font-size: var(--mantis-fs-xs);
   font-weight: 700;
-  color: #fff;
+  color: var(--fg1);
   letter-spacing: .04em;
   font-feature-settings: 'tnum' 1;
 }
@@ -191,7 +191,7 @@
 .pv-heatmap__dir {
   padding: 1px 5px;
   border-radius: 3px;
-  font-size: 8px;
+  font-size: var(--mantis-fs-xxs);
   font-weight: 700;
   letter-spacing: .08em;
   border: 1px solid transparent;
@@ -235,13 +235,13 @@
 }
 
 .pv-heatmap__conf {
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   color: rgba(255, 255, 255, .55);
   font-feature-settings: 'tnum' 1;
 }
 
 .pv-heatmap__state {
-  font-size: 8px;
+  font-size: var(--mantis-fs-xxs);
   font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;

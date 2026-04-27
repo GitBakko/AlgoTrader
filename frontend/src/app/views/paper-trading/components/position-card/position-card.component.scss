@@ -72,17 +72,17 @@
 }
 
 .pv-pc__ticker {
-  font-size: 14px;
+  font-size: var(--mantis-fs-body);
   font-weight: 700;
   letter-spacing: .02em;
-  color: #fff;
+  color: var(--fg1);
 }
 
 .pv-pc__age-row {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   font-feature-settings: 'tnum' 1;
 }
 
@@ -109,7 +109,7 @@
   align-items: center;
   padding: 2px 7px;
   border-radius: 3px;
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   font-weight: 700;
   letter-spacing: .12em;
   text-transform: uppercase;
@@ -134,12 +134,12 @@
     font-feature-settings: 'tnum' 1;
     text-transform: none;
     letter-spacing: 0;
-    font-size: 10px;
+    font-size: var(--mantis-fs-xs);
   }
 
   &--trail {
     border-radius: 2px;
-    font-size: 8px;
+    font-size: var(--mantis-fs-xxs);
 
     &[data-on='true'] {
       color: p.$mantis-cyan;
@@ -216,7 +216,7 @@
 }
 
 .pv-pc__triplet-label {
-  font-size: 8px;
+  font-size: var(--mantis-fs-xxs);
   font-weight: 700;
   letter-spacing: .12em;
   text-transform: uppercase;
@@ -227,14 +227,14 @@
 }
 
 .pv-pc__triplet-price {
-  font-size: 11px;
+  font-size: var(--mantis-fs-sm);
   font-weight: 700;
   font-feature-settings: 'tnum' 1;
-  color: #fff;
+  color: var(--fg1);
 }
 
 .pv-pc__triplet-meta {
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   font-feature-settings: 'tnum' 1;
   color: rgba(255, 255, 255, .4);
 
@@ -264,7 +264,7 @@
 }
 
 .pv-pc__pnl-label {
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;
@@ -274,7 +274,7 @@
 }
 
 .pv-pc__pnl-trend {
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   font-weight: 700;
   color: rgba(255, 255, 255, .55);
 
@@ -297,7 +297,7 @@
 }
 
 .pv-pc__pnl-value {
-  font-size: 22px;
+  font-size: var(--mantis-fs-2xl);
   font-weight: 700;
   font-feature-settings: 'tnum' 1;
   color: p.$mantis-neon;
@@ -307,7 +307,7 @@
 }
 
 .pv-pc__pnl-pct {
-  font-size: 11px;
+  font-size: var(--mantis-fs-sm);
   font-weight: 700;
   font-feature-settings: 'tnum' 1;
   color: p.$mantis-neon;
@@ -316,7 +316,7 @@
 }
 
 .pv-pc__pnl-quote {
-  font-size: 8px;
+  font-size: var(--mantis-fs-xxs);
   margin-top: 2px;
   color: rgba(255, 255, 255, .45);
   font-feature-settings: 'tnum' 1;
@@ -365,7 +365,7 @@
   align-items: center;
   justify-content: center;
   height: 44px;
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   letter-spacing: .12em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, .35);
@@ -374,7 +374,7 @@
 .pv-pc__spark-bounds {
   display: flex;
   justify-content: space-between;
-  font-size: 8px;
+  font-size: var(--mantis-fs-xxs);
   color: rgba(255, 255, 255, .4);
   font-feature-settings: 'tnum' 1;
 }
@@ -384,7 +384,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   font-feature-settings: 'tnum' 1;
 }
 
@@ -396,7 +396,7 @@
 }
 
 .pv-pc__meta-value {
-  color: #fff;
+  color: var(--fg1);
   font-weight: 700;
 
   &.is-profit { color: p.$mantis-neon; }
@@ -407,7 +407,7 @@
   margin-top: 2px;
   padding: 4px 8px;
   border-radius: 3px;
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;

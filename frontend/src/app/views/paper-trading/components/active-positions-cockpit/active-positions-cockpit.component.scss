@@ -50,17 +50,17 @@
 }
 
 .pv-apc__title {
-  font-size: 11px;
+  font-size: var(--mantis-fs-sm);
   font-weight: 700;
   letter-spacing: .2em;
   text-transform: uppercase;
-  color: #fff;
+  color: var(--fg1);
 }
 
 .pv-apc__count {
   padding: 2px 7px;
   border-radius: 2px;
-  font-size: 10px;
+  font-size: var(--mantis-fs-xs);
   font-weight: 700;
   font-feature-settings: 'tnum' 1;
   color: p.$mantis-cyan;
@@ -75,7 +75,7 @@
 }
 
 .pv-apc__total-label {
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;
@@ -83,10 +83,10 @@
 }
 
 .pv-apc__total-value {
-  font-size: 14px;
+  font-size: var(--mantis-fs-body);
   font-weight: 700;
   font-feature-settings: 'tnum' 1;
-  color: #fff;
+  color: var(--fg1);
 
   &.is-positive { color: p.$mantis-neon; }
   &.is-negative { color: p.$mantis-loss; }
@@ -123,13 +123,13 @@
 
 .pv-apc__empty-title {
   font-family: var(--mantis-font-ui, 'Plus Jakarta Sans', sans-serif);
-  font-size: 16px;
+  font-size: var(--mantis-fs-lg);
   font-weight: 600;
   color: rgba(255, 255, 255, .75);
 }
 
 .pv-apc__empty-sub {
-  font-size: 11px;
+  font-size: var(--mantis-fs-sm);
   color: rgba(255, 255, 255, .5);
   font-feature-settings: 'tnum' 1;
 }

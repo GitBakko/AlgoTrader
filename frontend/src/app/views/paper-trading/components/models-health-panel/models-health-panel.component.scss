@@ -24,7 +24,7 @@
 }
 
 .pv-mh__label {
-  font-size: 10px;
+  font-size: var(--mantis-fs-xs);
   font-weight: 700;
   letter-spacing: .18em;
   text-transform: uppercase;
@@ -32,7 +32,7 @@
 }
 
 .pv-mh__badge {
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   font-weight: 700;
   font-feature-settings: 'tnum' 1;
   color: p.$mantis-neon;
@@ -118,7 +118,7 @@
   gap: 6px;
   padding-top: 4px;
   border-top: 1px solid rgba(255, 255, 255, .04);
-  font-size: 9px;
+  font-size: var(--mantis-fs-xxs);
   color: rgba(255, 255, 255, .5);
   font-feature-settings: 'tnum' 1;
 }
