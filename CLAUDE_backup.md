@@ -73,14 +73,12 @@ Free to edit: SCSS (`_palette.scss`, `_custom.scss` entry + themed partials `_si
 
 ### Design tokens (authoritative source: `frontend/src/scss/_palette.scss`)
 
-> **Style Bible:** per regole di pattern (CARD-*, HDR-*, TBL-*, BTN-*, CHIP-*, FRM-*, KPI Pattern, Live Feed, Top 12 Violazioni VIO-*) la sorgente di verità è **`STYLE_BIBLE.md`** in root del repo (v1.0, 27/04/2026). I tokens elencati qui sotto restano in `_palette.scss`; la Bible aggiunge le regole di **composizione** dei tokens in pattern. Quando audisci una pagina, parti dalla `Top 12 Violazioni` (Bible §3) e dal pattern di pagina applicabile (HDR-01 cockpit, HDR-02 list, HDR-03 settings).
-
 - Accent: `$mantis-neon` `#39FF14` (CTAs, active, hero), `$mantis-green` `#00d97e` (primary UI), `$mantis-cyan` `#00E5FF` (info).
 - Semantic: profit=neon, loss=`#FF3D57`, warning=`#FFB020`, neutral=`#8B949E`.
 - Surface elevation 0–5 (`#010409` → `#2d333b`). Use elevation for depth, not borders.
 - Spacing scale tokens `var(--mantis-space-0..12)` (0, 4, 8, 12, 16, 20, 24, 32, 40, 48 px) — prefer over literal rem/px.
 - Type scale tokens `var(--mantis-fs-xxs..5xl)` (9→48 px). Body 14 px = `fs-body`. Never inline `font-size: 0.875rem`.
-- Radius tokens `var(--mantis-radius-sm|md|lg|xl|pill)` (4, 8, 12, 24, 100 px). Per le card di pagina la Bible standardizza su `sm` (4) e `md` (6-8) — evita `lg`/`xl` salvo modali/dropdown specifici.
+- Radius tokens `var(--mantis-radius-sm|md|lg|xl|pill)` (4, 8, 12, 24, 100 px).
 - Shadow tokens `var(--mantis-shadow-sm|md|lg)` + glows `var(--mantis-glow-green|neon)` (nulled in light theme).
 - Easing tokens `var(--mantis-ease-out-expo|out-back|ripple)`, duration `var(--mantis-dur-fast|normal|slow|reveal)`.
 - Semantic role aliases `var(--fg1|fg2|fg3|fg-accent|fg-disabled|bg1..bg5)` re-resolve per theme via the vars above.
@@ -88,28 +86,6 @@ Free to edit: SCSS (`_palette.scss`, `_custom.scss` entry + themed partials `_si
 - KPI card pattern: `.xxx-kpi-card` wrapper + absolute `__accent` **top bar** (3 px height, full width) with `--primary`/`--profit`/`--loss`/`--warning` variant — **never** a left-bar (flipped 2026-04-23). See `dashboard.component.scss`, `paper-trading.component.scss` for reference.
 - Mobile: bottom-nav <768px, sidebar hidden <992px, 44px touch targets, 16px min input font (iOS zoom guard), `.table-responsive-mobile` on every data table.
 - Internal `/design-system` route renders live token values + all badge / pill / KPI / form previews for dev reference (not in sidebar).
-
-## Active revamp tracks
-
-Stato delle 13 pagine MANTIS al 27/04/2026 (sintesi — vedi `STYLE_BIBLE.md` §4 per la lista completa con violazioni per pagina).
-
-| # | Pagina | Stato | Documento |
-|---|---|---|---|
-| 01 | Dashboard | ✅ DONE (v2 cockpit, in `views/dashboard-v2/`) | — |
-| 02 | **Paper Trading** | 🚧 **IN HANDOFF (Variant B Ambitious)** | `docs/handoff/paper-trading/HANDOFF.md` |
-| 03 | Posizioni | 🟡 PARZIALE | tba |
-| 04 | Trade Journal | 🔴 da rifare | tba |
-| 05 | Segnali AI | 🟡 PARZIALE | tba |
-| 06 | Backtest | 🟡 PARZIALE | tba |
-| 07 | Strategia | 🔴 da rifare | tba |
-| 08 | Modelli AI | 🟡 PARZIALE | tba |
-| 09 | Risk Manager | 🟡 PARZIALE | tba |
-| 10 | Broker | 🟡 PARZIALE | tba |
-| 11 | Notifications | 🟡 PARZIALE | tba |
-| 12 | Settings | 🔴 da rifare (priorità 1) | tba |
-| 13 | Login · 14 System Logs | ✅ CONFORME | — |
-
-**Priorità refactor:** Settings (#12) → Trade Journal (#04) → Strategia (#07) → resto delle PARZIALE in ordine di traffico. Vedi `STYLE_BIBLE.md` §4.
 
 ## Git / CI
 

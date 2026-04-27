@@ -1,0 +1,231 @@
+/* ═══════════════════════════════════════════════════════════
+   MANTIS AI — Design Tokens (Colors & Type)
+   ═══════════════════════════════════════════════════════════
+   Extracted from frontend/src/scss/_palette.scss + _custom.scss
+   Source of truth for the MANTIS AI dashboard (Angular 21 + CoreUI).
+   Dark theme is the primary / default. Light theme overrides follow.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Webfonts (Google Fonts fallback for Plus Jakarta Sans + IBM Plex Mono) ── */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  /* ── Font stacks ── */
+  --mantis-font-ui: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mantis-font-mono: 'IBM Plex Mono', 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+
+  /* ── Hero accents ── */
+  --mantis-neon:      #39FF14;   /* Neon-green, hero accent (only on dark) */
+  --mantis-green:     #00d97e;   /* Primary brand green (WCAG-friendlier) */
+  --mantis-cyan:      #00E5FF;   /* Secondary accent */
+  --mantis-cyan-dim:  #0097A7;
+  --mantis-dark:      #0a2e1a;
+
+  /* ── Semantic ── */
+  --mantis-profit:    #39FF14;
+  --mantis-profit-bg: rgba(57, 255, 20, 0.10);
+  --mantis-loss:      #FF3D57;
+  --mantis-loss-dim:  #CC3148;
+  --mantis-loss-bg:   rgba(255, 61, 87, 0.10);
+  --mantis-warning:   #FFB020;
+  --mantis-warning-bg:rgba(255, 176, 32, 0.10);
+  --mantis-neutral:   #8B949E;
+  --mantis-neutral-dim:#484F58;
+
+  /* ── 6-level surface elevation (dark) ── */
+  --mantis-surface-0: #010409;   /* void / deepest */
+  --mantis-surface-1: #0d1117;   /* body background */
+  --mantis-surface-2: #161b22;   /* cards, sidebar */
+  --mantis-surface-3: #1c2128;   /* dropdowns, popovers */
+  --mantis-surface-4: #21262d;   /* modals, toasts */
+  --mantis-surface-5: #2d333b;   /* tooltips */
+  --mantis-bg:        #0d1117;
+
+  /* ── Borders ── */
+  --mantis-border-subtle:  rgba(255,255,255,0.06);
+  --mantis-border-default: rgba(255,255,255,0.10);
+  --mantis-border-accent:  rgba(0,217,126,0.15);
+  --mantis-border-strong:  rgba(0,217,126,0.30);
+
+  /* ── Ghost / tint fills ── */
+  --mantis-green-ghost: rgba(57, 255, 20, 0.08);
+  --mantis-cyan-ghost:  rgba(0, 229, 255, 0.08);
+  --mantis-glass-bg:    rgba(22, 27, 34, 0.6);
+  --mantis-tint-subtle: rgba(255, 255, 255, 0.04);
+
+  /* ── Text (dark) ── */
+  --mantis-text-primary:   rgba(255, 255, 255, 0.92);
+  --mantis-text-secondary: rgba(255, 255, 255, 0.65);
+  --mantis-text-muted:     rgba(255, 255, 255, 0.45);
+  --mantis-text-disabled:  rgba(255, 255, 255, 0.25);
+
+  /* ── Shadows (dark) ── */
+  --mantis-shadow-sm: 0 1px 3px  rgba(0,0,0,0.20);
+  --mantis-shadow-md: 0 4px 12px rgba(0,0,0,0.30);
+  --mantis-shadow-lg: 0 8px 24px rgba(0,0,0,0.40);
+  --mantis-glow-green: 0 0 8px rgba(0, 217, 126, 0.30);
+  --mantis-glow-neon:  0 0 12px rgba(57, 255, 20, 0.45);
+
+  /* ── Radii ── */
+  --mantis-radius-sm: 4px;
+  --mantis-radius-md: 8px;
+  --mantis-radius-lg: 12px;
+  --mantis-radius-xl: 24px; /* auth cards */
+  --mantis-radius-pill: 100px;
+
+  /* ── Spacing scale (Bootstrap-aligned, 0.25rem step) ── */
+  --mantis-space-0: 0;
+  --mantis-space-1: 0.25rem;   /* 4px  */
+  --mantis-space-2: 0.5rem;    /* 8px  */
+  --mantis-space-3: 0.75rem;   /* 12px */
+  --mantis-space-4: 1rem;      /* 16px */
+  --mantis-space-5: 1.25rem;   /* 20px */
+  --mantis-space-6: 1.5rem;    /* 24px */
+  --mantis-space-8: 2rem;      /* 32px */
+  --mantis-space-10: 2.5rem;   /* 40px */
+  --mantis-space-12: 3rem;     /* 48px */
+
+  /* ── Touch targets & rails ── */
+  --mantis-touch-min: 44px;
+  --mantis-bottom-nav-h: 56px;
+
+  /* ── Motion / timing ── */
+  --mantis-dur-fast:   120ms;
+  --mantis-dur-normal: 250ms;
+  --mantis-dur-slow:   400ms;
+  --mantis-dur-reveal: 600ms;
+  --mantis-ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --mantis-ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --mantis-ease-ripple:   cubic-bezier(0.37, 0.24, 0.53, 0.99);
+
+  /* ── Type scale ──
+     Base body = 14px (0.875rem). Headings 600 weight UI sans. */
+  --mantis-fs-xxs: 0.5625rem;  /* 9px  — micro tags */
+  --mantis-fs-xs:  0.625rem;   /* 10px — nav title, badge */
+  --mantis-fs-sm:  0.6875rem;  /* 11px — footer, label */
+  --mantis-fs-md:  0.75rem;    /* 12px — helper */
+  --mantis-fs-base:0.8125rem;  /* 13px — nav link */
+  --mantis-fs-body:0.875rem;   /* 14px — default body */
+  --mantis-fs-md-lg:0.9375rem; /* 15px — auth form */
+  --mantis-fs-lg:  1rem;       /* 16px — ui primary */
+  --mantis-fs-xl:  1.125rem;   /* 18px */
+  --mantis-fs-2xl: 1.25rem;    /* 20px */
+  --mantis-fs-3xl: 1.5rem;     /* 24px */
+  --mantis-fs-4xl: 2rem;       /* 32px — auth h1 */
+  --mantis-fs-5xl: 3rem;       /* 48px — hero */
+
+  /* ── Semantic type (text roles) ── */
+  --h1-size: var(--mantis-fs-4xl);
+  --h1-weight: 700;
+  --h1-letter: 0.05em;
+  --h2-size: var(--mantis-fs-3xl);
+  --h2-weight: 600;
+  --h3-size: var(--mantis-fs-2xl);
+  --h3-weight: 600;
+  --h4-size: var(--mantis-fs-xl);
+  --h4-weight: 600;
+  --body-size: var(--mantis-fs-body);
+  --body-weight: 400;
+  --mono-feat: "tnum" 1, "zero" 1;
+
+  /* ── Semantic role tokens (convenient aliases) ── */
+  --fg1: var(--mantis-text-primary);
+  --fg2: var(--mantis-text-secondary);
+  --fg3: var(--mantis-text-muted);
+  --fg-disabled: var(--mantis-text-disabled);
+  --fg-accent: var(--mantis-neon);
+
+  --bg1: var(--mantis-surface-1);
+  --bg2: var(--mantis-surface-2);
+  --bg3: var(--mantis-surface-3);
+  --bg4: var(--mantis-surface-4);
+  --bg5: var(--mantis-surface-5);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Light theme overrides
+   ═══════════════════════════════════════════════════════════ */
+[data-coreui-theme="light"],
+.mantis-light {
+  --mantis-neon:    #00a86b;
+  --mantis-green:   #00a86b;
+  --mantis-profit:  #16a34a;
+  --mantis-loss:    #dc2626;
+  --mantis-warning: #d97706;
+  --mantis-cyan:    #0097A7;
+  --mantis-neutral: #6b7280;
+
+  --mantis-surface-0: #f6f8fa;
+  --mantis-surface-1: #ffffff;
+  --mantis-surface-2: #ffffff;
+  --mantis-surface-3: #f0f2f5;
+  --mantis-surface-4: #ffffff;
+  --mantis-surface-5: #e8eaed;
+  --mantis-bg:        #f6f8fa;
+
+  --mantis-text-primary:   rgba(0,0,0,0.87);
+  --mantis-text-secondary: rgba(0,0,0,0.60);
+  --mantis-text-muted:     rgba(0,0,0,0.45);
+  --mantis-text-disabled:  rgba(0,0,0,0.25);
+
+  --mantis-border-subtle:  rgba(0,0,0,0.06);
+  --mantis-border-default: rgba(0,0,0,0.12);
+  --mantis-border-accent:  rgba(0,168,107,0.20);
+  --mantis-border-strong:  rgba(0,168,107,0.40);
+
+  --mantis-glass-bg:    rgba(255,255,255,0.70);
+  --mantis-tint-subtle: rgba(0,0,0,0.03);
+
+  --mantis-shadow-sm: 0 1px 3px  rgba(0,0,0,0.08);
+  --mantis-shadow-md: 0 4px 12px rgba(0,0,0,0.10);
+  --mantis-shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Base body + semantic elements
+   ═══════════════════════════════════════════════════════════ */
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--mantis-bg);
+  color: var(--fg1);
+  font-family: var(--mantis-font-ui);
+  font-size: var(--body-size);
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, .h1 { font-family: var(--mantis-font-ui); font-size: var(--h1-size); font-weight: var(--h1-weight); letter-spacing: var(--h1-letter); color: var(--fg-accent); margin: 0 0 .5rem; }
+h2, .h2 { font-family: var(--mantis-font-ui); font-size: var(--h2-size); font-weight: var(--h2-weight); margin: 0 0 .5rem; color: var(--fg1); }
+h3, .h3 { font-family: var(--mantis-font-ui); font-size: var(--h3-size); font-weight: var(--h3-weight); margin: 0 0 .5rem; color: var(--fg1); }
+h4, .h4 { font-family: var(--mantis-font-ui); font-size: var(--h4-size); font-weight: var(--h4-weight); margin: 0 0 .5rem; color: var(--fg1); }
+p         { font-size: var(--body-size); color: var(--fg2); line-height: 1.5; margin: 0 0 .75rem; }
+small, .text-small { font-size: var(--mantis-fs-sm); color: var(--fg3); }
+
+code, kbd, pre, .font-monospace, .mantis-mono {
+  font-family: var(--mantis-font-mono) !important;
+  font-feature-settings: var(--mono-feat);
+  letter-spacing: -0.01em;
+}
+
+/* KPI / tabular numerics */
+.mantis-kpi {
+  font-family: var(--mantis-font-mono);
+  font-feature-settings: "tnum" 1;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* Section title (sidebar group label) */
+.mantis-section-title {
+  font-size: var(--mantis-fs-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: rgba(57,255,20,0.30);
+}
+
+/* Link */
+a { color: var(--mantis-green); text-decoration: none; }
+a:hover { color: var(--mantis-neon); text-decoration: underline; }
