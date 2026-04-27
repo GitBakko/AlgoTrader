@@ -144,7 +144,119 @@ class StrategyManager:
             mr = MeanReversionStrategy()
             mr_signal = mr.generate_signal(market_data, epic=epic)
 
+            # Build a full audit trail compatible with the signal-audit drawer
+            # (votes / gates / market_snapshot). Even though MR uses a
+            # different evidence model than ScalpScore, we map its inputs
+            # onto the same audit shape so the drawer renders the
+            # decisional path uniformly across strategies.
+            adx_val = float(market_data.get("adx", 0))
+            rsi_val = float(market_data.get("rsi", 50))
+            vwap_val = float(market_data.get("vwap", 0))
+            vwap_z_val = float(market_data.get("vwap_z_score", 0))
+            bb_pctb_val = float(market_data.get("bb_pctb", 0.5))
+            atr_val = float(market_data.get("atr", 0))
+            sil_composite = float(market_data.get("sil_composite_score", 0))
+
+            # Sentiment vote: SIL composite ranges roughly 0–1. >0.6 bullish,
+            # <0.35 bearish, otherwise neutral. Mirrors the thresholds used
+            # by ScalpScoreStrategy._vote_sentiment so the audit reads the
+            # same across strategies.
+            if sil_composite <= 0.0:
+                sentiment_vote = 0
+            elif sil_composite > 0.6:
+                sentiment_vote = 1
+            elif sil_composite < 0.35:
+                sentiment_vote = -1
+            else:
+                sentiment_vote = 0
+
+            # Z-score "vote" — direction = sign of -z (price above mean → SELL)
+            z_vote = 0
+            if mr_signal.z_score >= _settings.mr_z_entry:
+                z_vote = -1  # mean-reversion: high z → SELL
+            elif mr_signal.z_score <= -_settings.mr_z_entry:
+                z_vote = 1  # mean-reversion: low z → BUY
+
+            # RSI vote in MR sense: OB → SELL bias, OS → BUY bias
+            if rsi_val > 70:
+                rsi_vote = -1
+            elif rsi_val < 30:
+                rsi_vote = 1
+            else:
+                rsi_vote = 0
+
+            # VWAP-z secondary directional vote
+            if vwap_z_val >= _settings.mr_z_entry:
+                vwap_vote = -1
+            elif vwap_z_val <= -_settings.mr_z_entry:
+                vwap_vote = 1
+            else:
+                vwap_vote = 0
+
+            mr_votes = {
+                "z_score": {"value": z_vote, "z": round(mr_signal.z_score, 3)},
+                "rsi": {"value": rsi_vote, "rsi": round(rsi_val, 1)},
+                "vwap_z": {"value": vwap_vote, "z": round(vwap_z_val, 3)},
+                "bb_pctb": {
+                    "value": -1 if bb_pctb_val > 1.0 else 1 if bb_pctb_val < 0.0 else 0,
+                    "pctb": round(bb_pctb_val, 3),
+                },
+                "sentiment": {
+                    "value": sentiment_vote,
+                    "composite": round(sil_composite, 3),
+                    "available": sil_composite > 0,
+                },
+            }
+
+            mr_market_snapshot = {
+                "price": round(current_price, 5),
+                "atr": round(atr_val, 5),
+                "rsi": round(rsi_val, 1),
+                "adx": round(adx_val, 1),
+                "vwap": round(vwap_val, 5) if vwap_val else 0,
+                "vwap_z": round(vwap_z_val, 3),
+                "bb_pctb": round(bb_pctb_val, 3),
+                "sentiment_composite": round(sil_composite, 3),
+            }
+
+            def _mr_gates(*, trending_pass: bool, z_pass: bool, quality_pass: bool, ml_agrees: bool | None) -> dict:
+                return {
+                    "trending_filter": {
+                        "passed": trending_pass,
+                        "adx": round(adx_val, 1),
+                        "adx_max": _settings.mr_adx_max,
+                        "reason": (
+                            None if trending_pass
+                            else f"ADX {adx_val:.1f} > {_settings.mr_adx_max:.0f} (trending)"
+                        ),
+                    },
+                    "z_threshold": {
+                        "passed": z_pass,
+                        "z": round(mr_signal.z_score, 3),
+                        "z_entry": _settings.mr_z_entry,
+                        "reason": (
+                            None if z_pass
+                            else f"|z| {abs(mr_signal.z_score):.2f} < entry {_settings.mr_z_entry:.2f}"
+                        ),
+                    },
+                    "quality_gate": {
+                        "passed": quality_pass,
+                        "min_quality": _settings.mr_min_quality,
+                        "reason": (
+                            None if quality_pass
+                            else f"Quality below {_settings.mr_min_quality:.2f}"
+                        ),
+                    },
+                    "ml_agreement": {
+                        "passed": ml_agrees if ml_agrees is not None else True,
+                        "ml_direction": prediction.signal_name if prediction else None,
+                        "mr_direction": mr_signal.direction,
+                    },
+                }
+
             if mr_signal.direction == "HOLD":
+                # Trending vs no-extreme — mr_signal.reason carries the cause.
+                trending_hit = adx_val > _settings.mr_adx_max
                 return TradingSignal(
                     epic=epic,
                     direction=SignalDirection.HOLD,
@@ -157,15 +269,25 @@ class StrategyManager:
                     suggested_stop=None,
                     suggested_tp=None,
                     strategy_name="mean_reversion",
-                    metadata={"mr_reason": mr_signal.reason, "mr_z": mr_signal.z_score},
+                    metadata={
+                        "votes": mr_votes,
+                        "gates": _mr_gates(
+                            trending_pass=not trending_hit,
+                            z_pass=False,
+                            quality_pass=True,  # quality gate not reached at this point
+                            ml_agrees=None,
+                        ),
+                        "market_snapshot": mr_market_snapshot,
+                        "rejection_reason": mr_signal.reason,
+                        "mr_reason": mr_signal.reason,
+                        "mr_z": mr_signal.z_score,
+                    },
                 )
 
             # XGBoost quality score: use prediction confidence as setup quality
             quality = prediction.confidence if prediction else 0.0
 
             # --- DUAL DIRECTION LOGGING (added 2026-04-14) ---
-            # Log both ML and MR directions to measure agreement rate.
-            # This data will answer: "should ML or MR decide direction?"
             ml_direction = prediction.signal_name if prediction else "NONE"
             mr_direction = mr_signal.direction
             agrees = ml_direction == mr_direction
@@ -180,6 +302,24 @@ class StrategyManager:
             direction = (
                 SignalDirection.BUY if mr_signal.direction == "BUY" else SignalDirection.SELL
             )
+
+            # Sentiment confidence adjustment (was inert under MR-Primary mode):
+            # apply a small, capped boost when the SIL composite agrees with
+            # the MR direction, and a small penalty when it disagrees. The
+            # signal-audit drawer surfaces this so the user sees sentiment
+            # contributing to the decision instead of being silently dropped.
+            sentiment_adj = 0.0
+            if sil_composite > 0:
+                if (direction == SignalDirection.BUY and sentiment_vote > 0) or (
+                    direction == SignalDirection.SELL and sentiment_vote < 0
+                ):
+                    sentiment_adj = +0.10
+                elif (direction == SignalDirection.BUY and sentiment_vote < 0) or (
+                    direction == SignalDirection.SELL and sentiment_vote > 0
+                ):
+                    sentiment_adj = -0.10
+            quality_pre_sentiment = quality
+            quality = max(0.0, min(1.0, quality + sentiment_adj))
 
             # Apply quality gate
             if quality < _settings.mr_min_quality:
@@ -196,17 +336,41 @@ class StrategyManager:
                     suggested_tp=mr_signal.tp_level,
                     strategy_name="mean_reversion",
                     metadata={
-                        "mr_reason": f"Quality {quality:.2f} < {_settings.mr_min_quality}",
+                        "votes": mr_votes,
+                        "gates": _mr_gates(
+                            trending_pass=True,
+                            z_pass=True,
+                            quality_pass=False,
+                            ml_agrees=agrees,
+                        ),
+                        "market_snapshot": mr_market_snapshot,
+                        "ml": {
+                            "signal_class": prediction.signal_class if prediction else 1,
+                            "signal_name": ml_direction,
+                            "confidence": round(quality_pre_sentiment, 4),
+                            "probabilities": prediction.probabilities if prediction else {},
+                            "agreement": "agree" if agrees else "disagree",
+                            "confidence_before": round(quality_pre_sentiment, 4),
+                            "confidence_after": round(quality, 4),
+                        },
+                        "rejection_reason": (
+                            f"Quality {quality:.2f} < {_settings.mr_min_quality:.2f}"
+                        ),
+                        "mr_reason": (
+                            f"Quality {quality:.2f} < {_settings.mr_min_quality:.2f}"
+                        ),
                         "mr_z": mr_signal.z_score,
                         "mr_quality": quality,
                         "ml_direction": ml_direction,
                         "ml_agrees": agrees,
+                        "sentiment_adj": sentiment_adj,
                     },
                 )
 
             logger.info(
                 f"MR-Primary [{epic}]: {mr_signal.direction} "
-                f"(z={mr_signal.z_score:.2f}, quality={quality:.2f})"
+                f"(z={mr_signal.z_score:.2f}, quality={quality:.2f}, "
+                f"sentiment_adj={sentiment_adj:+.2f})"
             )
 
             return TradingSignal(
@@ -222,6 +386,23 @@ class StrategyManager:
                 suggested_tp=mr_signal.tp_level,
                 strategy_name="mean_reversion",
                 metadata={
+                    "votes": mr_votes,
+                    "gates": _mr_gates(
+                        trending_pass=True,
+                        z_pass=True,
+                        quality_pass=True,
+                        ml_agrees=agrees,
+                    ),
+                    "market_snapshot": mr_market_snapshot,
+                    "ml": {
+                        "signal_class": prediction.signal_class if prediction else 1,
+                        "signal_name": ml_direction,
+                        "confidence": round(quality_pre_sentiment, 4),
+                        "probabilities": prediction.probabilities if prediction else {},
+                        "agreement": "agree" if agrees else "disagree",
+                        "confidence_before": round(quality_pre_sentiment, 4),
+                        "confidence_after": round(quality, 4),
+                    },
                     "mr_z": mr_signal.z_score,
                     "mr_quality": quality,
                     "mr_direction": mr_signal.direction,
@@ -229,6 +410,7 @@ class StrategyManager:
                     "ml_direction": ml_direction,
                     "ml_agrees": agrees,
                     "adx": market_data.get("adx", 0),
+                    "sentiment_adj": sentiment_adj,
                 },
             )
 

@@ -85,17 +85,27 @@ export class SignalAuditDrawerComponent {
 
   voteLabel(key: string): string {
     const labels: Record<string, string> = {
+      // ScalpScore votes
       ema: 'EMA', rsi: 'RSI', macd: 'MACD',
       volume: 'Volume', adx: 'ADX', bb_keltner: 'BB/Keltner',
       sentiment: 'Sentiment',
+      // MeanReversion votes
+      z_score: 'Z-Score', vwap_z: 'VWAP Z', bb_pctb: 'BB %B',
     };
     return labels[key] ?? key.toUpperCase();
   }
 
   gateLabel(key: string): string {
     const labels: Record<string, string> = {
+      // ScalpScore gates
       session: 'Sessione', dead_market: 'Mercato Morto',
       vwap: 'VWAP', htf: 'HTF Trend', confluence: 'Confluenza',
+      data_quality: 'Data Quality',
+      // MeanReversion gates
+      trending_filter: 'Filtro Trend',
+      z_threshold: 'Soglia Z',
+      quality_gate: 'Quality Gate',
+      ml_agreement: 'ML Agreement',
     };
     return labels[key] ?? key;
   }
@@ -133,6 +143,9 @@ export class SignalAuditDrawerComponent {
       price: 'Prezzo', atr: 'ATR', rsi: 'RSI', adx: 'ADX',
       vwap: 'VWAP', htf_bias: 'HTF Bias', volume: 'Volume',
       bb_width: 'BB Width',
+      vwap_z: 'VWAP Z',
+      bb_pctb: 'BB %B',
+      sentiment_composite: 'Sentiment',
     };
     return labels[key] ?? key;
   }
@@ -182,6 +195,7 @@ export class SignalAuditDrawerComponent {
     if (!gate) return '';
     if (gate.reason) return String(gate.reason);
     switch (key) {
+      // ScalpScore gates
       case 'session':
         return `mult ${(gate.session_mult ?? 0).toFixed(1)} · ${gate.zone ?? ''}`.trim();
       case 'dead_market':
@@ -192,6 +206,20 @@ export class SignalAuditDrawerComponent {
         return gate.htf_bias ? `bias ${gate.htf_bias}` : '';
       case 'confluence':
         return `${gate.buy_count ?? 0}/${gate.effective_min ?? 0} BUY · ${gate.sell_count ?? 0} SELL`;
+      case 'data_quality':
+        return gate.passed === false ? 'missing data' : 'OK';
+      // MeanReversion gates
+      case 'trending_filter':
+        return `ADX ${gate.adx?.toFixed?.(1) ?? '—'} / max ${gate.adx_max ?? '—'}`;
+      case 'z_threshold': {
+        const z = gate.z;
+        const entry = gate.z_entry;
+        return `|z| ${(Math.abs(Number(z) || 0)).toFixed(2)} / ${entry}`;
+      }
+      case 'quality_gate':
+        return `min ${gate.min_quality ?? '—'}`;
+      case 'ml_agreement':
+        return `ML ${gate.ml_direction ?? '—'} · MR ${gate.mr_direction ?? '—'}`;
       default:
         return '';
     }
