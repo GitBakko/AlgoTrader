@@ -25,13 +25,15 @@
     <section class="pt2-center" aria-label="Cockpit center">
       <app-kpi-strip-compact
         [kpi]="kpiStrip()"
-        [currency]="currency()">
+        [currency]="currency()"
+        [loading]="isInitialLoading()">
       </app-kpi-strip-compact>
 
       <app-active-positions-cockpit
         [positions]="positions()"
         [signalsTotal]="kpiStrip().signalsTotal"
         [currency]="currency()"
+        [loading]="isInitialLoading()"
         (closeRequested)="onClosePosition($event)"
         (detailsRequested)="onPositionDetails($event)">
       </app-active-positions-cockpit>
@@ -48,6 +50,12 @@
     </aside>
 
   </section>
+
+  <app-position-detail-drawer
+    [position]="selectedPosition()"
+    [currency]="currency()"
+    (closed)="onDrawerClosed()">
+  </app-position-detail-drawer>
 
   <footer class="pt2-footer" aria-label="Cockpit footer">
     <span class="pt2-footer__chip">{{ buildTag() }}</span>

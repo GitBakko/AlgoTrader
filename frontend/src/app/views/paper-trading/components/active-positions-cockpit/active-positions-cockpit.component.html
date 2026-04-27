@@ -17,7 +17,13 @@
     }
   </header>
 
-  @if (positions().length > 0) {
+  @if (loading()) {
+    <div class="pv-apc__list" aria-busy="true" aria-label="Caricamento posizioni">
+      @for (_ of skeletonRows; track $index) {
+        <app-skeleton-position-card></app-skeleton-position-card>
+      }
+    </div>
+  } @else if (positions().length > 0) {
     <div class="pv-apc__list">
       @for (p of positions(); track p.id) {
         <app-position-card
