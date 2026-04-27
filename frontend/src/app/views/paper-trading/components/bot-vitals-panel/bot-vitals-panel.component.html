@@ -6,26 +6,26 @@
     </span>
   </header>
 
-  <div class="pv-bv__ecg" aria-label="Heartbeat ECG">
-    <svg viewBox="0 0 400 48" preserveAspectRatio="none" aria-hidden="true">
-      <defs>
-        <linearGradient id="pv-bv-ecg-fade" x1="0" x2="1" y1="0" y2="0">
-          <stop offset="0"   stop-color="rgba(57,255,20,0)"/>
-          <stop offset="0.2" stop-color="rgba(57,255,20,0.55)"/>
-          <stop offset="0.8" stop-color="rgba(57,255,20,1)"/>
-          <stop offset="1"   stop-color="rgba(57,255,20,0)"/>
-        </linearGradient>
-      </defs>
-      <g class="pv-bv__ecg-scroll">
-        <!-- waveform repeated 2x for seamless loop -->
-        <polyline class="pv-bv__ecg-line"
-                  points="0,24 18,24 24,18 30,32 36,8 42,38 48,24 70,24 78,20 84,28 90,24 130,24 138,16 144,32 150,8 156,40 162,24 200,24
-                          200,24 218,24 224,18 230,32 236,8 242,38 248,24 270,24 278,20 284,28 290,24 330,24 338,16 344,32 350,8 356,40 362,24 400,24"
-                  fill="none"
-                  stroke-linejoin="round"
-                  stroke-linecap="round"/>
-      </g>
-      <rect class="pv-bv__ecg-cursor" x="0" y="2" width="2" height="44" rx="1"/>
+  <div class="pv-bv__ecg"
+       [class.is-beating]="beating()"
+       (animationend)="onBeatEnd($event)"
+       aria-label="Heartbeat ECG (data-driven)">
+    <svg viewBox="0 0 200 48" preserveAspectRatio="none" aria-hidden="true">
+      <!-- Persistent static reference trace, faint -->
+      <polyline class="pv-bv__ecg-line pv-bv__ecg-line--ref"
+                points="0,24 28,24 36,18 42,32 48,8 54,38 60,24 92,24 100,20 106,28 112,24 138,24 146,16 152,32 158,8 164,40 170,24 200,24"
+                fill="none"
+                pathLength="100"
+                stroke-linejoin="round"
+                stroke-linecap="round"/>
+      <!-- One-shot beat overlay: same path, drawn left→right on each data
+           tick via stroke-dashoffset transition. -->
+      <polyline class="pv-bv__ecg-line pv-bv__ecg-line--beat"
+                points="0,24 28,24 36,18 42,32 48,8 54,38 60,24 92,24 100,20 106,28 112,24 138,24 146,16 152,32 158,8 164,40 170,24 200,24"
+                fill="none"
+                pathLength="100"
+                stroke-linejoin="round"
+                stroke-linecap="round"/>
     </svg>
     <span class="pv-bv__tick mantis-mono">{{ tickLabel() }}</span>
   </div>

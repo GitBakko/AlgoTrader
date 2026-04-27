@@ -73,37 +73,40 @@
     height: 100%;
     display: block;
   }
-
-  // Soft horizontal fade on left edge so loop seam is invisible.
-  &::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: linear-gradient(90deg,
-      p.$mantis-surface-1 0%,
-      transparent 12%,
-      transparent 88%,
-      p.$mantis-surface-1 100%);
-  }
 }
 
-.pv-bv__ecg-scroll {
-  animation: pv-bv-ecg-scroll 4s linear infinite;
-  will-change: transform;
-}
-
-.pv-bv__ecg-line {
-  stroke: p.$mantis-neon;
-  stroke-width: 1.6;
-  filter: drop-shadow(0 0 4px rgba(57, 255, 20, .6));
+// Static reference trace, faint — always visible so the panel is not empty
+// when the bot is idle. Lit up briefly during a beat draw.
+.pv-bv__ecg-line--ref {
+  stroke: rgba(57, 255, 20, .25);
+  stroke-width: 1.4;
   vector-effect: non-scaling-stroke;
+  transition: stroke 240ms ease;
 }
 
-.pv-bv__ecg-cursor {
-  fill: p.$mantis-neon;
-  filter: drop-shadow(0 0 6px rgba(57, 255, 20, .9));
-  animation: pv-bv-ecg-cursor 4s linear infinite, pv-bv-ecg-cursor-pulse 1s ease-in-out infinite;
+// One-shot beat overlay. Hidden by default via stroke-dashoffset = pathLength
+// (= 100 thanks to the SVG `pathLength="100"` attribute). When the parent
+// adds .is-beating, the offset transitions to 0 → the bright neon line
+// "draws" left-to-right in 700ms; opacity then fades back to 0 ready for
+// the next beat. No infinite animation: a beat fires only on data events.
+.pv-bv__ecg-line--beat {
+  stroke: p.$mantis-neon;
+  stroke-width: 1.8;
+  filter: drop-shadow(0 0 4px rgba(57, 255, 20, .65));
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  opacity: 0;
+}
+
+.pv-bv__ecg.is-beating {
+  .pv-bv__ecg-line--ref {
+    stroke: rgba(57, 255, 20, .45);
+  }
+
+  .pv-bv__ecg-line--beat {
+    animation: pv-bv-beat 700ms cubic-bezier(.2, .8, .2, 1) forwards;
+  }
 }
 
 .pv-bv__tick {
@@ -119,7 +122,12 @@
   text-transform: uppercase;
   color: p.$mantis-neon;
   font-feature-settings: 'tnum' 1;
-  animation: pv-bv-tick-glow 2s ease-in-out infinite;
+  // Glow keyframes are now triggered ON beat too — quiet at rest.
+  transition: box-shadow 200ms ease;
+}
+
+.pv-bv__ecg.is-beating .pv-bv__tick {
+  box-shadow: 0 0 10px rgba(57, 255, 20, .35);
 }
 
 .pv-bv__stats {
@@ -170,7 +178,6 @@
   height: 56px;
   flex-shrink: 0;
   transform: rotate(-90deg);
-  animation: pv-bv-donut-spin 14s linear infinite;
 }
 
 .pv-bv__donut-track {
@@ -239,40 +246,23 @@
   50%      { opacity: .35; }
 }
 
-// Continuous-trace ECG: shift waveform group 50% to the left, restart.
-// Two waveforms stitched in viewBox so seam is invisible at the wrap point.
-@keyframes pv-bv-ecg-scroll {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-200px); }
-}
-
-// Cursor follows the trailing edge of the visible waveform.
-@keyframes pv-bv-ecg-cursor {
-  from { transform: translateX(-2px); }
-  to   { transform: translateX(400px); }
-}
-
-@keyframes pv-bv-ecg-cursor-pulse {
-  0%, 100% { opacity: .85; }
-  50%      { opacity: .35; }
-}
-
-@keyframes pv-bv-tick-glow {
-  0%, 100% { box-shadow: 0 0 0 rgba(57, 255, 20, 0); }
-  50%      { box-shadow: 0 0 8px rgba(57, 255, 20, .35); }
-}
-
-@keyframes pv-bv-donut-spin {
-  from { transform: rotate(-90deg); }
-  to   { transform: rotate(270deg); }
+// One-shot beat: draw the line left-to-right, then fade out.
+// stroke-dashoffset works in tandem with the SVG `pathLength="100"` so the
+// percentages map cleanly regardless of the actual polyline length.
+@keyframes pv-bv-beat {
+  0%   { stroke-dashoffset: 100; opacity: 0; }
+  10%  { stroke-dashoffset: 100; opacity: 1; }
+  85%  { stroke-dashoffset: 0;   opacity: 1; }
+  100% { stroke-dashoffset: 0;   opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pv-bv__ecg-scroll,
-  .pv-bv__ecg-cursor,
-  .pv-bv__donut,
-  .pv-bv__dot,
-  .pv-bv__tick {
+  .pv-bv__ecg-line--beat,
+  .pv-bv__dot {
     animation: none !important;
+  }
+  .pv-bv__ecg.is-beating .pv-bv__ecg-line--beat {
+    opacity: 1;
+    stroke-dashoffset: 0;
   }
 }

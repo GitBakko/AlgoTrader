@@ -14,7 +14,10 @@
   <section class="pt2-grid" aria-label="Cockpit body">
 
     <aside class="pt2-rail-left" aria-label="Bot rail">
-      <app-bot-vitals-panel [vitals]="botVitals()"></app-bot-vitals-panel>
+      <app-bot-vitals-panel
+        [vitals]="botVitals()"
+        [heartbeat]="heartbeatNonce()">
+      </app-bot-vitals-panel>
       <app-risk-gauge-stack [risk]="riskState()"></app-risk-gauge-stack>
       <app-models-health-panel [health]="modelsHealth()"></app-models-health-panel>
     </aside>
