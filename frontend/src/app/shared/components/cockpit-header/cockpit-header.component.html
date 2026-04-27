@@ -1,0 +1,50 @@
+<div class="cockpit-header__inner">
+  <div class="cockpit-header__brand">
+    <span class="cockpit-header__signet" aria-hidden="true">▼</span>
+    <span class="cockpit-header__brand-label">MANTIS AI ·</span>
+    <h1 class="cockpit-header__title">{{ pageTitle() }}</h1>
+  </div>
+
+  <div class="cockpit-header__status" role="status" aria-live="polite">
+    <span class="cockpit-header__pill cockpit-header__pill--state"
+          [attr.data-state]="state()">
+      <span class="cockpit-header__dot" aria-hidden="true"></span>
+      {{ stateLabel() }}
+    </span>
+
+    <span class="cockpit-header__pill cockpit-header__pill--mode"
+          [attr.data-mode]="mode()">
+      {{ mode() }}
+    </span>
+
+    @if (marketStatus(); as mkt) {
+      <span class="cockpit-header__pill cockpit-header__pill--market"
+            [attr.data-market]="mkt">
+        MARKET {{ mkt }}
+      </span>
+    }
+
+    @if (tickLabel(); as tl) {
+      <span class="cockpit-header__tick" aria-label="Last tick">
+        last tick · {{ tl }}
+      </span>
+    }
+  </div>
+
+  <div class="cockpit-header__spacer"></div>
+
+  <div class="cockpit-header__actions">
+    <button type="button"
+            class="cockpit-header__btn cockpit-header__btn--warning"
+            [disabled]="stopBusy()"
+            (click)="onStop()">
+      STOP
+    </button>
+    <button type="button"
+            class="cockpit-header__btn cockpit-header__btn--danger"
+            [disabled]="emergencyBusy()"
+            (click)="onEmergency()">
+      EMERGENCY
+    </button>
+  </div>
+</div>

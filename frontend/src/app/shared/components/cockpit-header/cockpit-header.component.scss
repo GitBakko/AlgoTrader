@@ -1,0 +1,210 @@
+@use '../../../../scss/palette' as p;
+@use 'sass:color';
+
+// HDR-01 · Cockpit Header (Style Bible §1.2)
+:host {
+  display: block;
+  background: linear-gradient(180deg, rgba(57, 255, 20, .04) 0%, transparent 100%);
+  border-bottom: 1px solid rgba(57, 255, 20, .18);
+}
+
+.cockpit-header__inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  min-height: 48px;
+}
+
+.cockpit-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cockpit-header__signet {
+  color: p.$mantis-neon;
+  font-size: 18px;
+  line-height: 1;
+  filter: drop-shadow(0 0 4px rgba(57, 255, 20, .6));
+}
+
+.cockpit-header__brand-label {
+  font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, .55);
+}
+
+.cockpit-header__title {
+  margin: 0;
+  font-family: var(--mantis-font-ui, 'Plus Jakarta Sans', sans-serif);
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0;
+}
+
+.cockpit-header__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 8px;
+}
+
+.cockpit-header__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+
+  &--state[data-state='RUNNING'] {
+    color: p.$mantis-neon;
+    background: rgba(57, 255, 20, .1);
+    border-color: rgba(57, 255, 20, .3);
+
+    .cockpit-header__dot {
+      background: p.$mantis-neon;
+      box-shadow: 0 0 4px p.$mantis-neon;
+      animation: cockpit-pulse 1.6s ease-in-out infinite;
+    }
+  }
+
+  &--state[data-state='IDLE'] {
+    color: p.$mantis-neutral;
+    background: rgba(139, 148, 158, .1);
+    border-color: rgba(139, 148, 158, .25);
+
+    .cockpit-header__dot {
+      background: p.$mantis-neutral;
+    }
+  }
+
+  &--state[data-state='ERROR'] {
+    color: p.$mantis-loss;
+    background: rgba(255, 61, 87, .12);
+    border-color: rgba(255, 61, 87, .3);
+
+    .cockpit-header__dot {
+      background: p.$mantis-loss;
+      animation: cockpit-pulse 1s ease-in-out infinite;
+    }
+  }
+
+  &--mode[data-mode='DEMO'] {
+    color: p.$mantis-warning;
+    background: rgba(255, 176, 32, .08);
+    border-color: rgba(255, 176, 32, .3);
+  }
+
+  &--mode[data-mode='LIVE'] {
+    color: p.$mantis-loss;
+    background: rgba(255, 61, 87, .1);
+    border-color: rgba(255, 61, 87, .3);
+  }
+
+  &--mode[data-mode='PAPER'] {
+    color: p.$mantis-cyan;
+    background: rgba(0, 229, 255, .08);
+    border-color: rgba(0, 229, 255, .25);
+  }
+
+  &--market[data-market='OPEN'] {
+    color: p.$mantis-green;
+    background: rgba(0, 217, 126, .08);
+    border-color: rgba(0, 217, 126, .25);
+  }
+
+  &--market[data-market='CLOSED'] {
+    color: p.$mantis-neutral;
+    background: rgba(139, 148, 158, .08);
+    border-color: rgba(139, 148, 158, .2);
+  }
+
+  &--market[data-market='PRE'] {
+    color: p.$mantis-cyan;
+    background: rgba(0, 229, 255, .08);
+    border-color: rgba(0, 229, 255, .25);
+  }
+}
+
+.cockpit-header__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, .4);
+}
+
+.cockpit-header__tick {
+  font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
+  font-feature-settings: 'tnum' 1;
+  font-size: 10px;
+  color: rgba(255, 255, 255, .4);
+  letter-spacing: .04em;
+}
+
+.cockpit-header__spacer {
+  flex: 1 1 auto;
+}
+
+.cockpit-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cockpit-header__btn {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: filter 120ms ease, box-shadow 120ms ease;
+
+  &:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+  }
+
+  &--warning {
+    color: p.$mantis-warning;
+    background: rgba(255, 176, 32, .08);
+    border-color: rgba(255, 176, 32, .4);
+
+    &:hover:not(:disabled) {
+      filter: brightness(1.08);
+      box-shadow: 0 0 0 3px rgba(255, 176, 32, .12);
+    }
+  }
+
+  &--danger {
+    color: #fff;
+    background: p.$mantis-loss;
+    border-color: p.$mantis-loss;
+
+    &:hover:not(:disabled) {
+      filter: brightness(1.08);
+      box-shadow: 0 0 0 3px rgba(255, 61, 87, .25);
+    }
+  }
+}
+
+@keyframes cockpit-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .35; }
+}
