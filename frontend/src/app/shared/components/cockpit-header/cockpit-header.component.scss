@@ -29,15 +29,6 @@
   filter: drop-shadow(0 0 4px rgba(57, 255, 20, .6));
 }
 
-.cockpit-header__brand-label {
-  font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .22em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, .55);
-}
-
 .cockpit-header__title {
   margin: 0;
   font-family: var(--mantis-font-ui, 'Plus Jakarta Sans', sans-serif);
@@ -192,14 +183,25 @@
     }
   }
 
-  &--danger {
-    color: #fff;
-    background: p.$mantis-loss;
-    border-color: p.$mantis-loss;
+  // KILL SWITCH — mirrors dashboard-v2 .op-kill
+  // (operational-strip.component.scss:193). Loss-tinted ghost, NOT solid red.
+  &--kill {
+    color: var(--mantis-loss, #FF3D57);
+    background: rgba(255, 61, 87, .12);
+    border: 1px solid rgba(255, 61, 87, .5);
+    border-radius: var(--mantis-radius-sm, 4px);
+    padding: 3px 10px;
+    font-size: 9px;
+    letter-spacing: .08em;
+    animation: cockpit-kill-pulse 2s ease-in-out infinite;
 
     &:hover:not(:disabled) {
-      filter: brightness(1.08);
-      box-shadow: 0 0 0 3px rgba(255, 61, 87, .25);
+      background: rgba(255, 61, 87, .2);
+      box-shadow: 0 0 10px rgba(255, 61, 87, .5);
+    }
+
+    &:disabled {
+      animation: none;
     }
   }
 }
@@ -207,4 +209,9 @@
 @keyframes cockpit-pulse {
   0%, 100% { opacity: 1; }
   50%      { opacity: .35; }
+}
+
+@keyframes cockpit-kill-pulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(255, 61, 87, .45); }
+  50%      { box-shadow: 0 0 10px rgba(255, 61, 87, .55); }
 }

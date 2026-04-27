@@ -1,7 +1,6 @@
 <div class="cockpit-header__inner">
   <div class="cockpit-header__brand">
     <span class="cockpit-header__signet" aria-hidden="true">▼</span>
-    <span class="cockpit-header__brand-label">MANTIS AI ·</span>
     <h1 class="cockpit-header__title">{{ pageTitle() }}</h1>
   </div>
 
@@ -41,10 +40,15 @@
       STOP
     </button>
     <button type="button"
-            class="cockpit-header__btn cockpit-header__btn--danger"
+            class="cockpit-header__btn cockpit-header__btn--kill mantis-mono"
             [disabled]="emergencyBusy()"
-            (click)="onEmergency()">
-      EMERGENCY
+            (click)="onEmergency()"
+            aria-label="Emergency kill switch">
+      @if (emergencyBusy()) {
+        <span>Stopping…</span>
+      } @else {
+        <span>KILL SWITCH</span>
+      }
     </button>
   </div>
 </div>

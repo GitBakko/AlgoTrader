@@ -6,10 +6,17 @@
 
 :host {
   display: block;
-  min-height: 100%;
+  min-height: 100vh;
   background: p.$mantis-surface-1;
   font-family: var(--mantis-font-ui, 'Plus Jakarta Sans', sans-serif);
   color: #fff;
+  // Break out of default-layout's c-container horizontal padding + header mb-4
+  // (mirrors dashboard-v2.component.scss :host)
+  margin-top: -1.5rem;
+  margin-inline: -0.5rem;
+
+  @media (min-width: 576px) { margin-inline: -1rem; }
+  @media (min-width: 992px) { margin-inline: -1.5rem; }
 }
 
 .pt2 {

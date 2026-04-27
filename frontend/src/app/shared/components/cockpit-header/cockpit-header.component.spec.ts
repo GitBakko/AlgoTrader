@@ -57,12 +57,21 @@ describe('CockpitHeaderComponent', () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
-  it('emits emergencyClicked on EMERGENCY button click', () => {
+  it('emits emergencyClicked on KILL SWITCH button click', () => {
     const spy = jasmine.createSpy('emergency');
     component.emergencyClicked.subscribe(spy);
-    const btn = fixture.debugElement.query(By.css('.cockpit-header__btn--danger')).nativeElement as HTMLButtonElement;
+    const btn = fixture.debugElement.query(By.css('.cockpit-header__btn--kill')).nativeElement as HTMLButtonElement;
+    expect(btn.textContent?.trim()).toBe('KILL SWITCH');
     btn.click();
     expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders Stopping… label when emergencyBusy is true', () => {
+    fixture.componentRef.setInput('emergencyBusy', true);
+    fixture.detectChanges();
+    const btn = fixture.debugElement.query(By.css('.cockpit-header__btn--kill')).nativeElement as HTMLButtonElement;
+    expect(btn.textContent?.trim()).toBe('Stopping…');
+    expect(btn.disabled).toBeTrue();
   });
 
   it('does not emit stop when stopBusy is true', () => {
