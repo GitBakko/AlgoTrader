@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { SignalAuditService } from '../../../core/services/signal-audit.service';
 import { TradingService } from '../../../core/services/trading.service';
 import { EpicLogoComponent } from '../epic-logo/epic-logo.component';
-import { BadgeComponent, SpinnerComponent } from '@coreui/angular';
+import { SpinnerComponent } from '@coreui/angular';
 import { SlCooldownInfo, PaperPosition } from '../../../core/models';
 import { WebSocketService } from '../../../core/services/websocket.service';
 
@@ -11,7 +11,7 @@ import { WebSocketService } from '../../../core/services/websocket.service';
   selector: 'app-signal-audit-drawer',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, EpicLogoComponent, BadgeComponent, SpinnerComponent],
+  imports: [CommonModule, EpicLogoComponent, SpinnerComponent],
   templateUrl: './signal-audit-drawer.component.html',
   styleUrls: ['./signal-audit-drawer.component.scss'],
 })

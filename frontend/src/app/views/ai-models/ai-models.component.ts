@@ -5,7 +5,6 @@ import {
   ColComponent, RowComponent, BadgeComponent,
   ProgressComponent, ProgressBarComponent,
   TableDirective, NavModule, ButtonDirective,
-  TooltipDirective,
 } from '@coreui/angular';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -27,7 +26,7 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
     CommonModule, CardComponent, CardBodyComponent, CardHeaderComponent,
     ColComponent, RowComponent, BadgeComponent,
     ProgressComponent, ProgressBarComponent,
-    TableDirective, NavModule, ButtonDirective, TooltipDirective, IconDirective,
+    TableDirective, NavModule, ButtonDirective, IconDirective,
     EpicLogoComponent,
     NewsWidgetComponent,
     LoadingButtonComponent,

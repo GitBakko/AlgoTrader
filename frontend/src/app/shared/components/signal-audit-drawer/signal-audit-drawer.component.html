@@ -8,7 +8,7 @@
 
   @if (auditService.currentAudit(); as audit) {
     <!-- HDR-01 cockpit header -->
-    <header class="ad-head" [attr.data-status]="audit.status?.toLowerCase()">
+    <header class="ad-head" [attr.data-status]="audit.status.toLowerCase()">
       <div class="ad-head__topline">
         <span class="ad-head__pulse" aria-hidden="true"></span>
         <span class="ad-head__eyebrow mantis-mono">SIGNAL AUDIT · #{{ audit.id }}</span>
@@ -74,12 +74,12 @@
     <div class="ad-body">
 
       <!-- Rejection / outcome banner -->
-      @if (audit.features?.rejection_reason) {
+      @if (audit.features.rejection_reason) {
         <section class="ad-card ad-card--reject" aria-label="Motivo rifiuto">
           <span class="ad-card__icon" aria-hidden="true">⨯</span>
           <div class="ad-card__copy">
             <span class="ad-card__eyebrow mantis-mono">DECISIONE · REJECTED</span>
-            <span class="ad-card__title">{{ audit.features?.rejection_reason }}</span>
+            <span class="ad-card__title">{{ audit.features.rejection_reason }}</span>
           </div>
         </section>
       } @else if (audit.status === 'EXECUTED') {
@@ -188,7 +188,7 @@
       }
 
       <!-- ML prediction -->
-      @if (audit.features?.ml; as ml) {
+      @if (audit.features.ml; as ml) {
         <section class="ad-card">
           <header class="ad-card__head">
             <span class="ad-card__eyebrow mantis-mono">ML · {{ ml.signal_name || 'PREDICTION' }}</span>
@@ -234,7 +234,7 @@
       }
 
       <!-- Risk check -->
-      @if (audit.features?.risk; as risk) {
+      @if (audit.features.risk; as risk) {
         <section class="ad-card">
           <header class="ad-card__head">
             <span class="ad-card__eyebrow mantis-mono">RISK CHECK</span>
