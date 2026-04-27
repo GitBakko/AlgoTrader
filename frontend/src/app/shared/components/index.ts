@@ -5,3 +5,4 @@
 
 export * from './avatar/avatar.component';
 export * from './avatar-upload/avatar-upload.component';
+export * from './cockpit-header/cockpit-header.component';

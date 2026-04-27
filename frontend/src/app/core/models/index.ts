@@ -554,6 +554,9 @@ export interface SignalHistoryItem {
   position_status: string | null;
 }
 
+// Paper Trading v2 (cockpit page)
+export * from './paper-trading';
+
 // Notifications
 export * from './notification.model';
 

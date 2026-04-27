@@ -1,406 +1,130 @@
-// ═══════════════════════════════════════════════════════════
-// Paper Trading Component Styles
-// Uses CSS custom properties (no SCSS palette import needed)
-// ═══════════════════════════════════════════════════════════
+@use '../../../scss/palette' as p;
+@use 'sass:color';
+
+// Paper Trading v2 — cockpit shell (PR 1 · chrome only)
+// Source: docs/handoff/paper-trading/HANDOFF.md §1.1, §4.
 
 :host {
-  // Status Strip (glassmorphism - matches dashboard pattern)
-  .pt-status-strip {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    padding: 0.625rem 1rem;
-    margin-bottom: 1rem;
-    background: var(--mantis-glass-bg, rgba(22, 27, 34, 0.6));
-    backdrop-filter: blur(12px) saturate(1.2);
-    -webkit-backdrop-filter: blur(12px) saturate(1.2);
-    border: 1px solid var(--mantis-border-subtle, rgba(255, 255, 255, 0.06));
-    border-radius: var(--mantis-radius-md, 8px);
+  display: block;
+  min-height: 100vh;
+  background: p.$mantis-surface-1;
+  font-family: var(--mantis-font-ui, 'Plus Jakarta Sans', sans-serif);
+  color: #fff;
+  // Break out of default-layout's c-container horizontal padding + header mb-4
+  // (mirrors dashboard-v2.component.scss :host)
+  margin-top: -1.5rem;
+  margin-inline: -0.5rem;
 
-    &__left,
-    &__right {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
+  @media (min-width: 576px) { margin-inline: -1rem; }
+  @media (min-width: 992px) { margin-inline: -1.5rem; }
+}
+
+.pt2 {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.pt2-grid {
+  display: grid;
+  grid-template-columns: 260px 1fr 360px;
+  gap: 12px;
+  padding: 14px;
+  flex: 1 1 auto;
+
+  @media (max-width: 1280px) {
+    grid-template-columns: 220px 1fr 320px;
   }
 
-  // Status chips (reuse from dashboard pattern)
-  .pt-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.2rem 0.5rem;
-    border-radius: var(--mantis-radius-pill);
-    font-size: var(--mantis-fs-xs);
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+  @media (max-width: 1080px) {
+    grid-template-columns: 1fr;
 
-    &--running {
-      color: var(--mantis-neon, #39FF14);
-      background: rgba(57, 255, 20, 0.1);
-      border: 1px solid rgba(57, 255, 20, 0.2);
-    }
-
-    &--stopped {
-      color: var(--mantis-neutral, #8B949E);
-      background: rgba(139, 148, 158, 0.1);
-      border: 1px solid rgba(139, 148, 158, 0.15);
-    }
-
-    &--paper {
-      color: var(--mantis-cyan, #00E5FF);
-      background: rgba(0, 229, 255, 0.08);
-      border: 1px solid rgba(0, 229, 255, 0.15);
-    }
-
-    &--demo {
-      color: var(--mantis-warning, #FFB020);
-      background: rgba(255, 176, 32, 0.1);
-      border: 1px solid rgba(255, 176, 32, 0.2);
-    }
-
-    &--live {
-      color: var(--mantis-loss, #FF3D57);
-      background: rgba(255, 61, 87, 0.1);
-      border: 1px solid rgba(255, 61, 87, 0.2);
-    }
-
-    &--danger {
-      color: var(--mantis-loss, #FF3D57);
-      background: rgba(255, 61, 87, 0.12);
-      border: 1px solid rgba(255, 61, 87, 0.25);
-      animation: chip-pulse 2s ease-in-out infinite;
-    }
-
-    &--open {
-      color: var(--mantis-neon, #39FF14);
-      background: rgba(57, 255, 20, 0.08);
-      border: 1px solid rgba(57, 255, 20, 0.15);
-    }
-
-    &--closed {
-      color: var(--mantis-loss, #FF3D57);
-      background: rgba(255, 61, 87, 0.08);
-      border: 1px solid rgba(255, 61, 87, 0.15);
-    }
-
-    &--muted {
-      color: var(--mantis-text-disabled, rgba(255, 255, 255, 0.35));
-      background: var(--mantis-tint-subtle, rgba(255, 255, 255, 0.03));
-      border: 1px solid var(--mantis-border-subtle, rgba(255, 255, 255, 0.06));
-      font-weight: 500;
+    .pt2-rail-right {
+      order: 3;
     }
   }
+}
 
-  @keyframes chip-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
+.pt2-rail-left,
+.pt2-rail-right,
+.pt2-center {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.pt2-rail-right {
+  position: sticky;
+  top: 14px;
+  align-self: flex-start;
+  max-height: calc(100vh - 28px);
+  overflow: hidden;
+}
+
+.pt2-slot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: p.$mantis-surface-2;
+  border: 1px dashed rgba(0, 217, 126, .25);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, .35);
+  font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  min-height: 96px;
+  padding: 14px;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(57, 255, 20, .03) 0%, transparent 60%);
+    pointer-events: none;
   }
 
-  // KPI Cards (top-accent pattern — matches dashboard + canonical spec)
-  .pt-kpi-card {
+  &__label {
     position: relative;
-    overflow: hidden;
-    border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.1));
-    border-radius: var(--mantis-radius-md);
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
-
-    &:hover {
-      border-color: var(--mantis-border-accent, rgba(0, 217, 126, 0.15));
-      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
-    }
-
-    &__label {
-      font-size: var(--mantis-fs-xs);
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.18em;
-      color: var(--fg3);
-      margin-bottom: var(--mantis-space-2);
-    }
-
-    &__value {
-      font-family: var(--mantis-font-mono);
-      font-feature-settings: var(--mono-feat);
-      font-size: var(--mantis-fs-3xl);
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      line-height: 1.2;
-      margin-bottom: var(--mantis-space-2);
-    }
-
-    &__detail {
-      font-size: var(--mantis-fs-md);
-      color: var(--fg3);
-    }
-
-    &__value-sub {
-      font-size: var(--mantis-fs-lg);
-      font-weight: 400;
-      opacity: 0.5;
-    }
-
-    &__accent {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 3px;
-
-      &--primary {
-        background: var(--mantis-green, #00d97e);
-        box-shadow: 0 0 8px rgba(0, 217, 126, 0.3);
-      }
-
-      &--info {
-        background: var(--mantis-cyan, #00E5FF);
-        box-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
-      }
-
-      &--profit {
-        background: var(--mantis-profit, #39FF14);
-        box-shadow: 0 0 8px rgba(57, 255, 20, 0.3);
-      }
-
-      &--loss {
-        background: var(--mantis-loss, #FF3D57);
-        box-shadow: 0 0 8px rgba(255, 61, 87, 0.3);
-      }
-
-      &--warning {
-        background: var(--mantis-warning, #FFB020);
-        box-shadow: 0 0 8px rgba(255, 176, 32, 0.3);
-      }
-
-      &--success {
-        background: var(--mantis-green, #00d97e);
-        box-shadow: 0 0 8px rgba(0, 217, 126, 0.3);
-      }
-
-      &--danger {
-        background: var(--mantis-loss, #FF3D57);
-        box-shadow: 0 0 8px rgba(255, 61, 87, 0.3);
-      }
-    }
-  }
-
-  // Activity scroll container
-  .activity-scroll {
-    max-height: 400px;
-    overflow-y: auto;
-  }
-
-  // Sticky thead
-  .sticky-thead {
-    position: sticky;
-    top: 0;
     z-index: 1;
-    background: var(--cui-card-bg, var(--mantis-surface-1, #0d1117));
   }
 
-  // Confidence bar wrapper
-  .conf-bar-wrapper {
-    height: 4px;
-    min-width: 40px;
-  }
+  &--vitals    { min-height: 160px; }
+  &--risk      { min-height: 220px; }
+  &--models    { min-height: 140px; }
+  &--kpi       { min-height: 84px; }
+  &--positions { min-height: 320px; }
+  &--heatmap   { min-height: 180px; }
+  &--feed      { min-height: 100%; flex: 1 1 auto; }
+}
 
-  // Detail cell (max-width for error details)
-  .detail-cell {
-    max-width: 250px;
-  }
+.pt2-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 12px;
+  border-top: 1px solid rgba(255, 255, 255, .04);
+  font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, .35);
 
-  // Error sub text
-  .error-sub {
-    font-size: var(--mantis-fs-sm);
-  }
-
-  // RAW toggle button
-  .raw-toggle-btn {
-    font-size: var(--mantis-fs-xs);
-    padding: 0;
-    border: none;
-    background: none;
-    color: var(--mantis-green, #00d97e);
-    cursor: pointer;
-    text-decoration: underline;
-
-    &:hover {
-      color: var(--mantis-neon, #39FF14);
-    }
-  }
-
-  // RAW error pre
-  .raw-error-pre {
-    font-size: var(--mantis-fs-xs);
-    max-height: 80px;
-    overflow: auto;
-  }
-
-  // Circuit breaker badges container
-  .cb-badges {
-    max-width: 220px;
-  }
-
-  // Amber CB badge (distinct from red danger badges)
-  .cb-badge-warning {
-    color: var(--mantis-warning, #FFB020) !important;
-    background: rgba(255, 176, 32, 0.15) !important;
-    border: 1px solid rgba(255, 176, 32, 0.3);
+  &__chip {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
-
-    svg {
-      width: 10px;
-      height: 10px;
-    }
+    padding: 3px 8px;
+    border-radius: 100px;
+    background: rgba(255, 255, 255, .04);
+    border: 1px solid rgba(255, 255, 255, .08);
+    font-feature-settings: 'tnum' 1;
   }
 
-  // Kelly detail text
-  .kelly-detail {
-    font-size: var(--mantis-fs-md);
-  }
-
-  // Clickable epic links
-  .epic-link {
-    cursor: pointer;
-    transition: color 0.15s ease;
-
-    &:hover {
-      color: var(--mantis-green, #00d97e);
-    }
-  }
-
-  // Modal (scoped)
-  .pt-modal-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 1050;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .pt-modal {
-    width: 90%;
-    max-width: 800px;
-    max-height: 80vh;
-    border-radius: var(--mantis-radius-md, 8px);
-    border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.1));
-    background: var(--cui-card-bg, var(--mantis-surface-1, #0d1117));
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-
-    &__header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 1rem 1.25rem;
-      border-bottom: 1px solid var(--mantis-border-subtle, rgba(255, 255, 255, 0.06));
-    }
-
-    &__title {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-weight: 600;
-    }
-
-    &__body {
-      padding: 1rem 1.25rem;
-      overflow-y: auto;
-      flex: 1;
-    }
-
-    &__close {
-      background: none;
-      border: none;
-      color: var(--mantis-text-muted, rgba(255, 255, 255, 0.5));
-      font-size: var(--mantis-fs-2xl);
-      cursor: pointer;
-      padding: 0.25rem;
-      line-height: 1;
-      transition: color 0.15s ease;
-
-      &:hover {
-        color: var(--mantis-text-primary, white);
-      }
-    }
-  }
-
-  // Grouped positions table styles
-  .grouped-positions-table {
-    .group-header {
-      background-color: var(--cui-table-bg);
-      cursor: pointer;
-      transition: background-color 0.2s ease;
-
-      &:hover {
-        background-color: var(--cui-table-hover-bg);
-      }
-
-      &.group-expanded {
-        border-bottom: 2px solid var(--cui-primary);
-      }
-
-      td {
-        font-size: var(--mantis-fs-md-lg);
-        padding: 0.75rem 0.5rem;
-      }
-    }
-
-    .detail-row {
-      background-color: rgba(var(--cui-emphasis-color-rgb), 0.02);
-      border-left: 3px solid var(--cui-primary);
-      font-size: var(--mantis-fs-body);
-
-      td {
-        padding: 0.5rem 0.5rem;
-      }
-
-      &:hover {
-        background-color: rgba(var(--cui-emphasis-color-rgb), 0.05);
-      }
-    }
-
-    .chevron-icon {
-      transition: transform 0.2s ease;
-      color: var(--cui-body-color);
-
-      &.rotated {
-        transform: rotate(90deg);
-      }
-    }
-  }
-
-  // Compact warning alert (market closed banner)
-  .pt-alert-compact {
-    font-size: var(--mantis-fs-base);
-  }
-
-  // Emergency stop button
-  .emergency-stop-btn {
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    font-size: var(--mantis-fs-md);
-  }
-
-  // Mobile table min-width
-  @media (max-width: 991.98px) {
-    table[cTable] {
-      min-width: 500px;
-    }
+  &__spacer {
+    flex: 1 1 auto;
   }
 }
