@@ -22,13 +22,6 @@
   gap: 8px;
 }
 
-.cockpit-header__signet {
-  color: p.$mantis-neon;
-  font-size: 18px;
-  line-height: 1;
-  filter: drop-shadow(0 0 4px rgba(57, 255, 20, .6));
-}
-
 .cockpit-header__title {
   margin: 0;
   font-family: var(--mantis-font-ui, 'Plus Jakarta Sans', sans-serif);
@@ -153,16 +146,18 @@
   gap: 8px;
 }
 
+// STOP + KILL SWITCH share dimensions (font 9px, padding 3px 10px, radius 4)
+// to match dashboard-v2 .op-kill so the action cluster is visually aligned.
 .cockpit-header__btn {
   display: inline-flex;
   align-items: center;
   font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;
-  padding: 6px 12px;
-  border-radius: 4px;
+  padding: 3px 10px;
+  border-radius: var(--mantis-radius-sm, 4px);
   border: 1px solid transparent;
   cursor: pointer;
   transition: filter 120ms ease, box-shadow 120ms ease;
@@ -174,12 +169,12 @@
 
   &--warning {
     color: p.$mantis-warning;
-    background: rgba(255, 176, 32, .08);
-    border-color: rgba(255, 176, 32, .4);
+    background: rgba(255, 176, 32, .12);
+    border-color: rgba(255, 176, 32, .5);
 
     &:hover:not(:disabled) {
-      filter: brightness(1.08);
-      box-shadow: 0 0 0 3px rgba(255, 176, 32, .12);
+      background: rgba(255, 176, 32, .2);
+      box-shadow: 0 0 10px rgba(255, 176, 32, .5);
     }
   }
 
@@ -188,11 +183,7 @@
   &--kill {
     color: var(--mantis-loss, #FF3D57);
     background: rgba(255, 61, 87, .12);
-    border: 1px solid rgba(255, 61, 87, .5);
-    border-radius: var(--mantis-radius-sm, 4px);
-    padding: 3px 10px;
-    font-size: 9px;
-    letter-spacing: .08em;
+    border-color: rgba(255, 61, 87, .5);
     animation: cockpit-kill-pulse 2s ease-in-out infinite;
 
     &:hover:not(:disabled) {
