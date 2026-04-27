@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 import { CockpitHeaderComponent, type CockpitMode, type CockpitState } from '../../shared/components/cockpit-header/cockpit-header.component';
@@ -24,6 +24,7 @@ import { epicColor } from '../../shared/constants/epic-colors';
 
 const CIRCUIT_BREAKER_TOTAL = 6;
 const DEFAULT_DD_GATE_PCT = 20;
+const PRICE_BUFFER_LEN = 60;
 
 /**
  * Paper Trading v2 — cockpit shell.
@@ -69,6 +70,40 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   readonly status = this.trading.paperStatus;
   readonly overview = this.trading.overview;
   readonly currency = computed<string>(() => this.overview()?.currency ?? 'USD');
+
+  /** Per-epic mid-price history. Each tickClock fires we pull the WS quote
+   *  for every open position and append the mid; capped to {@link PRICE_BUFFER_LEN}
+   *  points. Powers the position-card sparkline so it shows actual price
+   *  motion instead of a flat entry→current segment. PR4 may swap the
+   *  source for a server-provided history endpoint. */
+  readonly priceHistory = signal<Record<string, number[]>>({});
+
+  constructor() {
+    effect(() => {
+      // Re-evaluate every clock tick OR when ws prices reshuffle.
+      this.tickClock();
+      const ticks = this.ws.prices();
+      const positions = this.trading.paperPositions();
+      if (positions.length === 0) return;
+      const current = this.priceHistory();
+      const next: Record<string, number[]> = { ...current };
+      let mutated = false;
+      for (const pos of positions) {
+        const tick = ticks[pos.epic];
+        if (!tick) continue;
+        const mid = (tick.bid + tick.offer) / 2;
+        if (!Number.isFinite(mid)) continue;
+        const prev = next[pos.epic] ?? [pos.level];
+        // Skip duplicate in a row to keep the chart from drawing flat noise.
+        if (prev.length > 0 && prev[prev.length - 1] === mid) continue;
+        const updated = [...prev, mid];
+        if (updated.length > PRICE_BUFFER_LEN) updated.splice(0, updated.length - PRICE_BUFFER_LEN);
+        next[pos.epic] = updated;
+        mutated = true;
+      }
+      if (mutated) this.priceHistory.set(next);
+    });
+  }
 
   readonly state = computed<CockpitState>(() => {
     const s = this.status();
@@ -153,8 +188,9 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   readonly positions = computed<PaperTradingPosition[]>(() => {
     const broker = this.trading.paperPositions();
     const prices = this.ws.prices();
+    const history = this.priceHistory();
     const now = this.tickClock();
-    return broker.map((p) => adaptPosition(p, prices[p.epic], now));
+    return broker.map((p) => adaptPosition(p, prices[p.epic], history[p.epic], now));
   });
 
   readonly kpiStrip = computed<KpiStrip>(() => {
@@ -333,6 +369,7 @@ function formatUptime(seconds: number | null): string {
 function adaptPosition(
   p: PaperPosition,
   tick: { bid: number; offer: number } | undefined,
+  history: number[] | undefined,
   nowMs: number,
 ): PaperTradingPosition {
   const direction = (p.direction === 'BUY' ? 'BUY' : 'SELL') as 'BUY' | 'SELL';
@@ -353,6 +390,11 @@ function adaptPosition(
   const reward = Math.abs(takeProfit - p.level);
   const rr = reward / risk;
   const trailing = !!p.trailing_stop_phase && p.trailing_stop_phase !== 'INITIAL';
+  // Always anchor the path on the entry level so the chart reads "since open".
+  // While the buffer fills, fall back to the current point so we never draw a
+  // straight diagonal segment.
+  const buffer = history && history.length > 0 ? history : [];
+  const pricePath = [p.level, ...buffer, current];
   return {
     id: p.deal_id,
     ticker: p.epic,
@@ -367,9 +409,7 @@ function adaptPosition(
     ageSec,
     trailing,
     rr,
-    // PR3 leaves the spark as a 2-point line (entry → current). PR4 will
-    // hydrate from the WS history buffer.
-    pricePath: [p.level, current],
+    pricePath,
   };
 }
 

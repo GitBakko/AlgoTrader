@@ -35,11 +35,32 @@ export class KpiStripCompactComponent {
     }
   });
 
-  readonly pnlOpenPath = computed(() => buildSparkPath(this.kpi().sparkOpen ?? []));
-  readonly pnlTodayPath = computed(() => buildSparkPath(this.kpi().sparkToday ?? []));
+  readonly pnlOpenPath = computed(() => buildSparkPath(
+    this.kpi().sparkOpen?.length ? this.kpi().sparkOpen! : syntheticSpark(this.kpi().pnlOpen),
+  ));
+  readonly pnlTodayPath = computed(() => buildSparkPath(
+    this.kpi().sparkToday?.length ? this.kpi().sparkToday! : syntheticSpark(this.kpi().pnlToday),
+  ));
 
   readonly pnlOpenSign = computed(() => Math.sign(this.kpi().pnlOpen));
   readonly pnlTodaySign = computed(() => Math.sign(this.kpi().pnlToday));
+
+  /** Open Positions cell — slot pips, filled for live, hollow for free. */
+  readonly slotPips = computed(() => {
+    const open = Math.max(0, this.kpi().openCount);
+    const max = 5;
+    return Array.from({ length: max }, (_, i) => i < open);
+  });
+
+  /** Win/Sig cell — stacked bar (win/miss) + signals intensity meter. */
+  readonly winSigBars = computed(() => {
+    const win = Math.min(100, Math.max(0, this.kpi().winRate));
+    const intensity = Math.min(100, this.kpi().signalsTotal);
+    return { win, miss: 100 - win, intensity };
+  });
+
+  /** R:R gauge — normalize 0..3 to 0..100% on a horizontal track. */
+  readonly rrPct = computed(() => Math.min(100, Math.max(0, (this.kpi().rr / 3) * 100)));
 
   /** DD bar fill — clamp to 0..100 of gate. */
   readonly ddBarPct = computed(() => {
@@ -47,6 +68,15 @@ export class KpiStripCompactComponent {
     if (!k.ddGate) return 0;
     return Math.min(100, Math.max(0, (Math.abs(k.ddLive) / k.ddGate) * 100));
   });
+}
+
+/** Fabricate a soft ramp toward the current value when no real history is
+ *  available. Replaced by the real WS price buffer once PR4 lands. */
+function syntheticSpark(target: number): number[] {
+  const sign = target >= 0 ? 1 : -1;
+  const magnitude = Math.abs(target);
+  if (magnitude === 0) return [0, 0, 0, 0, 0, 0, 0, 0];
+  return [0.1, 0.18, 0.05, 0.32, 0.5, 0.42, 0.78, 1].map((p) => sign * magnitude * p);
 }
 
 function buildSparkPath(data: number[]): string {

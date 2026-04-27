@@ -33,7 +33,7 @@
     </div>
   </div>
 
-  <!-- COL 2 — Range visualization SL ←→ Entry ←→ Current ←→ TP -->
+  <!-- COL 2 — Range visualization SL ←→ Entry ←→ Current ←→ TP + numeric triplet -->
   <div class="pv-pc__col pv-pc__col--range">
     <div class="pv-pc__range" aria-hidden="true">
       <div class="pv-pc__range-track"></div>
@@ -69,40 +69,45 @@
     </div>
   </div>
 
-  <!-- COL 3 — Trend 1H sparkline -->
-  <div class="pv-pc__col pv-pc__col--trend">
-    <div class="pv-pc__trend-head">
-      <span class="pv-pc__trend-label mantis-mono">Trend 1H</span>
-      <span class="pv-pc__trend-dir mantis-mono"
+  <!-- COL 3 — Current P&L hero (with trend chart side-by-side) -->
+  <div class="pv-pc__col pv-pc__col--pnl">
+    <div class="pv-pc__pnl-head">
+      <span class="pv-pc__pnl-label mantis-mono">P&amp;L corrente</span>
+      <span class="pv-pc__pnl-trend mantis-mono"
             [class.is-agree]="trendAgrees() === true"
             [class.is-against]="trendAgrees() === false">
         {{ trendLabel() }}
       </span>
     </div>
-    @if (trendPath()) {
-      <svg class="pv-pc__spark" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-        <path [attr.d]="trendPath()" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
-      </svg>
-    }
-    <div class="pv-pc__trend-bounds mantis-mono">
-      <span>min {{ priceMin() }}</span>
-      <span>max {{ priceMax() }}</span>
+    <div class="pv-pc__pnl-body">
+      <div class="pv-pc__pnl-numbers">
+        <span class="pv-pc__pnl-value mantis-mono">
+          {{ currencySym() }}{{ position().pnlEur >= 0 ? '+' : '' }}{{ position().pnlEur | number:'1.2-2':'it-IT' }}
+        </span>
+        <span class="pv-pc__pnl-pct mantis-mono">
+          {{ position().pnlPct >= 0 ? '+' : '' }}{{ position().pnlPct | number:'1.3-3':'it-IT' }}%
+        </span>
+        <span class="pv-pc__pnl-quote mantis-mono">quote {{ position().current }}</span>
+      </div>
+      <div class="pv-pc__pnl-chart">
+        @if (trendPath()) {
+          <svg class="pv-pc__spark" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <line class="pv-pc__spark-baseline" [attr.y1]="entryBaselineY()" [attr.y2]="entryBaselineY()" x1="0" x2="100"/>
+            <path [attr.d]="trendArea()" class="pv-pc__spark-area"/>
+            <path [attr.d]="trendPath()" class="pv-pc__spark-line" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+          </svg>
+        } @else {
+          <span class="pv-pc__spark-empty mantis-mono">in attesa di tick…</span>
+        }
+        <div class="pv-pc__spark-bounds mantis-mono">
+          <span>{{ priceMin() }}</span>
+          <span>{{ priceMax() }}</span>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- COL 4 — Current P&L hero -->
-  <div class="pv-pc__col pv-pc__col--pnl">
-    <span class="pv-pc__pnl-label mantis-mono">P&amp;L corrente</span>
-    <span class="pv-pc__pnl-value mantis-mono">
-      {{ currencySym() }}{{ position().pnlEur >= 0 ? '+' : '' }}{{ position().pnlEur | number:'1.2-2':'it-IT' }}
-    </span>
-    <span class="pv-pc__pnl-pct mantis-mono">
-      {{ position().pnlPct >= 0 ? '+' : '' }}{{ position().pnlPct | number:'1.3-3':'it-IT' }}%
-    </span>
-    <span class="pv-pc__pnl-quote mantis-mono">quote {{ position().current }}</span>
-  </div>
-
-  <!-- COL 5 — Meta + Close -->
+  <!-- COL 4 — Meta + Close -->
   <div class="pv-pc__col pv-pc__col--meta">
     <div class="pv-pc__meta-row">
       <span class="pv-pc__meta-label mantis-mono">R:R</span>

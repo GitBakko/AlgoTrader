@@ -91,33 +91,140 @@
   z-index: 1;
 }
 
-.pv-kpi__spark {
+// Right-side micro-chart slot — one per cell, absolute top-right.
+.pv-kpi__chart {
   position: absolute;
-  right: 8px;
-  top: 8px;
-  width: 56px;
-  height: 28px;
-  opacity: .85;
+  right: 10px;
+  top: 10px;
+  width: 64px;
+  height: 32px;
+  opacity: .9;
   pointer-events: none;
 
-  path {
+  &--spark path {
     stroke: p.$mantis-green;
-    stroke-width: 1.5;
+    stroke-width: 1.6;
     vector-effect: non-scaling-stroke;
   }
 
-  .pv-kpi__cell.is-positive & path { stroke: p.$mantis-neon; }
-  .pv-kpi__cell.is-negative & path { stroke: p.$mantis-loss; }
+  &--pips {
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    gap: 3px;
+  }
+
+  &--win {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  &--rr {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+  }
+
+  &--dd {
+    display: flex;
+    align-items: center;
+  }
+
+  .pv-kpi__cell.is-positive &--spark path { stroke: p.$mantis-neon; }
+  .pv-kpi__cell.is-negative &--spark path { stroke: p.$mantis-loss; }
 }
 
-.pv-kpi__bar {
-  position: relative;
-  margin-top: 4px;
-  height: 4px;
+// Open Positions — slot pips
+.pv-kpi__pip {
+  width: 7px;
+  height: 14px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .14);
+
+  &.is-on {
+    background: rgba(0, 229, 255, .35);
+    border-color: p.$mantis-cyan;
+    box-shadow: 0 0 4px rgba(0, 229, 255, .4);
+  }
+}
+
+// Win/Sig — stacked bar + intensity meter
+.pv-kpi__win-stack {
+  display: flex;
+  height: 8px;
+  border-radius: 100px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, .06);
+}
+
+.pv-kpi__win-seg {
+  height: 100%;
+  transition: width 240ms ease;
+
+  &--win  { background: p.$mantis-neon; }
+  &--miss { background: rgba(255, 61, 87, .55); }
+}
+
+.pv-kpi__win-meter {
+  height: 3px;
   border-radius: 100px;
   background: rgba(255, 255, 255, .06);
   overflow: hidden;
-  z-index: 1;
+}
+
+.pv-kpi__win-meter-fill {
+  height: 100%;
+  background: linear-gradient(90deg, rgba(0, 229, 255, .3) 0%, p.$mantis-cyan 100%);
+  transition: width 240ms ease;
+}
+
+// R:R — gauge with thirds markers
+.pv-kpi__rr-track {
+  position: relative;
+  height: 6px;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, .06);
+  overflow: hidden;
+}
+
+.pv-kpi__rr-fill {
+  position: absolute;
+  inset: 0;
+  width: 0;
+  background: linear-gradient(90deg, rgba(0, 229, 255, .35) 0%, p.$mantis-cyan 100%);
+  transition: width 240ms ease;
+}
+
+.pv-kpi__rr-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, .25);
+  transform: translateX(-50%);
+}
+
+.pv-kpi__rr-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 7px;
+  letter-spacing: .12em;
+  color: rgba(255, 255, 255, .35);
+  font-feature-settings: 'tnum' 1;
+}
+
+// DD bar — full width 6px
+.pv-kpi__bar {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, .06);
+  overflow: hidden;
 }
 
 .pv-kpi__bar-fill {
