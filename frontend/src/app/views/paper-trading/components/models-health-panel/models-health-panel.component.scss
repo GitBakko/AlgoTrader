@@ -1,0 +1,83 @@
+@use '../../../../../scss/palette' as p;
+
+:host {
+  display: block;
+}
+
+.pv-mh {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: p.$mantis-surface-2;
+  border: 1px solid rgba(0, 217, 126, .15);
+  border-top: 2px solid p.$mantis-green;
+  border-radius: 6px;
+}
+
+.pv-mh__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pv-mh__label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, .55);
+}
+
+.pv-mh__badge {
+  font-size: 14px;
+  font-weight: 700;
+  font-feature-settings: 'tnum' 1;
+  color: p.$mantis-green;
+
+  &.is-missing {
+    color: p.$mantis-loss;
+  }
+
+  &.is-partial {
+    color: p.$mantis-warning;
+  }
+}
+
+.pv-mh__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.pv-mh__dot {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .12);
+  cursor: help;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+
+  &[data-status='ok'] {
+    background: rgba(0, 217, 126, .25);
+    border-color: p.$mantis-green;
+  }
+
+  &[data-status='stale'] {
+    background: rgba(255, 176, 32, .25);
+    border-color: p.$mantis-warning;
+  }
+
+  &[data-status='missing'] {
+    background: rgba(255, 61, 87, .2);
+    border-color: p.$mantis-loss;
+  }
+
+  &:hover {
+    transform: scale(1.15);
+    box-shadow: 0 0 6px currentColor;
+  }
+}

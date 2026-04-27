@@ -1,0 +1,19 @@
+<div class="pv-mh">
+  <header class="pv-mh__head">
+    <span class="pv-mh__label mantis-mono">MODELS</span>
+    <span class="pv-mh__badge mantis-mono" [class]="badgeClass()">
+      {{ health().loaded }}/{{ health().total }}
+    </span>
+  </header>
+
+  <div class="pv-mh__grid" role="list" aria-label="Per-asset model status">
+    @for (cell of health().perAsset; track cell.epic) {
+      <span class="pv-mh__dot"
+            role="listitem"
+            [attr.data-status]="cell.status"
+            [attr.title]="cell.epic + ' · ' + cell.status"
+            [attr.aria-label]="cell.epic + ' ' + cell.status">
+      </span>
+    }
+  </div>
+</div>
