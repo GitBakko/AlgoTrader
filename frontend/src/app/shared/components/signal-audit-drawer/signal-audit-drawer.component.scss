@@ -87,7 +87,7 @@
   border-radius: var(--mantis-radius-sm, 4px);
   border: 1px solid rgba(255, 255, 255, .08);
   background: rgba(255, 255, 255, .04);
-  color: rgba(255, 255, 255, .65);
+  color: var(--fg2);
   font-size: var(--mantis-fs-body);
   cursor: pointer;
   transition: all 150ms ease;
@@ -257,7 +257,7 @@
 
   .ad-pipe__step[data-state='passed']  & { border-color: p.$mantis-neon; box-shadow: 0 0 5px rgba(57, 255, 20, .4); }
   .ad-pipe__step[data-state='failed']  & { border-color: p.$mantis-loss; box-shadow: 0 0 5px rgba(255, 61, 87, .4); }
-  .ad-pipe__step[data-state='neutral'] & { border-color: rgba(255, 255, 255, .25); }
+  .ad-pipe__step[data-state='neutral'] & { border-color: var(--fg-disabled); }
 }
 
 .ad-pipe__step-label {
@@ -427,7 +427,7 @@
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, .45);
+  color: var(--fg3);
 }
 
 .ad-kpi__value {
@@ -439,7 +439,7 @@
   &--win   { color: p.$mantis-neon; }
   &--loss  { color: p.$mantis-loss; }
   &--warn  { color: p.$mantis-warning; }
-  &--ghost { color: rgba(255, 255, 255, .25); }
+  &--ghost { color: var(--fg-disabled); }
 }
 
 // ── Pills ─────────────────────────────────────────────────────────
@@ -487,7 +487,7 @@
   font-size: var(--mantis-fs-xs);
   font-weight: 700;
   letter-spacing: .08em;
-  color: rgba(255, 255, 255, .65);
+  color: var(--fg2);
   text-transform: uppercase;
 }
 
@@ -586,7 +586,7 @@
 
 .ad-gate-row__detail {
   font-size: var(--mantis-fs-xs);
-  color: rgba(255, 255, 255, .45);
+  color: var(--fg3);
   letter-spacing: .04em;
   white-space: nowrap;
   overflow: hidden;
@@ -708,7 +708,7 @@
 
 .ad-related__reason {
   font-size: var(--mantis-fs-xs);
-  color: rgba(255, 255, 255, .45);
+  color: var(--fg3);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

@@ -48,7 +48,7 @@
   gap: 0.5rem;
   padding: 0.5rem 1rem !important;
   white-space: normal !important;
-  border-bottom: 1px solid var(--mantis-border-subtle, rgba(255, 255, 255, 0.06));
+  border-bottom: 1px solid var(--mantis-border-subtle, var(--mantis-border-subtle));
 
   &--unread {
     background: rgba(0, 217, 126, 0.04);

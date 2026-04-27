@@ -15,7 +15,7 @@
     background: var(--mantis-glass-bg, rgba(22, 27, 34, 0.6));
     backdrop-filter: blur(12px) saturate(1.2);
     -webkit-backdrop-filter: blur(12px) saturate(1.2);
-    border: 1px solid var(--mantis-border-subtle, rgba(255, 255, 255, 0.06));
+    border: 1px solid var(--mantis-border-subtle, var(--mantis-border-subtle));
     border-radius: var(--mantis-radius-md, 8px);
 
     &__left,
@@ -97,7 +97,7 @@
     &--muted {
       color: var(--mantis-text-disabled, rgba(255, 255, 255, 0.35));
       background: var(--mantis-tint-subtle, rgba(255, 255, 255, 0.03));
-      border: 1px solid var(--mantis-border-subtle, rgba(255, 255, 255, 0.06));
+      border: 1px solid var(--mantis-border-subtle, var(--mantis-border-subtle));
       font-weight: 500;
     }
   }
@@ -177,7 +177,7 @@
   .dash-kpi-card {
     position: relative;
     overflow: hidden;
-    border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.1));
+    border: 1px solid var(--mantis-border-default, var(--mantis-border-default));
     border-radius: var(--mantis-radius-md);
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
@@ -289,7 +289,7 @@
     padding: 0.625rem 0.75rem;
     border-radius: var(--mantis-radius-sm);
     background: rgba(255, 255, 255, 0.02);
-    border: 1px solid var(--mantis-border-subtle, rgba(255, 255, 255, 0.06));
+    border: 1px solid var(--mantis-border-subtle, var(--mantis-border-subtle));
     transition: border-color 0.15s ease, background 0.15s ease;
 
     &:hover {

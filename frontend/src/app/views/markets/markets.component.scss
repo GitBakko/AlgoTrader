@@ -7,7 +7,7 @@
   // Asset Cards
   .asset-card {
     cursor: pointer;
-    border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.1));
+    border: 1px solid var(--mantis-border-default, var(--mantis-border-default));
     transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
 
     &:hover {

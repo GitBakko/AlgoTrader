@@ -23,7 +23,7 @@
   flex-direction: column;
   gap: 2px;
   padding-right: 14px;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  border-right: 1px solid var(--mantis-border-subtle);
 
   &__head {
     display: flex;
@@ -102,7 +102,7 @@
     }
 
     &-sep {
-      color: rgba(255, 255, 255, 0.25);
+      color: var(--fg-disabled);
     }
   }
 
@@ -266,7 +266,7 @@
   &__sym {
     font-size: var(--mantis-fs-base);
     font-weight: 700;
-    color: rgba(255, 255, 255, 0.92);
+    color: var(--fg1);
     letter-spacing: 0.02em;
   }
 
@@ -308,7 +308,7 @@
     justify-content: center;
     font-size: var(--mantis-fs-xs);
     color: var(--mantis-text-muted);
-    border: 1px dashed rgba(255, 255, 255, 0.1);
+    border: 1px dashed var(--mantis-border-default);
     background: rgba(255, 255, 255, 0.02);
   }
 }
@@ -320,13 +320,13 @@
   gap: 4px;
   min-width: 200px;
   padding-left: 14px;
-  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 1px solid var(--mantis-border-subtle);
 
   &__head {
     font-size: var(--mantis-fs-xxs);
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.45);
+    color: var(--fg3);
     font-weight: 700;
   }
 
@@ -354,7 +354,7 @@
   }
 
   &__k {
-    color: rgba(255, 255, 255, 0.45);
+    color: var(--fg3);
   }
 
   &__v {

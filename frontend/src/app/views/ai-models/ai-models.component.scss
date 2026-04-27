@@ -46,7 +46,7 @@
     max-width: 800px;
     max-height: 80vh;
     border-radius: var(--mantis-radius-md);
-    border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.1));
+    border: 1px solid var(--mantis-border-default, var(--mantis-border-default));
     background: var(--cui-card-bg, var(--mantis-surface-1, #0d1117));
     overflow: hidden;
     display: flex;
@@ -57,7 +57,7 @@
       align-items: center;
       justify-content: space-between;
       padding: 1rem 1.25rem;
-      border-bottom: 1px solid var(--mantis-border-subtle, rgba(255, 255, 255, 0.06));
+      border-bottom: 1px solid var(--mantis-border-subtle, var(--mantis-border-subtle));
     }
 
     &__title {
@@ -144,7 +144,7 @@
       padding: 0.3rem 0;
 
       & + & {
-        border-top: 1px solid var(--mantis-border-subtle, rgba(255, 255, 255, 0.06));
+        border-top: 1px solid var(--mantis-border-subtle, var(--mantis-border-subtle));
       }
     }
 
@@ -165,7 +165,7 @@
   .training-job-card {
     padding: 0.75rem;
     border-radius: var(--mantis-radius-md);
-    border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.10));
+    border: 1px solid var(--mantis-border-default, var(--mantis-border-default));
     background: var(--cui-card-bg);
     transition: border-color 0.2s ease;
 
@@ -178,7 +178,7 @@
   // ── Advanced config ───────────────────────
   .advanced-config {
     background: var(--cui-tertiary-bg, var(--mantis-surface-3, #1c2128));
-    border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.10));
+    border: 1px solid var(--mantis-border-default, var(--mantis-border-default));
   }
 
   .epic-grid {
@@ -193,7 +193,7 @@
     gap: 0.25rem;
     padding: 0.25rem 0.5rem;
     border-radius: var(--mantis-radius-sm);
-    border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.10));
+    border: 1px solid var(--mantis-border-default, var(--mantis-border-default));
     background: var(--cui-card-bg, var(--mantis-surface-2, #161b22));
     cursor: pointer;
     transition: border-color 0.15s ease, background 0.15s ease;

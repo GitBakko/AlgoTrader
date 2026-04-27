@@ -41,7 +41,7 @@
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, .65);
+  color: var(--fg2);
 }
 
 .pv-feed__chips {
@@ -229,14 +229,14 @@
   padding: 1px 5px;
   border-radius: 2px;
   background: rgba(255, 255, 255, .03);
-  border: 1px solid rgba(255, 255, 255, .06);
+  border: 1px solid var(--mantis-border-subtle);
   color: rgba(255, 255, 255, .55);
   width: fit-content;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 
-  &--ghost { color: rgba(255, 255, 255, .25); }
+  &--ghost { color: var(--fg-disabled); }
 }
 
 .pv-feed__dir {
@@ -252,7 +252,7 @@
   &[data-direction='SELL'] { color: p.$mantis-loss; background: rgba(255, 61, 87, .1); border-color: rgba(255, 61, 87, .26); }
   &[data-direction='HOLD'] { color: p.$mantis-neutral; background: rgba(139, 148, 158, .08); border-color: rgba(139, 148, 158, .18); }
 
-  &--ghost { color: rgba(255, 255, 255, .25); border-color: rgba(255, 255, 255, .08); }
+  &--ghost { color: var(--fg-disabled); border-color: rgba(255, 255, 255, .08); }
 }
 
 .pv-feed__conf {
@@ -264,9 +264,9 @@
   &[data-tone='high'] { color: p.$mantis-neon; }
   &[data-tone='mid']  { color: p.$mantis-warning; }
   &[data-tone='low']  { color: rgba(255, 255, 255, .4); }
-  &[data-tone='none'] { color: rgba(255, 255, 255, .25); }
+  &[data-tone='none'] { color: var(--fg-disabled); }
 
-  &--ghost { color: rgba(255, 255, 255, .25); }
+  &--ghost { color: var(--fg-disabled); }
 }
 
 .pv-feed__price {
@@ -275,7 +275,7 @@
   font-feature-settings: 'tnum' 1;
   width: fit-content;
 
-  &--ghost { color: rgba(255, 255, 255, .25); }
+  &--ghost { color: var(--fg-disabled); }
 }
 
 .pv-feed__detail {
@@ -324,7 +324,7 @@
   &-sub {
     font-size: var(--mantis-fs-sm);
     line-height: 1.4;
-    color: rgba(255, 255, 255, .45);
+    color: var(--fg3);
   }
 }
 

@@ -53,7 +53,7 @@
 // Metric Cards
 .metric-card {
   background: var(--mantis-surface-2, #161b22);
-  border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.1));
+  border: 1px solid var(--mantis-border-default, var(--mantis-border-default));
   transition: all 0.3s ease;
 
   &:hover {
@@ -78,7 +78,7 @@
   padding: 1rem;
   background: var(--mantis-surface-2, #161b22);
   border-radius: var(--mantis-radius-md);
-  border: 1px solid var(--mantis-border-default, rgba(255, 255, 255, 0.1));
+  border: 1px solid var(--mantis-border-default, var(--mantis-border-default));
   text-align: center;
 
   .metric-label {
@@ -104,7 +104,7 @@ table {
     font-size: var(--mantis-fs-body);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    border-color: var(--mantis-border-default, rgba(255, 255, 255, 0.1));
+    border-color: var(--mantis-border-default, var(--mantis-border-default));
   }
 
   td {
@@ -123,12 +123,12 @@ table {
 // Cards
 c-card {
   background: var(--mantis-surface-2, #161b22);
-  border-color: var(--mantis-border-default, rgba(255, 255, 255, 0.1));
+  border-color: var(--mantis-border-default, var(--mantis-border-default));
 }
 
 c-card-header {
   background: rgba(0, 0, 0, 0.2);
-  border-bottom-color: var(--mantis-border-default, rgba(255, 255, 255, 0.1));
+  border-bottom-color: var(--mantis-border-default, var(--mantis-border-default));
 
   h5, h6 {
     color: var(--mantis-text-primary, white);

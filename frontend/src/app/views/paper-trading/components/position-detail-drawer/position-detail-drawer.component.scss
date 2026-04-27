@@ -194,7 +194,7 @@
   margin: 0;
   font-size: var(--mantis-fs-md);
   line-height: 1.5;
-  color: rgba(255, 255, 255, .65);
+  color: var(--fg2);
 }
 
 .pdd-grid {
@@ -221,7 +221,7 @@
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, .45);
+  color: var(--fg3);
 }
 
 .pdd-cell__value {
@@ -315,7 +315,7 @@
   font-feature-settings: 'tnum' 1;
 
   dt {
-    color: rgba(255, 255, 255, .45);
+    color: var(--fg3);
     text-transform: uppercase;
     letter-spacing: .12em;
     font-size: var(--mantis-fs-xxs);

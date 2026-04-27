@@ -11,7 +11,7 @@
     padding: 0.25rem;
     background: var(--mantis-surface-2, #161b22);
     border-radius: var(--mantis-radius-md);
-    border: 1px solid var(--mantis-border-subtle, rgba(255, 255, 255, 0.06));
+    border: 1px solid var(--mantis-border-subtle, var(--mantis-border-subtle));
   }
 
   .pos-tab {
@@ -148,7 +148,7 @@
   .pos-filter-select {
     max-width: 160px;
     background-color: var(--mantis-surface-3, #1c2128);
-    border-color: var(--mantis-border-default, rgba(255, 255, 255, 0.1));
+    border-color: var(--mantis-border-default, var(--mantis-border-default));
     color: var(--mantis-text-primary, #c9d1d9);
     font-size: var(--mantis-fs-base);
 
@@ -161,7 +161,7 @@
   .pos-filter-date {
     max-width: 140px;
     background-color: var(--mantis-surface-3, #1c2128);
-    border-color: var(--mantis-border-default, rgba(255, 255, 255, 0.1));
+    border-color: var(--mantis-border-default, var(--mantis-border-default));
     color: var(--mantis-text-primary, #c9d1d9);
     font-size: var(--mantis-fs-base);
 
@@ -176,7 +176,7 @@
     padding: 0.75rem;
     border-radius: var(--mantis-radius-md);
     background: var(--mantis-surface-2, #161b22);
-    border: 1px solid var(--mantis-border-subtle, rgba(255, 255, 255, 0.06));
+    border: 1px solid var(--mantis-border-subtle, var(--mantis-border-subtle));
 
     .trailing-phase--sm {
       font-size: var(--mantis-fs-xxs);

@@ -96,7 +96,7 @@
   gap: 8px;
   padding: 6px 8px;
   background: rgba(255, 255, 255, .015);
-  border: 1px solid rgba(255, 255, 255, .06);
+  border: 1px solid var(--mantis-border-subtle);
   border-radius: var(--mantis-radius-sm, 4px);
   cursor: pointer;
   text-align: left;
@@ -151,7 +151,7 @@
     .pv-heatmap__state { color: p.$mantis-neutral; }
   }
   &[data-state='none'] {
-    .pv-heatmap__state { color: rgba(255, 255, 255, .25); }
+    .pv-heatmap__state { color: var(--fg-disabled); }
   }
 
   &--skeleton {
