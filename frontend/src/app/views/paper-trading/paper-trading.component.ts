@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 import { CockpitHeaderComponent, type CockpitMode, type CockpitState } from '../../shared/components/cockpit-header/cockpit-header.component';
@@ -84,6 +84,33 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
    *  endpoint (`/api/trading/pnl-history`). */
   readonly paperPnlHistory = this.trading.paperPnlHistory;
 
+  /** Throttled heartbeat from the WS price feed (≥1.5s between beats so
+   *  100 ticks/s do not flood the ECG). Combined into `heartbeatNonce`. */
+  readonly priceTickPulse = signal(0);
+  private lastPriceTickAt = 0;
+
+  /**
+   * Composite "fresh data arrived" nonce. Changes whenever the values the
+   * cockpit cares about change — paper status, positions, history, throttled
+   * WS prices. The bot-vitals panel reads it as a signal input and beats
+   * the ECG once per change instead of running an idle CSS scroll loop.
+   */
+  readonly heartbeatNonce = computed<string>(() => {
+    const status = this.trading.paperStatus();
+    const positions = this.trading.paperPositions();
+    const paperHistory = this.trading.paperPnlHistory();
+    const positionHistory = this.trading.positionPnlHistory();
+    return [
+      status?.iteration_count ?? 0,
+      status?.last_run ?? '',
+      status?.signal_count ?? 0,
+      positions.length,
+      paperHistory?.points.length ?? 0,
+      Object.keys(positionHistory).length,
+      this.priceTickPulse(),
+    ].join('|');
+  });
+
   readonly state = computed<CockpitState>(() => {
     const s = this.status();
     if (!s) return 'IDLE';
@@ -115,7 +142,7 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     return {
       state: this.state(),
       uptime: formatUptime(s?.uptime_seconds ?? null),
-      lastTickAgo: this.lastTickAgo() ?? 0,
+      lastTickAgo: this.lastTickAgo(),
       iterations: s?.iteration_count ?? 0,
       intervalSec: s?.interval_seconds ?? 0,
       errors: s?.error_count ?? 0,
@@ -243,6 +270,20 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
 
   /** Build/footer label — extended in PR 5. */
   readonly buildTag = signal<string>('mantis · v2 shell');
+
+  constructor() {
+    // WS prices reshuffle on every broker tick (potentially many per second).
+    // Throttle to one beat every 1.5s so the ECG visual does not become a
+    // strobe under heavy market activity.
+    effect(() => {
+      this.ws.prices();
+      const now = Date.now();
+      if (now - this.lastPriceTickAt >= 1500) {
+        this.lastPriceTickAt = now;
+        this.priceTickPulse.set(now);
+      }
+    });
+  }
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private clockTimer: ReturnType<typeof setInterval> | null = null;

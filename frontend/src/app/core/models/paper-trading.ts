@@ -31,7 +31,10 @@ export type FeedKind =
 export interface BotVitals {
   state: PaperState;
   uptime: string;
-  lastTickAgo: number;
+  /** Seconds since last loop tick. Null when the bot has never run since
+   *  startup (no `last_run` from the backend) — the panel renders a dash
+   *  rather than a misleading 0.0s. */
+  lastTickAgo: number | null;
   iterations: number;
   intervalSec: number;
   errors: number;
