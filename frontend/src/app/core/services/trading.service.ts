@@ -18,6 +18,7 @@ import {
   PaperTradingStatus,
   PaperPosition,
   PaperSignal,
+  FeedEvent,
   ClosedPosition,
   PositionAggregates,
   TradingPerformance,
@@ -66,6 +67,10 @@ export class TradingService {
   readonly paperSignals = signal<PaperSignal[]>([]);
   readonly paperPnlHistory = signal<PaperPnlHistoryResponse | null>(null);
   readonly positionPnlHistory = signal<Record<string, PositionPnlHistoryResponse>>({});
+
+  /** Cockpit activity feed (HANDOFF §3.8) — fed by `/api/trading/events`,
+   *  the union of signals + positions + notifications, sorted by ts DESC. */
+  readonly feedEvents = signal<FeedEvent[]>([]);
 
   // Closed Positions & Performance
   readonly closedPositions = signal<ClosedPosition[]>([]);
@@ -116,8 +121,8 @@ export class TradingService {
 
   // ── Signals ──
 
-  loadSignals(epic?: string): void {
-    const params: Record<string, string> = {};
+  loadSignals(epic?: string, limit: number = 50): void {
+    const params: Record<string, string | number> = { limit };
     if (epic) params['epic'] = epic;
     this.api.get<TradingSignal[]>('/api/signals/', params)
       .subscribe({ next: data => this.signals.set(data), error: () => {} });
@@ -265,6 +270,17 @@ export class TradingService {
   loadPaperSignals(): void {
     this.api.get<PaperSignal[]>('/api/trading/signals')
       .subscribe({ next: data => this.paperSignals.set(data), error: () => {} });
+  }
+
+  /** Fetch the last `limit` activity events for the live-feed-timeline.
+   *  Sourced from `/api/trading/events`, which aggregates signals,
+   *  position open/close and notifications. */
+  loadFeedEvents(limit: number = 50, hours: number = 24): void {
+    this.api.get<FeedEvent[]>('/api/trading/events', { limit, hours })
+      .subscribe({
+        next: (data) => this.feedEvents.set(data ?? []),
+        error: () => {},
+      });
   }
 
   startPaperTrading() {

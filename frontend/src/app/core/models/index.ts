@@ -47,6 +47,46 @@ export interface Position {
   opened_at: string | null;
 }
 
+/**
+ * Live cockpit activity feed event (HANDOFF §3.8 + mocks/SignalsAndFeed.jsx).
+ * One row per event from the merged backend stream `/api/trading/events`:
+ * signals (emit / reject / pending), positions (open / close), notifications
+ * (alerts, model lifecycle, errors).
+ *
+ * The structured fields (direction, confidence, price, strategy, detail) let
+ * the FeedRow render the rich timeline shown in the mock — asset glyph +
+ * strategy chip + direction badge + confidence + price + reason — without
+ * extra round-trips per row.
+ */
+export interface FeedEvent {
+  id: string;
+  ts: string;
+  kind:
+    | 'signal-emit'
+    | 'signal-reject'
+    | 'signal-pending'
+    | 'position-open'
+    | 'position-close'
+    | 'model-load'
+    | 'error'
+    | 'alert'
+    | 'iteration';
+  epic: string | null;
+  /** Trade direction normalized to upper-case (`BUY|SELL|HOLD`). */
+  direction?: string | null;
+  /** Confidence percent (0..100), null when not available. */
+  confidence?: number | null;
+  /** Reference price (signal entry, position entry). */
+  price?: number | null;
+  /** Strategy that emitted the signal, e.g. `mean_reversion`/`ml_ensemble`. */
+  strategy?: string | null;
+  /** Human-readable reason or context (rejection reason, close reason+pnl). */
+  detail?: string | null;
+  title: string;
+  meta?: string | null;
+  severity?: 'info' | 'warning' | 'error' | 'critical' | string | null;
+}
+
 // Signals
 export interface TradingSignal {
   id: number | null;

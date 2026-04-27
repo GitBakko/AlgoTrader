@@ -1,0 +1,339 @@
+@use '../../../../../scss/palette' as p;
+
+// Mock FeedSegnali — vertical timeline with rail + bullets, 6-column row.
+:host {
+  display: block;
+  height: 100%;
+}
+
+.pv-feed {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: p.$mantis-surface-2;
+  border: 1px solid rgba(p.$mantis-green, .15);
+  border-radius: var(--mantis-radius-md, 6px);
+}
+
+.pv-feed__head {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, rgba(57, 255, 20, .04) 0%, transparent 100%);
+  border-bottom: 1px solid rgba(p.$mantis-green, .12);
+  z-index: 1;
+}
+
+.pv-feed__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 100px;
+  background: p.$mantis-neon;
+  box-shadow: 0 0 4px p.$mantis-neon;
+  animation: feed-pulse 1.6s ease-in-out infinite;
+}
+
+.pv-feed__title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, .65);
+}
+
+.pv-feed__chips {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+
+.pv-feed__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: var(--mantis-radius-sm, 4px);
+  border: 1px solid transparent;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  font-feature-settings: 'tnum' 1;
+
+  &-label { opacity: .85; }
+  &-value { font-weight: 700; }
+
+  &--exec {
+    color: p.$mantis-neon;
+    background: rgba(57, 255, 20, .08);
+    border-color: rgba(57, 255, 20, .22);
+  }
+  &--rej {
+    color: p.$mantis-loss;
+    background: rgba(255, 61, 87, .08);
+    border-color: rgba(255, 61, 87, .22);
+  }
+  &--hold {
+    color: p.$mantis-neutral;
+    background: rgba(139, 148, 158, .08);
+    border-color: rgba(139, 148, 158, .2);
+  }
+}
+
+.pv-feed__list-wrapper {
+  position: relative;
+  flex: 1 1 auto;
+  overflow-y: auto;
+
+  &::-webkit-scrollbar { width: 6px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(p.$mantis-green, .25);
+    border-radius: var(--mantis-radius-pill, 100px);
+  }
+}
+
+// Vertical timeline rail (mock: position absolute left=54px). The list items
+// share the same column track, the rail sits between time and bullet.
+.pv-feed__rail {
+  position: absolute;
+  left: 64px;
+  top: 12px;
+  bottom: 12px;
+  width: 1px;
+  background: rgba(255, 255, 255, .06);
+  pointer-events: none;
+}
+
+.pv-feed__list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+}
+
+.pv-feed__row {
+  display: grid;
+  grid-template-columns: 50px 14px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, .04);
+  transition: background 120ms ease;
+
+  &:last-child { border-bottom: none; }
+
+  &:hover { background: rgba(57, 255, 20, .03); }
+
+  // Per-state row tint when "important" (executed / rejected / error).
+  &--important[data-state='executed'] { background: rgba(57, 255, 20, .04); }
+  &--important[data-state='rejected'] { background: rgba(255, 61, 87, .04); }
+  &--important[data-state='error']    { background: rgba(255, 61, 87, .06); }
+}
+
+.pv-feed__ts {
+  font-size: 10px;
+  color: rgba(255, 255, 255, .5);
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+
+.pv-feed__bullet-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  z-index: 1;
+}
+
+.pv-feed__bullet {
+  width: 9px;
+  height: 9px;
+  border-radius: 100px;
+  background: p.$mantis-surface-1;
+  border: 2px solid rgba(255, 255, 255, .25);
+  transition: box-shadow 200ms ease;
+
+  // Bullet color follows the row state token.
+  .pv-feed__row[data-state='executed'] & { border-color: p.$mantis-neon; }
+  .pv-feed__row[data-state='rejected'] & { border-color: p.$mantis-loss; }
+  .pv-feed__row[data-state='hold']     & { border-color: p.$mantis-neutral; }
+  .pv-feed__row[data-state='closed']   & { border-color: p.$mantis-cyan; }
+  .pv-feed__row[data-state='error']    & { border-color: p.$mantis-loss; }
+
+  &--important {
+    .pv-feed__row[data-state='executed'] & { box-shadow: 0 0 6px rgba(57, 255, 20, .55); }
+    .pv-feed__row[data-state='rejected'] & { box-shadow: 0 0 6px rgba(255, 61, 87, .55); }
+    .pv-feed__row[data-state='error']    & { box-shadow: 0 0 6px rgba(255, 61, 87, .65); }
+  }
+}
+
+// 6-column body content. Falls back gracefully when the right rail
+// is narrow (compact layout < 320 px container width).
+.pv-feed__body {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr) auto auto auto minmax(0, 1.4fr);
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
+
+  @media (max-width: 1280px) {
+    grid-template-columns: minmax(64px, auto) auto auto minmax(0, 1.6fr);
+    .pv-feed__strategy,
+    .pv-feed__price { display: none; }
+  }
+}
+
+.pv-feed__asset {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+
+  &--system .pv-feed__epic { color: rgba(255, 255, 255, .5); }
+}
+
+.pv-feed__epic {
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: .04em;
+  font-feature-settings: 'tnum' 1;
+}
+
+.pv-feed__strategy {
+  font-size: 9px;
+  letter-spacing: .05em;
+  padding: 1px 5px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, .03);
+  border: 1px solid rgba(255, 255, 255, .06);
+  color: rgba(255, 255, 255, .55);
+  width: fit-content;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &--ghost { color: rgba(255, 255, 255, .25); }
+}
+
+.pv-feed__dir {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  padding: 1px 5px;
+  border-radius: 2px;
+  border: 1px solid transparent;
+  width: fit-content;
+
+  &[data-direction='BUY']  { color: p.$mantis-neon; background: rgba(57, 255, 20, .1);  border-color: rgba(57, 255, 20, .26); }
+  &[data-direction='SELL'] { color: p.$mantis-loss; background: rgba(255, 61, 87, .1); border-color: rgba(255, 61, 87, .26); }
+  &[data-direction='HOLD'] { color: p.$mantis-neutral; background: rgba(139, 148, 158, .08); border-color: rgba(139, 148, 158, .18); }
+
+  &--ghost { color: rgba(255, 255, 255, .25); border-color: rgba(255, 255, 255, .08); }
+}
+
+.pv-feed__conf {
+  font-size: 10px;
+  font-weight: 700;
+  font-feature-settings: 'tnum' 1;
+  width: fit-content;
+
+  &[data-tone='high'] { color: p.$mantis-neon; }
+  &[data-tone='mid']  { color: p.$mantis-warning; }
+  &[data-tone='low']  { color: rgba(255, 255, 255, .4); }
+  &[data-tone='none'] { color: rgba(255, 255, 255, .25); }
+
+  &--ghost { color: rgba(255, 255, 255, .25); }
+}
+
+.pv-feed__price {
+  font-size: 10px;
+  color: #fff;
+  font-feature-settings: 'tnum' 1;
+  width: fit-content;
+
+  &--ghost { color: rgba(255, 255, 255, .25); }
+}
+
+.pv-feed__detail {
+  font-size: 9px;
+  color: rgba(255, 255, 255, .45);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  .pv-feed__row[data-state='executed'] & { color: p.$mantis-neon; opacity: .9; }
+  .pv-feed__row[data-state='rejected'] & { color: p.$mantis-loss; opacity: .9; }
+  .pv-feed__row[data-state='error']    & { color: p.$mantis-loss; }
+}
+
+// Empty state
+.pv-feed__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 32px 18px;
+  text-align: center;
+
+  &-icon {
+    font-size: 36px;
+    opacity: .4;
+    line-height: 1;
+  }
+
+  &-title {
+    font-family: var(--mantis-font-ui, 'Plus Jakarta Sans', sans-serif);
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, .8);
+  }
+
+  &-sub {
+    font-size: 11px;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, .45);
+  }
+}
+
+// Skeleton rows
+.pv-feed__list--skeleton { list-style: none; margin: 0; padding: 6px 0; }
+
+.pv-feed__row--skeleton {
+  cursor: default;
+  pointer-events: none;
+  border-bottom-color: rgba(255, 255, 255, .03);
+
+  &:hover { background: transparent; }
+}
+
+.pv-feed__skel {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, .04) 0%,
+    rgba(255, 255, 255, .12) 50%,
+    rgba(255, 255, 255, .04) 100%
+  );
+  background-size: 200% 100%;
+  animation: feed-shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--mantis-radius-sm, 4px);
+
+  &--ts { width: 50px; height: 8px; }
+  &--bullet { width: 8px; height: 8px; border-radius: 100px; margin-top: 4px; }
+  &--body { width: 70%; height: 10px; }
+}
+
+@keyframes feed-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .35; }
+}
+
+@keyframes feed-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

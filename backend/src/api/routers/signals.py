@@ -47,7 +47,7 @@ def _signal_from_db(s) -> dict:
 async def list_signals(
     request: Request,
     epic: str | None = None,
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=50, ge=1, le=300),
     signal_repo=Depends(get_signal_repo),
 ):
     """List recent trading signals."""

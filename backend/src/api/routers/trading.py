@@ -133,6 +133,222 @@ async def trading_signals(request: Request):
     return success_response(loop.get_signal_history())
 
 
+@router.get("/events")
+async def trading_events(
+    request: Request,
+    limit: int = Query(default=50, ge=1, le=200),
+    hours: int = Query(default=24, ge=1, le=168),
+    session=Depends(get_db_session),
+):
+    """Aggregated activity feed for the cockpit live-feed-timeline (HANDOFF §3.8).
+
+    Merges three sources captured by the trading loop and the alert manager:
+        * `signals` table  → signal-emit (status=EXECUTED) and signal-reject (status=REJECTED)
+        * `positions` table → position-open (opened_at) and position-close (closed_at)
+        * `notifications` table → alerts (errors, training events, circuit breakers, ...)
+
+    Returns a flat list of normalized events sorted by timestamp DESC, capped at ``limit``.
+    Each item: ``{ id, ts, kind, epic?, title, meta?, severity? }``.
+
+    The cockpit also reads ``/trading/status`` on a 10s cadence to surface
+    iteration ticks; iteration events are deliberately not produced here.
+    """
+    if session is None:
+        return success_response([])
+
+    from sqlalchemy import text as sql_text
+
+    cutoff = (datetime.now(UTC) - timedelta(hours=hours)).replace(tzinfo=None)
+    events: list[dict] = []
+
+    # 1. Signals — emit + reject (include strategy + reason from JSONB features)
+    try:
+        result = await session.execute(
+            sql_text(
+                """
+                SELECT id, epic, direction, confidence, status, generated_at,
+                       predicted_price, stop_loss_price, take_profit_price,
+                       features
+                  FROM signals
+                 WHERE generated_at > :cutoff
+                   AND status IN ('EXECUTED', 'REJECTED', 'PENDING')
+                 ORDER BY generated_at DESC
+                 LIMIT :limit
+                """
+            ),
+            {"cutoff": cutoff, "limit": limit * 2},
+        )
+        for row in result.mappings():
+            status = (row["status"] or "").upper()
+            features = row["features"] or {}
+            strategy = features.get("strategy_name") or features.get("strategy") or "—"
+            direction = (row["direction"] or "").upper()
+            confidence = (
+                round(float(row["confidence"]) * 100) if row["confidence"] is not None else None
+            )
+            price = float(row["predicted_price"]) if row["predicted_price"] is not None else None
+            kind = (
+                "signal-emit"
+                if status == "EXECUTED"
+                else "signal-reject"
+                if status == "REJECTED"
+                else "signal-pending"
+            )
+            detail = (
+                features.get("rejection_reason")
+                if status == "REJECTED"
+                else features.get("regime") or direction
+            )
+            events.append(
+                {
+                    "id": f"signal-{row['id']}",
+                    "ts": row["generated_at"].isoformat() if row["generated_at"] else None,
+                    "kind": kind,
+                    "epic": row["epic"],
+                    "direction": direction or None,
+                    "confidence": confidence,
+                    "price": price,
+                    "strategy": strategy,
+                    "detail": detail,
+                    "title": f"{direction} {row['epic']}",
+                    "meta": (
+                        f"conf {confidence}%" if confidence is not None else strategy
+                    ),
+                    "severity": "info" if status == "EXECUTED" else "warning",
+                }
+            )
+    except Exception as e:
+        logger.debug(f"events: signals query failed: {e}")
+
+    # 2. Positions — open + close. LEFT JOIN signals to recover strategy
+    # and confidence so the feed row matches the mock spec without
+    # firing a second roundtrip per row.
+    try:
+        result = await session.execute(
+            sql_text(
+                """
+                SELECT p.id, p.deal_id, p.epic, p.direction, p.opened_at, p.closed_at,
+                       p.entry_price, p.close_reason, p.profit_loss,
+                       s.confidence  AS sig_confidence,
+                       s.features    AS sig_features
+                  FROM positions p
+                  LEFT JOIN signals s ON s.id = p.signal_id
+                 WHERE p.opened_at > :cutoff OR (p.closed_at IS NOT NULL AND p.closed_at > :cutoff)
+                 ORDER BY GREATEST(p.opened_at, COALESCE(p.closed_at, p.opened_at)) DESC
+                 LIMIT :limit
+                """
+            ),
+            {"cutoff": cutoff, "limit": limit * 2},
+        )
+        for row in result.mappings():
+            opened_at = row["opened_at"]
+            closed_at = row["closed_at"]
+            features = row["sig_features"] or {}
+            strategy = features.get("strategy_name") or features.get("strategy") or "—"
+            direction = (row["direction"] or "").upper()
+            confidence = (
+                round(float(row["sig_confidence"]) * 100)
+                if row["sig_confidence"] is not None
+                else None
+            )
+            price = float(row["entry_price"]) if row["entry_price"] is not None else None
+
+            if opened_at and opened_at > cutoff:
+                events.append(
+                    {
+                        "id": f"pos-open-{row['id']}",
+                        "ts": opened_at.isoformat(),
+                        "kind": "position-open",
+                        "epic": row["epic"],
+                        "direction": direction or None,
+                        "confidence": confidence,
+                        "price": price,
+                        "strategy": strategy,
+                        "detail": "aperta",
+                        "title": f"{direction} {row['epic']} aperta",
+                        "meta": row["deal_id"],
+                        "severity": "info",
+                    }
+                )
+            if closed_at and closed_at > cutoff:
+                pnl = row["profit_loss"]
+                pnl_str = f"{float(pnl):+.2f}" if pnl is not None else "—"
+                kind_severity = (
+                    "info" if pnl is not None and float(pnl) >= 0 else "warning"
+                )
+                close_reason = row["close_reason"] or "manual"
+                events.append(
+                    {
+                        "id": f"pos-close-{row['id']}",
+                        "ts": closed_at.isoformat(),
+                        "kind": "position-close",
+                        "epic": row["epic"],
+                        "direction": direction or None,
+                        "confidence": confidence,
+                        "price": price,
+                        "strategy": strategy,
+                        "detail": f"{close_reason} · {pnl_str}",
+                        "title": f"{direction} {row['epic']} chiusa · {pnl_str}",
+                        "meta": close_reason,
+                        "severity": kind_severity,
+                    }
+                )
+    except Exception as e:
+        logger.debug(f"events: positions query failed: {e}")
+
+    # 3. Notifications — errors, model lifecycle, circuit breakers, etc.
+    try:
+        result = await session.execute(
+            sql_text(
+                """
+                SELECT id, alert_type, severity, title, message, epic, created_at
+                  FROM notifications
+                 WHERE created_at > :cutoff
+                 ORDER BY created_at DESC
+                 LIMIT :limit
+                """
+            ),
+            {"cutoff": cutoff, "limit": limit * 2},
+        )
+        # Skip TRADE_OPENED / TRADE_CLOSED / SIGNAL_GENERATED — already covered by
+        # the signals + positions queries above to avoid duplicate rows.
+        skip_alert_types = {"TRADE_OPENED", "TRADE_CLOSED", "SIGNAL_GENERATED"}
+        for row in result.mappings():
+            alert_type = row["alert_type"] or ""
+            if alert_type in skip_alert_types:
+                continue
+            kind = (
+                "model-load"
+                if alert_type.startswith("TRAINING_")
+                else "error"
+                if (row["severity"] or "").upper() in ("ERROR", "CRITICAL")
+                else "alert"
+            )
+            events.append(
+                {
+                    "id": f"notif-{row['id']}",
+                    "ts": row["created_at"].isoformat() if row["created_at"] else None,
+                    "kind": kind,
+                    "epic": row["epic"],
+                    "direction": None,
+                    "confidence": None,
+                    "price": None,
+                    "strategy": None,
+                    "detail": row["message"][:120] if row["message"] else None,
+                    "title": row["title"] or alert_type,
+                    "meta": row["message"][:120] if row["message"] else None,
+                    "severity": (row["severity"] or "info").lower(),
+                }
+            )
+    except Exception as e:
+        logger.debug(f"events: notifications query failed: {e}")
+
+    # Sort merged stream by ts DESC, drop missing timestamps, cap at limit.
+    events = [e for e in events if e["ts"]]
+    events.sort(key=lambda e: e["ts"], reverse=True)
+    return success_response(events[:limit])
+
+
 @router.get("/performance")
 async def trading_performance(
     request: Request,

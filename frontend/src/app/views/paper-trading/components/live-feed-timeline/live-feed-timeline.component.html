@@ -1,0 +1,111 @@
+<section class="pv-feed" aria-label="Live feed timeline">
+  <header class="pv-feed__head">
+    <span class="pv-feed__dot" aria-hidden="true"></span>
+    <span class="pv-feed__title mantis-mono">FEED SEGNALI · LIVE</span>
+    <div class="pv-feed__chips" aria-label="Conteggi feed">
+      <span class="pv-feed__chip pv-feed__chip--exec mantis-mono">
+        <span class="pv-feed__chip-label">EXEC</span>
+        <span class="pv-feed__chip-value">{{ counts().exec }}</span>
+      </span>
+      <span class="pv-feed__chip pv-feed__chip--rej mantis-mono">
+        <span class="pv-feed__chip-label">REJ</span>
+        <span class="pv-feed__chip-value">{{ counts().rej }}</span>
+      </span>
+      <span class="pv-feed__chip pv-feed__chip--hold mantis-mono">
+        <span class="pv-feed__chip-label">HOLD</span>
+        <span class="pv-feed__chip-value">{{ counts().hold }}</span>
+      </span>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <ul class="pv-feed__list pv-feed__list--skeleton" aria-busy="true">
+      @for (_ of skeletonRows; track $index) {
+        <li class="pv-feed__row pv-feed__row--skeleton" aria-hidden="true">
+          <span class="pv-feed__skel pv-feed__skel--ts"></span>
+          <span class="pv-feed__skel pv-feed__skel--bullet"></span>
+          <span class="pv-feed__skel pv-feed__skel--body"></span>
+        </li>
+      }
+    </ul>
+  } @else if (visibleEvents().length === 0) {
+    <div class="pv-feed__empty" role="status">
+      <span class="pv-feed__empty-icon" aria-hidden="true">⌛</span>
+      <span class="pv-feed__empty-title">In ascolto del bot…</span>
+      <span class="pv-feed__empty-sub">
+        Nessun evento ancora. Il feed si popola appena il loop emette segnali, aperture, chiusure o alert.
+      </span>
+    </div>
+  } @else {
+    <div class="pv-feed__list-wrapper">
+      <span class="pv-feed__rail" aria-hidden="true"></span>
+      <ul class="pv-feed__list" role="list">
+        @for (event of visibleEvents(); track event.id) {
+          <li
+            class="pv-feed__row"
+            role="listitem"
+            [attr.data-state]="stateOf(event)"
+            [attr.data-kind]="event.kind"
+            [class.pv-feed__row--important]="isImportant(event)"
+            (click)="onEventClick(event)">
+
+            <span class="pv-feed__ts mantis-mono">{{ formatTime(event.ts) }}</span>
+
+            <span class="pv-feed__bullet-wrap" aria-hidden="true">
+              <span class="pv-feed__bullet" [class.pv-feed__bullet--important]="isImportant(event)"></span>
+            </span>
+
+            <div class="pv-feed__body">
+              @if (event.epic) {
+                <span class="pv-feed__asset">
+                  <app-epic-logo [epic]="event.epic" [size]="16"></app-epic-logo>
+                  <span class="pv-feed__epic mantis-mono">{{ event.epic }}</span>
+                </span>
+              } @else {
+                <span class="pv-feed__asset pv-feed__asset--system">
+                  <span class="pv-feed__epic mantis-mono">SYSTEM</span>
+                </span>
+              }
+
+              @if (event.strategy) {
+                <span class="pv-feed__strategy mantis-mono">{{ event.strategy }}</span>
+              } @else {
+                <span class="pv-feed__strategy pv-feed__strategy--ghost mantis-mono">—</span>
+              }
+
+              @if (event.direction) {
+                <span class="pv-feed__dir mantis-mono"
+                      [attr.data-direction]="event.direction">
+                  {{ event.direction }}
+                </span>
+              } @else {
+                <span class="pv-feed__dir pv-feed__dir--ghost mantis-mono">—</span>
+              }
+
+              @if (event.confidence !== null && event.confidence !== undefined) {
+                <span class="pv-feed__conf mantis-mono"
+                      [attr.data-tone]="confidenceTone(event.confidence)">
+                  {{ event.confidence }}%
+                </span>
+              } @else {
+                <span class="pv-feed__conf pv-feed__conf--ghost mantis-mono">—</span>
+              }
+
+              @if (event.price !== null && event.price !== undefined) {
+                <span class="pv-feed__price mantis-mono">
+                  {{ event.price | number:pricePrecision(event.price) }}
+                </span>
+              } @else {
+                <span class="pv-feed__price pv-feed__price--ghost mantis-mono">—</span>
+              }
+
+              <span class="pv-feed__detail" [title]="event.detail || event.title">
+                {{ event.detail || event.title }}
+              </span>
+            </div>
+          </li>
+        }
+      </ul>
+    </div>
+  }
+</section>

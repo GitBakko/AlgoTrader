@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 
 import { CockpitHeaderComponent, type CockpitMode, type CockpitState } from '../../shared/components/cockpit-header/cockpit-header.component';
 import { TradingService } from '../../core/services/trading.service';
+import { SignalAuditService } from '../../core/services/signal-audit.service';
 import { ToastService } from '../../shared/services/toast.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import type {
@@ -19,6 +20,8 @@ import { ModelsHealthPanelComponent } from './components/models-health-panel/mod
 import { KpiStripCompactComponent } from './components/kpi-strip-compact/kpi-strip-compact.component';
 import { ActivePositionsCockpitComponent } from './components/active-positions-cockpit/active-positions-cockpit.component';
 import { PositionDetailDrawerComponent } from './components/position-detail-drawer/position-detail-drawer.component';
+import { SignalsHeatmapComponent, type HeatmapCell } from './components/signals-heatmap/signals-heatmap.component';
+import { LiveFeedTimelineComponent } from './components/live-feed-timeline/live-feed-timeline.component';
 import { WebSocketService } from '../../core/services/websocket.service';
 import type { PaperPosition } from '../../core/models';
 import { epicColor } from '../../shared/constants/epic-colors';
@@ -30,6 +33,14 @@ const DEFAULT_DD_GATE_PCT = 20;
  *  refresh more aggressively to feel live while a position is open. */
 const PNL_HISTORY_REFRESH_MS = 60_000;
 const POSITION_HISTORY_REFRESH_MS = 30_000;
+/** How often the cockpit re-pulls the merged activity feed and the recent
+ *  signal history. Tight enough to feel live; gentle enough on Postgres. */
+const FEED_REFRESH_MS = 8_000;
+const SIGNALS_REFRESH_MS = 12_000;
+/** How many historical signal rows we ask the backend for. The heatmap
+ *  groups by epic and takes the latest, so we need enough rows to cover
+ *  the full 21-asset universe even when one asset dominates the feed. */
+const SIGNALS_HISTORY_LIMIT = 300;
 
 /**
  * Paper Trading v2 — cockpit shell.
@@ -52,6 +63,8 @@ const POSITION_HISTORY_REFRESH_MS = 30_000;
     KpiStripCompactComponent,
     ActivePositionsCockpitComponent,
     PositionDetailDrawerComponent,
+    SignalsHeatmapComponent,
+    LiveFeedTimelineComponent,
   ],
   templateUrl: './paper-trading.component.html',
   styleUrls: ['./paper-trading.component.scss'],
@@ -64,6 +77,7 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   private readonly ws = inject(WebSocketService);
   private readonly toast = inject(ToastService);
   private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly signalAudit = inject(SignalAuditService);
 
   readonly stopBusy = signal(false);
   readonly emergencyBusy = signal(false);
@@ -82,6 +96,28 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   readonly status = this.trading.paperStatus;
   readonly overview = this.trading.overview;
   readonly currency = computed<string>(() => this.overview()?.currency ?? 'USD');
+
+  /** Live broker positions surfaced verbatim (no adapter). The heatmap
+   *  needs the raw `PaperPosition[]` shape to overlay live state per epic. */
+  readonly brokerPositions = this.trading.paperPositions;
+
+  /** Recent signal history (DB-backed) used by the heatmap to compute
+   *  "latest signal per epic". Pulled from `/api/signals/`. */
+  readonly tradingSignals = this.trading.signals;
+
+  /** Merged activity feed (signals + positions + notifications) used by
+   *  the live-feed-timeline. Pulled from `/api/trading/events`. */
+  readonly feedEvents = this.trading.feedEvents;
+
+  /** 21-asset universe surfaced by `/trading/status`. The heatmap renders
+   *  one fixed cell per epic regardless of how many signals exist. */
+  readonly heatmapEpics = computed<readonly string[]>(() => this.status()?.epics ?? []);
+
+  /** True until both signals and feed have produced their first response.
+   *  Drives the heatmap and feed skeletons. */
+  readonly telemetryLoading = computed<boolean>(
+    () => this.tradingSignals().length === 0 && this.feedEvents().length === 0 && this.status() === null,
+  );
 
   /** Real per-position price history sourced from the backend snapshot
    *  endpoint (`/api/trading/positions/{deal_id}/pnl-history`). The
@@ -312,6 +348,8 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   private clockTimer: ReturnType<typeof setInterval> | null = null;
   private historyTimer: ReturnType<typeof setInterval> | null = null;
   private positionHistoryTimer: ReturnType<typeof setInterval> | null = null;
+  private feedTimer: ReturnType<typeof setInterval> | null = null;
+  private signalsTimer: ReturnType<typeof setInterval> | null = null;
   private knownDealIds = new Set<string>();
 
   ngOnInit(): void {
@@ -320,6 +358,8 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     this.trading.loadOverview();
     this.trading.loadPaperPositions();
     this.trading.loadPaperPnlHistory();
+    this.trading.loadSignals(undefined, SIGNALS_HISTORY_LIMIT);
+    this.trading.loadFeedEvents();
     this.ws.connectPrices();
     this.pollTimer = setInterval(() => {
       this.trading.loadPaperStatus();
@@ -335,6 +375,11 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     this.positionHistoryTimer = setInterval(
       () => this.refreshPositionHistories(),
       POSITION_HISTORY_REFRESH_MS,
+    );
+    this.feedTimer = setInterval(() => this.trading.loadFeedEvents(), FEED_REFRESH_MS);
+    this.signalsTimer = setInterval(
+      () => this.trading.loadSignals(undefined, SIGNALS_HISTORY_LIMIT),
+      SIGNALS_REFRESH_MS,
     );
     // Kick the first fetch right after the position list lands so the
     // chart isn't blank for a full 30s.
@@ -357,6 +402,14 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     if (this.positionHistoryTimer) {
       clearInterval(this.positionHistoryTimer);
       this.positionHistoryTimer = null;
+    }
+    if (this.feedTimer) {
+      clearInterval(this.feedTimer);
+      this.feedTimer = null;
+    }
+    if (this.signalsTimer) {
+      clearInterval(this.signalsTimer);
+      this.signalsTimer = null;
     }
   }
 
@@ -430,6 +483,25 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
 
   onDrawerClosed(): void {
     this.selectedPositionId.set(null);
+  }
+
+  /** Heatmap click → open the global signal-audit drawer for the cell's
+   *  most recent signal on that epic. Re-uses the existing audit logic
+   *  rather than introducing a parallel drawer just for the heatmap. */
+  onHeatmapCellClick(cell: HeatmapCell): void {
+    if (cell.state === 'live') {
+      // If the epic has an open position, surface the position drawer instead
+      // so the user lands on the live trade context, not the signal that opened it.
+      const live = this.trading.paperPositions().find((p) => p.epic === cell.epic);
+      if (live) {
+        this.selectedPositionId.set(live.deal_id);
+        return;
+      }
+    }
+    // Fall back to the global signal-audit drawer (latest by epic).
+    if (cell.epic && cell.state !== 'none') {
+      this.signalAudit.openLatestByEpic(cell.epic);
+    }
   }
 
   async onEmergency(): Promise<void> {

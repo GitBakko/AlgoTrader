@@ -1,0 +1,288 @@
+@use '../../../../../scss/palette' as p;
+
+// Mock SignalsPerAsset — 3-col mosaic, asset glyph + ticker + dir badge +
+// confidence bar + conf% + state pill (HANDOFF §3.7).
+:host {
+  display: block;
+}
+
+.pv-heatmap {
+  background: p.$mantis-surface-2;
+  border: 1px solid rgba(p.$mantis-green, .15);
+  border-radius: var(--mantis-radius-md, 6px);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pv-heatmap__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pv-heatmap__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 100px;
+  background: p.$mantis-cyan;
+  box-shadow: 0 0 4px rgba(0, 229, 255, .55);
+  animation: heatmap-pulse 2s ease-in-out infinite;
+}
+
+.pv-heatmap__title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, .55);
+}
+
+.pv-heatmap__count {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  color: rgba(255, 255, 255, .35);
+  font-feature-settings: 'tnum' 1;
+}
+
+.pv-heatmap__filters {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+
+.pv-heatmap__filter {
+  padding: 2px 8px;
+  border-radius: var(--mantis-radius-sm, 4px);
+  font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, .03);
+  color: rgba(255, 255, 255, .5);
+  border: 1px solid rgba(255, 255, 255, .08);
+  cursor: pointer;
+  transition: filter 120ms ease, color 120ms ease, border-color 120ms ease;
+
+  &:hover { filter: brightness(1.2); }
+
+  &--active {
+    background: rgba(57, 255, 20, .1);
+    color: p.$mantis-neon;
+    border-color: rgba(57, 255, 20, .35);
+  }
+}
+
+.pv-heatmap__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+
+  @media (max-width: 720px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  @media (max-width: 460px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pv-heatmap__cell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, .015);
+  border: 1px solid rgba(255, 255, 255, .06);
+  border-radius: var(--mantis-radius-sm, 4px);
+  cursor: pointer;
+  text-align: left;
+  transition: filter 120ms ease, transform 120ms ease, border-color 120ms ease;
+
+  &:hover {
+    filter: brightness(1.15);
+    transform: translateY(-1px);
+  }
+
+  &:focus-visible {
+    outline: 1px solid rgba(0, 229, 255, .55);
+    outline-offset: 2px;
+  }
+
+  // Direction tints
+  &[data-direction='BUY'] {
+    .pv-heatmap__dir { color: p.$mantis-neon; background: rgba(57, 255, 20, .12); border-color: rgba(57, 255, 20, .26); }
+  }
+  &[data-direction='SELL'] {
+    .pv-heatmap__dir { color: p.$mantis-loss; background: rgba(255, 61, 87, .12); border-color: rgba(255, 61, 87, .26); }
+  }
+  &[data-direction='HOLD'] {
+    .pv-heatmap__dir { color: p.$mantis-neutral; background: rgba(139, 148, 158, .12); border-color: rgba(139, 148, 158, .26); }
+  }
+  &[data-direction='—'] {
+    .pv-heatmap__dir { color: rgba(255, 255, 255, .35); background: rgba(255, 255, 255, .04); border-color: rgba(255, 255, 255, .08); }
+  }
+
+  // State overlays + state pill colors
+  &[data-state='executed'] {
+    background: rgba(57, 255, 20, .04);
+    border-color: rgba(57, 255, 20, .2);
+    .pv-heatmap__state { color: p.$mantis-neon; }
+  }
+  &[data-state='live'] {
+    background: rgba(57, 255, 20, .06);
+    border-color: rgba(57, 255, 20, .35);
+    .pv-heatmap__state { color: p.$mantis-neon; }
+  }
+  &[data-state='rejected'] {
+    background: rgba(255, 61, 87, .04);
+    border-color: rgba(255, 61, 87, .2);
+    .pv-heatmap__state { color: p.$mantis-loss; }
+  }
+  &[data-state='closed'] {
+    background: rgba(0, 229, 255, .04);
+    border-color: rgba(0, 229, 255, .22);
+    .pv-heatmap__state { color: p.$mantis-cyan; }
+  }
+  &[data-state='hold'] {
+    .pv-heatmap__state { color: p.$mantis-neutral; }
+  }
+  &[data-state='none'] {
+    .pv-heatmap__state { color: rgba(255, 255, 255, .25); }
+  }
+
+  &--skeleton {
+    cursor: default;
+    pointer-events: none;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px;
+  }
+}
+
+.pv-heatmap__avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.pv-heatmap__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pv-heatmap__row1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pv-heatmap__epic {
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: .04em;
+  font-feature-settings: 'tnum' 1;
+}
+
+.pv-heatmap__dir {
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  border: 1px solid transparent;
+}
+
+.pv-heatmap__live-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 100px;
+  background: p.$mantis-neon;
+  box-shadow: 0 0 4px p.$mantis-neon;
+  animation: heatmap-pulse 1.4s ease-in-out infinite;
+}
+
+.pv-heatmap__bar {
+  display: block;
+  height: 2px;
+  background: rgba(255, 255, 255, .06);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.pv-heatmap__bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 200ms ease;
+}
+
+// Bar tones — match the mock thresholds (≥50 neon, ≥30 amber, else neutral).
+.pv-heatmap__bar[data-tone='high'] .pv-heatmap__bar-fill { background: p.$mantis-neon; }
+.pv-heatmap__bar[data-tone='mid']  .pv-heatmap__bar-fill { background: p.$mantis-warning; }
+.pv-heatmap__bar[data-tone='low']  .pv-heatmap__bar-fill { background: p.$mantis-neutral; }
+.pv-heatmap__bar[data-tone='none'] .pv-heatmap__bar-fill { background: transparent; }
+
+.pv-heatmap__rhs {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.pv-heatmap__conf {
+  font-size: 9px;
+  color: rgba(255, 255, 255, .55);
+  font-feature-settings: 'tnum' 1;
+}
+
+.pv-heatmap__state {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+// Skeleton tokens
+.pv-heatmap__skel {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, .04) 0%,
+    rgba(255, 255, 255, .12) 50%,
+    rgba(255, 255, 255, .04) 100%
+  );
+  background-size: 200% 100%;
+  animation: heatmap-shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--mantis-radius-sm, 4px);
+
+  &--avatar {
+    width: 20px;
+    height: 20px;
+    border-radius: 100px;
+  }
+
+  &--line {
+    width: 70%;
+    height: 10px;
+  }
+
+  &--sm {
+    width: 40%;
+    height: 8px;
+  }
+}
+
+@keyframes heatmap-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .35; }
+}
+
+@keyframes heatmap-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

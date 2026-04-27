@@ -1,0 +1,75 @@
+<section class="pv-heatmap" aria-label="Signals heatmap">
+  <header class="pv-heatmap__head">
+    <span class="pv-heatmap__dot" aria-hidden="true"></span>
+    <span class="pv-heatmap__title mantis-mono">ULTIMO SEGNALE PER ASSET</span>
+    <span class="pv-heatmap__count mantis-mono">{{ cells().length }}</span>
+
+    <div class="pv-heatmap__filters" role="group" aria-label="Filtra heatmap">
+      @for (chip of [{ id: 'all', label: 'ALL' }, { id: 'active', label: 'ACTIVE' }, { id: 'hold', label: 'HOLD' }]; track chip.id) {
+        <button
+          type="button"
+          class="pv-heatmap__filter"
+          [class.pv-heatmap__filter--active]="filter() === chip.id"
+          [attr.aria-pressed]="filter() === chip.id"
+          (click)="setFilter($any(chip.id))">
+          {{ chip.label }}
+        </button>
+      }
+    </div>
+  </header>
+
+  @if (loading()) {
+    <div class="pv-heatmap__grid" aria-busy="true">
+      @for (_ of epics(); track $index) {
+        <div class="pv-heatmap__cell pv-heatmap__cell--skeleton" aria-hidden="true">
+          <span class="pv-heatmap__skel pv-heatmap__skel--avatar"></span>
+          <span class="pv-heatmap__skel pv-heatmap__skel--line"></span>
+          <span class="pv-heatmap__skel pv-heatmap__skel--line pv-heatmap__skel--sm"></span>
+        </div>
+      }
+    </div>
+  } @else {
+    <div class="pv-heatmap__grid" role="list">
+      @for (cell of cells(); track cell.epic) {
+        <button
+          type="button"
+          class="pv-heatmap__cell"
+          role="listitem"
+          [attr.data-direction]="cell.direction"
+          [attr.data-state]="cell.state"
+          [attr.aria-label]="cell.epic + ' · ' + cell.direction + ' · ' + cell.state"
+          (click)="onCellClick(cell)">
+
+          <app-epic-logo class="pv-heatmap__avatar" [epic]="cell.epic" [size]="20"></app-epic-logo>
+
+          <div class="pv-heatmap__body">
+            <div class="pv-heatmap__row1">
+              <span class="pv-heatmap__epic mantis-mono">{{ cell.epic }}</span>
+              <span class="pv-heatmap__dir mantis-mono">{{ cell.direction }}</span>
+              @if (cell.state === 'live') {
+                <span class="pv-heatmap__live-dot" aria-hidden="true"></span>
+              }
+            </div>
+            <span class="pv-heatmap__bar"
+                  [attr.data-tone]="confidenceTone(cell.confidence)"
+                  aria-hidden="true">
+              <span class="pv-heatmap__bar-fill"
+                    [style.width.%]="cell.confidence ?? 0"></span>
+            </span>
+          </div>
+
+          <div class="pv-heatmap__rhs">
+            <span class="pv-heatmap__conf mantis-mono">
+              @if (cell.confidence !== null) {
+                {{ cell.confidence }}%
+              } @else {
+                —
+              }
+            </span>
+            <span class="pv-heatmap__state mantis-mono">{{ cell.state }}</span>
+          </div>
+        </button>
+      }
+    </div>
+  }
+</section>
