@@ -38,7 +38,7 @@ describe('MarketStatusService', () => {
     const epic = 'XAUUSD';
     const statusPromise = service.getMarketStatus(epic);
 
-    const req = httpMock.expectOne(`${environment.apiUrl}/markets/status/${epic}`);
+    const req = httpMock.expectOne(`${environment.apiUrl}/api/markets/status/${epic}`);
     expect(req.request.method).toBe('GET');
     req.flush({ success: true, data: mockStatus });
 
@@ -51,13 +51,13 @@ describe('MarketStatusService', () => {
 
     // First request
     const firstPromise = service.getMarketStatus(epic);
-    const req = httpMock.expectOne(`${environment.apiUrl}/markets/status/${epic}`);
+    const req = httpMock.expectOne(`${environment.apiUrl}/api/markets/status/${epic}`);
     req.flush({ success: true, data: mockStatus });
     await firstPromise;
 
     // Second request (should use cache)
     const secondPromise = service.getMarketStatus(epic);
-    httpMock.expectNone(`${environment.apiUrl}/markets/status/${epic}`);
+    httpMock.expectNone(`${environment.apiUrl}/api/markets/status/${epic}`);
     const secondStatus = await secondPromise;
 
     expect(secondStatus).toEqual(mockStatus);
@@ -67,7 +67,7 @@ describe('MarketStatusService', () => {
     const epic = 'BTCUSD';
     const statusPromise = service.getMarketStatus(epic);
 
-    const req = httpMock.expectOne(`${environment.apiUrl}/markets/status/${epic}`);
+    const req = httpMock.expectOne(`${environment.apiUrl}/api/markets/status/${epic}`);
     req.error(new ProgressEvent('Network error'));
 
     const status = await statusPromise;
@@ -82,12 +82,12 @@ describe('MarketStatusService', () => {
 
     // Fetch status for both
     const promise1 = service.getMarketStatus(epic1);
-    const req1 = httpMock.expectOne(`${environment.apiUrl}/markets/status/${epic1}`);
+    const req1 = httpMock.expectOne(`${environment.apiUrl}/api/markets/status/${epic1}`);
     req1.flush({ success: true, data: mockStatus });
     await promise1;
 
     const promise2 = service.getMarketStatus(epic2);
-    const req2 = httpMock.expectOne(`${environment.apiUrl}/markets/status/${epic2}`);
+    const req2 = httpMock.expectOne(`${environment.apiUrl}/api/markets/status/${epic2}`);
     req2.flush({
       success: true,
       data: { ...mockStatus, epic: epic2, is_open: false, status: 'CLOSED', next_open: Date.now() + 3600000 }
@@ -108,7 +108,7 @@ describe('MarketStatusService', () => {
 
     // Fetch and cache
     const promise = service.getMarketStatus(epic);
-    const req = httpMock.expectOne(`${environment.apiUrl}/markets/status/${epic}`);
+    const req = httpMock.expectOne(`${environment.apiUrl}/api/markets/status/${epic}`);
     req.flush({ success: true, data: mockStatus });
     await promise;
 

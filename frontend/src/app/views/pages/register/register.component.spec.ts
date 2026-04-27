@@ -1,4 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ActivatedRoute, Router } from '@angular/router';
+import { of } from 'rxjs';
 
 import { ButtonModule, CardModule, FormModule, GridModule } from '@coreui/angular';
 import { IconModule } from '@coreui/icons-angular';
@@ -13,10 +15,13 @@ describe('RegisterComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    imports: [CardModule, FormModule, GridModule, ButtonModule, IconModule, RegisterComponent],
-    providers: [IconSetService]
-})
-    .compileComponents();
+      imports: [CardModule, FormModule, GridModule, ButtonModule, IconModule, RegisterComponent],
+      providers: [
+        IconSetService,
+        { provide: Router, useValue: jasmine.createSpyObj('Router', ['navigate']) },
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParams: {} }, queryParams: of({}) } },
+      ],
+    }).compileComponents();
   });
 
   beforeEach(() => {

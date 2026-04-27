@@ -7,12 +7,20 @@ import { TradingService } from '../../../../core/services/trading.service';
 describe('OvernightSwapComponent', () => {
   const tradingStub = {
     overnightSwap: signal<Record<string, any>>({}),
+    swapAccum: signal<Record<string, any>>({}),
+    paperPositions: signal<any[]>([]),
+    overview: signal<any>(null),
     loadOvernightSwap: jasmine.createSpy('loadOvernightSwap'),
+    loadSwapAccum: jasmine.createSpy('loadSwapAccum'),
   };
 
   beforeEach(async () => {
     tradingStub.overnightSwap.set({});
+    tradingStub.swapAccum.set({});
+    tradingStub.paperPositions.set([]);
+    tradingStub.overview.set(null);
     tradingStub.loadOvernightSwap.calls.reset();
+    tradingStub.loadSwapAccum.calls.reset();
     await TestBed.configureTestingModule({
       imports: [OvernightSwapComponent],
       providers: [
