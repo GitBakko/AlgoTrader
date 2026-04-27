@@ -178,6 +178,18 @@
     }
   }
 
+  // START — neon-tinted primary, mirrors KPI primary accent.
+  &--primary {
+    color: p.$mantis-neon;
+    background: rgba(57, 255, 20, .12);
+    border-color: rgba(57, 255, 20, .5);
+
+    &:hover:not(:disabled) {
+      background: rgba(57, 255, 20, .2);
+      box-shadow: 0 0 10px rgba(57, 255, 20, .45);
+    }
+  }
+
   // KILL SWITCH — mirrors dashboard-v2 .op-kill
   // (operational-strip.component.scss:193). Loss-tinted ghost, NOT solid red.
   &--kill {
