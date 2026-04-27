@@ -164,6 +164,63 @@ class TestRiskManager:
         )
         assert result.approved is True
 
+    def test_usdjpy_notional_uses_size_only_for_account_base_pair(self):
+        """USDJPY: account=USD == pair base. Notional in USD == size,
+        NOT size*level (which would yield JPY-denominated phantom notional).
+
+        Regression for the 2026-04-27 production rejection: a single
+        100-USD USDJPY SELL produced exposure 179.6% (== 100 * 159.286 /
+        8868) instead of the real 1.1% (== 100 / 8868).
+        """
+        limits = RiskLimits(max_total_exposure=0.80)
+        rm = RiskManager(initial_equity=8868.14, limits=limits)
+
+        open_positions = [
+            {
+                "epic": "USDJPY",
+                "direction": "SELL",
+                "size": 100.0,
+                "level": 159.286,
+                "currency": "JPY",
+            },
+        ]
+        signal = _make_signal(epic="EURUSD")
+        result = rm.check_trade(
+            signal=signal, equity=8868.14, atr=0.001,
+            open_positions=open_positions,
+        )
+        # 100 / 8868 ≈ 1.1% — well below the 80% cap → must approve.
+        assert result.approved is True, (
+            f"Expected approval; got rejection: {result.rejection_reason}"
+        )
+
+    def test_eurusd_notional_uses_size_times_level(self):
+        """EURUSD: quote=USD matches account → size*level still applies.
+
+        Confirms the fix doesn't break the standard case for FX pairs
+        whose quote currency IS the account currency.
+        """
+        limits = RiskLimits(max_total_exposure=0.50)
+        rm = RiskManager(initial_equity=10000.0, limits=limits)
+
+        # 5000 EUR @ 1.10 USD/EUR → 5500 USD notional, 55% exposure → reject.
+        open_positions = [
+            {
+                "epic": "EURUSD",
+                "direction": "BUY",
+                "size": 5000.0,
+                "level": 1.10,
+                "currency": "USD",
+            },
+        ]
+        signal = _make_signal(epic="GBPUSD")
+        result = rm.check_trade(
+            signal=signal, equity=10000.0, atr=0.001,
+            open_positions=open_positions,
+        )
+        assert result.approved is False
+        assert "Total exposure" in result.rejection_reason
+
     def test_exposure_check_skipped_when_default(self):
         """Default max_total_exposure=1.0 skips the check entirely."""
         rm = RiskManager(initial_equity=10000.0)

@@ -19,6 +19,55 @@ from src.strategy.schemas import TradingSignal
 from src.utils.config import get_settings
 
 
+def _position_notional_account_ccy(
+    position: dict, account_currency: str = "USD"
+) -> float:
+    """Estimate per-position notional in the account currency.
+
+    The naive ``size * entry_price`` formula is correct only when the
+    position's quote currency matches the account currency (true for
+    every USD-quoted CFD: NVDA, BTCUSD, EURUSD, XAUUSD …). It silently
+    breaks for FX pairs where the account currency is the *base* and
+    the quote is foreign — most notably ``USDJPY`` / ``USDCHF``: with
+    Capital.com sizes denominated in the base (USD) units,
+    ``100 * 159.286`` yielded a phantom 15.9 k USD notional and tripped
+    the 80% total-exposure guard with a single 100-USD position.
+
+    Heuristic (no async FX call, fits the synchronous risk_manager
+    contract):
+
+    1. ``position.currency == account_currency`` → quote already in
+       account ccy → ``size * level``.
+    2. Epic of the form ``ACCOUNT_CCY + XXX`` (e.g. ``USDJPY`` for a
+       USD account) → notional in account ccy = ``size``.
+    3. Fallback → ``size * level`` (preserves legacy behaviour for
+       exotic/cross-currency cases until a proper FxConverter pre-pass
+       lands).
+    """
+    size = abs(float(position.get("size", 0) or 0))
+    level = float(position.get("level", position.get("entry_price", 0)) or 0)
+    if size == 0 or level == 0:
+        return 0.0
+
+    epic = (position.get("epic") or "").upper()
+    pos_currency = (position.get("currency") or "").upper()
+    account_ccy = (account_currency or "USD").upper()
+    # Normalise broker quirks like "USDd" → "USD".
+    if pos_currency.endswith("D") and len(pos_currency) == 4:
+        pos_currency = pos_currency[:-1]
+
+    if pos_currency and pos_currency == account_ccy:
+        return size * level
+
+    if len(epic) == 6 and epic.startswith(account_ccy):
+        # FX pair AAA/BBB where AAA == account currency. Capital.com
+        # sizes the contract in base units, so notional in the account
+        # currency is exactly the size — independent of `level`.
+        return size
+
+    return size * level
+
+
 class RiskManager:
     """
     Orchestrates all risk checks for a proposed trade.
@@ -131,7 +180,7 @@ class RiskManager:
         # 1c. Check total exposure cap
         if self.limits.max_total_exposure < 1.0 and open_positions and equity > 0:
             total_notional = sum(
-                abs(p.get("size", 0) * p.get("level", p.get("entry_price", 0)))
+                _position_notional_account_ccy(p, account_currency="USD")
                 for p in open_positions
             )
             exposure_ratio = total_notional / equity
