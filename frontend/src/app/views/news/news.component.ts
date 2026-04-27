@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CardComponent, CardBodyComponent, CardHeaderComponent, BadgeComponent, RowComponent, ColComponent } from '@coreui/angular';
 import { NewsService } from '../../core/services/news.service';
@@ -11,8 +11,9 @@ import { NewsService } from '../../core/services/news.service';
   templateUrl: './news.component.html',
   styleUrls: ['./news.component.scss']
 })
-export class NewsComponent implements OnInit, OnDestroy {
+export class NewsComponent {
   private readonly newsService = inject(NewsService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly news = this.newsService.news;
   readonly sentimentScore = this.newsService.sentimentScore;
@@ -26,18 +27,10 @@ export class NewsComponent implements OnInit, OnDestroy {
     'NATGAS', 'COPPER', 'PLATINUM', 'GBPUSD', 'USDJPY', 'NAS100'
   ];
 
-  private pollTimer: any;
-
-  ngOnInit(): void {
+  constructor() {
     this.loadNews();
-    // Poll every 30 seconds
-    this.pollTimer = setInterval(() => this.loadNews(), 30_000);
-  }
-
-  ngOnDestroy(): void {
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer);
-    }
+    const pollTimer = setInterval(() => this.loadNews(), 30_000);
+    this.destroyRef.onDestroy(() => clearInterval(pollTimer));
   }
 
   loadNews(): void {
