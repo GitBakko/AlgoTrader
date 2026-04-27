@@ -1,0 +1,69 @@
+<div class="pv-bv">
+  <header class="pv-bv__head">
+    <span class="pv-bv__pill" [attr.data-state]="stateLabel()">
+      <span class="pv-bv__dot" aria-hidden="true"></span>
+      BOT VITALS
+    </span>
+  </header>
+
+  <div class="pv-bv__ecg" aria-label="Heartbeat ECG">
+    <svg viewBox="0 0 200 48" preserveAspectRatio="none" aria-hidden="true">
+      <polyline class="pv-bv__ecg-line"
+                points="0,24 18,24 24,18 30,32 36,8 42,38 48,24 70,24 78,20 84,28 90,24 130,24 138,16 144,32 150,8 156,40 162,24 200,24"
+                fill="none"
+                stroke-linejoin="round"
+                stroke-linecap="round"/>
+    </svg>
+    <span class="pv-bv__tick mantis-mono">{{ tickLabel() }}</span>
+  </div>
+
+  <div class="pv-bv__stats">
+    <div class="pv-bv__stat">
+      <span class="pv-bv__stat-label mantis-mono">ITER</span>
+      <span class="pv-bv__stat-value mantis-mono">{{ vitals().iterations }}</span>
+    </div>
+    <div class="pv-bv__stat">
+      <span class="pv-bv__stat-label mantis-mono">INTERVAL</span>
+      <span class="pv-bv__stat-value mantis-mono">{{ intervalLabel() }}</span>
+    </div>
+    <div class="pv-bv__stat">
+      <span class="pv-bv__stat-label mantis-mono">UPTIME</span>
+      <span class="pv-bv__stat-value mantis-mono">{{ vitals().uptime }}</span>
+    </div>
+    <div class="pv-bv__stat">
+      <span class="pv-bv__stat-label mantis-mono">ERRORS</span>
+      <span class="pv-bv__stat-value mantis-mono"
+            [class.is-loss]="vitals().errors > 0">
+        {{ vitals().errors }}
+      </span>
+    </div>
+  </div>
+
+  <div class="pv-bv__signals" aria-label="Signals breakdown">
+    <svg class="pv-bv__donut" viewBox="0 0 36 36" aria-hidden="true">
+      <circle class="pv-bv__donut-track" cx="18" cy="18" r="15.915" fill="none"/>
+      <circle class="pv-bv__donut-slice pv-bv__donut-slice--exec"
+              cx="18" cy="18" r="15.915" fill="none"
+              [attr.stroke-dasharray]="donut().exec + ' ' + (100 - donut().exec)"
+              [attr.stroke-dashoffset]="donut().execOffset"/>
+      <circle class="pv-bv__donut-slice pv-bv__donut-slice--rej"
+              cx="18" cy="18" r="15.915" fill="none"
+              [attr.stroke-dasharray]="donut().rej + ' ' + (100 - donut().rej)"
+              [attr.stroke-dashoffset]="donut().rejOffset"/>
+      <circle class="pv-bv__donut-slice pv-bv__donut-slice--hold"
+              cx="18" cy="18" r="15.915" fill="none"
+              [attr.stroke-dasharray]="donut().hold + ' ' + (100 - donut().hold)"
+              [attr.stroke-dashoffset]="donut().holdOffset"/>
+    </svg>
+    <div class="pv-bv__signals-meta">
+      <div class="pv-bv__signals-counts mantis-mono">
+        <span class="pv-bv__signals-total">{{ vitals().signals.total }}</span>
+        <span class="pv-bv__signals-sep">/</span>
+        <span class="pv-bv__signals-exec">{{ vitals().signals.executed }}</span>
+      </div>
+      <div class="pv-bv__signals-conv mantis-mono">
+        conv {{ conversionPct() | number:'1.1-1' }}%
+      </div>
+    </div>
+  </div>
+</div>

@@ -14,15 +14,9 @@
   <section class="pt2-grid" aria-label="Cockpit body">
 
     <aside class="pt2-rail-left" aria-label="Bot rail">
-      <div class="pt2-slot pt2-slot--vitals" data-slot="bot-vitals">
-        <span class="pt2-slot__label">Bot Vitals</span>
-      </div>
-      <div class="pt2-slot pt2-slot--risk" data-slot="risk-gauges">
-        <span class="pt2-slot__label">Risk Gauges</span>
-      </div>
-      <div class="pt2-slot pt2-slot--models" data-slot="models-health">
-        <span class="pt2-slot__label">Models Health</span>
-      </div>
+      <app-bot-vitals-panel [vitals]="botVitals()"></app-bot-vitals-panel>
+      <app-risk-gauge-stack [risk]="riskState()"></app-risk-gauge-stack>
+      <app-models-health-panel [health]="modelsHealth()"></app-models-health-panel>
     </aside>
 
     <section class="pt2-center" aria-label="Cockpit center">
@@ -51,7 +45,7 @@
       <span class="pt2-footer__chip">tick · {{ lastTickAgo()! | number:'1.1-1' }}s ago</span>
     }
     <span class="pt2-footer__spacer"></span>
-    <span class="pt2-footer__chip">PR 1 · chrome</span>
+    <span class="pt2-footer__chip">PR 2 · left rail</span>
   </footer>
 
 </main>

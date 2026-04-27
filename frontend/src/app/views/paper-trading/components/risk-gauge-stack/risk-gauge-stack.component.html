@@ -1,0 +1,58 @@
+<div class="pv-rg">
+  <header class="pv-rg__head">
+    <span class="pv-rg__head-label mantis-mono">RISK MANAGEMENT</span>
+  </header>
+
+  <article class="pv-rg__row" [class]="statusClass(risk().circuitBreakers.status)">
+    <header class="pv-rg__row-head">
+      <span class="pv-rg__row-label mantis-mono">Circuit Breakers</span>
+      <span class="pv-rg__pill mantis-mono" [attr.data-status]="risk().circuitBreakers.status">
+        {{ risk().circuitBreakers.status }}
+      </span>
+    </header>
+    <span class="pv-rg__row-meta mantis-mono">
+      {{ risk().circuitBreakers.tripped }}/{{ risk().circuitBreakers.total }} tripped
+    </span>
+  </article>
+
+  <article class="pv-rg__row" [class]="statusClass(risk().equityFilter.status)">
+    <header class="pv-rg__row-head">
+      <span class="pv-rg__row-label mantis-mono">Equity Filter</span>
+      <span class="pv-rg__row-value mantis-mono">
+        DD {{ risk().equityFilter.dd | number:'1.1-1' }}% / {{ risk().equityFilter.threshold | number:'1.0-0' }}%
+      </span>
+    </header>
+    <div class="pv-rg__bar" [attr.aria-label]="'Equity drawdown ' + (risk().equityFilter.dd | number:'1.1-1') + '%'">
+      <div class="pv-rg__bar-fill" [style.width.%]="equityBarPct()"></div>
+      <div class="pv-rg__bar-marker" aria-hidden="true"></div>
+    </div>
+  </article>
+
+  <article class="pv-rg__row" [class]="statusClass(risk().kelly.status)">
+    <header class="pv-rg__row-head">
+      <span class="pv-rg__row-label mantis-mono">Kelly Sizing</span>
+      <span class="pv-rg__pill mantis-mono" [attr.data-status]="risk().kelly.status">
+        {{ risk().kelly.status }}
+      </span>
+    </header>
+    <span class="pv-rg__row-meta mantis-mono">
+      avg {{ risk().kelly.avg }} ·
+      win {{ risk().kelly.win | number:'1.1-1' }}% ·
+      <span [class.is-positive]="risk().kelly.pnl >= 0" [class.is-negative]="risk().kelly.pnl < 0">
+        pnl {{ risk().kelly.pnl >= 0 ? '+' : '' }}{{ risk().kelly.pnl | number:'1.1-1' }}
+      </span>
+    </span>
+  </article>
+
+  <article class="pv-rg__row" [class]="statusClass(risk().tradingStops.status)">
+    <header class="pv-rg__row-head">
+      <span class="pv-rg__row-label mantis-mono">Trading Stops</span>
+      <span class="pv-rg__pill mantis-mono" [attr.data-status]="risk().tradingStops.status">
+        {{ risk().tradingStops.status }}
+      </span>
+    </header>
+    <span class="pv-rg__row-meta mantis-mono">
+      {{ risk().tradingStops.count }} tracked
+    </span>
+  </article>
+</div>
