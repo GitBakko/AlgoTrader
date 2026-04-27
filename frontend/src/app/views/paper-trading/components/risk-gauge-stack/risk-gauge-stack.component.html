@@ -36,10 +36,10 @@
       </span>
     </header>
     <span class="pv-rg__row-meta mantis-mono">
-      avg {{ risk().kelly.avg }} ·
+      n {{ risk().kelly.avg }} ·
       win {{ risk().kelly.win | number:'1.1-1' }}% ·
-      <span [class.is-positive]="risk().kelly.pnl >= 0" [class.is-negative]="risk().kelly.pnl < 0">
-        pnl {{ risk().kelly.pnl >= 0 ? '+' : '' }}{{ risk().kelly.pnl | number:'1.1-1' }}
+      <span class="is-cyan">
+        f½ {{ risk().kelly.fraction | number:'1.1-1' }}%
       </span>
     </span>
   </article>
