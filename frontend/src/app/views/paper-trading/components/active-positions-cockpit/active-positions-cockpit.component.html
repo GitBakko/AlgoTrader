@@ -1,0 +1,48 @@
+<section class="pv-apc">
+  <header class="pv-apc__head">
+    <div class="pv-apc__head-left">
+      <span class="pv-apc__dot" aria-hidden="true"></span>
+      <span class="pv-apc__title mantis-mono">POSIZIONI APERTE</span>
+      <span class="pv-apc__count mantis-mono">{{ positions().length }}</span>
+    </div>
+    @if (positions().length > 0) {
+      <div class="pv-apc__head-right">
+        <span class="pv-apc__total-label mantis-mono">P&amp;L Totale</span>
+        <span class="pv-apc__total-value mantis-mono"
+              [class.is-positive]="totalPnl() >= 0"
+              [class.is-negative]="totalPnl() < 0">
+          {{ currencySym() }}{{ totalPnl() >= 0 ? '+' : '' }}{{ totalPnl() | number:'1.2-2':'it-IT' }}
+        </span>
+      </div>
+    }
+  </header>
+
+  @if (positions().length > 0) {
+    <div class="pv-apc__list">
+      @for (p of positions(); track p.id) {
+        <app-position-card
+          [position]="p"
+          [currency]="currency()"
+          (closeClicked)="onClose($event)"
+          (detailsClicked)="onDetails($event)">
+        </app-position-card>
+      }
+    </div>
+  } @else {
+    <div class="pv-apc__empty" role="status">
+      <svg class="pv-apc__empty-icon" viewBox="0 0 64 64" aria-hidden="true">
+        <circle cx="22" cy="32" r="13" fill="none" stroke="currentColor" stroke-width="2"/>
+        <circle cx="42" cy="32" r="13" fill="none" stroke="currentColor" stroke-width="2"/>
+        <line x1="22" y1="18" x2="42" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <line x1="14" y1="20" x2="18" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <line x1="50" y1="20" x2="46" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="22" cy="32" r="3" fill="currentColor"/>
+        <circle cx="42" cy="32" r="3" fill="currentColor"/>
+      </svg>
+      <span class="pv-apc__empty-title">Nessuna posizione aperta</span>
+      <span class="pv-apc__empty-sub mantis-mono">
+        il bot sta osservando {{ signalsTotal() }} segnali
+      </span>
+    </div>
+  }
+</section>

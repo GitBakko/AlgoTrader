@@ -20,12 +20,19 @@
     </aside>
 
     <section class="pt2-center" aria-label="Cockpit center">
-      <div class="pt2-slot pt2-slot--kpi" data-slot="kpi-strip">
-        <span class="pt2-slot__label">KPI Strip · 6 cells</span>
-      </div>
-      <div class="pt2-slot pt2-slot--positions" data-slot="active-positions">
-        <span class="pt2-slot__label">Active Positions Cockpit</span>
-      </div>
+      <app-kpi-strip-compact
+        [kpi]="kpiStrip()"
+        [currency]="currency()">
+      </app-kpi-strip-compact>
+
+      <app-active-positions-cockpit
+        [positions]="positions()"
+        [signalsTotal]="kpiStrip().signalsTotal"
+        [currency]="currency()"
+        (closeRequested)="onClosePosition($event)"
+        (detailsRequested)="onPositionDetails($event)">
+      </app-active-positions-cockpit>
+
       <div class="pt2-slot pt2-slot--heatmap" data-slot="signals-heatmap">
         <span class="pt2-slot__label">Signals Heatmap · 21 cells</span>
       </div>
@@ -45,7 +52,7 @@
       <span class="pt2-footer__chip">tick · {{ lastTickAgo()! | number:'1.1-1' }}s ago</span>
     }
     <span class="pt2-footer__spacer"></span>
-    <span class="pt2-footer__chip">PR 2 · left rail</span>
+    <span class="pt2-footer__chip">PR 3 · center hero</span>
   </footer>
 
 </main>
