@@ -4,14 +4,15 @@
   display: block;
 }
 
+// Models Health Panel — mirror of `mocks/VariantB_Ambitious.jsx::ModelsHealthPanel`.
+// Asset-tinted cells with corner status dot, mono uppercase header, footer meta row.
 .pv-mh {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   padding: 12px;
   background: p.$mantis-surface-2;
   border: 1px solid rgba(0, 217, 126, .15);
-  border-top: 2px solid p.$mantis-green;
   border-radius: 6px;
 }
 
@@ -25,16 +26,16 @@
 .pv-mh__label {
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: .22em;
+  letter-spacing: .18em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, .55);
+  color: rgba(57, 255, 20, .7);
 }
 
 .pv-mh__badge {
-  font-size: 14px;
+  font-size: 9px;
   font-weight: 700;
   font-feature-settings: 'tnum' 1;
-  color: p.$mantis-green;
+  color: p.$mantis-neon;
 
   &.is-missing {
     color: p.$mantis-loss;
@@ -45,39 +46,79 @@
   }
 }
 
+.pv-mh__badge-check {
+  margin-left: 2px;
+}
+
 .pv-mh__grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
+  gap: 3px;
 }
 
-.pv-mh__dot {
-  display: block;
-  width: 100%;
+.pv-mh__cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   aspect-ratio: 1 / 1;
-  border-radius: 100px;
-  background: rgba(255, 255, 255, .08);
-  border: 1px solid rgba(255, 255, 255, .12);
-  cursor: help;
+  border-radius: 2px;
+  font-size: 7px;
+  font-weight: 700;
+  color: var(--cell-color, #{p.$mantis-neutral});
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--cell-color, #{p.$mantis-neutral}) 20%, transparent) 0%,
+    color-mix(in srgb, var(--cell-color, #{p.$mantis-neutral}) 7%, transparent) 100%);
+  border: 1px solid color-mix(in srgb, var(--cell-color, #{p.$mantis-neutral}) 33%, transparent);
   transition: transform 120ms ease, box-shadow 120ms ease;
-
-  &[data-status='ok'] {
-    background: rgba(0, 217, 126, .25);
-    border-color: p.$mantis-green;
-  }
-
-  &[data-status='stale'] {
-    background: rgba(255, 176, 32, .25);
-    border-color: p.$mantis-warning;
-  }
-
-  &[data-status='missing'] {
-    background: rgba(255, 61, 87, .2);
-    border-color: p.$mantis-loss;
-  }
+  cursor: help;
 
   &:hover {
-    transform: scale(1.15);
-    box-shadow: 0 0 6px currentColor;
+    transform: scale(1.08);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--cell-color, #{p.$mantis-neutral}) 50%, transparent);
   }
+
+  // Status dot top-right
+  &::after {
+    content: '';
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: p.$mantis-neon;
+    box-shadow: 0 0 3px p.$mantis-neon;
+  }
+
+  &[data-status='missing']::after {
+    background: p.$mantis-loss;
+    box-shadow: 0 0 3px p.$mantis-loss;
+  }
+
+  &[data-status='stale']::after {
+    background: p.$mantis-warning;
+    box-shadow: 0 0 3px p.$mantis-warning;
+  }
+}
+
+.pv-mh__cell-ticker {
+  letter-spacing: .04em;
+}
+
+// Status dot rendered via ::after — keeps DOM lean.
+.pv-mh__cell-dot {
+  display: none;
+}
+
+.pv-mh__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, .04);
+  font-size: 9px;
+  color: rgba(255, 255, 255, .5);
+  font-feature-settings: 'tnum' 1;
 }

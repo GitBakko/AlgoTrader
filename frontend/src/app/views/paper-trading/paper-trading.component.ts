@@ -5,10 +5,11 @@ import { CockpitHeaderComponent, type CockpitMode, type CockpitState } from '../
 import { TradingService } from '../../core/services/trading.service';
 import { ToastService } from '../../shared/services/toast.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
-import type { BotVitals, ModelsHealth, RiskState } from '../../core/models/paper-trading';
+import type { BotVitals, ModelsHealth, ModelsHealthMeta, RiskState } from '../../core/models/paper-trading';
 import { BotVitalsPanelComponent } from './components/bot-vitals-panel/bot-vitals-panel.component';
 import { RiskGaugeStackComponent } from './components/risk-gauge-stack/risk-gauge-stack.component';
 import { ModelsHealthPanelComponent } from './components/models-health-panel/models-health-panel.component';
+import { epicColor } from '../../shared/constants/epic-colors';
 
 const CIRCUIT_BREAKER_TOTAL = 6;
 const DEFAULT_DD_GATE_PCT = 20;
@@ -46,6 +47,11 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   readonly stopBusy = signal(false);
   readonly emergencyBusy = signal(false);
 
+  /** Wall-clock signal updated every 1s so `lastTickAgo` and dependent
+   *  computeds (cockpit-header tick chip, ECG label) re-render every second
+   *  even when the 10s polling cycle has not refreshed `paperStatus` yet. */
+  readonly tickClock = signal(Date.now());
+
   readonly status = this.trading.paperStatus;
 
   readonly state = computed<CockpitState>(() => {
@@ -65,7 +71,7 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     if (!iso) return null;
     const ts = Date.parse(iso);
     if (Number.isNaN(ts)) return null;
-    return Math.max(0, (Date.now() - ts) / 1000);
+    return Math.max(0, (this.tickClock() - ts) / 1000);
   });
 
   /** BotVitals derived from paperStatus. PR2 baseline: rejected/hold not yet
@@ -127,13 +133,24 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     const s = this.status();
     const epics = s?.epics ?? [];
     const loaded = s?.models_loaded ?? {};
+    const loadedKeys = Object.keys(loaded);
+    const primary = loadedKeys.length > 0 ? loaded[loadedKeys[0]] : null;
+    const meta: ModelsHealthMeta | undefined = primary
+      ? {
+          features: primary.num_features,
+          version: primary.version,
+          lastTrained: formatTrainedDate(primary.created_at),
+        }
+      : undefined;
     return {
-      loaded: Object.keys(loaded).length,
+      loaded: loadedKeys.length,
       total: epics.length,
       perAsset: epics.map((epic) => ({
         epic,
         status: loaded[epic] ? 'ok' : 'missing',
+        accent: epicColor(epic),
       })),
+      meta,
     };
   });
 
@@ -141,16 +158,22 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   readonly buildTag = signal<string>('mantis · v2 shell');
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private clockTimer: ReturnType<typeof setInterval> | null = null;
 
   ngOnInit(): void {
     this.trading.loadPaperStatus();
     this.pollTimer = setInterval(() => this.trading.loadPaperStatus(), 10_000);
+    this.clockTimer = setInterval(() => this.tickClock.set(Date.now()), 1_000);
   }
 
   ngOnDestroy(): void {
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
+    }
+    if (this.clockTimer) {
+      clearInterval(this.clockTimer);
+      this.clockTimer = null;
     }
   }
 
@@ -215,4 +238,14 @@ function formatUptime(seconds: number | null): string {
   const m = Math.floor((seconds % 3600) / 60);
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
+}
+
+function formatTrainedDate(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const yy = String(d.getUTCFullYear()).slice(-2);
+  return `${dd}/${mm}/${yy}`;
 }
