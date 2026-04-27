@@ -21,10 +21,25 @@ import { errorInterceptor } from './core/interceptors/error.interceptor';
 import { LogoService } from './core/services/logo.service';
 
 /**
- * Preload all asset logos on app initialization
+ * Warm the asset logo cache on app initialization.
+ *
+ * `LogoService.getLogoUrls` resolves a static fallback chain
+ * synchronously and persists it in localStorage, so this just walks the
+ * asset universe once to avoid a render-time miss on the first card.
  */
 function initializeLogos(logoService: LogoService) {
-  return () => logoService.preloadAll();
+  const allEpics = [
+    'BTCUSD', 'ETHUSD', 'SOLUSD', 'BNBUSD', 'DOGUSD', 'DASHUSD', 'ICPUSD',
+    'NVDA', 'TSLA',
+    'XAUUSD', 'XAGUSD', 'WTIUSD', 'NATGAS', 'COPPER', 'PLATINUM',
+    'EURUSD', 'GBPUSD', 'USDJPY',
+    'US500', 'NAS100', 'DE40',
+  ];
+  return () => {
+    for (const epic of allEpics) {
+      logoService.getLogoUrls(epic);
+    }
+  };
 }
 
 export const appConfig: ApplicationConfig = {

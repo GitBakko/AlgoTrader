@@ -557,6 +557,35 @@ export interface SignalHistoryItem {
 // Paper Trading v2 (cockpit page)
 export * from './paper-trading';
 
+// Paper Trading v2 — 60s P&L snapshot history
+export interface PaperPnlSnapshotPoint {
+  ts: string;
+  pnl_open: number;
+  pnl_today: number;
+  equity: number | null;
+  open_count: number;
+}
+
+export interface PaperPnlHistoryResponse {
+  points: PaperPnlSnapshotPoint[];
+  minutes: number;
+  source: string;
+}
+
+export interface PositionPnlSnapshotPoint {
+  ts: string;
+  pnl: number;
+  pnl_pct: number;
+  price: number;
+}
+
+export interface PositionPnlHistoryResponse {
+  deal_id: string;
+  points: PositionPnlSnapshotPoint[];
+  minutes: number;
+  source: string;
+}
+
 // Notifications
 export * from './notification.model';
 
