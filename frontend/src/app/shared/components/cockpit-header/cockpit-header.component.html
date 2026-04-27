@@ -33,10 +33,14 @@
 
   <div class="cockpit-header__actions">
     <button type="button"
-            class="cockpit-header__btn cockpit-header__btn--warning"
+            class="cockpit-header__btn"
+            [class.cockpit-header__btn--warning]="isRunning()"
+            [class.cockpit-header__btn--primary]="!isRunning()"
+            [attr.data-action]="isRunning() ? 'stop' : 'start'"
+            [attr.aria-label]="toggleAriaLabel()"
             [disabled]="stopBusy()"
             (click)="onStop()">
-      STOP
+      {{ toggleLabel() }}
     </button>
     <button type="button"
             class="cockpit-header__btn cockpit-header__btn--kill mantis-mono"

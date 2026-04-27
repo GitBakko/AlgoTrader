@@ -44,6 +44,14 @@ export class CockpitHeaderComponent {
     }
   });
 
+  readonly isRunning = computed<boolean>(() => this.state() === 'RUNNING');
+
+  readonly toggleLabel = computed<string>(() => (this.isRunning() ? 'STOP' : 'START'));
+
+  readonly toggleAriaLabel = computed<string>(() =>
+    this.isRunning() ? 'Stop paper trading loop' : 'Start paper trading loop'
+  );
+
   readonly tickLabel = computed<string | null>(() => {
     const t = this.lastTickAgo();
     if (t === null || t === undefined) return null;
