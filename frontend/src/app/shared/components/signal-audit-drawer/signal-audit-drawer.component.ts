@@ -142,4 +142,95 @@ export class SignalAuditDrawerComponent {
     if (typeof val === 'number') return val.toFixed(4);
     return String(val);
   }
+
+  /** Confidence tone tier — mirrors heatmap/feed thresholds so the same
+   *  signal color shows up consistently across the cockpit. */
+  confidenceTone(conf: number | null | undefined): 'high' | 'mid' | 'low' | 'none' {
+    if (conf === null || conf === undefined) return 'none';
+    const pct = conf * 100;
+    if (pct >= 50) return 'high';
+    if (pct >= 30) return 'mid';
+    if (pct > 0) return 'low';
+    return 'none';
+  }
+
+  /** Map a vote weight (-1, 0, +1) to a fill percentage of the bar half.
+   *  Each side of the bar represents 100%, so a +1 vote = 100% right fill,
+   *  a 0 vote = 0%. Built so the layout extends naturally to ±2 votes if
+   *  an indicator group ever returns stronger weights. */
+  voteFillPct(value: number | null | undefined): number {
+    if (value === null || value === undefined) return 0;
+    return Math.min(100, Math.abs(value) * 100);
+  }
+
+  /** "BUY 4 · SELL 2" header used in the votes card for a quick scan. */
+  voteSummary(): string {
+    const entries = this.voteEntries();
+    if (entries.length === 0) return '';
+    let buy = 0;
+    let sell = 0;
+    for (const [, v] of entries) {
+      const value = v?.value ?? 0;
+      if (value > 0) buy += value;
+      else if (value < 0) sell += Math.abs(value);
+    }
+    return `· BUY ${buy} / SELL ${sell}`;
+  }
+
+  /** Compact one-liner summary to display on the right of a gate row. */
+  gateDetail(key: string, gate: any): string {
+    if (!gate) return '';
+    if (gate.reason) return String(gate.reason);
+    switch (key) {
+      case 'session':
+        return `mult ${(gate.session_mult ?? 0).toFixed(1)} · ${gate.zone ?? ''}`.trim();
+      case 'dead_market':
+        return `ADX ${gate.adx?.toFixed?.(1) ?? gate.adx ?? '—'}`;
+      case 'vwap':
+        return gate.bias ? `bias ${gate.bias}` : '';
+      case 'htf':
+        return gate.htf_bias ? `bias ${gate.htf_bias}` : '';
+      case 'confluence':
+        return `${gate.buy_count ?? 0}/${gate.effective_min ?? 0} BUY · ${gate.sell_count ?? 0} SELL`;
+      default:
+        return '';
+    }
+  }
+
+  /** Pipeline-stage state used in the header chain (passed/failed/neutral).
+   *  Drives the dot color so the user sees at a glance which stage tripped
+   *  the rejection. */
+  stageState(stage: 'strategy' | 'ml' | 'risk' | 'outcome'): 'passed' | 'failed' | 'neutral' {
+    const audit = this.auditService.currentAudit();
+    if (!audit) return 'neutral';
+    const features = audit.features || {};
+    if (stage === 'outcome') {
+      return audit.status === 'EXECUTED' ? 'passed' : audit.status === 'REJECTED' ? 'failed' : 'neutral';
+    }
+    if (stage === 'strategy') {
+      const gates = features.gates;
+      if (!gates) return 'neutral';
+      const allPass = Object.values(gates).every(
+        (g: any) => g === null || g === undefined || g.passed !== false,
+      );
+      return allPass ? 'passed' : 'failed';
+    }
+    if (stage === 'ml') {
+      const ml = features.ml;
+      if (!ml) return 'neutral';
+      if (ml.agreement === 'agree') return 'passed';
+      if (ml.agreement === 'disagree') return 'failed';
+      return 'neutral';
+    }
+    if (stage === 'risk') {
+      const risk = features.risk;
+      if (!risk) return 'neutral';
+      const cb = risk.circuit_breakers?.passed;
+      const dd = risk.drawdown?.passed;
+      if (cb === false || dd === false) return 'failed';
+      if (cb === true && dd === true) return 'passed';
+      return 'neutral';
+    }
+    return 'neutral';
+  }
 }

@@ -2228,9 +2228,18 @@ class PaperTradingLoop:
 
         if signal.direction.value == "HOLD":
             signal_info["status"] = "hold"
-            # Persist HOLD as REJECTED audit
+            # Persist HOLD as REJECTED audit. Prefer the strategy-supplied
+            # rejection reason (which now describes WHICH gate failed —
+            # session / dead-market / confluence / HTF — and surfaces the
+            # vote tallies) over the legacy generic string. Fall back to
+            # the legacy text only when the strategy did not annotate.
             if audit_features is not None:
-                audit_features["rejection_reason"] = "Insufficient confluence (HOLD)"
+                strategy_reason = (
+                    signal.metadata.get("rejection_reason") if signal.metadata else None
+                )
+                audit_features["rejection_reason"] = (
+                    strategy_reason or "Insufficient confluence (HOLD)"
+                )
                 await self._persist_signal_audit(
                     epic=epic,
                     direction="HOLD",

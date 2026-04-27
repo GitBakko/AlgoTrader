@@ -4,325 +4,369 @@
 }
 
 <!-- Drawer panel -->
-<div class="audit-drawer" [class.audit-drawer--open]="auditService.isOpen()">
+<aside class="audit-drawer" [class.audit-drawer--open]="auditService.isOpen()" role="complementary" aria-label="Signal audit">
 
-  <!-- Header -->
-  <div class="audit-header">
-    <div class="d-flex align-items-center gap-2">
-      @if (auditService.currentAudit(); as audit) {
-        <app-epic-logo [epic]="audit.epic" [size]="24"></app-epic-logo>
-        <span class="fw-semibold">{{ audit.epic }}</span>
-        <c-badge [color]="audit.direction === 'BUY' ? 'success' : 'danger'">
-          {{ audit.direction === 'BUY' ? '▲ BUY' : '▼ SELL' }}
-        </c-badge>
-        <c-badge [color]="audit.status === 'EXECUTED' ? 'primary' : 'warning'">
-          {{ audit.status }}
-        </c-badge>
-      }
-    </div>
-    <button class="btn btn-sm btn-ghost-secondary" (click)="auditService.close()" aria-label="Chiudi">
-      ✕
-    </button>
-  </div>
-
-  <!-- Loading -->
-  @if (auditService.loading()) {
-    <div class="d-flex justify-content-center align-items-center p-5">
-      <c-spinner color="primary"></c-spinner>
-    </div>
-  }
-
-  <!-- Content -->
   @if (auditService.currentAudit(); as audit) {
-    <div class="audit-body">
-
-      <!-- Meta info -->
-      <div class="audit-meta small text-body-secondary mb-3">
-        <span>ID: {{ audit.id }}</span>
-        <span class="mx-2">|</span>
-        <span>{{ audit.generated_at | date:'dd/MM/yyyy HH:mm:ss' }}</span>
-        <span class="mx-2">|</span>
-        <span class="mantis-mono">Conf: {{ (audit.confidence * 100).toFixed(1) }}%</span>
+    <!-- HDR-01 cockpit header -->
+    <header class="ad-head" [attr.data-status]="audit.status?.toLowerCase()">
+      <div class="ad-head__topline">
+        <span class="ad-head__pulse" aria-hidden="true"></span>
+        <span class="ad-head__eyebrow mantis-mono">SIGNAL AUDIT · #{{ audit.id }}</span>
+        <button class="ad-head__close" (click)="auditService.close()" aria-label="Chiudi">✕</button>
       </div>
 
-      <!-- SECTION: Live Position (from broker, not audit) -->
-      @if (livePosition(); as pos) {
-        <div class="audit-section">
-          <div class="audit-section__title">
-            <span class="audit-section__icon">◆</span> Posizione Live (Broker)
+      <div class="ad-head__hero">
+        <app-epic-logo [epic]="audit.epic" [size]="40"></app-epic-logo>
+        <div class="ad-head__title">
+          <span class="ad-head__epic mantis-mono">{{ audit.epic }}</span>
+          <span class="ad-head__ts mantis-mono">{{ audit.generated_at | date:'dd MMM · HH:mm:ss':'UTC' }} UTC</span>
+        </div>
+        <div class="ad-head__verdict" [attr.data-direction]="audit.direction" [attr.data-status]="audit.status">
+          <span class="ad-head__direction mantis-mono">
+            {{ audit.direction === 'BUY' ? '▲ BUY' : audit.direction === 'SELL' ? '▼ SELL' : '◇ HOLD' }}
+          </span>
+          <span class="ad-head__status mantis-mono">{{ audit.status }}</span>
+        </div>
+      </div>
+
+      <!-- Confidence + decision pipeline -->
+      <div class="ad-head__pipeline">
+        <div class="ad-pipe ad-pipe--conf">
+          <span class="ad-pipe__label mantis-mono">CONF</span>
+          <span class="ad-pipe__value mantis-mono"
+                [attr.data-tone]="confidenceTone(audit.confidence)">
+            {{ (audit.confidence * 100) | number:'1.0-1' }}%
+          </span>
+          <span class="ad-pipe__bar" aria-hidden="true">
+            <span class="ad-pipe__bar-fill"
+                  [style.--w.%]="audit.confidence * 100"
+                  [attr.data-tone]="confidenceTone(audit.confidence)"></span>
+          </span>
+        </div>
+        <ol class="ad-pipe__chain" aria-label="Pipeline decisionale">
+          <li class="ad-pipe__step" [attr.data-state]="stageState('strategy')">
+            <span class="ad-pipe__dot" aria-hidden="true"></span>
+            <span class="ad-pipe__step-label mantis-mono">STRATEGY</span>
+          </li>
+          <li class="ad-pipe__step" [attr.data-state]="stageState('ml')">
+            <span class="ad-pipe__dot" aria-hidden="true"></span>
+            <span class="ad-pipe__step-label mantis-mono">ML</span>
+          </li>
+          <li class="ad-pipe__step" [attr.data-state]="stageState('risk')">
+            <span class="ad-pipe__dot" aria-hidden="true"></span>
+            <span class="ad-pipe__step-label mantis-mono">RISK</span>
+          </li>
+          <li class="ad-pipe__step" [attr.data-state]="stageState('outcome')">
+            <span class="ad-pipe__dot" aria-hidden="true"></span>
+            <span class="ad-pipe__step-label mantis-mono">{{ audit.status }}</span>
+          </li>
+        </ol>
+      </div>
+    </header>
+
+    @if (auditService.loading()) {
+      <div class="ad-loading">
+        <c-spinner color="primary" size="sm"></c-spinner>
+        <span class="mantis-mono">Caricamento audit…</span>
+      </div>
+    }
+
+    <div class="ad-body">
+
+      <!-- Rejection / outcome banner -->
+      @if (audit.features?.rejection_reason) {
+        <section class="ad-card ad-card--reject" aria-label="Motivo rifiuto">
+          <span class="ad-card__icon" aria-hidden="true">⨯</span>
+          <div class="ad-card__copy">
+            <span class="ad-card__eyebrow mantis-mono">DECISIONE · REJECTED</span>
+            <span class="ad-card__title">{{ audit.features?.rejection_reason }}</span>
           </div>
-          <div class="ml-grid">
-            <div class="ml-item">
-              <span class="small text-body-secondary">Entry</span>
-              <span class="mantis-mono fw-bold">{{ pos.level }}</span>
+        </section>
+      } @else if (audit.status === 'EXECUTED') {
+        <section class="ad-card ad-card--exec" aria-label="Esecuzione">
+          <span class="ad-card__icon" aria-hidden="true">✓</span>
+          <div class="ad-card__copy">
+            <span class="ad-card__eyebrow mantis-mono">DECISIONE · EXECUTED</span>
+            <span class="ad-card__title">Trade aperto · {{ audit.direction }} @ {{ audit.entry_price | number:'1.2-5' }}</span>
+          </div>
+        </section>
+      }
+
+      <!-- Live position (broker) -->
+      @if (livePosition(); as pos) {
+        <section class="ad-card ad-card--live">
+          <header class="ad-card__head">
+            <span class="ad-card__eyebrow mantis-mono">POSIZIONE LIVE · BROKER</span>
+            <span class="ad-pill ad-pill--live mantis-mono">APERTA</span>
+          </header>
+          <div class="ad-kpi-grid">
+            <div class="ad-kpi">
+              <span class="ad-kpi__label mantis-mono">ENTRY</span>
+              <span class="ad-kpi__value mantis-mono">{{ pos.level | number:'1.2-5' }}</span>
             </div>
-            <div class="ml-item">
-              <span class="small text-body-secondary">Stop Loss</span>
-              <span class="mantis-mono" [class.text-danger]="true">{{ pos.stop_level ?? '-' }}</span>
+            <div class="ad-kpi">
+              <span class="ad-kpi__label mantis-mono">STOP</span>
+              <span class="ad-kpi__value mantis-mono ad-kpi__value--loss">{{ pos.stop_level ?? '—' }}</span>
             </div>
-            <div class="ml-item">
-              <span class="small text-body-secondary">Take Profit</span>
-              <span class="mantis-mono" [class.text-success]="true">{{ pos.profit_level ?? '-' }}</span>
+            <div class="ad-kpi">
+              <span class="ad-kpi__label mantis-mono">TP</span>
+              <span class="ad-kpi__value mantis-mono ad-kpi__value--win">{{ pos.profit_level ?? '—' }}</span>
             </div>
-            <div class="ml-item">
-              <span class="small text-body-secondary">Size</span>
-              <span class="mantis-mono">{{ pos.size }}</span>
+            <div class="ad-kpi">
+              <span class="ad-kpi__label mantis-mono">SIZE</span>
+              <span class="ad-kpi__value mantis-mono">{{ pos.size }}</span>
             </div>
-            <div class="ml-item">
-              <span class="small text-body-secondary">P&L Live</span>
+            <div class="ad-kpi ad-kpi--span2">
+              <span class="ad-kpi__label mantis-mono">P&amp;L LIVE</span>
               @if (livePnl() !== null) {
-                <span class="mantis-mono fw-bold"
-                      [class.text-success]="livePnl()! >= 0"
-                      [class.text-danger]="livePnl()! < 0">
-                  ${{ livePnl()! >= 0 ? '+' : '' }}{{ livePnl()! | number:'1.2-2' }}
+                <span class="ad-kpi__value mantis-mono"
+                      [class.ad-kpi__value--win]="livePnl()! >= 0"
+                      [class.ad-kpi__value--loss]="livePnl()! < 0">
+                  {{ livePnl()! >= 0 ? '+' : '' }}{{ livePnl()! | number:'1.2-2' }}
                 </span>
               } @else {
-                <span class="text-body-secondary">-</span>
+                <span class="ad-kpi__value mantis-mono ad-kpi__value--ghost">—</span>
               }
             </div>
-            <div class="ml-item">
-              <span class="small text-body-secondary">Stato</span>
-              <c-badge color="primary">APERTA</c-badge>
-            </div>
           </div>
-        </div>
+        </section>
       }
 
-      <!-- Rejection reason -->
-      @if (audit.features?.rejection_reason) {
-        <div class="alert alert-warning py-2 px-3 small mb-3">
-          <strong>Motivo rifiuto:</strong> {{ audit.features.rejection_reason }}
-        </div>
-      }
-
-      <!-- SECTION: ScalpScore Votes -->
+      <!-- ScalpScore votes — directional weight bars -->
       @if (voteEntries().length > 0) {
-        <div class="audit-section">
-          <div class="audit-section__title">
-            <span class="audit-section__icon">◆</span> ScalpScore Voti
-          </div>
-          <div class="votes-grid">
+        <section class="ad-card">
+          <header class="ad-card__head">
+            <span class="ad-card__eyebrow mantis-mono">SCALPSCORE · VOTI {{ voteSummary() }}</span>
+            <span class="ad-card__legend mantis-mono">
+              <span class="ad-card__legend-item ad-card__legend-item--sell">SELL</span>
+              <span class="ad-card__legend-item ad-card__legend-item--buy">BUY</span>
+            </span>
+          </header>
+          <ol class="ad-vote-list" aria-label="Voti">
             @for (entry of voteEntries(); track entry[0]) {
-              <div class="vote-card">
-                <div class="vote-card__label">{{ voteLabel(entry[0]) }}</div>
-                <div class="vote-card__value mantis-mono"
-                     [class.text-success]="entry[1].value > 0"
-                     [class.text-danger]="entry[1].value < 0"
-                     [class.text-body-secondary]="entry[1].value === 0">
-                  {{ entry[1].value > 0 ? '+1' : entry[1].value < 0 ? '-1' : '0' }}
-                </div>
-              </div>
+              <li class="ad-vote-row" [attr.data-vote]="entry[1].value">
+                <span class="ad-vote-row__label mantis-mono">{{ voteLabel(entry[0]) }}</span>
+                <span class="ad-vote-row__bar" aria-hidden="true">
+                  <span class="ad-vote-row__bar-mid"></span>
+                  <span class="ad-vote-row__bar-fill"
+                        [style.--w.%]="voteFillPct(entry[1].value)"
+                        [attr.data-direction]="entry[1].value > 0 ? 'BUY' : entry[1].value < 0 ? 'SELL' : 'NONE'"></span>
+                </span>
+                <span class="ad-vote-row__value mantis-mono"
+                      [attr.data-direction]="entry[1].value > 0 ? 'BUY' : entry[1].value < 0 ? 'SELL' : 'NONE'">
+                  {{ entry[1].value > 0 ? '+1' : entry[1].value < 0 ? '−1' : '0' }}
+                </span>
+              </li>
             }
-          </div>
-        </div>
+          </ol>
+        </section>
       }
 
-      <!-- SECTION: Gates -->
+      <!-- Gates timeline -->
       @if (gateEntries().length > 0) {
-        <div class="audit-section">
-          <div class="audit-section__title">
-            <span class="audit-section__icon">◆</span> Gates ({{ gatesPassed() }}/{{ gatesTotal() }})
-          </div>
-          <div class="gates-list">
+        <section class="ad-card">
+          <header class="ad-card__head">
+            <span class="ad-card__eyebrow mantis-mono">GATES · {{ gatesPassed() }}/{{ gatesTotal() }} PASS</span>
+          </header>
+          <ol class="ad-gate-list" aria-label="Gates">
             @for (entry of gateEntries(); track entry[0]) {
               @if (entry[1] !== null) {
-                <div class="gate-row">
-                  <span class="gate-dot"
-                        [class.gate-dot--pass]="entry[1].passed"
-                        [class.gate-dot--fail]="!entry[1].passed"></span>
-                  <span class="gate-label">{{ gateLabel(entry[0]) }}</span>
-                  <span class="gate-status mantis-mono small"
-                        [class.text-success]="entry[1].passed"
-                        [class.text-danger]="!entry[1].passed">
+                <li class="ad-gate-row" [attr.data-pass]="entry[1].passed">
+                  <span class="ad-gate-row__bullet" aria-hidden="true"></span>
+                  <span class="ad-gate-row__label mantis-mono">{{ gateLabel(entry[0]) }}</span>
+                  <span class="ad-gate-row__detail mantis-mono">{{ gateDetail(entry[0], entry[1]) }}</span>
+                  <span class="ad-gate-row__status mantis-mono"
+                        [class.is-pass]="entry[1].passed"
+                        [class.is-fail]="!entry[1].passed">
                     {{ entry[1].passed ? 'PASS' : 'FAIL' }}
                   </span>
-                </div>
+                </li>
               }
             }
-          </div>
-        </div>
+          </ol>
+        </section>
       }
 
-      <!-- SECTION: ML Prediction -->
+      <!-- ML prediction -->
       @if (audit.features?.ml; as ml) {
-        <div class="audit-section">
-          <div class="audit-section__title">
-            <span class="audit-section__icon">◆</span> ML Prediction
-          </div>
-          <div class="ml-grid">
-            <div class="ml-item">
-              <span class="small text-body-secondary">Accordo</span>
-              <c-badge [color]="mlAgreementColor()">{{ mlAgreementLabel() }}</c-badge>
-            </div>
-            <div class="ml-item">
-              <span class="small text-body-secondary">Classe</span>
-              <span class="mantis-mono">{{ ml.signal_name }}</span>
-            </div>
-            <div class="ml-item">
-              <span class="small text-body-secondary">Conf. ML</span>
-              <span class="mantis-mono">{{ (ml.confidence * 100).toFixed(1) }}%</span>
+        <section class="ad-card">
+          <header class="ad-card__head">
+            <span class="ad-card__eyebrow mantis-mono">ML · {{ ml.signal_name || 'PREDICTION' }}</span>
+            <span class="ad-pill mantis-mono"
+                  [attr.data-tone]="mlAgreementColor()">
+              {{ mlAgreementLabel() || '—' }}
+            </span>
+          </header>
+          <div class="ad-kpi-grid">
+            <div class="ad-kpi">
+              <span class="ad-kpi__label mantis-mono">CONF ML</span>
+              <span class="ad-kpi__value mantis-mono">{{ (ml.confidence * 100) | number:'1.0-1' }}%</span>
             </div>
             @if (ml.confidence_before != null && ml.confidence_after != null) {
-              <div class="ml-item">
-                <span class="small text-body-secondary">Prima → Dopo</span>
-                <span class="mantis-mono">
-                  {{ (ml.confidence_before * 100).toFixed(1) }}%
-                  →
-                  {{ (ml.confidence_after * 100).toFixed(1) }}%
+              <div class="ad-kpi">
+                <span class="ad-kpi__label mantis-mono">PRIMA → DOPO</span>
+                <span class="ad-kpi__value mantis-mono">
+                  {{ (ml.confidence_before * 100) | number:'1.0-1' }}% → {{ (ml.confidence_after * 100) | number:'1.0-1' }}%
+                </span>
+              </div>
+            }
+            @if (ml.probabilities) {
+              <div class="ad-kpi ad-kpi--span2">
+                <span class="ad-kpi__label mantis-mono">PROBABILITÀ CLASSI</span>
+                <span class="ad-class-bars" aria-hidden="true">
+                  <span class="ad-class-bar ad-class-bar--sell"
+                        [style.--w.%]="(ml.probabilities['sell'] ?? 0) * 100">
+                    <span class="ad-class-bar__lbl mantis-mono">{{ ((ml.probabilities['sell'] ?? 0) * 100) | number:'1.0-1' }}%</span>
+                  </span>
+                  <span class="ad-class-bar ad-class-bar--hold"
+                        [style.--w.%]="(ml.probabilities['hold'] ?? 0) * 100">
+                    <span class="ad-class-bar__lbl mantis-mono">{{ ((ml.probabilities['hold'] ?? 0) * 100) | number:'1.0-1' }}%</span>
+                  </span>
+                  <span class="ad-class-bar ad-class-bar--buy"
+                        [style.--w.%]="(ml.probabilities['buy'] ?? 0) * 100">
+                    <span class="ad-class-bar__lbl mantis-mono">{{ ((ml.probabilities['buy'] ?? 0) * 100) | number:'1.0-1' }}%</span>
+                  </span>
                 </span>
               </div>
             }
           </div>
-        </div>
+        </section>
       }
 
-      <!-- SECTION: Risk Check -->
+      <!-- Risk check -->
       @if (audit.features?.risk; as risk) {
-        <div class="audit-section">
-          <div class="audit-section__title">
-            <span class="audit-section__icon">◆</span> Risk Check
-          </div>
-          <div class="risk-grid">
+        <section class="ad-card">
+          <header class="ad-card__head">
+            <span class="ad-card__eyebrow mantis-mono">RISK CHECK</span>
+          </header>
+          <div class="ad-kpi-grid">
             @if (risk.circuit_breakers) {
-              <div class="risk-item">
-                <span class="small text-body-secondary">Circuit Breakers</span>
-                <span class="mantis-mono" [class.text-success]="risk.circuit_breakers.passed"
-                      [class.text-danger]="!risk.circuit_breakers.passed">
+              <div class="ad-kpi">
+                <span class="ad-kpi__label mantis-mono">BREAKERS</span>
+                <span class="ad-kpi__value mantis-mono"
+                      [class.ad-kpi__value--win]="risk.circuit_breakers.passed"
+                      [class.ad-kpi__value--loss]="!risk.circuit_breakers.passed">
                   {{ risk.circuit_breakers.passed ? 'OK' : 'TRIPPED' }}
                 </span>
               </div>
             }
             @if (risk.drawdown) {
-              <div class="risk-item">
-                <span class="small text-body-secondary">Drawdown</span>
-                <span class="mantis-mono" [class.text-success]="risk.drawdown.passed"
-                      [class.text-danger]="!risk.drawdown.passed">
+              <div class="ad-kpi">
+                <span class="ad-kpi__label mantis-mono">DRAWDOWN</span>
+                <span class="ad-kpi__value mantis-mono"
+                      [class.ad-kpi__value--win]="risk.drawdown.passed"
+                      [class.ad-kpi__value--loss]="!risk.drawdown.passed">
                   {{ risk.drawdown.passed ? 'OK' : 'EXCEEDED' }}
                 </span>
               </div>
             }
             @if (risk.sizing) {
-              <div class="risk-item">
-                <span class="small text-body-secondary">Metodo Sizing</span>
-                <span class="mantis-mono">{{ risk.sizing['method'] || '-' }}</span>
+              <div class="ad-kpi">
+                <span class="ad-kpi__label mantis-mono">SIZING</span>
+                <span class="ad-kpi__value mantis-mono">{{ risk.sizing['method'] || '—' }}</span>
               </div>
             }
             @if (risk.confidence_tier) {
-              <div class="risk-item">
-                <span class="small text-body-secondary">Tier Confidenza</span>
-                <span class="mantis-mono">{{ risk.confidence_tier['multiplier'] ?? '-' }}x</span>
+              <div class="ad-kpi">
+                <span class="ad-kpi__label mantis-mono">CONF TIER</span>
+                <span class="ad-kpi__value mantis-mono">{{ risk.confidence_tier['multiplier'] ?? '—' }}×</span>
               </div>
             }
             @if (risk.stop_loss) {
-              <div class="risk-item">
-                <span class="small text-body-secondary">Stop Loss</span>
-                <span class="mantis-mono">{{ risk.stop_loss['stop_loss'] ?? '-' }}</span>
+              <div class="ad-kpi">
+                <span class="ad-kpi__label mantis-mono">SL</span>
+                <span class="ad-kpi__value mantis-mono ad-kpi__value--loss">{{ risk.stop_loss['stop_loss'] ?? '—' }}</span>
               </div>
-              <div class="risk-item">
-                <span class="small text-body-secondary">Take Profit</span>
-                <span class="mantis-mono">{{ risk.stop_loss['take_profit'] ?? '-' }}</span>
+              <div class="ad-kpi">
+                <span class="ad-kpi__label mantis-mono">TP</span>
+                <span class="ad-kpi__value mantis-mono ad-kpi__value--win">{{ risk.stop_loss['take_profit'] ?? '—' }}</span>
               </div>
             }
           </div>
-        </div>
+        </section>
       }
 
-      <!-- SECTION: SL Cooldown -->
+      <!-- SL Cooldown -->
       @if (epicCooldown(); as cd) {
-        <div class="audit-section">
-          <div class="audit-section__title">
-            <span class="audit-section__icon">◆</span> SL Cooldown
-          </div>
-          <div class="ml-grid">
-            <div class="ml-item">
-              <span class="small text-body-secondary">SL in {{ cd.window_hours }}h</span>
-              <span class="mantis-mono fw-bold"
-                    [class.text-danger]="cd.blocked"
-                    [class.text-warning]="cd.sl_count > 0 && !cd.blocked">
+        <section class="ad-card">
+          <header class="ad-card__head">
+            <span class="ad-card__eyebrow mantis-mono">SL COOLDOWN · {{ cd.window_hours }}h</span>
+            @if (cd.blocked) {
+              <span class="ad-pill ad-pill--danger mantis-mono">BLOCCATO</span>
+            } @else if (cd.sl_count > 0) {
+              <span class="ad-pill ad-pill--warn mantis-mono">PENALTY</span>
+            } @else {
+              <span class="ad-pill ad-pill--ok mantis-mono">OK</span>
+            }
+          </header>
+          <div class="ad-kpi-grid">
+            <div class="ad-kpi">
+              <span class="ad-kpi__label mantis-mono">SL HITS</span>
+              <span class="ad-kpi__value mantis-mono"
+                    [class.ad-kpi__value--loss]="cd.blocked"
+                    [class.ad-kpi__value--warn]="cd.sl_count > 0 && !cd.blocked">
                 {{ cd.sl_count }}/{{ cd.max_strikes }}
               </span>
             </div>
-            <div class="ml-item">
-              <span class="small text-body-secondary">Penalty</span>
-              <span class="mantis-mono"
-                    [class.text-danger]="cd.penalty === 0"
-                    [class.text-warning]="cd.penalty > 0 && cd.penalty < 1"
-                    [class.text-success]="cd.penalty === 1">
-                {{ (cd.penalty * 100).toFixed(0) }}%
-              </span>
-            </div>
-            <div class="ml-item">
-              <span class="small text-body-secondary">Stato</span>
-              @if (cd.blocked) {
-                <c-badge color="danger">BLOCCATO</c-badge>
-              } @else if (cd.sl_count > 0) {
-                <c-badge color="warning">Penalizzato</c-badge>
-              } @else {
-                <c-badge color="success">OK</c-badge>
-              }
+            <div class="ad-kpi">
+              <span class="ad-kpi__label mantis-mono">PENALTY</span>
+              <span class="ad-kpi__value mantis-mono">{{ (cd.penalty * 100) | number:'1.0-0' }}%</span>
             </div>
           </div>
-        </div>
+        </section>
       }
 
-      <!-- SECTION: Market Snapshot -->
+      <!-- Market snapshot -->
       @if (snapshotEntries().length > 0) {
-        <div class="audit-section">
-          <div class="audit-section__title">
-            <span class="audit-section__icon">◆</span> Market Snapshot
-          </div>
-          <div class="snapshot-grid">
+        <section class="ad-card">
+          <header class="ad-card__head">
+            <span class="ad-card__eyebrow mantis-mono">MARKET SNAPSHOT</span>
+          </header>
+          <div class="ad-kpi-grid">
             @for (entry of snapshotEntries(); track entry[0]) {
-              <div class="snapshot-item">
-                <span class="small text-body-secondary">{{ snapshotLabel(entry[0]) }}</span>
-                <span class="mantis-mono">{{ formatValue(entry[1]) }}</span>
+              <div class="ad-kpi">
+                <span class="ad-kpi__label mantis-mono">{{ snapshotLabel(entry[0]) }}</span>
+                <span class="ad-kpi__value mantis-mono">{{ formatValue(entry[1]) }}</span>
               </div>
             }
           </div>
-        </div>
+        </section>
       }
 
-      <!-- SECTION: Related Signals -->
+      <!-- Related signals (history) -->
       @if (auditService.relatedSignals().length > 0) {
-        <div class="audit-section">
-          <div class="audit-section__title">
-            <span class="audit-section__icon">◆</span> Ultimi Segnali
-          </div>
-          <div class="related-list">
+        <section class="ad-card">
+          <header class="ad-card__head">
+            <span class="ad-card__eyebrow mantis-mono">ULTIMI SEGNALI · {{ audit.epic }}</span>
+          </header>
+          <ul class="ad-related" role="list">
             @for (sig of auditService.relatedSignals(); track sig.id) {
-              <div class="related-row"
-                   [class.related-row--active]="sig.id === audit.id"
-                   (click)="auditService.navigateToSignal(sig.id)"
-                   style="cursor:pointer;">
-                <span class="small"
-                      [class.text-success]="sig.direction === 'BUY'"
-                      [class.text-danger]="sig.direction === 'SELL'">
-                  {{ sig.direction === 'BUY' ? '▲' : '▼' }}
+              <li class="ad-related__row"
+                  [class.is-active]="sig.id === audit.id"
+                  [attr.data-direction]="sig.direction"
+                  [attr.data-status]="sig.status"
+                  (click)="auditService.navigateToSignal(sig.id)">
+                <span class="ad-related__dir mantis-mono">
+                  {{ sig.direction === 'BUY' ? '▲' : sig.direction === 'SELL' ? '▼' : '◇' }}
                 </span>
-                <span class="mantis-mono small">{{ (sig.confidence * 100).toFixed(0) }}%</span>
-                <c-badge size="sm"
-                         [color]="sig.status === 'EXECUTED' ? 'primary' : 'warning'">
-                  {{ sig.status }}
-                </c-badge>
+                <span class="ad-related__conf mantis-mono">{{ (sig.confidence * 100) | number:'1.0-0' }}%</span>
+                <span class="ad-related__status mantis-mono"
+                      [attr.data-status]="sig.status">{{ sig.status }}</span>
                 @if (sig.position_pnl !== null) {
-                  <span class="mantis-mono small ms-auto"
-                        [class.text-success]="sig.position_pnl >= 0"
-                        [class.text-danger]="sig.position_pnl < 0">
-                    {{ sig.position_pnl >= 0 ? '+' : '' }}{{ sig.position_pnl.toFixed(2) }}
+                  <span class="ad-related__pnl mantis-mono"
+                        [class.ad-kpi__value--win]="sig.position_pnl >= 0"
+                        [class.ad-kpi__value--loss]="sig.position_pnl < 0">
+                    {{ sig.position_pnl >= 0 ? '+' : '' }}{{ sig.position_pnl | number:'1.2-2' }}
                   </span>
+                } @else if (sig.rejection_reason) {
+                  <span class="ad-related__reason" [title]="sig.rejection_reason">{{ sig.rejection_reason }}</span>
                 }
-                @if (sig.rejection_reason) {
-                  <span class="small text-body-secondary ms-auto text-truncate"
-                        style="max-width: 120px;" [title]="sig.rejection_reason">
-                    {{ sig.rejection_reason }}
-                  </span>
-                }
-              </div>
+              </li>
             }
-          </div>
-        </div>
+          </ul>
+        </section>
       }
 
     </div>
   }
-</div>
+</aside>

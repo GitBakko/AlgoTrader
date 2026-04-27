@@ -196,8 +196,30 @@ class ScalpScoreStrategy(BaseStrategy):
         price = float(current_bar.get("close", 0))
         atr = float(current_bar.get("atr_14", 0))
 
+        # Snapshot is built incrementally as we collect data so even an
+        # early-exit HOLD carries the data we have at that point. The
+        # signal-audit drawer renders Market Snapshot from this dict.
+        market_snapshot: dict[str, float | str] = {
+            "price": price,
+            "atr": round(atr, 5),
+            "rsi": round(float(current_bar.get("rsi_14", 0)), 1),
+            "adx": round(float(current_bar.get("adx_14", 0)), 1),
+        }
+
         if price <= 0 or atr <= 0:
-            return self._hold(epic, price)
+            return self._hold(
+                epic,
+                price,
+                metadata={
+                    "gates": {
+                        "data_quality": {
+                            "passed": False,
+                            "reason": "missing price or ATR (insufficient bars)",
+                        },
+                    },
+                    "market_snapshot": market_snapshot,
+                },
+            )
 
         # Session awareness: block off-session trades
         utc_hour = int(current_bar.get("utc_hour", -1))
@@ -206,7 +228,21 @@ class ScalpScoreStrategy(BaseStrategy):
             session_mult = SessionFilter.get_session_multiplier(epic, utc_hour)
             if session_mult == 0.0:
                 logger.debug(f"[{epic}] Session blocked (UTC hour={utc_hour})")
-                return self._hold(epic, price)
+                return self._hold(
+                    epic,
+                    price,
+                    metadata={
+                        "gates": {
+                            "session": {
+                                "passed": False,
+                                "session_mult": session_mult,
+                                "utc_hour": utc_hour,
+                                "reason": "off-session window for this epic",
+                            },
+                        },
+                        "market_snapshot": market_snapshot,
+                    },
+                )
 
         # Dead market gate: skip when BOTH ADX low AND BB width compressed
         _dm_settings = get_settings()
@@ -236,7 +272,28 @@ class ScalpScoreStrategy(BaseStrategy):
                 logger.debug(
                     f"[{epic}] Dead market gate: ADX={adx_val:.1f} " f"BB_pctile={bb_pctile:.0f}%"
                 )
-                return self._hold(epic, price)
+                return self._hold(
+                    epic,
+                    price,
+                    metadata={
+                        "gates": {
+                            "session": {
+                                "passed": True,
+                                "session_mult": session_mult,
+                                "utc_hour": utc_hour,
+                            },
+                            "dead_market": {
+                                "passed": False,
+                                "adx": adx_val,
+                                "bb_pctile": round(bb_pctile, 1),
+                                "threshold_adx": _dm_settings.scalp_dead_market_adx,
+                                "threshold_bb_pctile": _dm_settings.scalp_dead_market_bb_pctile,
+                                "reason": "ADX low + BB compressed (dead market)",
+                            },
+                        },
+                        "market_snapshot": market_snapshot,
+                    },
+                )
 
         # --- Collect votes from each indicator group ---
         ema_vote, ema_details = self._vote_ema(
@@ -353,6 +410,74 @@ class ScalpScoreStrategy(BaseStrategy):
             f"SENT={sentiment_vote:+d}"
         )
 
+        # Enrich the snapshot now that all votes/gates have been computed.
+        market_snapshot.update(
+            {
+                "vwap": round(vwap, 4) if vwap else 0,
+                "htf_bias": htf_bias or "neutral",
+                "volume": float(current_bar.get("volume", 0)),
+                "bb_width": round(bb_upper - bb_lower, 4),
+            }
+        )
+
+        def _hold_with_audit(reason: str, **gate_overrides: dict) -> TradingSignal:
+            """Build a HOLD signal with the full ScalpScore audit trail.
+
+            The signal-audit drawer renders the votes grid, gates list,
+            and market snapshot from this metadata; without it the user
+            only sees the rejection reason string and cannot inspect
+            *why* the bot held back.
+            """
+            zone = (
+                "kill_zone"
+                if session_mult >= 1.0
+                else "chop_zone"
+                if (
+                    _strat_settings.scalp_chop_zone_start
+                    <= utc_hour
+                    < _strat_settings.scalp_chop_zone_end
+                )
+                else "default"
+            )
+            base_gates: dict = {
+                "session": {
+                    "passed": True,
+                    "session_mult": session_mult,
+                    "utc_hour": utc_hour,
+                    "zone": zone,
+                },
+                "dead_market": {"passed": True, "adx": adx_val},
+                "vwap": {
+                    "passed": True,
+                    "price": price,
+                    "vwap": vwap,
+                    "bias": "above" if price > vwap else "below" if vwap > 0 else "n/a",
+                },
+                "htf": {
+                    "passed": True,
+                    "htf_bias": htf_bias,
+                },
+                "confluence": {
+                    "passed": False,
+                    "buy_count": buy_count,
+                    "sell_count": sell_count,
+                    "effective_min": effective_min,
+                    "direction": "HOLD",
+                    "reason": reason,
+                },
+            }
+            base_gates.update(gate_overrides)
+            return self._hold(
+                epic,
+                price,
+                metadata={
+                    "votes": votes_data,
+                    "gates": base_gates,
+                    "market_snapshot": market_snapshot,
+                    "rejection_reason": reason,
+                },
+            )
+
         # Determine signal
         if buy_count >= effective_min and buy_count > sell_count:
             direction = SignalDirection.BUY
@@ -370,7 +495,9 @@ class ScalpScoreStrategy(BaseStrategy):
                 f"[{epic}] Confluence: BUY={buy_count} SELL={sell_count} "
                 f"< min={effective_min} [{votes_str}]{vwap_tag}{htf_tag}{sess_tag}"
             )
-            return self._hold(epic, price)
+            return _hold_with_audit(
+                f"Confluence {max(buy_count, sell_count)}/{effective_min} insufficient"
+            )
 
         # HTF gate: block counter-trend entries entirely
         if _strat_settings.scalp_htf_gate_enabled and htf_bias is not None:
@@ -379,13 +506,27 @@ class ScalpScoreStrategy(BaseStrategy):
                     f"[{epic}] HTF gate: BUY blocked by bearish 1H trend "
                     f"(confluence={confluence}/7)"
                 )
-                return self._hold(epic, price)
+                return _hold_with_audit(
+                    "HTF gate: BUY blocked by bearish 1H trend",
+                    htf={
+                        "passed": False,
+                        "htf_bias": htf_bias,
+                        "blocked_direction": "BUY",
+                    },
+                )
             if direction == SignalDirection.SELL and htf_bias == "bullish":
                 logger.info(
                     f"[{epic}] HTF gate: SELL blocked by bullish 1H trend "
                     f"(confluence={confluence}/7)"
                 )
-                return self._hold(epic, price)
+                return _hold_with_audit(
+                    "HTF gate: SELL blocked by bullish 1H trend",
+                    htf={
+                        "passed": False,
+                        "htf_bias": htf_bias,
+                        "blocked_direction": "SELL",
+                    },
+                )
 
         # Confidence: map confluence count to [0.3, 1.0]
         # 3/7 = 0.43, 4/7 = 0.57, 5/7 = 0.71, 6/7 = 0.86, 7/7 = 1.0
@@ -662,7 +803,20 @@ class ScalpScoreStrategy(BaseStrategy):
         )
 
     @staticmethod
-    def _hold(epic: str, price: float) -> TradingSignal:
+    def _hold(
+        epic: str,
+        price: float,
+        *,
+        metadata: dict | None = None,
+    ) -> TradingSignal:
+        """Build a HOLD signal carrying the audit metadata of WHY we held.
+
+        ``metadata`` should describe the votes (when available), the gate
+        that caused the rejection, and a market snapshot. Without it, the
+        signal-audit drawer cannot show the decisional path the user
+        clicked through to inspect — only the rejection reason string —
+        which was the original UX gap reported on 2026-04-27.
+        """
         return TradingSignal(
             epic=epic,
             direction=SignalDirection.HOLD,
@@ -670,4 +824,5 @@ class ScalpScoreStrategy(BaseStrategy):
             signal_class=SignalClass.HOLD,
             entry_price=price,
             technical_confirmation=False,
+            metadata=metadata or {},
         )

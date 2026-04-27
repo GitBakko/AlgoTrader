@@ -204,15 +204,22 @@ class TestGenerateSignalMetadata:
         for key in ["atr", "rsi", "adx", "vwap", "htf_bias"]:
             assert key in snap, f"Missing snapshot key: {key}"
 
-    def test_hold_signal_has_empty_metadata(self):
-        """HOLD signals keep metadata empty (not persisted anyway)."""
+    def test_hold_signal_has_audit_metadata(self):
+        """HOLD signals must carry audit metadata so the signal-audit drawer
+        can render the decisional path (gate that failed + market snapshot)
+        instead of just a generic rejection_reason string. Regression guard
+        for the 2026-04-27 UX gap."""
         strategy = ScalpScoreStrategy(min_confluence=3)
-        bar = _make_bar(close=0)  # invalid price → HOLD
+        bar = _make_bar(close=0)  # invalid price → HOLD on data_quality gate
         signal = strategy.generate_signal(
             "XAUUSD", bar, _make_recent_bars(), _make_config(),
         )
         assert signal.direction == SignalDirection.HOLD
-        assert signal.metadata == {}
+        # data_quality gate carries the rejection cause
+        assert "gates" in signal.metadata
+        assert signal.metadata["gates"]["data_quality"]["passed"] is False
+        # market snapshot is always available — even when we hold early.
+        assert "market_snapshot" in signal.metadata
 
 
 class TestProcessScalpMlMetadata:
