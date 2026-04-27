@@ -1,9 +1,14 @@
 /**
- * Epic Logo Component - Display asset logos with loading state
- * Uses LogoService to fetch logos from CoinGecko/Brandfetch with emoji fallback
+ * Epic Logo Component — resilient asset logo with fallback chain.
+ *
+ * Walks a priority-ordered URL list provided by `LogoService`. On image
+ * load error we step to the next entry; the final entry is always an
+ * inline SVG emoji that cannot fail. No API calls — every URL points
+ * directly at an image, so CORS / rate-limit failures simply fall
+ * through to the next source.
  */
 
-import { Component, Input, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, OnChanges, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { LogoService } from '../../../core/services/logo.service';
 
@@ -13,18 +18,17 @@ import { LogoService } from '../../../core/services/logo.service';
   imports: [CommonModule],
   template: `
     <div class="epic-logo-wrapper" [style.width.px]="size" [style.height.px]="size">
-      @if (loading()) {
-        <div class="logo-skeleton" [style.width.px]="size" [style.height.px]="size"></div>
-      } @else if (logoUrl()) {
+      @if (currentUrl()) {
         <img
-          [src]="logoUrl()"
+          [src]="currentUrl()"
           [alt]="epic + ' logo'"
           [width]="size"
           [height]="size"
           class="epic-logo"
           [class.rounded]="rounded"
-          (error)="onError()"
-        />
+          loading="lazy"
+          referrerpolicy="no-referrer"
+          (error)="onError()" />
       } @else {
         <div class="logo-fallback" [style.width.px]="size" [style.height.px]="size">
           <span class="fallback-text">{{ epic.substring(0, 2) }}</span>
@@ -53,83 +57,50 @@ import { LogoService } from '../../../core/services/logo.service';
       }
     }
 
-    .logo-skeleton {
-      background: linear-gradient(
-        90deg,
-        var(--cui-border-color) 25%,
-        var(--cui-body-bg) 50%,
-        var(--cui-border-color) 75%
-      );
-      background-size: 200% 100%;
-      animation: shimmer 1.5s infinite;
-      border-radius: var(--mantis-radius-sm);
-    }
-
-    @keyframes shimmer {
-      0% {
-        background-position: 200% 0;
-      }
-      100% {
-        background-position: -200% 0;
-      }
-    }
-
     .logo-fallback {
       display: flex;
       align-items: center;
       justify-content: center;
-      background-color: var(--cui-primary);
-      border-radius: var(--mantis-radius-sm);
+      background-color: var(--mantis-neon, #39ff14);
+      border-radius: var(--mantis-radius-sm, 4px);
 
       .fallback-text {
-        color: white;
-        font-weight: 600;
+        color: var(--mantis-bg, #0d1117);
+        font-weight: 700;
         font-size: 0.75em;
         text-transform: uppercase;
       }
     }
-
-    // Mantis AI theme
-    :host-context(.mantis-theme) {
-      .logo-fallback {
-        background-color: var(--mantis-neon, #39ff14);
-
-        .fallback-text {
-          color: var(--mantis-bg);
-        }
-      }
-    }
   `],
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class EpicLogoComponent implements OnInit {
+export class EpicLogoComponent implements OnChanges {
   @Input() epic!: string;
-  @Input() size: number = 32;
-  @Input() rounded: boolean = false;
+  @Input() size = 32;
+  @Input() rounded = false;
 
-  readonly loading = signal(true);
-  readonly logoUrl = signal<string | null>(null);
+  private urlChain: string[] = [];
+  private chainIndex = 0;
+  readonly currentUrl = signal<string | null>(null);
 
   constructor(private logoService: LogoService) {}
 
-  async ngOnInit(): Promise<void> {
+  ngOnChanges(): void {
     if (!this.epic) {
-      this.loading.set(false);
+      this.currentUrl.set(null);
       return;
     }
-
-    try {
-      const url = await this.logoService.getLogoUrl(this.epic);
-      this.logoUrl.set(url);
-    } catch (error) {
-      // logo unavailable — fallback rendering handles this
-    } finally {
-      this.loading.set(false);
-    }
+    this.urlChain = this.logoService.getLogoUrls(this.epic);
+    this.chainIndex = 0;
+    this.currentUrl.set(this.urlChain[0] ?? null);
   }
 
   onError(): void {
-    // On image load error, clear URL to show fallback
-    this.logoUrl.set(null);
+    this.chainIndex += 1;
+    if (this.chainIndex < this.urlChain.length) {
+      this.currentUrl.set(this.urlChain[this.chainIndex]);
+    } else {
+      this.currentUrl.set(null);
+    }
   }
 }

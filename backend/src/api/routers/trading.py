@@ -11,7 +11,7 @@ from loguru import logger
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from src.api.dependencies import get_journal_note_repo, get_position_repo
+from src.api.dependencies import get_db_session, get_journal_note_repo, get_position_repo
 from src.api.schemas import UpdateTradeNoteRequest, error_response, success_response
 
 # Timeout for broker-dependent async calls (seconds)
@@ -578,5 +578,89 @@ async def upsert_signal_note(
             "signal_timestamp": note.signal_timestamp,
             "notes": note.notes,
             "updated_at": note.updated_at.isoformat() if note.updated_at else None,
+        }
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# P&L history (60s snapshots)
+# ─────────────────────────────────────────────────────────────────────
+
+# Read window cap — keep payloads small + protect the DB.
+_PNL_HISTORY_MAX_MINUTES = 24 * 60
+
+
+@router.get("/pnl-history")
+async def get_pnl_history(
+    minutes: int = Query(180, ge=1, le=_PNL_HISTORY_MAX_MINUTES),
+    session=Depends(get_db_session),
+):
+    """Real Paper Trading P&L history captured every 60s.
+
+    Powers the Paper Trading v2 KPI strip (P&L Open / P&L Today
+    sparklines) — replaces the synthetic ramps the cockpit used to draw
+    when no history was available.
+    """
+    if session is None:
+        return success_response({"points": [], "source": "no-db"})
+
+    from src.database.repositories.pnl_snapshot_repository import (
+        PaperPnlSnapshotRepository,
+    )
+
+    repo = PaperPnlSnapshotRepository(session)
+    rows = await repo.list_recent(minutes=minutes)
+    points = [
+        {
+            "ts": row.captured_at.isoformat(),
+            "pnl_open": float(row.pnl_open),
+            "pnl_today": float(row.pnl_today),
+            "equity": float(row.equity) if row.equity is not None else None,
+            "open_count": int(row.open_count),
+        }
+        for row in rows
+    ]
+    return success_response(
+        {
+            "points": points,
+            "minutes": minutes,
+            "source": "snapshot",
+        }
+    )
+
+
+@router.get("/positions/{deal_id}/pnl-history")
+async def get_position_pnl_history(
+    deal_id: str,
+    minutes: int = Query(360, ge=1, le=_PNL_HISTORY_MAX_MINUTES),
+    session=Depends(get_db_session),
+):
+    """Per-position P&L history captured every 60s for the lifetime
+    of the open position. Powers the position-card price chart.
+    """
+    if session is None:
+        return success_response({"deal_id": deal_id, "points": [], "source": "no-db"})
+
+    from src.database.repositories.pnl_snapshot_repository import (
+        PositionPnlSnapshotRepository,
+    )
+
+    repo = PositionPnlSnapshotRepository(session)
+    rows = await repo.list_for_deal(deal_id=deal_id, minutes=minutes)
+    points = [
+        {
+            "ts": row.captured_at.isoformat(),
+            "pnl": float(row.pnl),
+            "pnl_pct": float(row.pnl_pct),
+            "price": float(row.current_price),
+        }
+        for row in rows
+    ]
+    return success_response(
+        {
+            "deal_id": deal_id,
+            "points": points,
+            "minutes": minutes,
+            "source": "snapshot",
         }
     )

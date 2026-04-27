@@ -1,225 +1,173 @@
 /**
- * Logo Service - Asset logo fetching and caching
- * Uses CoinGecko for crypto, Brandfetch for stocks, emoji fallback for commodities/forex
+ * Logo Service — resilient asset logo URLs.
+ *
+ * The previous implementation called the CoinGecko REST API which is
+ * rate-limited (30 req/min on the free tier) and unreliable from a
+ * browser due to occasional CORS failures, causing every stock/crypto
+ * card to fall back to the emoji silhouette. This rewrite removes API
+ * calls entirely: each epic resolves to an ordered list of direct
+ * image URLs, and the EpicLogoComponent steps through them in `onError`
+ * until one loads. The final entry is always an inline SVG emoji that
+ * cannot fail.
+ *
+ * Sources used (all free, no API key required):
+ *  - Crypto:      `assets.coincap.io/assets/icons/{symbol}@2x.png`
+ *                  + `cryptologos.cc/logos/{slug}-{ticker}-logo.svg`
+ *                  + `cryptoicons.org/api/icon/{symbol}/64`
+ *  - Stocks:      `logo.clearbit.com/{domain}` (free tier, returns image)
+ *                  + `eodhd.com/img/logos/US/{ticker}.png`
+ *  - Forex/idx/   inline SVG emoji (already in the previous impl)
+ *    commodities
  */
 
 import { Injectable, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
-
-interface LogoCache {
-  url: string;
-  timestamp: number;
-}
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class LogoService {
-  private readonly CACHE_KEY = 'mantis-logos';
-  private readonly CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-  private cache = new Map<string, LogoCache>();
+  private readonly CACHE_KEY = 'mantis-logos-v2';
+  private readonly CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+  private cache = new Map<string, { urls: string[]; ts: number }>();
 
-  // CoinGecko API (free tier: 30 req/min)
-  private readonly COINGECKO_API = 'https://api.coingecko.com/api/v3';
-
-  // Epic → CoinGecko ID mapping
-  private readonly COIN_MAP: Record<string, string> = {
-    'BTCUSD': 'bitcoin',
-    'ETHUSD': 'ethereum',
-    'SOLUSD': 'solana',
-    'BNBUSD': 'binancecoin',
-    'DOGUSD': 'dogecoin',
-    'DASHUSD': 'dash',
-    'ICPUSD': 'internet-computer',
+  // Crypto epics → (CoinCap symbol, cryptologos slug, cryptoicons symbol)
+  private readonly CRYPTO_MAP: Record<string, { symbol: string; slug?: string; ticker?: string }> = {
+    BTCUSD:  { symbol: 'btc', slug: 'bitcoin',           ticker: 'btc' },
+    ETHUSD:  { symbol: 'eth', slug: 'ethereum',          ticker: 'eth' },
+    SOLUSD:  { symbol: 'sol', slug: 'solana',            ticker: 'sol' },
+    BNBUSD:  { symbol: 'bnb', slug: 'bnb',               ticker: 'bnb' },
+    DOGUSD:  { symbol: 'doge', slug: 'dogecoin',         ticker: 'doge' },
+    DASHUSD: { symbol: 'dash', slug: 'dash',             ticker: 'dash' },
+    ICPUSD:  { symbol: 'icp', slug: 'internet-computer', ticker: 'icp' },
   };
 
-  // Epic → Brandfetch domain mapping (stocks)
+  // Stock epics → primary domain (clearbit lookup)
   private readonly STOCK_MAP: Record<string, string> = {
-    'NVDA': 'nvidia.com',
-    'TSLA': 'tesla.com',
+    NVDA: 'nvidia.com',
+    TSLA: 'tesla.com',
   };
 
-  // Epic → Emoji fallback (commodities, forex, indices)
+  // Inline emoji fallback for forex/commodities/indices and as final tier.
   private readonly EMOJI_MAP: Record<string, string> = {
-    'XAUUSD': '🥇',  // Gold
-    'XAGUSD': '🥈',  // Silver
-    'WTIUSD': '🛢️',  // Oil
-    'NATGAS': '🔥',  // Natural Gas
-    'COPPER': '🔶',  // Copper
-    'PLATINUM': '⚪', // Platinum
-    'EURUSD': '💶',  // Euro
-    'GBPUSD': '💷',  // Pound
-    'USDJPY': '💴',  // Yen
-    'US500': '📊',   // S&P 500
-    'NAS100': '💻',  // Nasdaq
-    'DE40': '🇩🇪',   // DAX
+    XAUUSD:   '🥇',
+    XAGUSD:   '🥈',
+    WTIUSD:   '🛢️',
+    NATGAS:   '🔥',
+    COPPER:   '🟠',
+    PLATINUM: '⚪',
+    EURUSD:   '💶',
+    GBPUSD:   '💷',
+    USDJPY:   '💴',
+    US500:    '📊',
+    NAS100:   '💻',
+    DE40:     '🇩🇪',
   };
 
-  readonly logos = signal<Map<string, string>>(new Map());
+  // Per-epic accent color for the SVG emoji bg (mantis palette mirror).
+  private readonly ACCENT_MAP: Record<string, string> = {
+    XAUUSD: '#FFD700',
+    XAGUSD: '#C0C0C0',
+    BTCUSD: '#F7931A',
+    ETHUSD: '#627EEA',
+    SOLUSD: '#9945FF',
+    BNBUSD: '#F0B90B',
+    DOGUSD: '#C2A633',
+    NVDA:   '#76B900',
+    TSLA:   '#E31937',
+    DE40:   '#FFCE00',
+    NAS100: '#5B9BD5',
+    US500:  '#5B7FFF',
+  };
 
-  constructor(private http: HttpClient) {
+  readonly logos = signal<Map<string, string[]>>(new Map());
+
+  constructor() {
     this.loadCache();
   }
 
   /**
-   * Get logo URL for an epic
+   * Resolve a priority-ordered list of logo URLs for an epic. Caller
+   * (EpicLogoComponent) walks the list in `onError`. The last entry is
+   * always an inline SVG that cannot fail.
    */
-  async getLogoUrl(epic: string): Promise<string> {
-    // Check cache first
+  getLogoUrls(epic: string): string[] {
     const cached = this.cache.get(epic);
-    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
-      return cached.url;
+    if (cached && Date.now() - cached.ts < this.CACHE_TTL_MS) {
+      return cached.urls;
     }
-
-    // Crypto assets (CoinGecko)
-    if (this.COIN_MAP[epic]) {
-      try {
-        const url = await this.fetchCoinGeckoLogo(epic);
-        this.cacheUrl(epic, url);
-        return url;
-      } catch {
-        return this.getEmojiUrl(epic);
-      }
-    }
-
-    // Stock assets (Brandfetch or emoji)
-    if (this.STOCK_MAP[epic]) {
-      try {
-        const url = await this.fetchBrandfetchLogo(epic);
-        this.cacheUrl(epic, url);
-        return url;
-      } catch {
-        return this.getEmojiUrl(epic);
-      }
-    }
-
-    // Emoji fallback
-    return this.getEmojiUrl(epic);
-  }
-
-  /**
-   * Preload logos for all 21 assets
-   */
-  async preloadAll(): Promise<void> {
-    const allEpics = [
-      // Crypto (7)
-      'BTCUSD', 'ETHUSD', 'SOLUSD', 'BNBUSD', 'DOGUSD', 'DASHUSD', 'ICPUSD',
-      // Stocks (2)
-      'NVDA', 'TSLA',
-      // Commodities (6)
-      'XAUUSD', 'XAGUSD', 'WTIUSD', 'NATGAS', 'COPPER', 'PLATINUM',
-      // Forex (3)
-      'EURUSD', 'GBPUSD', 'USDJPY',
-      // Indices (3)
-      'US500', 'NAS100', 'DE40',
-    ];
-
-    const logoMap = new Map<string, string>();
-
-    // Fetch in parallel (respecting rate limits)
-    await Promise.allSettled(
-      allEpics.map(async (epic) => {
-        try {
-          const url = await this.getLogoUrl(epic);
-          logoMap.set(epic, url);
-        } catch {
-          logoMap.set(epic, this.getEmojiUrl(epic));
-        }
-      })
-    );
-
-    this.logos.set(logoMap);
-  }
-
-  /**
-   * Fetch crypto logo from CoinGecko
-   */
-  private async fetchCoinGeckoLogo(epic: string): Promise<string> {
-    const coinId = this.COIN_MAP[epic];
-    if (!coinId) throw new Error(`No CoinGecko mapping for ${epic}`);
-
-    const url = `${this.COINGECKO_API}/coins/${coinId}`;
-    const response = await firstValueFrom(
-      this.http.get<any>(url)
-    );
-
-    return response.image?.small || response.image?.thumb || this.getEmojiUrl(epic);
-  }
-
-  /**
-   * Fetch stock logo from Brandfetch (fallback to emoji for now)
-   * Note: Brandfetch requires API key, using emoji fallback
-   */
-  private async fetchBrandfetchLogo(epic: string): Promise<string> {
-    // For now, use emoji fallback (Brandfetch requires paid API key)
-    // In production, implement actual Brandfetch API call here
-    return this.getEmojiUrl(epic);
-  }
-
-  /**
-   * Get emoji fallback for an epic
-   */
-  private getEmojiUrl(epic: string): string {
-    const emoji = this.EMOJI_MAP[epic] || '📈';
-    // Use emoji as data URI (works in img src)
-    return `data:image/svg+xml,${encodeURIComponent(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">
-        <text x="50%" y="50%" font-size="24" text-anchor="middle" dominant-baseline="central">
-          ${emoji}
-        </text>
-      </svg>`
-    )}`;
-  }
-
-  /**
-   * Cache logo URL with timestamp
-   */
-  private cacheUrl(epic: string, url: string): void {
-    this.cache.set(epic, { url, timestamp: Date.now() });
+    const urls = this.buildUrls(epic);
+    this.cache.set(epic, { urls, ts: Date.now() });
     this.saveCache();
+    return urls;
   }
 
-  /**
-   * Load cache from localStorage
-   */
+  /** Backwards-compat shim — older callers asked for a single URL. */
+  async getLogoUrl(epic: string): Promise<string> {
+    const urls = this.getLogoUrls(epic);
+    return urls[0] ?? this.emojiSvg(epic);
+  }
+
+  private buildUrls(epic: string): string[] {
+    const fallback = this.emojiSvg(epic);
+
+    if (this.CRYPTO_MAP[epic]) {
+      const { symbol, slug, ticker } = this.CRYPTO_MAP[epic];
+      const out: string[] = [
+        `https://assets.coincap.io/assets/icons/${symbol}@2x.png`,
+      ];
+      if (slug && ticker) {
+        out.push(`https://cryptologos.cc/logos/${slug}-${ticker}-logo.svg?v=035`);
+      }
+      out.push(`https://cryptoicons.org/api/icon/${symbol}/64`);
+      out.push(fallback);
+      return out;
+    }
+
+    if (this.STOCK_MAP[epic]) {
+      const domain = this.STOCK_MAP[epic];
+      return [
+        `https://logo.clearbit.com/${domain}`,
+        `https://eodhd.com/img/logos/US/${epic}.png`,
+        fallback,
+      ];
+    }
+
+    return [fallback];
+  }
+
+  /** Render an inline SVG containing the emoji + tinted backdrop. */
+  private emojiSvg(epic: string): string {
+    const emoji = this.EMOJI_MAP[epic] ?? '📈';
+    const accent = this.ACCENT_MAP[epic] ?? '#39FF14';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+      <rect width="32" height="32" rx="6" fill="${accent}1f"/>
+      <text x="50%" y="55%" font-size="18" text-anchor="middle" dominant-baseline="middle">${emoji}</text>
+    </svg>`;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  }
+
   private loadCache(): void {
     try {
       const stored = localStorage.getItem(this.CACHE_KEY);
-      if (stored) {
-        const data = JSON.parse(stored) as Record<string, LogoCache>;
-        Object.entries(data).forEach(([epic, cache]) => {
-          this.cache.set(epic, cache);
-        });
+      if (!stored) return;
+      const data = JSON.parse(stored) as Record<string, { urls: string[]; ts: number }>;
+      for (const [epic, value] of Object.entries(data)) {
+        this.cache.set(epic, value);
       }
-    } catch (error) {
+    } catch {
+      // ignore — cache is best-effort
     }
   }
 
-  /**
-   * Save cache to localStorage
-   */
   private saveCache(): void {
     try {
-      const data: Record<string, LogoCache> = {};
-      this.cache.forEach((cache, epic) => {
-        data[epic] = cache;
+      const data: Record<string, { urls: string[]; ts: number }> = {};
+      this.cache.forEach((value, epic) => {
+        data[epic] = value;
       });
       localStorage.setItem(this.CACHE_KEY, JSON.stringify(data));
-    } catch (error) {
+    } catch {
+      // ignore — quota or disabled storage
     }
-  }
-
-  /**
-   * Clear expired cache entries
-   */
-  clearExpired(): void {
-    const now = Date.now();
-    this.cache.forEach((cache, epic) => {
-      if (now - cache.timestamp >= this.CACHE_TTL_MS) {
-        this.cache.delete(epic);
-      }
-    });
-    this.saveCache();
   }
 }

@@ -27,6 +27,8 @@ import {
   OvernightSwapResponse,
   PerformanceDeltaResponse,
   SwapAccumResponse,
+  PaperPnlHistoryResponse,
+  PositionPnlHistoryResponse,
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -62,6 +64,8 @@ export class TradingService {
   readonly paperStatus = signal<PaperTradingStatus | null>(null);
   readonly paperPositions = signal<PaperPosition[]>([]);
   readonly paperSignals = signal<PaperSignal[]>([]);
+  readonly paperPnlHistory = signal<PaperPnlHistoryResponse | null>(null);
+  readonly positionPnlHistory = signal<Record<string, PositionPnlHistoryResponse>>({});
 
   // Closed Positions & Performance
   readonly closedPositions = signal<ClosedPosition[]>([]);
@@ -269,6 +273,35 @@ export class TradingService {
 
   stopPaperTrading() {
     return this.api.post<PaperTradingStatus & { message: string }>('/api/trading/stop');
+  }
+
+  /**
+   * Real Paper Trading P&L history (60s snapshots) for the KPI strip
+   * sparklines. Replaces the synthetic ramps that used to be drawn when
+   * no buffer was available.
+   */
+  loadPaperPnlHistory(minutes = 180): void {
+    this.api.get<PaperPnlHistoryResponse>('/api/trading/pnl-history', { minutes })
+      .subscribe({
+        next: (data) => this.paperPnlHistory.set(data),
+        error: () => {},
+      });
+  }
+
+  /**
+   * Real per-position P&L history (60s snapshots) for the position-card
+   * price chart.
+   */
+  loadPositionPnlHistory(dealId: string, minutes = 360): void {
+    this.api.get<PositionPnlHistoryResponse>(
+      `/api/trading/positions/${dealId}/pnl-history`,
+      { minutes },
+    ).subscribe({
+      next: (data) => {
+        this.positionPnlHistory.update((h) => ({ ...h, [dealId]: data }));
+      },
+      error: () => {},
+    });
   }
 
   // ── Closed Positions & Performance ──

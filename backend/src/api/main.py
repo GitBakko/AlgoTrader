@@ -324,6 +324,19 @@ async def lifespan(app: FastAPI):
         task = asyncio.create_task(coro, name=name)
         task.add_done_callback(_bg_task_done)
 
+    # 60s P&L snapshot scheduler (Paper Trading v2 real-history charts)
+    from src.data.pnl_snapshot_scheduler import PnlSnapshotScheduler
+
+    app.state.pnl_snapshot_scheduler = PnlSnapshotScheduler(
+        db_session_factory=getattr(app.state, "db_session_factory", None),
+        get_paper_loop=lambda: getattr(app.state, "paper_loop", None),
+        get_broker_client=lambda: getattr(app.state, "broker_client", None),
+    )
+    try:
+        app.state.pnl_snapshot_scheduler.start()
+    except Exception as exc:
+        logger.warning(f"PnlSnapshotScheduler failed to start: {exc}")
+
     # Initialize paper trading loop (does not start automatically)
     from src.trading.paper_loop import PaperTradingLoop
 
@@ -485,6 +498,13 @@ async def lifespan(app: FastAPI):
             app.state.data_scheduler.stop()
         except Exception as e:
             logger.warning(f"Scheduler stop error: {e}")
+
+    # Stop P&L snapshot scheduler
+    if getattr(app.state, "pnl_snapshot_scheduler", None):
+        try:
+            app.state.pnl_snapshot_scheduler.stop()
+        except Exception as e:
+            logger.warning(f"PnlSnapshotScheduler stop error: {e}")
 
     # Close broker WebSocket
     if getattr(app.state, "broker_ws_client", None):

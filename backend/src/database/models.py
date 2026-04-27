@@ -591,3 +591,54 @@ class SwapDailySnapshot(SQLModel, table=True):
         nullable=False,
         sa_column_kwargs={"server_default": text("NOW()")},
     )
+
+
+class PaperPnlSnapshot(SQLModel, table=True):
+    """60s-tick snapshot of the global Paper Trading P&L state.
+
+    Powers the Paper Trading v2 KPI strip (P&L Open / P&L Today
+    sparklines) with real history. One row per scheduler tick.
+    See migration ``c3d8e9f0a1b2``.
+    """
+
+    __tablename__ = "paper_pnl_snapshots"
+
+    id: int | None = Field(default=None, primary_key=True)
+    captured_at: datetime = Field(nullable=False, index=True)
+    pnl_open: float = Field(default=0.0, nullable=False)
+    pnl_today: float = Field(default=0.0, nullable=False)
+    equity: float | None = Field(default=None, nullable=True)
+    open_count: int = Field(default=0, nullable=False)
+    currency: str | None = Field(default=None, max_length=8, nullable=True)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
+        nullable=False,
+        sa_column_kwargs={"server_default": text("NOW()")},
+    )
+
+
+class PositionPnlSnapshot(SQLModel, table=True):
+    """60s-tick snapshot of a single open position's P&L.
+
+    Powers the position-card price chart with real history per deal.
+    One row per scheduler tick PER open position. Unbounded growth is
+    fine because positions live for at most a few days; the rows are
+    addressed via ``(deal_id, captured_at)`` and clean up automatically
+    once the position is closed and a TTL job prunes old rows.
+    See migration ``c3d8e9f0a1b2``.
+    """
+
+    __tablename__ = "position_pnl_snapshots"
+
+    id: int | None = Field(default=None, primary_key=True)
+    deal_id: str = Field(nullable=False, max_length=64)
+    epic: str = Field(nullable=False, max_length=32)
+    captured_at: datetime = Field(nullable=False, index=True)
+    pnl: float = Field(default=0.0, nullable=False)
+    pnl_pct: float = Field(default=0.0, nullable=False)
+    current_price: float = Field(default=0.0, nullable=False)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
+        nullable=False,
+        sa_column_kwargs={"server_default": text("NOW()")},
+    )

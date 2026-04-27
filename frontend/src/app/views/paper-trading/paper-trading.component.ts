@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 import { CockpitHeaderComponent, type CockpitMode, type CockpitState } from '../../shared/components/cockpit-header/cockpit-header.component';
@@ -24,7 +24,11 @@ import { epicColor } from '../../shared/constants/epic-colors';
 
 const CIRCUIT_BREAKER_TOTAL = 6;
 const DEFAULT_DD_GATE_PCT = 20;
-const PRICE_BUFFER_LEN = 60;
+/** Polling cadences (ms). The backend captures snapshots every 60s, so
+ *  we refresh the KPI history on the same beat. Per-position charts
+ *  refresh more aggressively to feel live while a position is open. */
+const PNL_HISTORY_REFRESH_MS = 60_000;
+const POSITION_HISTORY_REFRESH_MS = 30_000;
 
 /**
  * Paper Trading v2 — cockpit shell.
@@ -71,39 +75,14 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   readonly overview = this.trading.overview;
   readonly currency = computed<string>(() => this.overview()?.currency ?? 'USD');
 
-  /** Per-epic mid-price history. Each tickClock fires we pull the WS quote
-   *  for every open position and append the mid; capped to {@link PRICE_BUFFER_LEN}
-   *  points. Powers the position-card sparkline so it shows actual price
-   *  motion instead of a flat entry→current segment. PR4 may swap the
-   *  source for a server-provided history endpoint. */
-  readonly priceHistory = signal<Record<string, number[]>>({});
+  /** Real per-position price history sourced from the backend snapshot
+   *  endpoint (`/api/trading/positions/{deal_id}/pnl-history`). The
+   *  scheduler captures one row every 60s while the position is open. */
+  readonly positionHistory = this.trading.positionPnlHistory;
 
-  constructor() {
-    effect(() => {
-      // Re-evaluate every clock tick OR when ws prices reshuffle.
-      this.tickClock();
-      const ticks = this.ws.prices();
-      const positions = this.trading.paperPositions();
-      if (positions.length === 0) return;
-      const current = this.priceHistory();
-      const next: Record<string, number[]> = { ...current };
-      let mutated = false;
-      for (const pos of positions) {
-        const tick = ticks[pos.epic];
-        if (!tick) continue;
-        const mid = (tick.bid + tick.offer) / 2;
-        if (!Number.isFinite(mid)) continue;
-        const prev = next[pos.epic] ?? [pos.level];
-        // Skip duplicate in a row to keep the chart from drawing flat noise.
-        if (prev.length > 0 && prev[prev.length - 1] === mid) continue;
-        const updated = [...prev, mid];
-        if (updated.length > PRICE_BUFFER_LEN) updated.splice(0, updated.length - PRICE_BUFFER_LEN);
-        next[pos.epic] = updated;
-        mutated = true;
-      }
-      if (mutated) this.priceHistory.set(next);
-    });
-  }
+  /** Real KPI sparkline history sourced from the backend snapshot
+   *  endpoint (`/api/trading/pnl-history`). */
+  readonly paperPnlHistory = this.trading.paperPnlHistory;
 
   readonly state = computed<CockpitState>(() => {
     const s = this.status();
@@ -188,9 +167,26 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   readonly positions = computed<PaperTradingPosition[]>(() => {
     const broker = this.trading.paperPositions();
     const prices = this.ws.prices();
-    const history = this.priceHistory();
+    const histories = this.positionHistory();
     const now = this.tickClock();
-    return broker.map((p) => adaptPosition(p, prices[p.epic], history[p.epic], now));
+    return broker.map((p) => {
+      const snapshot = histories[p.deal_id];
+      const path = snapshot?.points?.map((pt) => pt.price).filter((v) => Number.isFinite(v)) ?? [];
+      return adaptPosition(p, prices[p.epic], path, now);
+    });
+  });
+
+  /** Sparkline arrays for the KPI strip cells, derived from the real
+   *  paper-pnl-snapshots endpoint. Empty when the backend has no rows
+   *  yet — the KPI cell renders without a chart in that case. */
+  readonly kpiSparkOpen = computed<number[]>(() => {
+    const points = this.paperPnlHistory()?.points ?? [];
+    return points.map((p) => p.pnl_open).filter((v) => Number.isFinite(v));
+  });
+
+  readonly kpiSparkToday = computed<number[]>(() => {
+    const points = this.paperPnlHistory()?.points ?? [];
+    return points.map((p) => p.pnl_today).filter((v) => Number.isFinite(v));
   });
 
   readonly kpiStrip = computed<KpiStrip>(() => {
@@ -215,6 +211,8 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
       rr: rrAvg,
       ddLive: ddPct,
       ddGate: DEFAULT_DD_GATE_PCT,
+      sparkOpen: this.kpiSparkOpen(),
+      sparkToday: this.kpiSparkToday(),
     };
   });
 
@@ -248,12 +246,16 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private clockTimer: ReturnType<typeof setInterval> | null = null;
+  private historyTimer: ReturnType<typeof setInterval> | null = null;
+  private positionHistoryTimer: ReturnType<typeof setInterval> | null = null;
+  private knownDealIds = new Set<string>();
 
   ngOnInit(): void {
     this.trading.loadPaperStatus();
     this.trading.loadRiskStatus();
     this.trading.loadOverview();
     this.trading.loadPaperPositions();
+    this.trading.loadPaperPnlHistory();
     this.ws.connectPrices();
     this.pollTimer = setInterval(() => {
       this.trading.loadPaperStatus();
@@ -262,6 +264,17 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
       this.trading.loadPaperPositions();
     }, 10_000);
     this.clockTimer = setInterval(() => this.tickClock.set(Date.now()), 1_000);
+    this.historyTimer = setInterval(
+      () => this.trading.loadPaperPnlHistory(),
+      PNL_HISTORY_REFRESH_MS,
+    );
+    this.positionHistoryTimer = setInterval(
+      () => this.refreshPositionHistories(),
+      POSITION_HISTORY_REFRESH_MS,
+    );
+    // Kick the first fetch right after the position list lands so the
+    // chart isn't blank for a full 30s.
+    queueMicrotask(() => this.refreshPositionHistories());
   }
 
   ngOnDestroy(): void {
@@ -273,6 +286,27 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
       clearInterval(this.clockTimer);
       this.clockTimer = null;
     }
+    if (this.historyTimer) {
+      clearInterval(this.historyTimer);
+      this.historyTimer = null;
+    }
+    if (this.positionHistoryTimer) {
+      clearInterval(this.positionHistoryTimer);
+      this.positionHistoryTimer = null;
+    }
+  }
+
+  /** Re-fetch per-position P&L history. Called on a timer + every time
+   *  a new deal_id appears in the broker positions list, so the chart
+   *  starts populating immediately rather than waiting the full poll. */
+  private refreshPositionHistories(): void {
+    const broker = this.trading.paperPositions();
+    const liveIds = new Set<string>();
+    for (const p of broker) {
+      liveIds.add(p.deal_id);
+      this.trading.loadPositionPnlHistory(p.deal_id);
+    }
+    this.knownDealIds = liveIds;
   }
 
   async onStop(): Promise<void> {
@@ -369,7 +403,7 @@ function formatUptime(seconds: number | null): string {
 function adaptPosition(
   p: PaperPosition,
   tick: { bid: number; offer: number } | undefined,
-  history: number[] | undefined,
+  history: number[],
   nowMs: number,
 ): PaperTradingPosition {
   const direction = (p.direction === 'BUY' ? 'BUY' : 'SELL') as 'BUY' | 'SELL';
@@ -390,11 +424,14 @@ function adaptPosition(
   const reward = Math.abs(takeProfit - p.level);
   const rr = reward / risk;
   const trailing = !!p.trailing_stop_phase && p.trailing_stop_phase !== 'INITIAL';
-  // Always anchor the path on the entry level so the chart reads "since open".
-  // While the buffer fills, fall back to the current point so we never draw a
-  // straight diagonal segment.
-  const buffer = history && history.length > 0 ? history : [];
-  const pricePath = [p.level, ...buffer, current];
+  // Real history from `position_pnl_snapshots`. Empty until the 60s
+  // scheduler has captured at least one row; the chart honours that
+  // and shows a "in attesa di tick…" placeholder rather than fabricating
+  // a line. The current live price is appended so the chart reads up
+  // to the moment of render.
+  const pricePath = history.length > 0
+    ? [...history, current]
+    : [];
   return {
     id: p.deal_id,
     ticker: p.epic,
