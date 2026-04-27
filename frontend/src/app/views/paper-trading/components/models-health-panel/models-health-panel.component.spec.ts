@@ -21,15 +21,19 @@ describe('ModelsHealthPanelComponent', () => {
     fixture.detectChanges();
   });
 
-  it('renders 21 dots in grid', () => {
-    const dots = fixture.debugElement.queryAll(By.css('.pv-mh__dot'));
-    expect(dots.length).toBe(21);
+  it('renders 21 cells in grid', () => {
+    const cells = fixture.debugElement.queryAll(By.css('.pv-mh__cell'));
+    expect(cells.length).toBe(21);
   });
 
-  it('renders badge as loaded/total', () => {
+  it('renders ML MODELS header label', () => {
+    const label = fixture.debugElement.query(By.css('.pv-mh__label')).nativeElement as HTMLElement;
+    expect(label.textContent?.trim()).toBe('ML MODELS');
+  });
+
+  it('renders badge as loaded/total with check when fully loaded', () => {
     const badge = fixture.debugElement.query(By.css('.pv-mh__badge')).nativeElement as HTMLElement;
-    expect(badge.textContent?.trim()).toBe('21/21');
-    expect(badge.classList).toContain('is-ok');
+    expect(badge.textContent?.replace(/\s+/g, ' ').trim()).toBe('21/21 ✓');
   });
 
   it('marks badge is-missing when loaded is 0', () => {
@@ -48,16 +52,38 @@ describe('ModelsHealthPanelComponent', () => {
     const mixed = {
       ...baseHealth,
       perAsset: [
-        { epic: 'A', status: 'ok' as const },
-        { epic: 'B', status: 'missing' as const },
-        { epic: 'C', status: 'stale' as const },
+        { epic: 'XAUUSD', status: 'ok' as const, accent: '#FFD700' },
+        { epic: 'BTCUSD', status: 'missing' as const, accent: '#F7931A' },
+        { epic: 'TSLA',   status: 'stale' as const, accent: '#E31937' },
       ],
     };
     fixture.componentRef.setInput('health', mixed);
     fixture.detectChanges();
-    const dots = fixture.debugElement.queryAll(By.css('.pv-mh__dot'));
-    expect(dots[0].nativeElement.getAttribute('data-status')).toBe('ok');
-    expect(dots[1].nativeElement.getAttribute('data-status')).toBe('missing');
-    expect(dots[2].nativeElement.getAttribute('data-status')).toBe('stale');
+    const cells = fixture.debugElement.queryAll(By.css('.pv-mh__cell'));
+    expect(cells[0].nativeElement.getAttribute('data-status')).toBe('ok');
+    expect(cells[1].nativeElement.getAttribute('data-status')).toBe('missing');
+    expect(cells[2].nativeElement.getAttribute('data-status')).toBe('stale');
+  });
+
+  it('renders 3-letter ticker per cell', () => {
+    fixture.componentRef.setInput('health', {
+      loaded: 1, total: 1,
+      perAsset: [{ epic: 'XAUUSD', status: 'ok' as const }],
+    });
+    fixture.detectChanges();
+    const ticker = fixture.debugElement.query(By.css('.pv-mh__cell-ticker')).nativeElement as HTMLElement;
+    expect(ticker.textContent?.trim()).toBe('XAU');
+  });
+
+  it('renders footer meta when present', () => {
+    fixture.componentRef.setInput('health', {
+      ...baseHealth,
+      meta: { features: 199, version: 'v1', lastTrained: '26/04/26' },
+    });
+    fixture.detectChanges();
+    const foot = fixture.debugElement.query(By.css('.pv-mh__foot')).nativeElement as HTMLElement;
+    expect(foot.textContent).toContain('199 features');
+    expect(foot.textContent).toContain('v1');
+    expect(foot.textContent).toContain('26/04/26');
   });
 });

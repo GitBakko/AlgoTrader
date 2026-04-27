@@ -88,11 +88,23 @@ export interface ModelsHealth {
   loaded: number;
   total: number;
   perAsset: ModelHealthCell[];
+  meta?: ModelsHealthMeta;
 }
 
 export interface ModelHealthCell {
   epic: string;
   status: ModelStatus;
+  /** Hex color used to tint the cell background/border. Falls back to neutral. */
+  accent?: string;
+}
+
+/** Aggregate model metadata shown in the panel footer. */
+export interface ModelsHealthMeta {
+  /** Total feature count of the primary model (or aggregate). */
+  features: number;
+  version: string;
+  /** Last trained date in dd/MM/yy. */
+  lastTrained: string;
 }
 
 /** KPI Strip Compact — 6 cells. */

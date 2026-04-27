@@ -1,19 +1,33 @@
 <div class="pv-mh">
   <header class="pv-mh__head">
-    <span class="pv-mh__label mantis-mono">MODELS</span>
+    <span class="pv-mh__label mantis-mono">ML MODELS</span>
     <span class="pv-mh__badge mantis-mono" [class]="badgeClass()">
       {{ health().loaded }}/{{ health().total }}
+      @if (health().loaded === health().total && health().total > 0) {
+        <span class="pv-mh__badge-check" aria-hidden="true">✓</span>
+      }
     </span>
   </header>
 
   <div class="pv-mh__grid" role="list" aria-label="Per-asset model status">
     @for (cell of health().perAsset; track cell.epic) {
-      <span class="pv-mh__dot"
+      <span class="pv-mh__cell mantis-mono"
             role="listitem"
             [attr.data-status]="cell.status"
             [attr.title]="cell.epic + ' · ' + cell.status"
-            [attr.aria-label]="cell.epic + ' ' + cell.status">
+            [attr.aria-label]="cell.epic + ' ' + cell.status"
+            [style.--cell-color]="cell.accent || '#8B949E'">
+        <span class="pv-mh__cell-ticker">{{ cell.epic.slice(0, 3) }}</span>
+        <span class="pv-mh__cell-dot" aria-hidden="true"></span>
       </span>
     }
   </div>
+
+  @if (health().meta; as meta) {
+    <footer class="pv-mh__foot mantis-mono">
+      <span>{{ meta.features }} features</span>
+      <span>{{ meta.version }}</span>
+      <span>{{ meta.lastTrained }}</span>
+    </footer>
+  }
 </div>
