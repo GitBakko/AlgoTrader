@@ -11,7 +11,7 @@
     </span>
     <span class="pv-kpi__sub mantis-mono">unrealized · live</span>
     @if (pnlOpenPath()) {
-      <svg class="pv-kpi__spark" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <svg class="pv-kpi__chart pv-kpi__chart--spark" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
         <path [attr.d]="pnlOpenPath()" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
       </svg>
     }
@@ -28,7 +28,7 @@
     </span>
     <span class="pv-kpi__sub mantis-mono">realized · today</span>
     @if (pnlTodayPath()) {
-      <svg class="pv-kpi__spark" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <svg class="pv-kpi__chart pv-kpi__chart--spark" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
         <path [attr.d]="pnlTodayPath()" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
       </svg>
     }
@@ -38,6 +38,11 @@
     <span class="pv-kpi__label mantis-mono">Open</span>
     <span class="pv-kpi__value mantis-mono">{{ kpi().openCount }}</span>
     <span class="pv-kpi__sub mantis-mono">posizioni vive</span>
+    <div class="pv-kpi__chart pv-kpi__chart--pips" aria-hidden="true">
+      @for (filled of slotPips(); track $index) {
+        <span class="pv-kpi__pip" [class.is-on]="filled"></span>
+      }
+    </div>
   </article>
 
   <article class="pv-kpi__cell" role="listitem" data-accent="info">
@@ -46,6 +51,15 @@
       {{ kpi().winRate | number:'1.1-1':'it-IT' }}<span class="pv-kpi__value-suffix">%</span>
     </span>
     <span class="pv-kpi__sub mantis-mono">{{ kpi().signalsTotal }} sig totali</span>
+    <div class="pv-kpi__chart pv-kpi__chart--win" aria-hidden="true">
+      <div class="pv-kpi__win-stack">
+        <span class="pv-kpi__win-seg pv-kpi__win-seg--win" [style.width.%]="winSigBars().win"></span>
+        <span class="pv-kpi__win-seg pv-kpi__win-seg--miss" [style.width.%]="winSigBars().miss"></span>
+      </div>
+      <div class="pv-kpi__win-meter">
+        <span class="pv-kpi__win-meter-fill" [style.width.%]="winSigBars().intensity"></span>
+      </div>
+    </div>
   </article>
 
   <article class="pv-kpi__cell" role="listitem" data-accent="cyan">
@@ -54,6 +68,16 @@
       1:{{ kpi().rr | number:'1.2-2':'it-IT' }}
     </span>
     <span class="pv-kpi__sub mantis-mono">reward / risk</span>
+    <div class="pv-kpi__chart pv-kpi__chart--rr" aria-hidden="true">
+      <div class="pv-kpi__rr-track">
+        <span class="pv-kpi__rr-fill" [style.width.%]="rrPct()"></span>
+        <span class="pv-kpi__rr-marker" style="left: 33.3%"></span>
+        <span class="pv-kpi__rr-marker" style="left: 66.6%"></span>
+      </div>
+      <div class="pv-kpi__rr-scale mantis-mono">
+        <span>0</span><span>1</span><span>2</span><span>3+</span>
+      </div>
+    </div>
   </article>
 
   <article class="pv-kpi__cell"
@@ -66,8 +90,10 @@
       {{ kpi().ddLive | number:'1.1-1':'it-IT' }}<span class="pv-kpi__value-suffix">%</span>
     </span>
     <span class="pv-kpi__sub mantis-mono">gate {{ kpi().ddGate }}%</span>
-    <div class="pv-kpi__bar" aria-hidden="true">
-      <div class="pv-kpi__bar-fill" [style.width.%]="ddBarPct()"></div>
+    <div class="pv-kpi__chart pv-kpi__chart--dd" aria-hidden="true">
+      <div class="pv-kpi__bar">
+        <div class="pv-kpi__bar-fill" [style.width.%]="ddBarPct()"></div>
+      </div>
     </div>
   </article>
 

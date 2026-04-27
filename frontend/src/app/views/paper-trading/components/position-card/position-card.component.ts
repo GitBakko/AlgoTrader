@@ -6,12 +6,11 @@ import type { PaperTradingPosition } from '../../../../core/models/paper-trading
 /**
  * Position Card — center hero (HANDOFF §3.6).
  *
- * CARD-03 with state border-left (profit/loss). Five-column grid:
+ * CARD-03 with state border-left (profit/loss). Four-column grid:
  *   1. Asset · direction · size · age · trailing
- *   2. SL ←→ Entry ←→ TP visualization
- *   3. Trend sparkline 1H + min/max
- *   4. Current value (P&L hero)
- *   5. Meta (R:R · → SL · → TP) + Close button
+ *   2. SL ←→ Entry ←→ TP visualization + numeric triplet
+ *   3. P&L hero (value + % + price chart since open, side-by-side)
+ *   4. Meta (R:R · → SL · → TP) + Close button
  */
 @Component({
   selector: 'app-position-card',
@@ -57,6 +56,33 @@ export class PositionCardComponent {
   readonly rangeMarkers = computed(() => buildRangeMarkers(this.position()));
 
   readonly trendPath = computed(() => buildSparkPath(this.position().pricePath));
+
+  /** Filled area under the price line, bounded by the entry baseline so it
+   *  reads as "P&L vs open". Empty when the buffer has fewer than 2 points. */
+  readonly trendArea = computed(() => {
+    const path = this.position().pricePath;
+    if (path.length < 2) return '';
+    const min = Math.min(...path);
+    const max = Math.max(...path);
+    const range = max - min || 1;
+    const stepX = 100 / (path.length - 1);
+    const baselineY = 100 - ((this.position().entry - min) / range) * 100;
+    const vertices = path.map((v, i) => {
+      const x = i * stepX;
+      const y = 100 - ((v - min) / range) * 100;
+      return `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+    }).join(' ');
+    return `${vertices} L 100 ${baselineY.toFixed(2)} L 0 ${baselineY.toFixed(2)} Z`;
+  });
+
+  readonly entryBaselineY = computed(() => {
+    const path = this.position().pricePath;
+    if (path.length < 2) return 50;
+    const min = Math.min(...path);
+    const max = Math.max(...path);
+    const range = max - min || 1;
+    return 100 - ((this.position().entry - min) / range) * 100;
+  });
 
   readonly priceMin = computed(() => {
     const path = this.position().pricePath;
