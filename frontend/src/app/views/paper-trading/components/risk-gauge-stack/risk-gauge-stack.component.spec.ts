@@ -6,7 +6,7 @@ import type { RiskState } from '../../../../core/models/paper-trading';
 const baseRisk: RiskState = {
   circuitBreakers: { status: 'OK', tripped: 0, total: 6 },
   equityFilter: { status: 'OK', dd: 19.4, threshold: 20 },
-  kelly: { status: 'ATTIVO', avg: 14, win: 60.4, pnl: -28.7 },
+  kelly: { status: 'ATTIVO', avg: 14, win: 60.4, fraction: 12.5 },
   tradingStops: { status: 'OK', count: 3 },
 };
 
@@ -41,10 +41,10 @@ describe('RiskGaugeStackComponent', () => {
     expect(component.equityBarPct()).toBeCloseTo(97, 0);
   });
 
-  it('renders Kelly negative pnl with is-negative class', () => {
-    const negative = fixture.debugElement.query(By.css('.is-negative'));
-    expect(negative).toBeTruthy();
-    expect((negative.nativeElement as HTMLElement).textContent).toContain('-28.7');
+  it('renders Kelly fraction in cyan', () => {
+    const cyan = fixture.debugElement.query(By.css('.is-cyan'));
+    expect(cyan).toBeTruthy();
+    expect((cyan.nativeElement as HTMLElement).textContent).toContain('12.5%');
   });
 
   it('paints WARN circuit breakers row with is-warn', () => {

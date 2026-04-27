@@ -101,10 +101,14 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
 
   readonly riskState = computed<RiskState>(() => {
     const s = this.status();
+    const rs = this.trading.riskStatus();
     const cbRaw = s?.circuit_breakers_tripped ?? {};
     const cbTripped = Array.isArray(cbRaw) ? cbRaw.length : Object.keys(cbRaw).length;
     const equityBelow = s?.equity_curve_below_sma === true;
     const kelly = s?.kelly_stats ?? null;
+    // Backend stores current_drawdown_pct as a decimal fraction (0.04 = 4%).
+    const ddPct = (rs?.current_drawdown_pct ?? 0) * 100;
+    const ddOverThreshold = ddPct >= DEFAULT_DD_GATE_PCT * 0.7;
     return {
       circuitBreakers: {
         status: cbTripped === 0 ? 'OK' : 'WARN',
@@ -112,15 +116,15 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
         total: CIRCUIT_BREAKER_TOTAL,
       },
       equityFilter: {
-        status: equityBelow ? 'WARN' : 'OK',
-        dd: 0,
+        status: equityBelow || ddOverThreshold ? 'WARN' : 'OK',
+        dd: ddPct,
         threshold: DEFAULT_DD_GATE_PCT,
       },
       kelly: {
         status: kelly?.active ? 'ATTIVO' : 'PAUSED',
         avg: kelly?.total_trades ?? 0,
         win: (kelly?.win_rate ?? 0) * 100,
-        pnl: kelly?.total_pnl ?? 0,
+        fraction: (kelly?.half_kelly ?? kelly?.kelly_fraction ?? 0) * 100,
       },
       tradingStops: {
         status: 'OK',
@@ -162,7 +166,11 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.trading.loadPaperStatus();
-    this.pollTimer = setInterval(() => this.trading.loadPaperStatus(), 10_000);
+    this.trading.loadRiskStatus();
+    this.pollTimer = setInterval(() => {
+      this.trading.loadPaperStatus();
+      this.trading.loadRiskStatus();
+    }, 10_000);
     this.clockTimer = setInterval(() => this.tickClock.set(Date.now()), 1_000);
   }
 

@@ -71,11 +71,14 @@ export interface RiskEquityFilter {
 
 export interface RiskKelly {
   status: GaugeStatus;
+  /** Sample size (total trades counted by the Kelly tracker). */
   avg: number;
   /** Win rate percent (0..100). */
   win: number;
-  /** Cumulative P&L in account currency. */
-  pnl: number;
+  /** Half-Kelly fraction actually applied to sizing, expressed as % (0..100).
+   *  Replaces the previously surfaced `total_pnl`, which read as a lifetime
+   *  cumulative figure and was confusing next to live broker P&L. */
+  fraction: number;
 }
 
 export interface RiskTradingStops {
