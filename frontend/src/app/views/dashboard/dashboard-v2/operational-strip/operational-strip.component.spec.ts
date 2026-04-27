@@ -22,8 +22,12 @@ describe('OperationalStripComponent', () => {
     equityCurve: signal<any[]>([
       { date: new Date().toISOString().slice(0, 10), trade_count: 7 },
     ]),
+    paperPositions: signal<any[]>([]),
+    overview: signal<any>(null),
     performance: signal<any>(null),
     currentModels: signal<any>(null),
+    overnightSwap: signal<Record<string, any>>({}),
+    allocationData: signal<any>(null),
   };
 
   const wsStub = {
@@ -44,9 +48,12 @@ describe('OperationalStripComponent', () => {
   };
 
   beforeEach(async () => {
-    // Reset shared stubs between tests.
     tradingStub.performance.set(null);
     tradingStub.currentModels.set(null);
+    tradingStub.overview.set(null);
+    tradingStub.paperPositions.set([]);
+    tradingStub.overnightSwap.set({});
+    tradingStub.allocationData.set(null);
     wsStub.latencyMs.set(null);
     tradingStub.paperStatus.set({
       running: true,
@@ -82,7 +89,7 @@ describe('OperationalStripComponent', () => {
       circuit_breakers_tripped: { daily_loss: 'Hit soglia' },
     });
     fixture.detectChanges();
-    expect(component.circuitBreakersTrippedCount()).toBe(1);
+    expect(component.circuitBreakersTripped()).toBe(1);
   });
 
   it('counts tripped circuit breakers from legacy array shape', () => {
@@ -91,75 +98,24 @@ describe('OperationalStripComponent', () => {
       circuit_breakers_tripped: ['daily_loss', 'heartbeat_timeout'],
     });
     fixture.detectChanges();
-    expect(component.circuitBreakersTrippedCount()).toBe(2);
+    expect(component.circuitBreakersTripped()).toBe(2);
   });
 
-  it('falls back to equity curve last row when daily_trade_count missing', () => {
-    fixture.detectChanges();
-    expect(component.tradesToday()).toBe(7);
-  });
-
-  it('prefers performance.daily_trade_count over equity curve', () => {
-    tradingStub.performance.set({ daily_trade_count: 18 });
+  it('reads trade_count from performance signal', () => {
+    tradingStub.performance.set({ trade_count: 18 });
     fixture.detectChanges();
     expect(component.tradesToday()).toBe(18);
   });
 
-  it('renders uptime from backend uptime_seconds when available', () => {
-    tradingStub.paperStatus.set({
-      running: true,
-      execution_mode: 'PAPER',
-      iteration_count: 0,
-      interval_seconds: 10,
-      uptime_seconds: 7_200, // 2h
-      circuit_breakers_tripped: {},
-    });
+  it('defaults trade count to zero when performance missing', () => {
     fixture.detectChanges();
-    expect(component.paperBotUptimeText()).toBe('2h 0m');
+    expect(component.tradesToday()).toBe(0);
   });
 
-  it('falls back to iteration × interval when uptime_seconds missing', () => {
-    tradingStub.paperStatus.set({
-      running: true,
-      execution_mode: 'PAPER',
-      iteration_count: 360,
-      interval_seconds: 10,
-      uptime_seconds: undefined,
-      circuit_breakers_tripped: {},
-    });
+  it('reports zero open positions when paperPositions empty', () => {
     fixture.detectChanges();
-    expect(component.paperBotUptimeText()).toBe('1h 0m');
-  });
-
-  it('dash when bot idle', () => {
-    tradingStub.paperStatus.set({
-      running: false,
-      execution_mode: 'PAPER',
-      iteration_count: 0,
-      interval_seconds: 10,
-      uptime_seconds: 0,
-      circuit_breakers_tripped: {},
-    });
-    fixture.detectChanges();
-    expect(component.paperBotUptimeText()).toBe('—');
-  });
-
-  it('renders primary model label when currentModels populated', () => {
-    tradingStub.currentModels.set({
-      count: 1,
-      by_epic: {},
-      primary: {
-        epic: 'XAUUSD',
-        model_id: 'xgb-gold-v2-3',
-        model_type: 'xgboost',
-        num_features: 412,
-        version: '2.3',
-        last_trained: new Date().toISOString(),
-      },
-    });
-    fixture.detectChanges();
-    expect(component.primaryModelLabel()).toBe('XGBOOST·XAUUSD v2.3');
-    expect(component.primaryModelTrainedAt()).toContain('trained');
+    expect(component.openCount()).toBe(0);
+    expect(component.slotsFree()).toBe(component.maxSlots);
   });
 
   it('surfaces WS latency from the WebSocketService signal', () => {

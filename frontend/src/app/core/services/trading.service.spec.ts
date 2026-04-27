@@ -57,9 +57,15 @@ describe('TradingService', () => {
 
   it('should load overview and update signal', () => {
     const mockOverview = {
-      equity: 10000, daily_pnl: 50, total_pnl: 200,
-      open_positions_count: 3, win_rate: 0.65, sharpe_ratio: 1.5,
-      circuit_breaker_active: false, trading_mode: 'PAPER',
+      equity: 10000,
+      daily_pnl: 50,
+      today_realized_pnl: 30,
+      total_pnl: 200,
+      open_positions_count: 3,
+      win_rate: 0.65,
+      sharpe_ratio: 1.5,
+      circuit_breaker_active: false,
+      trading_mode: 'PAPER',
     };
 
     service.loadOverview();
