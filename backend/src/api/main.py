@@ -331,6 +331,7 @@ async def lifespan(app: FastAPI):
         db_session_factory=getattr(app.state, "db_session_factory", None),
         get_paper_loop=lambda: getattr(app.state, "paper_loop", None),
         get_broker_client=lambda: getattr(app.state, "broker_client", None),
+        get_broker_ws=lambda: getattr(app.state, "broker_ws_client", None),
     )
     try:
         app.state.pnl_snapshot_scheduler.start()

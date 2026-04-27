@@ -47,12 +47,19 @@ class PnlSnapshotScheduler:
         db_session_factory: DbSessionFactory | None,
         get_paper_loop: Callable[[], Any | None],
         get_broker_client: Callable[[], Any | None],
+        get_broker_ws: Callable[[], Any | None] | None = None,
     ) -> None:
         self._db_session_factory = db_session_factory
         self._get_paper_loop = get_paper_loop
         self._get_broker_client = get_broker_client
+        self._get_broker_ws = get_broker_ws or (lambda: None)
         self._scheduler = AsyncIOScheduler()
         self._tick_count = 0
+        # Live quote cache populated via the broker WS fan-out listener.
+        # Persists across tick failures so a single missing tick does not
+        # blank the chart. Updated on every WS message we receive.
+        self._latest_quotes: dict[str, tuple[float, float]] = {}
+        self._ws_listener_attached = False
 
     def start(self) -> None:
         if self._db_session_factory is None:
@@ -77,11 +84,63 @@ class PnlSnapshotScheduler:
             replace_existing=True,
         )
         self._scheduler.start()
+        # Try to attach to the broker WS so we get live quotes; the broker
+        # is started right after us so we retry on the first tick if the
+        # client wasn't available yet.
+        self._attach_ws_listener()
         logger.info(
             "P&L snapshot scheduler started "
             f"(interval={self.SNAPSHOT_INTERVAL_SECONDS}s, "
             f"retention={self.PRUNE_RETENTION_DAYS}d)"
         )
+
+    def _attach_ws_listener(self) -> None:
+        """Register a passive listener on the broker WS so the scheduler
+        sees the same live quote stream the frontend gets. Mirrors the
+        fan-out pattern in ``api/websocket._broker_price_stream``: the
+        broker WS may already have an ``_quote_listeners`` list set up by
+        a previous module — we just append to it. Otherwise we install
+        the fan-out wrapper ourselves.
+        """
+        if self._ws_listener_attached:
+            return
+        broker_ws = self._get_broker_ws()
+        if broker_ws is None:
+            return
+
+        def _capture(quote: Any) -> None:
+            try:
+                bid = float(getattr(quote, "bid", 0) or 0)
+                offer = float(getattr(quote, "offer", 0) or 0)
+                if bid <= 0 and offer <= 0:
+                    return
+                self._latest_quotes[str(quote.epic)] = (bid, offer)
+            except Exception:
+                pass
+
+        listeners: list = getattr(broker_ws, "_quote_listeners", None)
+        if listeners is None:
+            listeners = []
+            broker_ws._quote_listeners = listeners
+            original_handler = getattr(broker_ws, "_quote_handler", None)
+
+            async def _fan_out(quote: Any) -> None:
+                if original_handler:
+                    try:
+                        await original_handler(quote)
+                    except Exception as exc:
+                        logger.debug(f"original WS handler raised: {exc}")
+                for listener in list(listeners):
+                    try:
+                        listener(quote)
+                    except Exception:
+                        pass
+
+            broker_ws.on_quote(_fan_out)
+
+        listeners.append(_capture)
+        self._ws_listener_attached = True
+        logger.info("PnlSnapshotScheduler attached to broker WS quote stream")
 
     def stop(self) -> None:
         try:
@@ -100,6 +159,10 @@ class PnlSnapshotScheduler:
     async def _take_snapshot(self) -> None:
         if self._db_session_factory is None:
             return
+
+        # Lazy WS attach: broker_ws may not be ready when start() runs.
+        if not self._ws_listener_attached:
+            self._attach_ws_listener()
 
         captured_at = datetime.now(UTC)
         paper_loop = self._get_paper_loop()
@@ -153,18 +216,26 @@ class PnlSnapshotScheduler:
                 deal_id = self._position_deal_id(pos)
                 if not deal_id:
                     continue
-                price = self._position_current_price(pos)
+                epic = str(self._position_epic(pos) or "")
                 upl = self._position_upl(pos)
                 entry = self._position_entry(pos)
+                direction = self._position_direction(pos)
+                price = await self._resolve_live_price(
+                    epic=epic,
+                    direction=direction,
+                    entry=entry,
+                    upl=upl,
+                    size=self._position_size(pos),
+                    broker_client=broker_client,
+                )
                 pnl_pct = 0.0
                 if entry and price:
-                    direction = self._position_direction(pos)
                     base = (price - entry) / entry * 100.0
                     pnl_pct = base if direction == "BUY" else -base
                 position_rows.append(
                     PositionPnlSnapshot(
                         deal_id=str(deal_id),
-                        epic=str(self._position_epic(pos) or ""),
+                        epic=epic,
                         captured_at=captured_at,
                         pnl=float(upl) if upl is not None else 0.0,
                         pnl_pct=round(pnl_pct, 6),
@@ -232,18 +303,77 @@ class PnlSnapshotScheduler:
         return getattr(pos, "epic", None)
 
     @staticmethod
-    def _position_current_price(pos: Any) -> float | None:
+    def _position_size(pos: Any) -> float | None:
         if isinstance(pos, dict):
-            for key in ("current_price", "currentPrice", "level", "price"):
-                value = pos.get(key)
-                if value is not None:
-                    return float(value)
-            return None
-        for attr in ("current_price", "level"):
-            value = getattr(pos, attr, None)
+            value = pos.get("size")
             if value is not None:
                 return float(value)
+            return None
+        value = getattr(pos, "size", None)
+        if value is not None:
+            return float(value)
         return None
+
+    async def _resolve_live_price(
+        self,
+        *,
+        epic: str,
+        direction: str,
+        entry: float | None,
+        upl: float | None,
+        size: float | None,
+        broker_client: Any | None,
+    ) -> float | None:
+        """Best-effort live mid-price. Resolution chain:
+          1. WS quote cache (mid of bid/offer received via broker WS).
+          2. ``broker_client.get_market_details(epic)`` snapshot bid/offer.
+          3. Reconstructed price from broker UPL: for forex-like instruments
+             ``current ≈ entry + sign * upl/size``. Approximate (ignores
+             fees/conversion) but always non-flat while UPL drifts.
+          4. ``entry`` as last resort. The chart treats this as flat — we
+             prefer to leave the row out, but consistency with old data
+             is acceptable.
+        """
+        if not epic:
+            return entry
+
+        cached = self._latest_quotes.get(epic)
+        if cached:
+            bid, offer = cached
+            if direction == "BUY":
+                return bid or offer or None
+            if direction == "SELL":
+                return offer or bid or None
+            mid = (bid + offer) / 2.0 if bid and offer else (bid or offer)
+            if mid:
+                return mid
+
+        if broker_client is not None:
+            try:
+                details = await broker_client.get_market_details(epic)
+                snap = (details or {}).get("snapshot") or {}
+                bid = snap.get("bid")
+                offer = snap.get("offer")
+                if bid and offer:
+                    self._latest_quotes[epic] = (float(bid), float(offer))
+                    if direction == "BUY":
+                        return float(bid)
+                    if direction == "SELL":
+                        return float(offer)
+                    return (float(bid) + float(offer)) / 2.0
+            except Exception as exc:
+                logger.debug(f"market_details({epic}) failed: {exc}")
+
+        # Last-ditch reconstruction from UPL (forex-like — order of magnitude
+        # rather than exact, but enough to keep the chart non-flat).
+        if entry and upl is not None and size:
+            sign = 1.0 if direction == "BUY" else -1.0
+            try:
+                return float(entry) + sign * (float(upl) / float(size))
+            except Exception:
+                return entry
+
+        return entry
 
     @staticmethod
     def _position_entry(pos: Any) -> float | None:
