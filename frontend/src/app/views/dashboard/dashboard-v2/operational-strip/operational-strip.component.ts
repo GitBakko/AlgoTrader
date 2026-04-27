@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, computed, inject, output, signal, effect, input } from '@angular/core';
+import { Component, ChangeDetectionStrategy, computed, inject, output, signal, effect, input, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TradingService } from '../../../../core/services/trading.service';
 import { WebSocketService } from '../../../../core/services/websocket.service';
@@ -51,7 +51,6 @@ export class OperationalStripComponent {
   readonly marketStatusSig = signal<{ is_open: boolean; status: string } | null>(null);
 
   readonly nowTick = signal<number>(Date.now());
-  private readonly nowTimer = setInterval(() => this.nowTick.set(Date.now()), 30_000);
 
   readonly ws$ = this.ws;
 
@@ -206,6 +205,10 @@ export class OperationalStripComponent {
   }
 
   constructor() {
+    const destroyRef = inject(DestroyRef);
+    const timer = setInterval(() => this.nowTick.set(Date.now()), 30_000);
+    destroyRef.onDestroy(() => clearInterval(timer));
+
     effect(async () => {
       this.nowTick();
       try {

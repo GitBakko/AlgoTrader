@@ -1,18 +1,17 @@
 import {
-  Component, ChangeDetectionStrategy, inject, OnInit, signal, computed,
+  Component, ChangeDetectionStrategy, inject, OnInit, signal, computed, DestroyRef,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
   ColComponent, RowComponent,
 } from '@coreui/angular';
-import { HttpClient } from '@angular/common/http';
 import { ChartjsComponent } from '@coreui/angular-chartjs';
 import { TradingService } from '../../core/services/trading.service';
+import { ApiService } from '../../core/services/api.service';
 import { TvChartComponent, LineDataPoint } from '../../shared/components/tv-chart/tv-chart.component';
 import { CorrelationHeatmapComponent, CorrelationData } from './correlation-heatmap.component';
-import { environment } from '../../../environments/environment';
-import { ApiResponse } from '../../core/models';
 
 @Component({
   selector: 'app-performance',
@@ -31,7 +30,8 @@ import { ApiResponse } from '../../core/models';
 })
 export class PerformanceComponent implements OnInit {
   private readonly trading = inject(TradingService);
-  private readonly http = inject(HttpClient);
+  private readonly api = inject(ApiService);
+  private readonly destroyRef = inject(DestroyRef);
   readonly performance = this.trading.performance;
   readonly correlationData = signal<CorrelationData | null>(null);
 
@@ -60,13 +60,12 @@ export class PerformanceComponent implements OnInit {
   }
 
   private loadCorrelation(): void {
-    this.http.get<ApiResponse<CorrelationData>>(
-      `${environment.apiUrl}/api/analytics/correlation-matrix?days=90`
-    ).subscribe({
-      next: res => {
-        if (res.success) this.correlationData.set(res.data);
-      },
-    });
+    this.api
+      .get<CorrelationData>('/api/analytics/correlation-matrix', { days: 90 })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: data => this.correlationData.set(data),
+      });
   }
 
   // Equity curve for TvChart — deduplicate to last value per day
