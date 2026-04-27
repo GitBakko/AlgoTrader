@@ -360,9 +360,17 @@ async def trading_performance(
     if position_repo is not None:
         try:
             date_from = datetime.now(UTC) - timedelta(days=days)
+            # Anchor max-drawdown / Calmar to the broker's live equity so
+            # the figures stay in lockstep with /dashboard/equity-curve.
+            from src.api.dependencies import get_risk_manager  # local import to avoid cycle
+
+            risk_mgr = get_risk_manager(request)
+            live_equity = risk_mgr.drawdown_monitor.state.current_equity if risk_mgr else None
+            terminal = float(live_equity) if live_equity and live_equity > 0 else None
             stats = await position_repo.get_performance_stats(
                 date_from=date_from,
                 epic=epic,
+                terminal_equity=terminal,
             )
             # Dashboard v2: enrich with "trades opened today" count.
             try:

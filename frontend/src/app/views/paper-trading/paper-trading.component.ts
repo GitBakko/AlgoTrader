@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, ElementRef, inject, OnDestroy, OnInit, signal, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 import { CockpitHeaderComponent, type CockpitMode, type CockpitState } from '../../shared/components/cockpit-header/cockpit-header.component';
@@ -22,6 +22,7 @@ import { ActivePositionsCockpitComponent } from './components/active-positions-c
 import { PositionDetailDrawerComponent } from './components/position-detail-drawer/position-detail-drawer.component';
 import { SignalsHeatmapComponent, type HeatmapCell } from './components/signals-heatmap/signals-heatmap.component';
 import { LiveFeedTimelineComponent } from './components/live-feed-timeline/live-feed-timeline.component';
+import type { FeedEvent } from '../../core/models';
 import { WebSocketService } from '../../core/services/websocket.service';
 import type { PaperPosition } from '../../core/models';
 import { epicColor } from '../../shared/constants/epic-colors';
@@ -352,6 +353,13 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   private signalsTimer: ReturnType<typeof setInterval> | null = null;
   private knownDealIds = new Set<string>();
 
+  /** ResizeObserver bound to the left rail. Right rail height tracks it
+   *  via the `--rail-left-height` CSS variable so the feed never overflows
+   *  past the bottom of the ML Models card (last left-rail item). */
+  readonly leftRailRef = viewChild<ElementRef<HTMLElement>>('leftRail');
+  readonly rightRailRef = viewChild<ElementRef<HTMLElement>>('rightRail');
+  private leftRailObserver: ResizeObserver | null = null;
+
   ngOnInit(): void {
     this.trading.loadPaperStatus();
     this.trading.loadRiskStatus();
@@ -384,6 +392,11 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     // Kick the first fetch right after the position list lands so the
     // chart isn't blank for a full 30s.
     queueMicrotask(() => this.refreshPositionHistories());
+
+    // Start observing the left rail so the right rail's height stays
+    // pinned to the ML-Models card bottom. `viewChild()` resolves async
+    // after the first paint; queueMicrotask gives Angular one tick.
+    queueMicrotask(() => this.attachLeftRailObserver());
   }
 
   ngOnDestroy(): void {
@@ -411,6 +424,28 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
       clearInterval(this.signalsTimer);
       this.signalsTimer = null;
     }
+    if (this.leftRailObserver) {
+      this.leftRailObserver.disconnect();
+      this.leftRailObserver = null;
+    }
+  }
+
+  private attachLeftRailObserver(): void {
+    if (typeof ResizeObserver === 'undefined') return;
+    const left = this.leftRailRef()?.nativeElement;
+    const right = this.rightRailRef()?.nativeElement;
+    if (!left || !right) {
+      // First paint hasn't materialized the views yet — retry one frame later.
+      queueMicrotask(() => this.attachLeftRailObserver());
+      return;
+    }
+    const apply = (): void => {
+      const h = Math.round(left.getBoundingClientRect().height);
+      if (h > 0) right.style.setProperty('--rail-left-height', `${h}px`);
+    };
+    this.leftRailObserver = new ResizeObserver(apply);
+    this.leftRailObserver.observe(left);
+    apply();
   }
 
   /** Re-fetch per-position P&L history. Called on a timer + every time
@@ -501,6 +536,36 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     // Fall back to the global signal-audit drawer (latest by epic).
     if (cell.epic && cell.state !== 'none') {
       this.signalAudit.openLatestByEpic(cell.epic);
+    }
+  }
+
+  /** Feed-row click → open the signal-audit drawer with the row's reasoning,
+   *  pro/contro vote breakdown and ML agreement (HANDOFF §3.8). The feed
+   *  row id is prefixed (`signal-{n}`, `pos-open-{n}`, `pos-close-{n}`,
+   *  `notif-{n}`); we resolve to the right drawer call from the prefix. */
+  onFeedEventClick(event: FeedEvent): void {
+    const id = event.id ?? '';
+    if (id.startsWith('signal-')) {
+      const numeric = Number(id.slice('signal-'.length));
+      if (Number.isFinite(numeric) && numeric > 0) {
+        this.signalAudit.open(numeric);
+        return;
+      }
+    }
+    if (id.startsWith('pos-open-') || id.startsWith('pos-close-')) {
+      // `meta` carries the broker deal_id for position-open events; the
+      // open-by-deal endpoint walks back to the source signal via the
+      // signal_id FK so we can render the same audit panel.
+      const dealId = event.meta && id.startsWith('pos-open-') ? event.meta : null;
+      if (dealId) {
+        this.signalAudit.openByDealId(dealId, event.epic ?? undefined);
+        return;
+      }
+    }
+    // Fallback: latest signal by epic. Keeps the click meaningful even for
+    // notification rows tied to a specific asset.
+    if (event.epic) {
+      this.signalAudit.openLatestByEpic(event.epic);
     }
   }
 

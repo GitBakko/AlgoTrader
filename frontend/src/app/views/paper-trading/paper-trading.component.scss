@@ -54,11 +54,28 @@
   min-width: 0;
 }
 
+// Right rail height is synced to the left-rail content via a CSS variable
+// set from TS (ResizeObserver). Falls back to viewport-bounded sticky if
+// the variable is not yet computed (first paint), so the column never
+// overflows past the page bottom border.
 .pt2-rail-right {
   position: sticky;
   top: 14px;
   align-self: flex-start;
+  height: var(--rail-left-height, calc(100vh - 28px));
   max-height: calc(100vh - 28px);
+  min-height: 0;
+  overflow: hidden;
+}
+
+// The feed component must fill the rail and own its internal scroll.
+// Without this it would size to its intrinsic content and ignore the
+// rail's max-height, pushing the bottom border off-screen.
+.pt2-rail-right > app-live-feed-timeline {
+  display: block;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
   overflow: hidden;
 }
 

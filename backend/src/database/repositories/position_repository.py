@@ -463,9 +463,19 @@ class PositionRepository(BaseRepository[Position]):
         date_from: datetime | None = None,
         date_to: datetime | None = None,
         epic: str | None = None,
+        terminal_equity: float | None = None,
     ) -> dict:
         """
         Get comprehensive performance statistics from closed positions.
+
+        ``terminal_equity`` is the broker-side current equity. When supplied,
+        the equity curve and max-drawdown are reconstructed by walking back
+        from that anchor (terminal − daily_pnl) instead of using
+        ``settings.initial_capital + cumulative_pnl``. The static-anchor
+        path drifts from broker truth on demo resets, UNRECONCILED filter
+        exclusions, or external manual adjustments — anchoring to the
+        broker's reported equity keeps every DD %% the dashboard surfaces
+        consistent.
 
         Returns:
             Dict with trade_count, win/loss stats, profit_factor, pnl_by_epic, equity_curve
@@ -534,31 +544,26 @@ class PositionRepository(BaseRepository[Position]):
                 day = p.closed_at.strftime("%Y-%m-%d")
                 daily_buckets[day].append(float(p.profit_loss))
 
-        # Second pass: build enriched equity points
+        # Second pass: build enriched equity points.
+        # When ``terminal_equity`` is supplied (broker truth), walk backward
+        # from it: equity[i] = equity[i+1] − daily_pnl[i+1]. Otherwise fall
+        # back to the legacy `initial_capital + cumulative` reconstruction.
         from src.utils.config import get_settings
 
         initial_equity = get_settings().initial_capital
-        equity_points: list[dict] = []
-        cumulative = 0.0
+        sorted_days = sorted(daily_buckets.keys())
+        daily_summaries: list[dict] = []
         cumulative_trades = 0
         cumulative_wins = 0
-        peak_equity = initial_equity
-        for day in sorted(daily_buckets.keys()):
+        for day in sorted_days:
             day_pnls = daily_buckets[day]
-            daily_pnl = sum(day_pnls)
             day_wins = sum(1 for v in day_pnls if v > 0)
-            cumulative += daily_pnl
             cumulative_trades += len(day_pnls)
             cumulative_wins += day_wins
-            equity_now = initial_equity + cumulative
-            peak_equity = max(peak_equity, equity_now)
-            dd_pct = (equity_now - peak_equity) / peak_equity * 100 if peak_equity > 0 else 0.0
-            equity_points.append(
+            daily_summaries.append(
                 {
                     "date": day,
-                    "value": round(cumulative, 2),
-                    "daily_pnl": round(daily_pnl, 2),
-                    "drawdown_pct": round(dd_pct, 2),
+                    "daily_pnl": round(sum(day_pnls), 2),
                     "trade_count": len(day_pnls),
                     "win_count": day_wins,
                     "cumulative_trades": cumulative_trades,
@@ -567,6 +572,50 @@ class PositionRepository(BaseRepository[Position]):
                         if cumulative_trades > 0
                         else 0.0
                     ),
+                }
+            )
+
+        equities: list[float] = []
+        if terminal_equity is not None and terminal_equity > 0 and daily_summaries:
+            equities = [0.0] * len(daily_summaries)
+            equities[-1] = float(terminal_equity)
+            for i in range(len(daily_summaries) - 2, -1, -1):
+                next_pnl = float(daily_summaries[i + 1].get("daily_pnl", 0.0) or 0.0)
+                equities[i] = equities[i + 1] - next_pnl
+        else:
+            cumulative = 0.0
+            for s in daily_summaries:
+                cumulative += float(s["daily_pnl"])
+                equities.append(initial_equity + cumulative)
+
+        # Peak anchor depends on whether we're walk-backed or legacy:
+        # • Walk-back (terminal_equity supplied): the broker's real starting
+        #   equity inside the window is ``equities[0]``. Demo resets and
+        #   manual adjustments may put it well below ``initial_capital``.
+        #   Anchoring peak to that value gives a real "high-water mark
+        #   inside the window" curve.
+        # • Legacy (no terminal_equity): the implicit anchor is
+        #   ``initial_capital``; preserving that keeps the previous
+        #   behaviour for callers that haven't been migrated yet.
+        if terminal_equity is not None and equities:
+            peak_equity = equities[0]
+        else:
+            peak_equity = initial_equity
+        equity_points: list[dict] = []
+        for s, equity_now in zip(daily_summaries, equities, strict=False):
+            peak_equity = max(peak_equity, equity_now)
+            dd_pct = (equity_now - peak_equity) / peak_equity * 100 if peak_equity > 0 else 0.0
+            equity_points.append(
+                {
+                    "date": s["date"],
+                    "value": round(equity_now - initial_equity, 2),
+                    "equity": round(equity_now, 2),
+                    "daily_pnl": s["daily_pnl"],
+                    "drawdown_pct": round(dd_pct, 2),
+                    "trade_count": s["trade_count"],
+                    "win_count": s["win_count"],
+                    "cumulative_trades": s["cumulative_trades"],
+                    "cumulative_win_rate": s["cumulative_win_rate"],
                 }
             )
 
@@ -587,19 +636,22 @@ class PositionRepository(BaseRepository[Position]):
             sharpe_ratio = (avg_return / std_return * np.sqrt(252)) if std_return > 0 else 0.0
             sortino_ratio = (avg_return / downside_std * np.sqrt(252)) if downside_std > 0 else 0.0
 
-            # Max drawdown + Calmar — computed on REAL equity (initial + cumulative P&L),
-            # NOT on cumulative P&L alone. The `values` array here is cumulative P&L,
-            # which starts near 0 and can go negative; dividing by peak(cumulative) produces
-            # meaningless ratios (e.g. -5e11 calmar) because the denominator is tiny.
-            equity_values = initial_equity + values  # real equity curve
+            # Max drawdown + Calmar — computed on the (possibly broker-anchored)
+            # equity curve we just built, not on cumulative P&L alone. When
+            # ``terminal_equity`` was supplied, the curve is the walk-back
+            # reconstruction (real broker truth at the end, real walk-back
+            # for prior days). Otherwise it falls back to the legacy
+            # ``initial + cumulative`` shape.
+            equity_values = np.array(equities, dtype=np.float64)
             peak_eq = np.maximum.accumulate(equity_values)
             drawdowns = (peak_eq - equity_values) / np.maximum(peak_eq, 1e-10)
             max_drawdown = float(np.max(drawdowns)) if len(drawdowns) > 0 else 0.0
 
             total_days = max(len(equity_points), 1)
+            equity_start = float(equity_values[0])
             equity_end = float(equity_values[-1])
-            if initial_equity > 0 and equity_end > 0:
-                total_return_factor = equity_end / initial_equity
+            if equity_start > 0 and equity_end > 0:
+                total_return_factor = equity_end / equity_start
                 annualized_return = total_return_factor ** (252 / total_days) - 1
             else:
                 annualized_return = 0.0

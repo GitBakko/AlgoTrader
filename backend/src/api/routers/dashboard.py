@@ -172,14 +172,25 @@ async def get_equity_curve(
     if position_repo is not None:
         try:
             date_from = datetime.now(UTC) - timedelta(days=days)
-            stats = await position_repo.get_performance_stats(date_from=date_from)
+            # Anchor the curve to the broker's live equity. This is the only
+            # value the broker treats as truth; deriving past days from
+            # `initial_capital + cumulative_pnl` drifts whenever the demo
+            # account is reset, UNRECONCILED rows are excluded by the
+            # repository filter, or when external adjustments land outside
+            # the trading loop.
+            live_equity = risk_mgr.drawdown_monitor.state.current_equity
+            terminal = float(live_equity) if live_equity and live_equity > 0 else None
+            stats = await position_repo.get_performance_stats(
+                date_from=date_from,
+                terminal_equity=terminal,
+            )
             curve = stats.get("equity_curve", [])
             if curve:
-                initial = get_settings().initial_capital
                 points = [
                     EquityCurvePoint(
                         date=pt["date"],
-                        equity=initial + pt["value"],
+                        equity=pt.get("equity")
+                        or round(get_settings().initial_capital + pt["value"], 2),
                         drawdown_pct=pt.get("drawdown_pct", 0.0),
                         daily_pnl=pt.get("daily_pnl", 0.0),
                         trade_count=pt.get("trade_count", 0),
@@ -190,22 +201,21 @@ async def get_equity_curve(
                     for pt in curve
                 ]
 
-                # Append live equity point so curve matches the dashboard badge
-                live_equity = risk_mgr.drawdown_monitor.state.current_equity
-                if live_equity and live_equity > 0:
-                    today = datetime.now(UTC).strftime("%Y-%m-%d")
-                    last_pt = points[-1]
-                    if last_pt["date"] == today:
-                        # Replace today's point with live equity
-                        last_pt["equity"] = round(live_equity, 2)
+                # Append/replace the "today" tip so the curve always ends
+                # at the broker truth, regardless of whether a close hit
+                # the books today.
+                today = datetime.now(UTC).strftime("%Y-%m-%d")
+                if terminal is not None:
+                    if points and points[-1]["date"] == today:
+                        points[-1]["equity"] = round(terminal, 2)
                     else:
-                        # Add a new point for today
                         points.append(
                             EquityCurvePoint(
                                 date=today,
-                                equity=round(live_equity, 2),
+                                equity=round(terminal, 2),
                                 drawdown_pct=round(
-                                    risk_mgr.drawdown_monitor.state.current_drawdown_pct * 100,
+                                    risk_mgr.drawdown_monitor.state.current_drawdown_pct
+                                    * 100,
                                     2,
                                 ),
                             ).model_dump()
