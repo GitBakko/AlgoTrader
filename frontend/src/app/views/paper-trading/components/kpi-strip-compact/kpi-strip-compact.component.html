@@ -1,0 +1,74 @@
+<div class="pv-kpi" role="list" aria-label="Paper Trading KPI strip">
+
+  <article class="pv-kpi__cell"
+           role="listitem"
+           [class.is-positive]="pnlOpenSign() > 0"
+           [class.is-negative]="pnlOpenSign() < 0"
+           data-accent="profit">
+    <span class="pv-kpi__label mantis-mono">P&amp;L Open</span>
+    <span class="pv-kpi__value mantis-mono">
+      {{ currencySym() }}{{ kpi().pnlOpen >= 0 ? '+' : '' }}{{ kpi().pnlOpen | number:'1.2-2':'it-IT' }}
+    </span>
+    <span class="pv-kpi__sub mantis-mono">unrealized · live</span>
+    @if (pnlOpenPath()) {
+      <svg class="pv-kpi__spark" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <path [attr.d]="pnlOpenPath()" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+      </svg>
+    }
+  </article>
+
+  <article class="pv-kpi__cell"
+           role="listitem"
+           [class.is-positive]="pnlTodaySign() > 0"
+           [class.is-negative]="pnlTodaySign() < 0"
+           data-accent="profit">
+    <span class="pv-kpi__label mantis-mono">P&amp;L Today</span>
+    <span class="pv-kpi__value mantis-mono">
+      {{ currencySym() }}{{ kpi().pnlToday >= 0 ? '+' : '' }}{{ kpi().pnlToday | number:'1.2-2':'it-IT' }}
+    </span>
+    <span class="pv-kpi__sub mantis-mono">realized · today</span>
+    @if (pnlTodayPath()) {
+      <svg class="pv-kpi__spark" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <path [attr.d]="pnlTodayPath()" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+      </svg>
+    }
+  </article>
+
+  <article class="pv-kpi__cell" role="listitem" data-accent="info">
+    <span class="pv-kpi__label mantis-mono">Open</span>
+    <span class="pv-kpi__value mantis-mono">{{ kpi().openCount }}</span>
+    <span class="pv-kpi__sub mantis-mono">posizioni vive</span>
+  </article>
+
+  <article class="pv-kpi__cell" role="listitem" data-accent="info">
+    <span class="pv-kpi__label mantis-mono">Win / Sig</span>
+    <span class="pv-kpi__value mantis-mono">
+      {{ kpi().winRate | number:'1.1-1':'it-IT' }}<span class="pv-kpi__value-suffix">%</span>
+    </span>
+    <span class="pv-kpi__sub mantis-mono">{{ kpi().signalsTotal }} sig totali</span>
+  </article>
+
+  <article class="pv-kpi__cell" role="listitem" data-accent="cyan">
+    <span class="pv-kpi__label mantis-mono">R:R Avg</span>
+    <span class="pv-kpi__value mantis-mono pv-kpi__value--cyan">
+      1:{{ kpi().rr | number:'1.2-2':'it-IT' }}
+    </span>
+    <span class="pv-kpi__sub mantis-mono">reward / risk</span>
+  </article>
+
+  <article class="pv-kpi__cell"
+           role="listitem"
+           [class.is-warn]="ddBarPct() >= 70"
+           [class.is-loss]="ddBarPct() >= 95"
+           data-accent="loss">
+    <span class="pv-kpi__label mantis-mono">DD Live</span>
+    <span class="pv-kpi__value mantis-mono">
+      {{ kpi().ddLive | number:'1.1-1':'it-IT' }}<span class="pv-kpi__value-suffix">%</span>
+    </span>
+    <span class="pv-kpi__sub mantis-mono">gate {{ kpi().ddGate }}%</span>
+    <div class="pv-kpi__bar" aria-hidden="true">
+      <div class="pv-kpi__bar-fill" [style.width.%]="ddBarPct()"></div>
+    </div>
+  </article>
+
+</div>

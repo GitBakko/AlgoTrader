@@ -1,0 +1,130 @@
+<article class="pv-pc"
+         [class.is-profit]="inProfit()"
+         [class.is-loss]="!inProfit()"
+         (click)="onCardClick()"
+         tabindex="0"
+         role="button"
+         [attr.aria-label]="'Posizione ' + position().ticker + ' ' + position().direction">
+
+  <!-- COL 1 — Asset · direction · size · age · trail -->
+  <div class="pv-pc__col pv-pc__col--asset">
+    <div class="pv-pc__asset">
+      <app-epic-logo [epic]="position().ticker" [size]="28"></app-epic-logo>
+      <div class="pv-pc__asset-text">
+        <span class="pv-pc__ticker mantis-mono">{{ position().ticker }}</span>
+        <span class="pv-pc__age-row mantis-mono">
+          <span class="pv-pc__age-label">AGE</span>
+          <span class="pv-pc__age-value">{{ ageLabel() }}</span>
+        </span>
+      </div>
+    </div>
+    <div class="pv-pc__chips">
+      <span class="pv-pc__chip pv-pc__chip--dir mantis-mono"
+            [attr.data-dir]="position().direction">
+        {{ position().direction }}
+      </span>
+      <span class="pv-pc__chip pv-pc__chip--size mantis-mono">
+        {{ position().size | number:'1.0-4':'it-IT' }}
+      </span>
+      <span class="pv-pc__chip pv-pc__chip--trail mantis-mono"
+            [attr.data-on]="position().trailing">
+        {{ position().trailing ? 'TRAIL ●' : 'TRAIL ○' }}
+      </span>
+    </div>
+  </div>
+
+  <!-- COL 2 — Range visualization SL ←→ Entry ←→ Current ←→ TP -->
+  <div class="pv-pc__col pv-pc__col--range">
+    <div class="pv-pc__range" aria-hidden="true">
+      <div class="pv-pc__range-track"></div>
+      <div class="pv-pc__range-marker pv-pc__range-marker--sl"
+           [style.left.%]="rangeMarkers().sl"></div>
+      <div class="pv-pc__range-marker pv-pc__range-marker--tp"
+           [style.left.%]="rangeMarkers().tp"></div>
+      <div class="pv-pc__range-marker pv-pc__range-marker--entry"
+           [style.left.%]="rangeMarkers().entry"></div>
+      <div class="pv-pc__range-marker pv-pc__range-marker--current"
+           [style.left.%]="rangeMarkers().current"></div>
+    </div>
+    <div class="pv-pc__triplet">
+      <div class="pv-pc__triplet-cell pv-pc__triplet-cell--sl">
+        <span class="pv-pc__triplet-label mantis-mono">STOP LOSS</span>
+        <span class="pv-pc__triplet-price mantis-mono">{{ position().stopLoss }}</span>
+        <span class="pv-pc__triplet-meta mantis-mono">
+          {{ distToSlPct() | number:'1.2-2':'it-IT' }}%
+        </span>
+      </div>
+      <div class="pv-pc__triplet-cell pv-pc__triplet-cell--entry">
+        <span class="pv-pc__triplet-label mantis-mono">ENTRY</span>
+        <span class="pv-pc__triplet-price mantis-mono">{{ position().entry }}</span>
+        <span class="pv-pc__triplet-meta mantis-mono">marker ⬤</span>
+      </div>
+      <div class="pv-pc__triplet-cell pv-pc__triplet-cell--tp">
+        <span class="pv-pc__triplet-label mantis-mono">TAKE PROFIT</span>
+        <span class="pv-pc__triplet-price mantis-mono">{{ position().takeProfit }}</span>
+        <span class="pv-pc__triplet-meta mantis-mono">
+          {{ distToTpPct() | number:'1.2-2':'it-IT' }}%
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- COL 3 — Trend 1H sparkline -->
+  <div class="pv-pc__col pv-pc__col--trend">
+    <div class="pv-pc__trend-head">
+      <span class="pv-pc__trend-label mantis-mono">Trend 1H</span>
+      <span class="pv-pc__trend-dir mantis-mono"
+            [class.is-agree]="trendAgrees() === true"
+            [class.is-against]="trendAgrees() === false">
+        {{ trendLabel() }}
+      </span>
+    </div>
+    @if (trendPath()) {
+      <svg class="pv-pc__spark" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <path [attr.d]="trendPath()" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+      </svg>
+    }
+    <div class="pv-pc__trend-bounds mantis-mono">
+      <span>min {{ priceMin() }}</span>
+      <span>max {{ priceMax() }}</span>
+    </div>
+  </div>
+
+  <!-- COL 4 — Current P&L hero -->
+  <div class="pv-pc__col pv-pc__col--pnl">
+    <span class="pv-pc__pnl-label mantis-mono">P&amp;L corrente</span>
+    <span class="pv-pc__pnl-value mantis-mono">
+      {{ currencySym() }}{{ position().pnlEur >= 0 ? '+' : '' }}{{ position().pnlEur | number:'1.2-2':'it-IT' }}
+    </span>
+    <span class="pv-pc__pnl-pct mantis-mono">
+      {{ position().pnlPct >= 0 ? '+' : '' }}{{ position().pnlPct | number:'1.3-3':'it-IT' }}%
+    </span>
+    <span class="pv-pc__pnl-quote mantis-mono">quote {{ position().current }}</span>
+  </div>
+
+  <!-- COL 5 — Meta + Close -->
+  <div class="pv-pc__col pv-pc__col--meta">
+    <div class="pv-pc__meta-row">
+      <span class="pv-pc__meta-label mantis-mono">R:R</span>
+      <span class="pv-pc__meta-value mantis-mono">1:{{ position().rr | number:'1.2-2':'it-IT' }}</span>
+    </div>
+    <div class="pv-pc__meta-row">
+      <span class="pv-pc__meta-label mantis-mono">→ SL</span>
+      <span class="pv-pc__meta-value mantis-mono is-loss">
+        {{ distToSlPct() | number:'1.2-2':'it-IT' }}%
+      </span>
+    </div>
+    <div class="pv-pc__meta-row">
+      <span class="pv-pc__meta-label mantis-mono">→ TP</span>
+      <span class="pv-pc__meta-value mantis-mono is-profit">
+        {{ distToTpPct() | number:'1.2-2':'it-IT' }}%
+      </span>
+    </div>
+    <button type="button"
+            class="pv-pc__close mantis-mono"
+            (click)="onClose($event)"
+            [attr.aria-label]="'Chiudi posizione ' + position().ticker">
+      CLOSE NOW
+    </button>
+  </div>
+</article>

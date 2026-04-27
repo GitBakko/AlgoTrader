@@ -5,10 +5,21 @@ import { CockpitHeaderComponent, type CockpitMode, type CockpitState } from '../
 import { TradingService } from '../../core/services/trading.service';
 import { ToastService } from '../../shared/services/toast.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
-import type { BotVitals, ModelsHealth, ModelsHealthMeta, RiskState } from '../../core/models/paper-trading';
+import type {
+  BotVitals,
+  KpiStrip,
+  ModelsHealth,
+  ModelsHealthMeta,
+  PaperTradingPosition,
+  RiskState,
+} from '../../core/models/paper-trading';
 import { BotVitalsPanelComponent } from './components/bot-vitals-panel/bot-vitals-panel.component';
 import { RiskGaugeStackComponent } from './components/risk-gauge-stack/risk-gauge-stack.component';
 import { ModelsHealthPanelComponent } from './components/models-health-panel/models-health-panel.component';
+import { KpiStripCompactComponent } from './components/kpi-strip-compact/kpi-strip-compact.component';
+import { ActivePositionsCockpitComponent } from './components/active-positions-cockpit/active-positions-cockpit.component';
+import { WebSocketService } from '../../core/services/websocket.service';
+import type { PaperPosition } from '../../core/models';
 import { epicColor } from '../../shared/constants/epic-colors';
 
 const CIRCUIT_BREAKER_TOTAL = 6;
@@ -32,6 +43,8 @@ const DEFAULT_DD_GATE_PCT = 20;
     BotVitalsPanelComponent,
     RiskGaugeStackComponent,
     ModelsHealthPanelComponent,
+    KpiStripCompactComponent,
+    ActivePositionsCockpitComponent,
   ],
   templateUrl: './paper-trading.component.html',
   styleUrls: ['./paper-trading.component.scss'],
@@ -41,6 +54,7 @@ const DEFAULT_DD_GATE_PCT = 20;
 })
 export class PaperTradingComponent implements OnInit, OnDestroy {
   private readonly trading = inject(TradingService);
+  private readonly ws = inject(WebSocketService);
   private readonly toast = inject(ToastService);
   private readonly confirmDialog = inject(ConfirmDialogService);
 
@@ -53,6 +67,8 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   readonly tickClock = signal(Date.now());
 
   readonly status = this.trading.paperStatus;
+  readonly overview = this.trading.overview;
+  readonly currency = computed<string>(() => this.overview()?.currency ?? 'USD');
 
   readonly state = computed<CockpitState>(() => {
     const s = this.status();
@@ -133,6 +149,39 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     };
   });
 
+  /** Live PaperTradingPosition list adapted from broker positions + WS ticks. */
+  readonly positions = computed<PaperTradingPosition[]>(() => {
+    const broker = this.trading.paperPositions();
+    const prices = this.ws.prices();
+    const now = this.tickClock();
+    return broker.map((p) => adaptPosition(p, prices[p.epic], now));
+  });
+
+  readonly kpiStrip = computed<KpiStrip>(() => {
+    const positions = this.positions();
+    const o = this.overview();
+    const s = this.status();
+    const rs = this.trading.riskStatus();
+    const kelly = s?.kelly_stats ?? null;
+    const ddPct = (rs?.current_drawdown_pct ?? 0) * 100;
+    const pnlOpen = positions.reduce((sum, p) => sum + p.pnlEur, 0);
+    const pnlToday = o?.today_realized_pnl ?? 0;
+    const winRate = (kelly?.win_rate ?? o?.win_rate ?? 0) * 100;
+    const rrAvg = positions.length
+      ? positions.reduce((sum, p) => sum + p.rr, 0) / positions.length
+      : 0;
+    return {
+      pnlOpen,
+      pnlToday,
+      openCount: positions.length,
+      winRate,
+      signalsTotal: s?.signal_count ?? 0,
+      rr: rrAvg,
+      ddLive: ddPct,
+      ddGate: DEFAULT_DD_GATE_PCT,
+    };
+  });
+
   readonly modelsHealth = computed<ModelsHealth>(() => {
     const s = this.status();
     const epics = s?.epics ?? [];
@@ -167,9 +216,14 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.trading.loadPaperStatus();
     this.trading.loadRiskStatus();
+    this.trading.loadOverview();
+    this.trading.loadPaperPositions();
+    this.ws.connectPrices();
     this.pollTimer = setInterval(() => {
       this.trading.loadPaperStatus();
       this.trading.loadRiskStatus();
+      this.trading.loadOverview();
+      this.trading.loadPaperPositions();
     }, 10_000);
     this.clockTimer = setInterval(() => this.tickClock.set(Date.now()), 1_000);
   }
@@ -214,6 +268,34 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     });
   }
 
+  async onClosePosition(p: PaperTradingPosition): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: `Chiudere ${p.ticker}?`,
+      message: `Chiusura della posizione ${p.direction} ${p.ticker} al prezzo corrente. Procedere?`,
+      confirmText: 'Chiudi',
+      cancelText: 'Annulla',
+      color: 'danger',
+    });
+    if (!confirmed) return;
+
+    this.trading.closePosition(p.id).subscribe({
+      next: () => {
+        this.toast.success(`Posizione ${p.ticker} chiusa`);
+        this.trading.loadPaperPositions();
+        this.trading.loadPaperStatus();
+      },
+      error: (err) => {
+        this.toast.error(err?.error?.error ?? `Chiusura ${p.ticker} fallita`);
+      },
+    });
+  }
+
+  onPositionDetails(p: PaperTradingPosition): void {
+    // PR5 wires the audit drawer; for PR3 details are a no-op so the card
+    // remains keyboard-focusable without breaking accessibility.
+    void p;
+  }
+
   async onEmergency(): Promise<void> {
     if (this.emergencyBusy()) return;
     const confirmed = await this.confirmDialog.confirm({
@@ -246,6 +328,49 @@ function formatUptime(seconds: number | null): string {
   const m = Math.floor((seconds % 3600) / 60);
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
+}
+
+function adaptPosition(
+  p: PaperPosition,
+  tick: { bid: number; offer: number } | undefined,
+  nowMs: number,
+): PaperTradingPosition {
+  const direction = (p.direction === 'BUY' ? 'BUY' : 'SELL') as 'BUY' | 'SELL';
+  const current = tick
+    ? (direction === 'BUY' ? tick.bid : tick.offer)
+    : p.level;
+  const stopLoss = p.stop_level ?? p.level;
+  const takeProfit = p.profit_level ?? p.level;
+  const upl = p.upl;
+  const livePnl = upl != null
+    ? upl
+    : (direction === 'BUY' ? (current - p.level) : (p.level - current)) * p.size;
+  const denom = p.level || 1;
+  const pnlPct = ((current - p.level) / denom) * 100 * (direction === 'BUY' ? 1 : -1);
+  const openedMs = p.opened_at ? Date.parse(p.opened_at) : nowMs;
+  const ageSec = Math.max(0, Math.floor((nowMs - openedMs) / 1000));
+  const risk = Math.abs(p.level - stopLoss) || 1;
+  const reward = Math.abs(takeProfit - p.level);
+  const rr = reward / risk;
+  const trailing = !!p.trailing_stop_phase && p.trailing_stop_phase !== 'INITIAL';
+  return {
+    id: p.deal_id,
+    ticker: p.epic,
+    direction,
+    size: p.size,
+    entry: p.level,
+    stopLoss,
+    takeProfit,
+    current,
+    pnlEur: livePnl,
+    pnlPct,
+    ageSec,
+    trailing,
+    rr,
+    // PR3 leaves the spark as a 2-point line (entry → current). PR4 will
+    // hydrate from the WS history buffer.
+    pricePath: [p.level, current],
+  };
 }
 
 function formatTrainedDate(iso: string | null | undefined): string {

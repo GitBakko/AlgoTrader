@@ -1,0 +1,140 @@
+@use '../../../../../scss/palette' as p;
+
+:host {
+  display: block;
+}
+
+.pv-apc {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: p.$mantis-surface-2;
+  border: 1px solid rgba(0, 217, 126, .15);
+  border-radius: 6px;
+  overflow: hidden;
+
+  // Subtle scan line — taken from mockup `ActivePositionsCockpit`.
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(57, 255, 20, .02) 0%, transparent 30%);
+    pointer-events: none;
+  }
+}
+
+.pv-apc__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.pv-apc__head-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pv-apc__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 100px;
+  background: p.$mantis-neon;
+  box-shadow: 0 0 6px p.$mantis-neon;
+  animation: pv-apc-pulse 1.6s ease-in-out infinite;
+}
+
+.pv-apc__title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.pv-apc__count {
+  padding: 2px 7px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 700;
+  font-feature-settings: 'tnum' 1;
+  color: p.$mantis-cyan;
+  background: rgba(0, 229, 255, .1);
+  border: 1px solid rgba(0, 229, 255, .3);
+}
+
+.pv-apc__head-right {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.pv-apc__total-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, .5);
+}
+
+.pv-apc__total-value {
+  font-size: 14px;
+  font-weight: 700;
+  font-feature-settings: 'tnum' 1;
+  color: #fff;
+
+  &.is-positive { color: p.$mantis-neon; }
+  &.is-negative { color: p.$mantis-loss; }
+}
+
+.pv-apc__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.pv-apc__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 32px 16px;
+  background: p.$mantis-surface-1;
+  border: 1px dashed rgba(255, 255, 255, .08);
+  border-radius: 4px;
+  position: relative;
+  z-index: 1;
+}
+
+.pv-apc__empty-icon {
+  width: 56px;
+  height: 56px;
+  color: rgba(255, 255, 255, .25);
+  margin-bottom: 4px;
+}
+
+.pv-apc__empty-title {
+  font-family: var(--mantis-font-ui, 'Plus Jakarta Sans', sans-serif);
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, .75);
+}
+
+.pv-apc__empty-sub {
+  font-size: 11px;
+  color: rgba(255, 255, 255, .5);
+  font-feature-settings: 'tnum' 1;
+}
+
+@keyframes pv-apc-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .35; }
+}
