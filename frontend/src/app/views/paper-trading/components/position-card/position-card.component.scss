@@ -87,14 +87,14 @@
 }
 
 .pv-pc__age-label {
-  color: rgba(255, 255, 255, .35);
+  color: var(--fg-soft);
   font-weight: 700;
   letter-spacing: .12em;
   text-transform: uppercase;
 }
 
 .pv-pc__age-value {
-  color: rgba(255, 255, 255, .7);
+  color: var(--fg2);
 }
 
 .pv-pc__chips {
@@ -128,9 +128,9 @@
   }
 
   &--size {
-    color: rgba(255, 255, 255, .7);
-    background: rgba(255, 255, 255, .04);
-    border-color: rgba(255, 255, 255, .08);
+    color: var(--fg2);
+    background: var(--mantis-ghost-1);
+    border-color: var(--mantis-border-soft);
     font-feature-settings: 'tnum' 1;
     text-transform: none;
     letter-spacing: 0;
@@ -148,9 +148,9 @@
     }
 
     &[data-on='false'] {
-      color: rgba(255, 255, 255, .35);
+      color: var(--fg-soft);
       background: rgba(139, 148, 158, .08);
-      border-color: rgba(255, 255, 255, .08);
+      border-color: var(--mantis-border-soft);
     }
   }
 }
@@ -171,7 +171,7 @@
   transform: translateY(-50%);
   background: linear-gradient(90deg,
     rgba(255, 61, 87, .35) 0%,
-    rgba(255, 255, 255, .14) 50%,
+    var(--mantis-ghost-3) 50%,
     rgba(57, 255, 20, .35) 100%);
   border-radius: 100px;
 }
@@ -187,7 +187,7 @@
 
   &--sl       { background: p.$mantis-loss; }
   &--tp       { background: p.$mantis-neon; }
-  &--entry    { width: 10px; height: 10px; background: rgba(255, 255, 255, .85); }
+  &--entry    { width: 10px; height: 10px; background: var(--fg1); }
   &--current  {
     width: 12px;
     height: 12px;
@@ -210,8 +210,8 @@
 
   &--entry {
     padding: 0 8px;
-    border-left: 1px solid rgba(255, 255, 255, .08);
-    border-right: 1px solid rgba(255, 255, 255, .08);
+    border-left: 1px solid var(--mantis-border-soft);
+    border-right: 1px solid var(--mantis-border-soft);
   }
 }
 
@@ -220,7 +220,7 @@
   font-weight: 700;
   letter-spacing: .12em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, .5);
+  color: var(--fg3);
 
   .pv-pc__triplet-cell--sl & { color: p.$mantis-loss; }
   .pv-pc__triplet-cell--tp & { color: p.$mantis-neon; }
@@ -236,7 +236,7 @@
 .pv-pc__triplet-meta {
   font-size: var(--mantis-fs-xxs);
   font-feature-settings: 'tnum' 1;
-  color: rgba(255, 255, 255, .4);
+  color: var(--fg3);
 
   .pv-pc__triplet-cell--sl & { color: p.$mantis-loss; }
   .pv-pc__triplet-cell--tp & { color: p.$mantis-neon; }
@@ -276,7 +276,7 @@
 .pv-pc__pnl-trend {
   font-size: var(--mantis-fs-xxs);
   font-weight: 700;
-  color: rgba(255, 255, 255, .55);
+  color: var(--fg-faint);
 
   &.is-agree   { color: p.$mantis-neon; }
   &.is-against { color: p.$mantis-loss; }
@@ -354,7 +354,7 @@
 }
 
 .pv-pc__spark-baseline {
-  stroke: rgba(255, 255, 255, .25);
+  stroke: var(--fg-disabled);
   stroke-width: .5;
   stroke-dasharray: 1.5 1.5;
   vector-effect: non-scaling-stroke;
@@ -368,14 +368,14 @@
   font-size: var(--mantis-fs-xxs);
   letter-spacing: .12em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, .35);
+  color: var(--fg-soft);
 }
 
 .pv-pc__spark-bounds {
   display: flex;
   justify-content: space-between;
   font-size: var(--mantis-fs-xxs);
-  color: rgba(255, 255, 255, .4);
+  color: var(--fg3);
   font-feature-settings: 'tnum' 1;
 }
 
@@ -389,7 +389,7 @@
 }
 
 .pv-pc__meta-label {
-  color: rgba(255, 255, 255, .4);
+  color: var(--fg3);
   font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;
