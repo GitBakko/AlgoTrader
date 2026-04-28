@@ -38,7 +38,7 @@ import { Injectable, signal } from '@angular/core';
   providedIn: 'root',
 })
 export class LogoService {
-  private readonly CACHE_KEY = 'mantis-logos-v3';
+  private readonly CACHE_KEY = 'mantis-logos-v4';
   private readonly CACHE_TTL_MS = 24 * 60 * 60 * 1000;
   private cache = new Map<string, { urls: string[]; ts: number }>();
 
@@ -79,7 +79,16 @@ export class LogoService {
   private readonly COMMODITY_SVG: Record<string, () => string> = {
     XAUUSD: () => this.commoditySvg('#FFD700', 'M5 18h22v6H5z M8 11h16v6H8z M11 4h10v6H11z'),
     XAGUSD: () => this.commoditySvg('#C0C0C0', 'M5 18h22v6H5z M8 11h16v6H8z M11 4h10v6H11z'),
-    WTIUSD: () => this.commoditySvg('#1A1A1A', 'M16 4 C 9 12, 6 17, 6 22 a10 10 0 0 0 20 0 c 0 -5 -3 -10 -10 -18 z', '#39FF14'),
+    // WTIUSD: black oil drop on a white circle backdrop so it stays
+    // legible on dark themes (otherwise the black-on-tinted-black square
+    // collapses to a flat invisible square).
+    WTIUSD: () => this.commoditySvg(
+      '#1A1A1A',
+      'M16 4 C 9 12, 6 17, 6 22 a10 10 0 0 0 20 0 c 0 -5 -3 -10 -10 -18 z',
+      null,
+      false,
+      true,
+    ),
     NATGAS: () => this.commoditySvg('#FFB020', 'M16 4 c -2 5 -6 7 -6 14 a 6 6 0 0 0 12 0 c 0 -3 -3 -5 -3 -8 c 0 -2 1 -4 -3 -6 z'),
     COPPER: () => this.commoditySvg('#B87333', null, null, true),
     PLATINUM: () => this.commoditySvg('#E5E4E2', 'M5 18h22v6H5z M8 11h16v6H8z M11 4h10v6H11z'),
@@ -201,7 +210,14 @@ export class LogoService {
     path: string | null = null,
     accent: string | null = null,
     coin = false,
+    whiteCircleBg = false,
   ): string {
+    // Optional white-disc backdrop behind the path — used when the glyph
+    // colour is too dark to be legible on the 10%-tinted-square background
+    // (e.g. WTI's black oil drop on a dark theme would otherwise vanish).
+    const backdrop = whiteCircleBg
+      ? `<circle cx="16" cy="16" r="11" fill="#ffffff"/>`
+      : '';
     const inner = coin
       ? `<circle cx="16" cy="16" r="11" fill="${fill}" stroke="${accent ?? 'rgba(0,0,0,.25)'}" stroke-width="1.5"/>
          <text x="50%" y="55%" font-size="13" font-weight="700" text-anchor="middle"
@@ -212,6 +228,7 @@ export class LogoService {
         : '';
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
       <rect width="32" height="32" rx="6" fill="${fill}1f"/>
+      ${backdrop}
       ${inner}
     </svg>`;
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
