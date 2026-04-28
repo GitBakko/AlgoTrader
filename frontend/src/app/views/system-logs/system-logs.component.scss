@@ -1,7 +1,45 @@
 // ═══════════════════════════════════════════════════════════
 // System Logs Component Styles
 // Uses CSS custom properties for theme compatibility
+// HDR-02 list-page header (no card chrome around the page itself —
+// fixes Bible VIO-04 card-in-card; metric cards inside are still cards).
 // ═══════════════════════════════════════════════════════════
+
+:host {
+  display: block;
+}
+
+.sl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantis-space-4);
+}
+
+.sl-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mantis-space-4);
+  padding: var(--mantis-space-2) 0;
+  border-bottom: 1px solid var(--mantis-border-subtle);
+}
+
+.sl-header__title {
+  margin: 0;
+  font-size: var(--mantis-fs-xl);
+  font-weight: 600;
+  color: var(--fg1);
+}
+
+.sl-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--mantis-space-2);
+}
+
+.sl-body {
+  display: block;
+}
 
 // Health Score Card
 .health-score-card {

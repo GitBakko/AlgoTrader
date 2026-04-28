@@ -1,50 +1,52 @@
-<c-row>
-  <c-col xs="12">
-    <c-card class="mb-4">
-      <c-card-header class="d-flex justify-content-between align-items-center">
-        <span class="fw-semibold text-body-secondary">System Monitoring & Logs</span>
-        <div class="d-flex gap-2 align-items-center">
-          <!-- Date Range Selector -->
-          <c-button-group role="group" aria-label="Date range">
-            @for (option of dateRangeOptions; track option.value) {
-              @if (selectedDays() === option.value) {
-                <button
-                  cButton
-                  color="success"
-                  (click)="onDateRangeChange(option.value)"
-                  size="sm"
-                >
-                  {{ option.label }}
-                </button>
-              } @else {
-                <button
-                  cButton
-                  color="dark"
-                  variant="outline"
-                  (click)="onDateRangeChange(option.value)"
-                  size="sm"
-                >
-                  {{ option.label }}
-                </button>
-              }
-            }
-          </c-button-group>
+<main class="sl" role="main" aria-label="System Monitoring & Logs">
 
-          <!-- Refresh Button -->
-          <button
-            cButton
-            color="primary"
-            size="sm"
-            (click)="refresh()"
-            [disabled]="loading()"
-          >
-            <svg cIcon name="cilReload" size="sm"></svg>
-            Refresh
-          </button>
-        </div>
-      </c-card-header>
+  <header class="sl-header">
+    <div class="sl-header__left">
+      <h1 class="sl-header__title">System Monitoring & Logs</h1>
+    </div>
 
-      <c-card-body>
+    <div class="sl-header__actions">
+      <!-- Date Range Selector -->
+      <c-button-group role="group" aria-label="Date range">
+        @for (option of dateRangeOptions; track option.value) {
+          @if (selectedDays() === option.value) {
+            <button
+              cButton
+              color="success"
+              (click)="onDateRangeChange(option.value)"
+              size="sm"
+            >
+              {{ option.label }}
+            </button>
+          } @else {
+            <button
+              cButton
+              color="dark"
+              variant="outline"
+              (click)="onDateRangeChange(option.value)"
+              size="sm"
+            >
+              {{ option.label }}
+            </button>
+          }
+        }
+      </c-button-group>
+
+      <!-- Refresh Button -->
+      <button
+        cButton
+        color="primary"
+        size="sm"
+        (click)="refresh()"
+        [disabled]="loading()"
+      >
+        <svg cIcon name="cilReload" size="sm"></svg>
+        Refresh
+      </button>
+    </div>
+  </header>
+
+  <section class="sl-body">
         @if (loading()) {
           <div class="text-center py-5">
             <div class="spinner-border text-success" role="status">
@@ -391,7 +393,5 @@
             </c-row>
           }
         }
-      </c-card-body>
-    </c-card>
-  </c-col>
-</c-row>
+  </section>
+</main>
