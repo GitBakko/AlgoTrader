@@ -104,7 +104,7 @@
   top: 12px;
   bottom: 12px;
   width: 1px;
-  background: rgba(255, 255, 255, .06);
+  background: var(--mantis-border-subtle);
   pointer-events: none;
 }
 
@@ -123,7 +123,7 @@
   gap: 8px;
   padding: 8px 12px;
   cursor: pointer;
-  border-bottom: 1px solid rgba(255, 255, 255, .04);
+  border-bottom: 1px solid var(--mantis-ghost-1);
   transition: background 120ms ease;
 
   &:last-child { border-bottom: none; }
@@ -138,7 +138,7 @@
 
 .pv-feed__ts {
   font-size: var(--mantis-fs-xs);
-  color: rgba(255, 255, 255, .5);
+  color: var(--fg3);
   font-feature-settings: 'tnum' 1;
   letter-spacing: .04em;
   white-space: nowrap;
@@ -156,7 +156,7 @@
   height: 9px;
   border-radius: 100px;
   background: p.$mantis-surface-1;
-  border: 2px solid rgba(255, 255, 255, .25);
+  border: 2px solid var(--mantis-border-medium);
   transition: box-shadow 200ms ease;
 
   // Bullet color follows the row state token.
@@ -212,7 +212,7 @@
   gap: 4px;
   min-width: 0;
 
-  &--system .pv-feed__epic { color: rgba(255, 255, 255, .5); }
+  &--system .pv-feed__epic { color: var(--fg3); }
 }
 
 .pv-feed__epic {
@@ -228,9 +228,9 @@
   letter-spacing: .05em;
   padding: 1px 5px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, .03);
+  background: var(--mantis-ghost-1);
   border: 1px solid var(--mantis-border-subtle);
-  color: rgba(255, 255, 255, .55);
+  color: var(--fg-faint);
   width: fit-content;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -252,7 +252,7 @@
   &[data-direction='SELL'] { color: p.$mantis-loss; background: rgba(255, 61, 87, .1); border-color: rgba(255, 61, 87, .26); }
   &[data-direction='HOLD'] { color: p.$mantis-neutral; background: rgba(139, 148, 158, .08); border-color: rgba(139, 148, 158, .18); }
 
-  &--ghost { color: var(--fg-disabled); border-color: rgba(255, 255, 255, .08); }
+  &--ghost { color: var(--fg-disabled); border-color: var(--mantis-border-soft); }
 }
 
 .pv-feed__conf {
@@ -263,7 +263,7 @@
 
   &[data-tone='high'] { color: p.$mantis-neon; }
   &[data-tone='mid']  { color: p.$mantis-warning; }
-  &[data-tone='low']  { color: rgba(255, 255, 255, .4); }
+  &[data-tone='low']  { color: var(--fg3); }
   &[data-tone='none'] { color: var(--fg-disabled); }
 
   &--ghost { color: var(--fg-disabled); }
@@ -281,7 +281,7 @@
 .pv-feed__detail {
   font-size: var(--mantis-fs-xs);
   line-height: 1.35;
-  color: rgba(255, 255, 255, .55);
+  color: var(--fg-faint);
   // Allow up to two lines so reasoning strings ("Total exposure 231.5%
   // > limit 80%") stay readable at the right edge of the rail. Long
   // single-token strings (deal IDs, tokens) still break to keep the
@@ -318,7 +318,7 @@
     font-family: var(--mantis-font-ui, 'Plus Jakarta Sans', sans-serif);
     font-size: var(--mantis-fs-base);
     font-weight: 600;
-    color: rgba(255, 255, 255, .8);
+    color: var(--fg1);
   }
 
   &-sub {
@@ -334,7 +334,7 @@
 .pv-feed__row--skeleton {
   cursor: default;
   pointer-events: none;
-  border-bottom-color: rgba(255, 255, 255, .03);
+  border-bottom-color: var(--mantis-ghost-1);
 
   &:hover { background: transparent; }
 }
@@ -343,9 +343,9 @@
   display: block;
   background: linear-gradient(
     90deg,
-    rgba(255, 255, 255, .04) 0%,
-    rgba(255, 255, 255, .12) 50%,
-    rgba(255, 255, 255, .04) 100%
+    var(--mantis-ghost-1) 0%,
+    var(--mantis-ghost-3) 50%,
+    var(--mantis-ghost-1) 100%
   );
   background-size: 200% 100%;
   animation: feed-shimmer 1.4s ease-in-out infinite;
