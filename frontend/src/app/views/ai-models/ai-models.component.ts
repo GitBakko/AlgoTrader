@@ -206,7 +206,7 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
                     Training:
                     <span class="mantis-mono">{{ trainingCompletedCount() }}/{{ trainingTotalJobs() }}</span>
                   </span>
-                  <c-progress class="flex-grow-1" style="height: 8px;">
+                  <c-progress class="flex-grow-1 ai-progress-thin">
                     <c-progress-bar
                       [value]="trainingProgressPct()"
                       color="success"
@@ -317,7 +317,7 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
                     <th class="fw-semibold small text-end">P&amp;L</th>
                     <th class="fw-semibold small text-end d-mobile-none">F1</th>
                     <th class="fw-semibold small d-mobile-none">Ultimo Training</th>
-                    <th class="fw-semibold small text-end" style="width: 120px;">Azione</th>
+                    <th class="fw-semibold small text-end ai-col-action">Azione</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -443,7 +443,7 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
 
                 <!-- Error -->
                 @if (job.status === 'failed' && job.error) {
-                  <div class="text-danger small mt-2" style="word-break: break-word;">
+                  <div class="text-danger small mt-2 ai-job-error">
                     {{ job.error }}
                   </div>
                 }

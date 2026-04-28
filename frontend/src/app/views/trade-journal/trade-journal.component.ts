@@ -89,8 +89,7 @@ type SortDir = 'asc' | 'desc';
           <div class="d-flex align-items-center gap-1 tj-filter-conf">
             <span class="text-body-secondary small text-nowrap">Conf. min</span>
             <input cFormControl type="number" min="0" max="100" step="5"
-                   class="form-control form-control-sm"
-                   style="width: 72px"
+                   class="form-control form-control-sm tj-conf-input"
                    [ngModel]="filterMinConfidence()" (ngModelChange)="filterMinConfidence.set($event)">
           </div>
         </div>
@@ -166,7 +165,7 @@ type SortDir = 'asc' | 'desc';
                   <th>Stato</th>
                   <th class="d-mobile-none">Posizione</th>
                   <th class="d-mobile-none">Dettaglio</th>
-                  <th class="text-center d-mobile-none" style="width: 44px;">Note</th>
+                  <th class="text-center d-mobile-none tj-col-note">Note</th>
                 </tr>
               </thead>
               <tbody>
@@ -208,7 +207,7 @@ type SortDir = 'asc' | 'desc';
                         @let posInfo = getPositionInfo(sig);
                         @if (posInfo.status === 'open') {
                           <span class="d-inline-flex align-items-center gap-1">
-                            <span class="pulse-dot" style="width:6px;height:6px;"></span>
+                            <span class="pulse-dot tj-pulse-sm"></span>
                             <span class="small">Aperta</span>
                             @if (posInfo.pnl !== null) {
                               <span class="mantis-mono small ms-1"
@@ -306,7 +305,7 @@ type SortDir = 'asc' | 'desc';
     <!-- ═══════ NOTE MODAL ═══════ -->
     @if (showNoteModal()) {
       <div class="tj-modal-backdrop" (click)="closeNoteModal()" role="dialog" aria-modal="true" aria-label="Nota">
-        <div class="tj-modal" style="max-width: 500px" (click)="$event.stopPropagation()">
+        <div class="tj-modal tj-modal-md" (click)="$event.stopPropagation()">
           <div class="tj-modal__header">
             <div class="tj-modal__title">
               <svg cIcon name="cilPencil" size="lg" class="me-2"></svg>

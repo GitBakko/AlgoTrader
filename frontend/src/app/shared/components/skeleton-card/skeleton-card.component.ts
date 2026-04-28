@@ -18,7 +18,7 @@ import { PlaceholderDirective, PlaceholderAnimationDirective } from '@coreui/ang
       @if (showHeader()) {
         <c-card-header class="py-2">
           <span cPlaceholderAnimation="wave">
-            <span cPlaceholder cPlaceholderSize="sm" class="skeleton-line" style="width:40%"></span>
+            <span cPlaceholder cPlaceholderSize="sm" class="skeleton-line skeleton-line--header"></span>
           </span>
         </c-card-header>
       }
@@ -39,6 +39,7 @@ import { PlaceholderDirective, PlaceholderAnimationDirective } from '@coreui/ang
       height: 0.75rem;
       border-radius: var(--mantis-radius-sm);
     }
+    .skeleton-line--header { width: 40%; }
     :host ::ng-deep .placeholder {
       background-color: var(--mantis-surface-4, #21262d) !important;
       opacity: 0.6;

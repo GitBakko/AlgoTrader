@@ -125,7 +125,7 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
                 <table cTable [small]="true" [hover]="true" class="mb-0">
                   <thead>
                     <tr>
-                      <th class="text-center" style="width: 36px">
+                      <th class="text-center bt-col-vs">
                         <span class="small text-body-secondary" title="Confronta">VS</span>
                       </th>
                       <th>Asset</th>

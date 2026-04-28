@@ -13,7 +13,7 @@ import { ToastService } from '../../services/toast.service';
     ToastBodyComponent, ToastCloseDirective,
   ],
   template: `
-    <c-toaster placement="top-end" class="p-3" position="fixed" style="z-index: 1090;">
+    <c-toaster placement="top-end" class="p-3 mantis-toaster" position="fixed">
       @for (toast of toastService.toasts(); track toast.id) {
         <c-toast #toastEl [color]="toast.color" [visible]="toast.visible"
                  (visibleChange)="onVisibleChange(toast.id, $event)"
@@ -27,6 +27,10 @@ import { ToastService } from '../../services/toast.service';
       }
     </c-toaster>
   `,
+  styles: [`
+    /* CoreUI modals reserve 1050; toasters must layer above them. */
+    .mantis-toaster { z-index: 1090; }
+  `],
 })
 export class ToastContainerComponent {
   readonly toastService = inject(ToastService);

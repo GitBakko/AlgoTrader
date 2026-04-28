@@ -211,3 +211,8 @@
     table[cTable] { min-width: 560px; }
   }
 }
+
+// R7 helpers — replace inline styles inside ai-models inline template
+.ai-progress-thin { --cui-progress-height: 8px; height: 8px; }
+.ai-col-action    { width: 120px; }
+.ai-job-error     { word-break: break-word; }

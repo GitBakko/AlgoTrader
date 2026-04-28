@@ -194,7 +194,7 @@ const TYPE_BADGE_COLORS: Record<string, string> = {
                   <span class="text-body-secondary small">Drawdown</span>
                   <strong class="text-danger small">{{ (rs.current_drawdown_pct * 100) | number:'1.2-2' }}%</strong>
                 </div>
-                <c-progress [value]="rs.current_drawdown_pct * 100" [max]="20" color="danger" style="height: 4px;"></c-progress>
+                <c-progress [value]="rs.current_drawdown_pct * 100" [max]="20" color="danger" class="settings-progress-thin"></c-progress>
               </div>
               <div class="d-flex justify-content-between mb-3">
                 <span class="text-body-secondary small">Daily P&amp;L (USD)</span>
