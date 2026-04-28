@@ -72,7 +72,7 @@
 
 .pdd-header__deal {
   font-size: var(--mantis-fs-xxs);
-  color: rgba(255, 255, 255, .4);
+  color: var(--fg3);
   letter-spacing: .12em;
   text-transform: uppercase;
   overflow: hidden;
@@ -81,9 +81,9 @@
 }
 
 .pdd-close {
-  border: 1px solid rgba(255, 255, 255, .12);
-  background: rgba(255, 255, 255, .04);
-  color: rgba(255, 255, 255, .85);
+  border: 1px solid var(--mantis-border-default);
+  background: var(--mantis-ghost-1);
+  color: var(--fg1);
   width: 28px;
   height: 28px;
   border-radius: var(--mantis-radius-sm, 4px);
@@ -93,8 +93,8 @@
   transition: filter 120ms ease, box-shadow 120ms ease;
 
   &:hover {
-    background: rgba(255, 255, 255, .08);
-    box-shadow: 0 0 8px rgba(255, 255, 255, .12);
+    background: var(--mantis-ghost-2);
+    box-shadow: 0 0 8px var(--mantis-ghost-3);
   }
 }
 
@@ -111,7 +111,7 @@
   padding: 10px 0;
   background: transparent;
   border: 0;
-  color: rgba(255, 255, 255, .5);
+  color: var(--fg3);
   font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
   font-size: var(--mantis-fs-xs);
   font-weight: 700;
@@ -121,7 +121,7 @@
   position: relative;
   transition: color 120ms ease;
 
-  &:hover { color: rgba(255, 255, 255, .85); }
+  &:hover { color: var(--fg1); }
 
   &--active {
     color: p.$mantis-neon;
@@ -160,7 +160,7 @@
   flex-direction: column;
   gap: 8px;
   padding: 12px;
-  background: rgba(255, 255, 255, .02);
+  background: var(--mantis-ghost-1);
   border: 1px solid rgba(p.$mantis-green, .1);
   border-radius: var(--mantis-radius-md, 6px);
 }
@@ -171,7 +171,7 @@
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, .55);
+  color: var(--fg-faint);
 }
 
 .pdd-pnl {
@@ -236,7 +236,7 @@
 
 .pdd-cell__sub {
   font-size: var(--mantis-fs-xs);
-  color: rgba(255, 255, 255, .4);
+  color: var(--fg3);
   font-feature-settings: 'tnum' 1;
 }
 
@@ -311,7 +311,7 @@
   gap: 4px 12px;
   margin: 0;
   font-size: var(--mantis-fs-sm);
-  color: rgba(255, 255, 255, .85);
+  color: var(--fg1);
   font-feature-settings: 'tnum' 1;
 
   dt {
@@ -348,16 +348,16 @@
     font-family: var(--mantis-font-ui, 'Plus Jakarta Sans', sans-serif);
     font-size: var(--mantis-fs-body);
     font-weight: 600;
-    color: rgba(255, 255, 255, .85);
+    color: var(--fg1);
   }
 
   &__sub {
     font-size: var(--mantis-fs-md);
-    color: rgba(255, 255, 255, .55);
+    color: var(--fg-faint);
     line-height: 1.4;
   }
 
-  code { color: rgba(255, 255, 255, .8); }
+  code { color: var(--fg1); }
 }
 
 @keyframes pdd-fade-in {
