@@ -24,6 +24,7 @@ Free to edit: SCSS (`_palette.scss`, `_custom.scss` entry + themed partials `_si
 3. **Close detection is 3-tier** — Tier 1 dealId match → Tier 2 10-min retry → Tier 3 UNRECONCILED (pnl=NULL + alert). No code path invents P&L.
 4. **Emergency kill switch**: `POST /api/trading/emergency-stop` stops loop + closes all + fires CRITICAL alert.
 5. **State recovery**: PAPER → Postgres only. DEMO/LIVE → broker `list_positions()` authoritative, DB fallback only if broker unreachable.
+6. **SL/TP reconciliation rule** (post 2026-04-28 fix `745f2ee`): when a `TradingSignal` carries BOTH `suggested_stop` and `suggested_tp`, `RiskManager.check_trade` MUST use the pair as-is — strategy authors calibrate the R:R intentionally. Only when one side is missing does the risk-manager ATR default fill in. **Never** mix risk-mgr SL with strategy TP (or vice-versa) — that path produced inverted R:R 0.13–0.30 in production. For BUY-SL the *tighter* value is the LARGER one (closer to entry from below); for SELL-SL it is the SMALLER. See `src/risk/risk_manager.py` §4-bis.
 
 ## Backend Gotchas
 
@@ -41,6 +42,7 @@ Free to edit: SCSS (`_palette.scss`, `_custom.scss` entry + themed partials `_si
 - Auth: api-key + email + password → CST + X-SECURITY-TOKEN, **10-min expiry**. Session manager handles refresh.
 - Epic mapping (`EPIC_TO_BROKER`): `XAUUSD→GOLD`, `XAGUSD→SILVER`, `WTIUSD→OIL_CRUDE`. Transaction history uses **broker epics** (`OIL_CRUDE`, `DE40`, `NATURALGAS`) — NOT display names like "Oil - Crude".
 - OHLC prices come as `{bid, ask}` dicts — always use mid-price.
+- **`Position` model has NO `current_price` field** — only `level` (entry) and `upl`. Live mid-price comes from the WS quote stream, REST `get_market_details(epic).snapshot.{bid,offer}`, or UPL reconstruction (`current ≈ entry + sign*upl/size`). Never store `level` as live price.
 - Rate limits: 10 req/sec, 40 WS subs, 1000 orders/hour (demo).
 - `/history/transactions`:
   - Params `from`/`to` MUST be naive `yyyy-MM-dd'T'HH:mm:ss` (no `Z`, no offset). Server rejects tz suffix with `error.invalid.from` (HTTP 400).
@@ -54,6 +56,7 @@ Free to edit: SCSS (`_palette.scss`, `_custom.scss` entry + themed partials `_si
 - **No `console.log`** in production code. `console.error`/`console.warn` only for real errors.
 - API calls: use `ApiService` (prepends apiUrl). Never raw `HttpClient`.
 - **Async action buttons**: use `<app-loading-button [loading]="isBusy()" (clicked)="…">`.
+- **NO MOCK DATA NELLE MASCHERE** — invariant. Charts/sparklines/lists must source from persisted backend tables. No `syntheticSpark`, no in-memory ws-only ring buffers, no fabricated placeholders. KPI sparklines read `paperPnlHistory()`; position-card chart reads `positionPnlHistory()[deal_id]` (60s `paper_pnl_snapshots` / `position_pnl_snapshots`).
 - **Never hardcode hex colors.** Always `var(--mantis-*)` or SCSS `$mantis-*` tokens from `_palette.scss`.
 - Financial numbers MUST use `.mantis-mono` or `.mantis-kpi` class (tabular figures). Never UI font for prices.
 - Icons: CoreUI only (`cil-*`). Do NOT add FontAwesome/Heroicons/other.
@@ -89,6 +92,11 @@ Free to edit: SCSS (`_palette.scss`, `_custom.scss` entry + themed partials `_si
 - Mobile: bottom-nav <768px, sidebar hidden <992px, 44px touch targets, 16px min input font (iOS zoom guard), `.table-responsive-mobile` on every data table.
 - Internal `/design-system` route renders live token values + all badge / pill / KPI / form previews for dev reference (not in sidebar).
 
+## Backend data contracts
+
+- **60s P&L snapshot system** — `paper_pnl_snapshots` (global figures) + `position_pnl_snapshots` (per deal). `PnlSnapshotScheduler` in `backend/src/data/pnl_snapshot_scheduler.py` (APScheduler 60s + 04:30 UTC prune). Live prices via WS quote cache (`broker_ws._quote_listeners` fan-out) → REST `get_market_details` fallback → UPL reconstruction. Endpoints: `/api/trading/pnl-history`, `/api/trading/positions/{deal_id}/pnl-history`. Migration `c3d8e9f0a1b2`.
+- **Logo service resilience** — `LogoService.getLogoUrls(epic): string[]` returns a static fallback chain (no API calls). `EpicLogoComponent` walks chain via `<img onerror>`. Final entry is always an inline SVG `data:` URI. Cache key `mantis-logos-v2`.
+
 ## Active revamp tracks
 
 Stato delle 13 pagine MANTIS al 27/04/2026 (sintesi — vedi `STYLE_BIBLE.md` §4 per la lista completa con violazioni per pagina).
@@ -96,20 +104,20 @@ Stato delle 13 pagine MANTIS al 27/04/2026 (sintesi — vedi `STYLE_BIBLE.md` §
 | # | Pagina | Stato | Documento |
 |---|---|---|---|
 | 01 | Dashboard | ✅ DONE (v2 cockpit, in `views/dashboard-v2/`) | — |
-| 02 | **Paper Trading** | 🚧 **IN HANDOFF (Variant B Ambitious)** | `docs/handoff/paper-trading/HANDOFF.md` |
+| 02 | **Paper Trading** | 🚧 PR #8/9/10/11 stacked + EXP indicator (`65ce137`) · PR5 drawer pending | `docs/handoff/paper-trading/HANDOFF.md` |
 | 03 | Posizioni | 🟡 PARZIALE | tba |
-| 04 | Trade Journal | 🔴 da rifare | tba |
+| 04 | Trade Journal | ✅ DONE (`2f0d273`, HDR-02 + Bible buttons) | — |
 | 05 | Segnali AI | 🟡 PARZIALE | tba |
 | 06 | Backtest | 🟡 PARZIALE | tba |
-| 07 | Strategia | 🔴 da rifare | tba |
+| 07 | Strategia | ✅ DONE (`81de886`, HDR-03 + form tokens) | — |
 | 08 | Modelli AI | 🟡 PARZIALE | tba |
 | 09 | Risk Manager | 🟡 PARZIALE | tba |
 | 10 | Broker | 🟡 PARZIALE | tba |
 | 11 | Notifications | 🟡 PARZIALE | tba |
-| 12 | Settings | 🔴 da rifare (priorità 1) | tba |
+| 12 | Settings | ✅ DONE (`c8d1724`, HDR-03 + Bible buttons + form tokens) | — |
 | 13 | Login · 14 System Logs | ✅ CONFORME | — |
 
-**Priorità refactor:** Settings (#12) → Trade Journal (#04) → Strategia (#07) → resto delle PARZIALE in ordine di traffico. Vedi `STYLE_BIBLE.md` §4.
+**Priorità refactor restante (2026-04-28):** Posizioni (#03) → Modelli AI (#08) → Risk Manager (#09) → Broker (#10) → Notifications (#11) → Segnali AI (#05) → Backtest (#06). Tutte le PARZIALE da promuovere a CONFORME via HDR-02/03 + tokens.
 
 ## Git / CI
 
@@ -124,6 +132,7 @@ Stato delle 13 pagine MANTIS al 27/04/2026 (sintesi — vedi `STYLE_BIBLE.md` §
 - Patch at **source module**, not where imported.
 - Mock `check_exposure_dynamic` (NOT static `check_exposure`).
 - Integration tests: hit real DB, not mocks — prior incident where mocked DB tests passed but prod migration failed.
+- **Strategy-manager tests must mock `get_settings`** to set `mr_primary_enabled=False` / `ml_primary_enabled=False` if they want the legacy `_process_default()` path. Production `.env` ships both flags `true` so any test that doesn't mock will route through MR/ML primary chains and hit HOLD when market_data is sparse. Pre-existing baseline ~28 fails are stuck on this pattern + incomplete async mocks (`MagicMock` where `AsyncMock` is required).
 
 ## Local Ops Cheatsheet
 
