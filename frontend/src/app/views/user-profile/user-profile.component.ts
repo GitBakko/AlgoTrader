@@ -1,4 +1,5 @@
-import { Component, inject, signal, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import {
@@ -53,6 +54,7 @@ export class UserProfileComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly confirmDialog = inject(ConfirmDialogService);
   private readonly toast = inject(ToastService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly user = this.authService.currentUser;
   readonly loading = signal(false);
@@ -66,7 +68,7 @@ export class UserProfileComponent implements OnInit {
 
   refreshProfile(): void {
     this.loading.set(true);
-    this.authService.getCurrentUser().subscribe({
+    this.authService.getCurrentUser().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.loading.set(false);
       },
@@ -114,7 +116,7 @@ export class UserProfileComponent implements OnInit {
     if (!confirmed) return;
 
     this.deletingAvatar.set(true);
-    this.authService.deleteAvatar().subscribe({
+    this.authService.deleteAvatar().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.deletingAvatar.set(false);
         this.refreshProfile();

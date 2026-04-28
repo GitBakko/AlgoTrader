@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 
 import { CockpitHeaderComponent, type CockpitMode, type CockpitState } from '../../shared/components/cockpit-header/cockpit-header.component';
@@ -75,6 +76,7 @@ const SIGNALS_HISTORY_LIMIT = 300;
 })
 export class PaperTradingComponent implements OnInit, OnDestroy {
   private readonly trading = inject(TradingService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly ws = inject(WebSocketService);
   private readonly toast = inject(ToastService);
   private readonly confirmDialog = inject(ConfirmDialogService);
@@ -441,7 +443,7 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
 
     this.stopBusy.set(true);
     const action$ = running ? this.trading.stopPaperTrading() : this.trading.startPaperTrading();
-    action$.subscribe({
+    action$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (data) => {
         this.toast.success(data.message);
         this.stopBusy.set(false);
@@ -464,7 +466,7 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     });
     if (!confirmed) return;
 
-    this.trading.closePosition(p.id).subscribe({
+    this.trading.closePosition(p.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.toast.success(`Posizione ${p.ticker} chiusa`);
         this.trading.loadPaperPositions();
@@ -545,7 +547,7 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     if (!confirmed) return;
 
     this.emergencyBusy.set(true);
-    this.trading.emergencyStop().subscribe({
+    this.trading.emergencyStop().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (data) => {
         this.toast.success(data.message);
         this.emergencyBusy.set(false);

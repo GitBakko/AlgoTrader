@@ -1,4 +1,5 @@
-import { Component, ChangeDetectionStrategy, OnInit, inject, signal, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -436,6 +437,7 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
 })
 export class BacktestComponent implements OnInit {
   private readonly trading = inject(TradingService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
 
@@ -487,7 +489,7 @@ export class BacktestComponent implements OnInit {
     this.selectedRun.set(null);
     this.metricCards.set([]);
 
-    this.trading.runBacktest(this.config).subscribe({
+    this.trading.runBacktest(this.config).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (run) => {
         this.running.set(false);
         this.runConfigs.set(run.id, { timeframe: this.config.timeframe, startDate: '', endDate: '' });
@@ -503,7 +505,7 @@ export class BacktestComponent implements OnInit {
   }
 
   loadRuns(): void {
-    this.trading.listBacktestRuns().subscribe({
+    this.trading.listBacktestRuns().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (data) => this.runs.set(data),
       error: () => {}
     });
@@ -515,7 +517,7 @@ export class BacktestComponent implements OnInit {
   }
 
   selectRunById(runId: string): void {
-    this.trading.getBacktestDetail(runId).subscribe({
+    this.trading.getBacktestDetail(runId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (data) => {
         this.detail.set(data);
         this.selectedRun.set(data.summary);
@@ -654,7 +656,7 @@ export class BacktestComponent implements OnInit {
 
   private loadComparisonDetail(runId: string): void {
     if (this.comparisonDetails().has(runId)) return;
-    this.trading.getBacktestDetail(runId).subscribe({
+    this.trading.getBacktestDetail(runId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (data) => {
         this.comparisonDetails.update(map => {
           const newMap = new Map(map);

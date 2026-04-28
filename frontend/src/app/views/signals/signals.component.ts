@@ -1,4 +1,5 @@
-import { Component, ChangeDetectionStrategy, computed, inject, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
@@ -152,6 +153,7 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
 })
 export class SignalsComponent implements OnInit {
   private readonly trading = inject(TradingService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly toast = inject(ToastService);
   readonly signals = this.trading.paperSignals;
 
@@ -185,7 +187,7 @@ export class SignalsComponent implements OnInit {
   }
 
   generateTestSignal(): void {
-    this.trading.generateSignal('XAUUSD').subscribe({
+    this.trading.generateSignal('XAUUSD').pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.toast.success('Segnale test generato');
         this.trading.loadPaperSignals();

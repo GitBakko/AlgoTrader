@@ -1,4 +1,5 @@
-import { Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy, signal, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
@@ -294,6 +295,7 @@ const TYPE_BADGE_COLORS: Record<string, string> = {
 })
 export class SettingsComponent implements OnInit, OnDestroy {
   private readonly trading = inject(TradingService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly ws = inject(WebSocketService);
   readonly notifications = inject(NotificationService);
   private readonly notifCenter = inject(NotificationCenterService);
@@ -333,8 +335,8 @@ export class SettingsComponent implements OnInit, OnDestroy {
   });
 
   ngOnInit(): void {
-    this.trading.getSystemSettings().subscribe(data => this.settings.set(data));
-    this.trading.getRiskStatus().subscribe(data => this.riskStatus.set(data));
+    this.trading.getSystemSettings().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(data => this.settings.set(data));
+    this.trading.getRiskStatus().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(data => this.riskStatus.set(data));
     this.trading.loadPaperPositions();
   }
 
@@ -381,7 +383,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
     training.add(epic);
     this.trainingEpics.set(training);
 
-    this.trading.trainModel(epic).subscribe({
+    this.trading.trainModel(epic).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         // Training started as background subprocess — spinner stays for 3s then clears
         const timer = setTimeout(() => {

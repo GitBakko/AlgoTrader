@@ -1,4 +1,5 @@
-import { Component, ChangeDetectionStrategy, computed, inject, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -93,6 +94,7 @@ import { StrategyConfig } from '../../core/models';
 })
 export class StrategyComponent implements OnInit {
   private readonly trading = inject(TradingService);
+  private readonly destroyRef = inject(DestroyRef);
   readonly configs = this.trading.strategyConfigs;
   readonly limits = this.trading.riskLimitsData;
   readonly allocation = this.trading.allocationData;
@@ -108,13 +110,13 @@ export class StrategyComponent implements OnInit {
   }
 
   saveConfig(cfg: StrategyConfig): void {
-    this.trading.updateStrategyConfig(cfg).subscribe();
+    this.trading.updateStrategyConfig(cfg).pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
   }
 
   saveLimits(): void {
     const l = this.limits();
     if (l) {
-      this.trading.updateRiskLimits(l).subscribe();
+      this.trading.updateRiskLimits(l).pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
     }
   }
 }

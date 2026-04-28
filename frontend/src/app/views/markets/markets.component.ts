@@ -1,4 +1,5 @@
-import { Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy, computed, signal, effect } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
@@ -194,6 +195,7 @@ const TIMEFRAMES = [
 })
 export class MarketsComponent implements OnInit, OnDestroy {
   private readonly trading = inject(TradingService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly ws = inject(WebSocketService);
   private readonly marketStatus = inject(MarketStatusService);
   private readonly newsService = inject(NewsService);
@@ -324,7 +326,7 @@ export class MarketsComponent implements OnInit, OnDestroy {
     this.chartLoading.set(true);
     this.rawCandles.set([]);
 
-    this.trading.getMarketPrices(epic, tf, 300).subscribe({
+    this.trading.getMarketPrices(epic, tf, 300).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: candles => {
         this.rawCandles.set(candles);
         this.chartLoading.set(false);

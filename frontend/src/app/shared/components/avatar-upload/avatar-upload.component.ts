@@ -1,4 +1,5 @@
-import { Component, Output, EventEmitter, signal, inject } from '@angular/core';
+import { Component, DestroyRef, EventEmitter, Output, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../../core/services/auth.service';
 
@@ -173,6 +174,7 @@ import { AuthService } from '../../../core/services/auth.service';
 })
 export class AvatarUploadComponent {
   private readonly authService = inject(AuthService);
+  private readonly destroyRef = inject(DestroyRef);
 
   @Output() uploaded = new EventEmitter<void>();
 
@@ -249,7 +251,7 @@ export class AvatarUploadComponent {
 
     // Upload file
     this.isUploading.set(true);
-    this.authService.uploadAvatar(file).subscribe({
+    this.authService.uploadAvatar(file).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.isUploading.set(false);
         this.success.set(true);

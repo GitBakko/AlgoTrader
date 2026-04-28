@@ -1,4 +1,5 @@
 import { Component, inject, signal, ChangeDetectionStrategy, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { CardComponent, CardBodyComponent, CardHeaderComponent, BadgeComponent, RowComponent, ColComponent } from '@coreui/angular';
 import { NewsService } from '../../core/services/news.service';
@@ -36,7 +37,7 @@ export class NewsComponent {
   loadNews(): void {
     const epic = this.selectedEpic();
     this.newsService.getNews(epic, 20, 7);
-    this.newsService.getSentiment(epic, 7).subscribe();
+    this.newsService.getSentiment(epic, 7).pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
   }
 
   onEpicChange(epic: string): void {

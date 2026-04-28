@@ -1,7 +1,5 @@
-import {
-  Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy,
-  computed, signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -477,6 +475,7 @@ type Tab = 'open' | 'history';
 })
 export class PositionsComponent implements OnInit, OnDestroy {
   readonly trading = inject(TradingService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly ws = inject(WebSocketService);
   private readonly toast = inject(ToastService);
   private readonly auditService = inject(SignalAuditService);
@@ -577,7 +576,7 @@ export class PositionsComponent implements OnInit, OnDestroy {
 
   closePosition(dealId: string): void {
     this.closingDealId.set(dealId);
-    this.trading.closePosition(dealId).subscribe({
+    this.trading.closePosition(dealId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.closingDealId.set(null);
         // Toast notification handled by NotificationService via WebSocket event
@@ -597,7 +596,7 @@ export class PositionsComponent implements OnInit, OnDestroy {
       close_reason: this.filterReason() || undefined,
       date_from: this.filterFrom() || undefined,
       date_to: this.filterTo() || undefined,
-    }).subscribe({
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (blob) => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');

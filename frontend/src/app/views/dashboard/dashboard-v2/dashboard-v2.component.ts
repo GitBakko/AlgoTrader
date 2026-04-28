@@ -1,4 +1,5 @@
-import { Component, ChangeDetectionStrategy, computed, inject, signal, OnInit, OnDestroy, effect } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 
 import { TradingService } from '../../../core/services/trading.service';
@@ -50,6 +51,7 @@ import { currencySymbol } from './shared/currency.util';
 })
 export class DashboardV2Component implements OnInit, OnDestroy {
   readonly trading = inject(TradingService);
+  private readonly destroyRef = inject(DestroyRef);
   readonly ws = inject(WebSocketService);
   readonly timeframeSvc = inject(TimeframeService);
   private readonly news = inject(NewsService);
@@ -353,7 +355,7 @@ export class DashboardV2Component implements OnInit, OnDestroy {
     });
     if (!confirmed) return;
     this.killSwitchBusy.set(true);
-    this.trading.emergencyStop().subscribe({
+    this.trading.emergencyStop().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (res) => {
         const closed = res.positions_closed?.length ?? 0;
         this.toast.success(`Emergency stop: ${closed} posizioni chiuse`);

@@ -1,4 +1,5 @@
-import { Component, ChangeDetectionStrategy, computed, inject, OnInit, OnDestroy, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import {
@@ -42,6 +43,7 @@ import { ToastService } from '../../shared/services/toast.service';
 })
 export class DashboardComponent implements OnInit, OnDestroy {
   readonly trading = inject(TradingService);
+  private readonly destroyRef = inject(DestroyRef);
   readonly ws = inject(WebSocketService);
   readonly marketStatus = inject(MarketStatusService);
   readonly newsService = inject(NewsService);
@@ -316,7 +318,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (!confirmed) return;
 
     this.resetCbInProgress.set(true);
-    this.trading.resetCircuitBreakers().subscribe({
+    this.trading.resetCircuitBreakers().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (data) => {
         this.toast.success(data.message);
         this.resetCbInProgress.set(false);

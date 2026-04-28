@@ -1,4 +1,5 @@
-import { Component, ChangeDetectionStrategy, inject, OnInit, signal, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -336,6 +337,7 @@ type SortDir = 'asc' | 'desc';
 })
 export class TradeJournalComponent implements OnInit {
   private readonly trading = inject(TradingService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly ws = inject(WebSocketService);
   readonly newsService = inject(NewsService);
   readonly auditService = inject(SignalAuditService);
@@ -581,7 +583,7 @@ export class TradeJournalComponent implements OnInit {
     const text = this.editingNoteText();
     this.savingNote.set(true);
 
-    this.trading.updateSignalNote(epic, timestamp, text).subscribe({
+    this.trading.updateSignalNote(epic, timestamp, text).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         const notes = { ...this.trading.signalNotes() };
         if (text.trim()) {

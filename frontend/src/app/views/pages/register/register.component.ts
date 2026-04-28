@@ -1,4 +1,5 @@
-import { Component, inject, signal, computed, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractControl, ValidationErrors } from '@angular/forms';
 import { IconDirective } from '@coreui/icons-angular';
@@ -32,6 +33,7 @@ import { CommonModule } from '@angular/common';
 })
 export class RegisterComponent {
   private readonly authService = inject(AuthService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
 
@@ -146,7 +148,7 @@ export class RegisterComponent {
 
     const { username, email, password, role_name } = this.registerForm.value;
 
-    this.authService.register(username, email, password, role_name).subscribe({
+    this.authService.register(username, email, password, role_name).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (response) => {
         this.loading.set(false);
         this.successMessage.set('Registrazione completata! Reindirizzamento al login...');

@@ -1,4 +1,5 @@
-import { Component, ChangeDetectionStrategy, inject, signal, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   BadgeComponent,
   CardBodyComponent,
@@ -27,6 +28,7 @@ import { AppNotification } from '../../core/models';
 })
 export class NotificationsComponent implements OnInit {
   readonly #notifService = inject(NotificationCenterService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly notifications = signal<AppNotification[]>([]);
   readonly total = signal(0);
@@ -65,7 +67,7 @@ export class NotificationsComponent implements OnInit {
     if (this.filterEpic()) params['epic'] = this.filterEpic();
     if (this.filterUnreadOnly()) params['is_read'] = false;
 
-    this.#notifService.loadPage(params).subscribe({
+    this.#notifService.loadPage(params).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: res => {
         if (res.success) {
           this.notifications.set(res.data.notifications);
