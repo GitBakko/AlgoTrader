@@ -95,8 +95,8 @@
     }
 
     &--muted {
-      color: var(--mantis-text-disabled, rgba(255, 255, 255, 0.35));
-      background: var(--mantis-tint-subtle, rgba(255, 255, 255, 0.03));
+      color: var(--mantis-text-disabled, var(--fg-soft));
+      background: var(--mantis-tint-subtle, var(--mantis-ghost-1));
       border: 1px solid var(--mantis-border-subtle, var(--mantis-border-subtle));
       font-weight: 500;
     }
@@ -130,7 +130,7 @@
     font-size: var(--mantis-fs-md);
     background: rgba(255, 61, 87, 0.15);
     border: 1px solid rgba(255, 61, 87, 0.25);
-    color: rgba(255, 255, 255, 0.85);
+    color: var(--fg1);
 
     svg {
       width: 12px;
@@ -244,7 +244,7 @@
   // Custom drawdown bar
   .dash-drawdown-bar {
     height: 4px;
-    background: var(--mantis-tint-subtle, rgba(255, 255, 255, 0.06));
+    background: var(--mantis-tint-subtle, var(--mantis-border-subtle));
     border-radius: 2px;
     overflow: hidden;
 
@@ -266,7 +266,7 @@
   // ═══════════════════════════════════════════════════════
 
   .dash-link {
-    color: var(--mantis-text-muted, rgba(255, 255, 255, 0.45));
+    color: var(--mantis-text-muted, var(--fg3));
     text-decoration: none;
     transition: color 0.15s ease;
 
@@ -288,7 +288,7 @@
   .price-block {
     padding: 0.625rem 0.75rem;
     border-radius: var(--mantis-radius-sm);
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--mantis-ghost-1);
     border: 1px solid var(--mantis-border-subtle, var(--mantis-border-subtle));
     transition: border-color 0.15s ease, background 0.15s ease;
 
@@ -333,7 +333,7 @@
     &__track {
       flex: 1;
       height: 8px;
-      background: var(--mantis-tint-subtle, rgba(255, 255, 255, 0.04));
+      background: var(--mantis-tint-subtle, var(--mantis-ghost-1));
       border-radius: var(--mantis-radius-sm);
       overflow: hidden;
     }
