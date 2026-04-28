@@ -38,7 +38,9 @@ class RLConfig(BaseModel):
     """Configuration for the RL system."""
 
     algorithm: Literal["PPO", "SAC"] = "PPO"
-    reward_function: Literal["scalping", "sharpe", "risk_adjusted", "composite"] = "composite"
+    reward_function: Literal[
+        "scalping", "sharpe", "risk_adjusted", "composite", "xgb_marginal"
+    ] = "composite"
     reward_weights: dict[str, float] = Field(
         default_factory=lambda: {
             "scalping": 0.4,
@@ -53,6 +55,10 @@ class RLConfig(BaseModel):
     max_drawdown_pct: float = 0.01
     learning_rate: float = 3e-4
     total_timesteps: int = 50_000
+    # Phase 5-bis: scale factor for the XGB-marginal reward.  Higher values
+    # encourage the agent to deviate from the XGBoost director only when the
+    # marginal pay-off is large.
+    xgb_marginal_scale: float = 5.0
 
 
 # ---------------------------------------------------------------------------
@@ -76,6 +82,11 @@ class EnvState(BaseModel):
     max_drawdown: float = 0.0
     volatility_regime: int = 0  # 0=LOW, 1=MED, 2=HIGH, 3=EXTREME
     returns_history: list[float] = Field(default_factory=list)
+    # Phase 5-bis: cumulative XGBoost-baseline P&L for marginal reward
+    # shaping.  Populated by the environment caller (XGBOverlayEnv) per
+    # step.  Default 0.0 keeps standalone training mode unaffected.
+    xgb_cumulative_pnl: float = 0.0
+    xgb_step_pnl: float = 0.0
 
 
 # ---------------------------------------------------------------------------

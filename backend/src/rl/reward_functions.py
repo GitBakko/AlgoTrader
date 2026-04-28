@@ -122,3 +122,39 @@ class MantisRewardCalculator:
         ) / total
 
         return float(reward)
+
+    def xgb_marginal_reward(self, state: EnvState) -> float:
+        """
+        Phase 5-bis reward shaping.
+
+        Reward = (PPO realised step P&L) - (XGBoost baseline step P&L),
+        scaled by `config.xgb_marginal_scale`.
+
+        Encourages the agent to add marginal value over the XGBoost
+        director rather than learning to trade in isolation.  When the
+        baseline P&L stream is zero (standalone training) this falls
+        back to scaled current_profit, equivalent to a smaller-magnitude
+        scalping reward.
+        """
+        scale = float(getattr(self.config, "xgb_marginal_scale", 5.0))
+
+        # Realised step P&L for the agent.  When a trade just closed in
+        # this step the last entry of returns_history is non-zero; while
+        # holding open we use unrealised current_profit as a smoothed
+        # proxy.
+        agent_step_pnl = (
+            state.returns_history[-1]
+            if state.returns_history and state.trade_duration == 0
+            else state.current_profit
+        )
+        baseline_step_pnl = float(state.xgb_step_pnl)
+
+        marginal = agent_step_pnl - baseline_step_pnl
+        reward = marginal * scale
+
+        # Soft drawdown penalty so the marginal reward can't run away.
+        if state.max_drawdown > self.config.max_drawdown_pct:
+            excess = state.max_drawdown - self.config.max_drawdown_pct
+            reward -= excess * 50.0
+
+        return float(np.clip(reward, -3.0, 3.0))
