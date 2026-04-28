@@ -575,7 +575,10 @@ export interface SignalMl {
   signal_class: number;
   signal_name: string;
   confidence: number;
-  probabilities: Record<string, number>;
+  // Backend may omit a class entirely when its probability rounds to 0,
+  // so each key is independently optional. Using Partial<Record> tells
+  // the template the `?? 0` guards aren't dead code (silences NG8102).
+  probabilities: Partial<Record<'buy' | 'sell' | 'hold', number>>;
   agreement: string;
   confidence_before: number;
   confidence_after: number;
