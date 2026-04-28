@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy, computed, signal, effect } from '@angular/core';
+import { Component, ChangeDetectionStrategy, DestroyRef, inject, OnInit, computed, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   CardComponent, CardBodyComponent, CardHeaderComponent,
@@ -482,8 +482,9 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
     }
   `
 })
-export class AiModelsComponent implements OnInit, OnDestroy {
+export class AiModelsComponent implements OnInit {
   private readonly trading = inject(TradingService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly ws = inject(WebSocketService);
   private readonly router = inject(Router);
   readonly newsService = inject(NewsService);
@@ -497,6 +498,7 @@ export class AiModelsComponent implements OnInit, OnDestroy {
         this.trading.trainingStatus.set(update);
       }
     });
+    this.destroyRef.onDestroy(() => this.stopPolling());
   }
 
   readonly activeTab = signal<'models' | 'training'>('models');
@@ -583,10 +585,6 @@ export class AiModelsComponent implements OnInit, OnDestroy {
     this.trading.loadModels();
     this.trading.loadTrainingStatus();
     this.trading.loadPerformance();
-  }
-
-  ngOnDestroy(): void {
-    this.stopPolling();
   }
 
   switchToTraining(): void {

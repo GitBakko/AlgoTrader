@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
@@ -41,7 +41,7 @@ import { ToastService } from '../../shared/services/toast.service';
     LoadingButtonComponent,
   ]
 })
-export class DashboardComponent implements OnInit, OnDestroy {
+export class DashboardComponent implements OnInit {
   readonly trading = inject(TradingService);
   private readonly destroyRef = inject(DestroyRef);
   readonly ws = inject(WebSocketService);
@@ -212,7 +212,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
   );
 
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
-  private newsTimer: ReturnType<typeof setInterval> | null = null;
 
   ngOnInit(): void {
     this.startSmartPolling();
@@ -220,18 +219,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
     // Fetch market headlines (US500 news) - refresh every 5 minutes
     this.newsService.getNews('US500', 5, 7);
-    this.newsTimer = setInterval(() => this.newsService.getNews('US500', 5, 7), 5 * 60 * 1000);
-  }
+    const newsTimer = setInterval(() => this.newsService.getNews('US500', 5, 7), 5 * 60 * 1000);
 
-  ngOnDestroy(): void {
-    if (this.pollTimer) {
-      clearTimeout(this.pollTimer);
-      this.pollTimer = null;
-    }
-    if (this.newsTimer) {
-      clearInterval(this.newsTimer);
-      this.newsTimer = null;
-    }
+    this.destroyRef.onDestroy(() => {
+      if (this.pollTimer) {
+        clearTimeout(this.pollTimer);
+        this.pollTimer = null;
+      }
+      clearInterval(newsTimer);
+    });
   }
 
   private async startSmartPolling(): Promise<void> {

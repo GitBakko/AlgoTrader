@@ -177,3 +177,13 @@
   flex-direction: column;
   gap: var(--mantis-space-3);
 }
+
+// R7 helpers — sample rows in the type/buttons sections
+.ds-sample-mono-2xl {
+  font-size: var(--mantis-fs-2xl);
+
+  &--neon { color: var(--mantis-neon); }
+  &--loss { color: var(--mantis-loss); }
+}
+
+.ds-auth-sample { max-width: 180px; }

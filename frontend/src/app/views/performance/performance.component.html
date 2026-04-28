@@ -159,7 +159,7 @@
           </c-card-header>
           <c-card-body class="p-3">
             @if (pnlDistChartData(); as data) {
-              <div style="height: 280px;">
+              <div class="perf-chart-280">
                 <c-chart type="bar" [data]="data" [options]="pnlDistChartOptions"></c-chart>
               </div>
             } @else {

@@ -146,6 +146,11 @@
     transform: translateY(-50%);
     padding-right: 4px;
 
+    &--t0  { top: 0; }
+    &--t25 { top: 25%; }
+    &--t50 { top: 50%; }
+    &--t75 { top: 75%; }
+
     &::after {
       content: "";
       position: absolute;

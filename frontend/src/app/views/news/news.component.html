@@ -11,8 +11,7 @@
             </c-badge>
           </div>
           <select
-            class="form-select form-select-sm"
-            style="width: 150px;"
+            class="form-select form-select-sm news-asset-select"
             [value]="selectedEpic()"
             (change)="onEpicChange($any($event.target).value)">
             @for (asset of assets; track asset) {

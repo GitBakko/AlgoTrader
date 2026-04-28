@@ -362,3 +362,14 @@
     }
   }
 }
+
+// ── R7 helpers ──────────────────────────────────────────────────────────
+.skeleton-line--w50 { width: 50%; }
+.skeleton-line--w80 { width: 80%; }
+.skeleton-line--w40 { width: 40%; }
+.skeleton-line--h-tiny { height: 0.65rem; }
+.skeleton-line--h-1    { height: 1rem; }
+.skeleton-line--h-mini { height: 0.5rem; }
+
+.dash-clickable-row { cursor: pointer; }
+.dash-time-col { width: 50px; }

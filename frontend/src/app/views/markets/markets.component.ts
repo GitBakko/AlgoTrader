@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import {
@@ -193,7 +193,7 @@ const TIMEFRAMES = [
     }
   `
 })
-export class MarketsComponent implements OnInit, OnDestroy {
+export class MarketsComponent implements OnInit {
   private readonly trading = inject(TradingService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly ws = inject(WebSocketService);
@@ -266,13 +266,10 @@ export class MarketsComponent implements OnInit, OnDestroy {
     this.startSmartPolling();
     this.ws.connectPrices();
     this.trading.loadPaperStatus();
-  }
 
-  ngOnDestroy(): void {
-    if (this.pollTimer) {
-      clearTimeout(this.pollTimer);
-      this.pollTimer = null;
-    }
+    this.destroyRef.onDestroy(() => {
+      if (this.pollTimer) { clearTimeout(this.pollTimer); this.pollTimer = null; }
+    });
   }
 
   private async startSmartPolling(): Promise<void> {

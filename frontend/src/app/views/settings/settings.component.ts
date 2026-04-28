@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import {
@@ -293,13 +293,20 @@ const TYPE_BADGE_COLORS: Record<string, string> = {
     </c-card>
   `
 })
-export class SettingsComponent implements OnInit, OnDestroy {
+export class SettingsComponent implements OnInit {
   private readonly trading = inject(TradingService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly ws = inject(WebSocketService);
   readonly notifications = inject(NotificationService);
   private readonly notifCenter = inject(NotificationCenterService);
   private trainTimers: ReturnType<typeof setTimeout>[] = [];
+
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      this.trainTimers.forEach(t => clearTimeout(t));
+      this.trainTimers = [];
+    });
+  }
 
   /** Alert types that can be toggled for in-app filtering */
   readonly alertTypes = [
@@ -338,11 +345,6 @@ export class SettingsComponent implements OnInit, OnDestroy {
     this.trading.getSystemSettings().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(data => this.settings.set(data));
     this.trading.getRiskStatus().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(data => this.riskStatus.set(data));
     this.trading.loadPaperPositions();
-  }
-
-  ngOnDestroy(): void {
-    this.trainTimers.forEach(t => clearTimeout(t));
-    this.trainTimers = [];
   }
 
   toggleBrowserNotifications(): void {

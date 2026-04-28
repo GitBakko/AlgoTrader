@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 
@@ -49,7 +49,7 @@ import { currencySymbol } from './shared/currency.util';
   templateUrl: './dashboard-v2.component.html',
   styleUrl: './dashboard-v2.component.scss',
 })
-export class DashboardV2Component implements OnInit, OnDestroy {
+export class DashboardV2Component implements OnInit {
   readonly trading = inject(TradingService);
   private readonly destroyRef = inject(DestroyRef);
   readonly ws = inject(WebSocketService);
@@ -299,10 +299,10 @@ export class DashboardV2Component implements OnInit, OnDestroy {
     this.ws.connectMarkets();
     this.news.getNews('US500', 5, 7);
     this.trading.loadCurrentModels();
-  }
 
-  ngOnDestroy(): void {
-    if (this.pollTimer)  { clearTimeout(this.pollTimer);   this.pollTimer = null; }
+    this.destroyRef.onDestroy(() => {
+      if (this.pollTimer) { clearTimeout(this.pollTimer); this.pollTimer = null; }
+    });
   }
 
   private startPolling(): void {

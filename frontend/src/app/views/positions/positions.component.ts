@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -473,7 +473,7 @@ type Tab = 'open' | 'history';
     }
   `
 })
-export class PositionsComponent implements OnInit, OnDestroy {
+export class PositionsComponent implements OnInit {
   readonly trading = inject(TradingService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly ws = inject(WebSocketService);
@@ -529,13 +529,10 @@ export class PositionsComponent implements OnInit, OnDestroy {
     this.trading.loadPaperPositions();
     this.ws.connectPrices();
     this.startSmartPolling();
-  }
 
-  ngOnDestroy(): void {
-    if (this.pollTimer) {
-      clearTimeout(this.pollTimer);
-      this.pollTimer = null;
-    }
+    this.destroyRef.onDestroy(() => {
+      if (this.pollTimer) { clearTimeout(this.pollTimer); this.pollTimer = null; }
+    });
   }
 
   private startSmartPolling(): void {

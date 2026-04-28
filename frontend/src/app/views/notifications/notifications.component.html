@@ -13,7 +13,7 @@
           <div class="d-flex flex-wrap align-items-end gap-3">
             <div>
               <label class="form-label small text-body-secondary mb-1">Tipo</label>
-              <select cSelect class="form-select form-select-sm" style="min-width: 180px"
+              <select cSelect class="form-select form-select-sm notif-filter-type"
                 [value]="filterAlertType()"
                 (change)="filterAlertType.set($any($event.target).value); applyFilters()">
                 <option value="">Tutti</option>
@@ -24,7 +24,7 @@
             </div>
             <div>
               <label class="form-label small text-body-secondary mb-1">Severità</label>
-              <select cSelect class="form-select form-select-sm" style="min-width: 140px"
+              <select cSelect class="form-select form-select-sm notif-filter-severity"
                 [value]="filterSeverity()"
                 (change)="filterSeverity.set($any($event.target).value); applyFilters()">
                 <option value="">Tutte</option>
@@ -35,7 +35,7 @@
             </div>
             <div>
               <label class="form-label small text-body-secondary mb-1">Asset</label>
-              <input type="text" class="form-control form-control-sm" style="min-width: 120px"
+              <input type="text" class="form-control form-control-sm notif-filter-epic"
                 placeholder="es. XAUUSD"
                 [value]="filterEpic()"
                 (change)="filterEpic.set($any($event.target).value); applyFilters()">
@@ -75,13 +75,13 @@
             <table cTable [hover]="true" [small]="true" class="mb-0">
               <thead>
                 <tr class="text-body-secondary">
-                  <th class="fw-semibold small" style="width: 40px"></th>
+                  <th class="fw-semibold small notif-col-checkbox"></th>
                   <th class="fw-semibold small">Titolo</th>
                   <th class="fw-semibold small d-none d-md-table-cell">Messaggio</th>
-                  <th class="fw-semibold small" style="width: 90px">Asset</th>
-                  <th class="fw-semibold small" style="width: 90px">Severità</th>
-                  <th class="fw-semibold small" style="width: 80px">Tempo</th>
-                  <th class="fw-semibold small text-end" style="width: 100px">Azioni</th>
+                  <th class="fw-semibold small notif-col-asset">Asset</th>
+                  <th class="fw-semibold small notif-col-severity">Severità</th>
+                  <th class="fw-semibold small notif-col-time">Tempo</th>
+                  <th class="fw-semibold small text-end notif-col-actions">Azioni</th>
                 </tr>
               </thead>
               <tbody>
@@ -92,7 +92,7 @@
                       <div class="fw-medium small" [class.fw-semibold]="!n.is_read">{{ n.title }}</div>
                     </td>
                     <td class="d-none d-md-table-cell">
-                      <div class="small text-body-secondary text-truncate" style="max-width: 300px">
+                      <div class="small text-body-secondary text-truncate notif-msg-truncate">
                         {{ n.message }}
                       </div>
                     </td>

@@ -33,10 +33,10 @@
     <div class="tb-chart" (mouseleave)="clearFocus()">
 
       <div class="tb-yaxis mantis-mono" aria-hidden="true">
-        <span class="tb-yaxis__tick" style="top: 0%">{{ maxStack() }}</span>
-        <span class="tb-yaxis__tick" style="top: 25%">{{ (maxStack() * 0.75) | number: '1.0-0' }}</span>
-        <span class="tb-yaxis__tick" style="top: 50%">{{ (maxStack() * 0.5) | number: '1.0-0' }}</span>
-        <span class="tb-yaxis__tick" style="top: 75%">{{ (maxStack() * 0.25) | number: '1.0-0' }}</span>
+        <span class="tb-yaxis__tick tb-yaxis__tick--t0">{{ maxStack() }}</span>
+        <span class="tb-yaxis__tick tb-yaxis__tick--t25">{{ (maxStack() * 0.75) | number: '1.0-0' }}</span>
+        <span class="tb-yaxis__tick tb-yaxis__tick--t50">{{ (maxStack() * 0.5) | number: '1.0-0' }}</span>
+        <span class="tb-yaxis__tick tb-yaxis__tick--t75">{{ (maxStack() * 0.25) | number: '1.0-0' }}</span>
       </div>
 
       <div class="tb-chart__half tb-chart__half--buy">

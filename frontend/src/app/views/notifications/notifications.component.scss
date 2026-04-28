@@ -21,3 +21,14 @@
   font-size: var(--mantis-fs-base);
   color: var(--cui-body-color-secondary);
 }
+
+// R7 — column / filter sizings (replaces inline style="" attributes)
+.notif-filter-type     { min-width: 180px; }
+.notif-filter-severity { min-width: 140px; }
+.notif-filter-epic     { min-width: 120px; }
+.notif-col-checkbox    { width: 40px; }
+.notif-col-asset       { width: 90px; }
+.notif-col-severity    { width: 90px; }
+.notif-col-time        { width: 80px; }
+.notif-col-actions     { width: 100px; }
+.notif-msg-truncate    { max-width: 300px; }

@@ -209,15 +209,19 @@ export class OperationalStripComponent {
     const timer = setInterval(() => this.nowTick.set(Date.now()), 30_000);
     destroyRef.onDestroy(() => clearInterval(timer));
 
-    effect(async () => {
+    effect(() => {
       this.nowTick();
-      try {
-        const status = await this.marketStatus.getMarketStatus(this.sessionEpic);
-        this.marketStatusSig.set({ is_open: status.is_open, status: status.status });
-      } catch {
-        // silent — market status cache falls back internally
-      }
+      void this.refreshMarketStatus();
     });
+  }
+
+  private async refreshMarketStatus(): Promise<void> {
+    try {
+      const status = await this.marketStatus.getMarketStatus(this.sessionEpic);
+      this.marketStatusSig.set({ is_open: status.is_open, status: status.status });
+    } catch {
+      // silent — market status cache falls back internally
+    }
   }
 
   onKill(): void {

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 
@@ -74,7 +74,7 @@ const SIGNALS_HISTORY_LIMIT = 300;
     'data-screen-label': '02 Paper Trading',
   },
 })
-export class PaperTradingComponent implements OnInit, OnDestroy {
+export class PaperTradingComponent implements OnInit {
   private readonly trading = inject(TradingService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly ws = inject(WebSocketService);
@@ -351,14 +351,7 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
 
   }
 
-  private pollTimer: ReturnType<typeof setInterval> | null = null;
-  private clockTimer: ReturnType<typeof setInterval> | null = null;
-  private historyTimer: ReturnType<typeof setInterval> | null = null;
-  private positionHistoryTimer: ReturnType<typeof setInterval> | null = null;
-  private feedTimer: ReturnType<typeof setInterval> | null = null;
-  private signalsTimer: ReturnType<typeof setInterval> | null = null;
   private knownDealIds = new Set<string>();
-
 
   ngOnInit(): void {
     this.trading.loadPaperStatus();
@@ -369,56 +362,38 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     this.trading.loadSignals(undefined, SIGNALS_HISTORY_LIMIT);
     this.trading.loadFeedEvents();
     this.ws.connectPrices();
-    this.pollTimer = setInterval(() => {
+
+    const pollTimer = setInterval(() => {
       this.trading.loadPaperStatus();
       this.trading.loadRiskStatus();
       this.trading.loadOverview();
       this.trading.loadPaperPositions();
     }, 10_000);
-    this.clockTimer = setInterval(() => this.tickClock.set(Date.now()), 1_000);
-    this.historyTimer = setInterval(
+    const clockTimer = setInterval(() => this.tickClock.set(Date.now()), 1_000);
+    const historyTimer = setInterval(
       () => this.trading.loadPaperPnlHistory(),
       PNL_HISTORY_REFRESH_MS,
     );
-    this.positionHistoryTimer = setInterval(
+    const positionHistoryTimer = setInterval(
       () => this.refreshPositionHistories(),
       POSITION_HISTORY_REFRESH_MS,
     );
-    this.feedTimer = setInterval(() => this.trading.loadFeedEvents(), FEED_REFRESH_MS);
-    this.signalsTimer = setInterval(
+    const feedTimer = setInterval(() => this.trading.loadFeedEvents(), FEED_REFRESH_MS);
+    const signalsTimer = setInterval(
       () => this.trading.loadSignals(undefined, SIGNALS_HISTORY_LIMIT),
       SIGNALS_REFRESH_MS,
     );
-    // Kick the first fetch right after the position list lands so the
-    // chart isn't blank for a full 30s.
-    queueMicrotask(() => this.refreshPositionHistories());
-  }
 
-  ngOnDestroy(): void {
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer);
-      this.pollTimer = null;
-    }
-    if (this.clockTimer) {
-      clearInterval(this.clockTimer);
-      this.clockTimer = null;
-    }
-    if (this.historyTimer) {
-      clearInterval(this.historyTimer);
-      this.historyTimer = null;
-    }
-    if (this.positionHistoryTimer) {
-      clearInterval(this.positionHistoryTimer);
-      this.positionHistoryTimer = null;
-    }
-    if (this.feedTimer) {
-      clearInterval(this.feedTimer);
-      this.feedTimer = null;
-    }
-    if (this.signalsTimer) {
-      clearInterval(this.signalsTimer);
-      this.signalsTimer = null;
-    }
+    this.destroyRef.onDestroy(() => {
+      clearInterval(pollTimer);
+      clearInterval(clockTimer);
+      clearInterval(historyTimer);
+      clearInterval(positionHistoryTimer);
+      clearInterval(feedTimer);
+      clearInterval(signalsTimer);
+    });
+
+    queueMicrotask(() => this.refreshPositionHistories());
   }
 
   /** Re-fetch per-position P&L history. Called on a timer + every time

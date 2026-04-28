@@ -406,9 +406,9 @@
       <div class="price-grid">
         @for (_ of [1,2,3,4,5,6,7,8]; track $index) {
           <div class="price-block" cPlaceholderAnimation="wave">
-            <div class="mb-2"><span cPlaceholder class="skeleton-line" style="width:50%; height:0.65rem;"></span></div>
-            <div class="mb-1"><span cPlaceholder class="skeleton-line" style="width:80%; height:1rem;"></span></div>
-            <div><span cPlaceholder class="skeleton-line" style="width:40%; height:0.5rem;"></span></div>
+            <div class="mb-2"><span cPlaceholder class="skeleton-line skeleton-line--w50 skeleton-line--h-tiny"></span></div>
+            <div class="mb-1"><span cPlaceholder class="skeleton-line skeleton-line--w80 skeleton-line--h-1"></span></div>
+            <div><span cPlaceholder class="skeleton-line skeleton-line--w40 skeleton-line--h-mini"></span></div>
           </div>
         }
       </div>
@@ -473,7 +473,7 @@
               </thead>
               <tbody>
                 @for (pos of livePositions(); track pos.deal_id) {
-                  <tr (click)="auditService.openByDealId(pos.deal_id, pos.epic)" (keydown.enter)="auditService.openByDealId(pos.deal_id, pos.epic)" tabindex="0" style="cursor:pointer;">
+                  <tr class="dash-clickable-row" (click)="auditService.openByDealId(pos.deal_id, pos.epic)" (keydown.enter)="auditService.openByDealId(pos.deal_id, pos.epic)" tabindex="0">
                     <td class="fw-semibold">
                       <div class="d-flex align-items-center gap-1">
                         <app-epic-logo [epic]="pos.epic" [size]="20" [rounded]="true" />
@@ -534,7 +534,7 @@
             <tbody>
               @for (sig of recentSignals(); track sig.timestamp + sig.epic) {
                 <tr>
-                  <td class="mantis-mono text-body-secondary small" style="width: 50px;">{{ formatTime(sig.timestamp) }}</td>
+                  <td class="mantis-mono text-body-secondary small dash-time-col">{{ formatTime(sig.timestamp) }}</td>
                   <td class="fw-semibold small">
                     <div class="d-flex align-items-center gap-1">
                       <app-epic-logo [epic]="sig.epic" [size]="16" [rounded]="true" />
