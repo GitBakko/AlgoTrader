@@ -125,14 +125,14 @@
   width: 6px;
   height: 6px;
   border-radius: 100px;
-  background: rgba(255, 255, 255, .4);
+  background: var(--fg3);
 }
 
 .cockpit-header__tick {
   font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
   font-feature-settings: 'tnum' 1;
   font-size: var(--mantis-fs-xs);
-  color: rgba(255, 255, 255, .4);
+  color: var(--fg3);
   letter-spacing: .04em;
 }
 

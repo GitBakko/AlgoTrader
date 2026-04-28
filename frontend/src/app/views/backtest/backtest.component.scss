@@ -29,7 +29,7 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--mantis-text-secondary, rgba(255, 255, 255, 0.5));
+    color: var(--mantis-text-secondary, var(--fg3));
     margin-bottom: 0.25rem;
   }
 

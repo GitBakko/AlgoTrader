@@ -145,7 +145,7 @@
   .user-dropdown {
     &__toggle {
       &:hover {
-        background: rgba(255, 255, 255, 0.05);
+        background: var(--mantis-border-subtle);
       }
     }
 
@@ -155,7 +155,7 @@
 
     &__item {
       &:hover {
-        background: rgba(255, 255, 255, 0.05);
+        background: var(--mantis-border-subtle);
       }
 
       &--logout:hover {

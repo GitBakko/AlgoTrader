@@ -7,7 +7,7 @@
   // Profile info rows
   .profile-info-label {
     font-weight: 600;
-    color: var(--mantis-text-secondary, rgba(255, 255, 255, 0.6));
+    color: var(--mantis-text-secondary, var(--fg2));
     font-size: var(--mantis-fs-body);
   }
 

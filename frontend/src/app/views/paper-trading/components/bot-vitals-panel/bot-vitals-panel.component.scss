@@ -150,7 +150,7 @@
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, .4);
+  color: var(--fg3);
 }
 
 .pv-bv__stat-value {
@@ -181,7 +181,7 @@
 }
 
 .pv-bv__donut-track {
-  stroke: rgba(255, 255, 255, .08);
+  stroke: var(--mantis-ghost-2);
   stroke-width: 3;
 }
 
@@ -221,11 +221,11 @@
 }
 
 .pv-bv__signals-total {
-  color: rgba(255, 255, 255, .85);
+  color: var(--fg1);
 }
 
 .pv-bv__signals-sep {
-  color: rgba(255, 255, 255, .35);
+  color: var(--fg-soft);
 }
 
 .pv-bv__signals-exec {

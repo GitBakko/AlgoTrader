@@ -107,7 +107,7 @@
     &__close {
       background: none;
       border: none;
-      color: var(--mantis-text-muted, rgba(255, 255, 255, 0.5));
+      color: var(--mantis-text-muted, var(--fg3));
       font-size: var(--mantis-fs-2xl);
       cursor: pointer;
       padding: 0.25rem;

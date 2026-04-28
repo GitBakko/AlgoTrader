@@ -94,7 +94,7 @@
   height: 26px;
   border-radius: 3px;
   border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--mantis-ghost-1);
   padding: 0;
   cursor: pointer;
   display: flex;
@@ -112,7 +112,7 @@
   }
 
   &.is-win .ch-cell__pnl { color: rgba(13, 17, 23, 0.95); }
-  &.is-loss .ch-cell__pnl { color: rgba(255, 255, 255, 0.95); }
+  &.is-loss .ch-cell__pnl { color: var(--fg1); }
 
   &.is-glow {
     box-shadow: 0 0 6px rgba(57, 255, 20, 0.35);
@@ -122,8 +122,8 @@
 
   &.is-focus {
     transform: scale(1.15);
-    border-color: rgba(255, 255, 255, 1);
-    outline: 1px solid rgba(255, 255, 255, 0.4);
+    border-color: var(--fg1);
+    outline: 1px solid var(--fg3);
     z-index: 2;
     position: relative;
   }
@@ -155,7 +155,7 @@
   gap: 4px;
   min-width: 170px;
   padding: var(--mantis-space-2) var(--mantis-space-3);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--mantis-ghost-1);
   border: 1px solid var(--mantis-border-accent);
   border-radius: var(--mantis-radius-sm);
 

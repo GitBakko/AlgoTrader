@@ -32,7 +32,7 @@
 
     &:hover:not(&--active) {
       color: var(--mantis-text-primary, #c9d1d9);
-      background: rgba(255, 255, 255, 0.04);
+      background: var(--mantis-ghost-1);
     }
 
     &--active {

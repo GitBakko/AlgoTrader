@@ -22,8 +22,8 @@
     gap: 4px;
     flex: 1 1 0;
     padding: 12px 14px;
-    background: rgba(255, 255, 255, 0.015);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: var(--mantis-ghost-1);
+    border: 1px solid var(--mantis-border-subtle);
     border-radius: 4px;
     font-family: var(--mantis-font-mono);
   }
@@ -41,7 +41,7 @@
     font-size: var(--mantis-fs-xxs);
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.4);
+    color: var(--fg3);
     font-weight: 700;
   }
 
@@ -62,12 +62,12 @@
 
     &--warn { color: var(--mantis-warning); }
 
-    &.is-muted { color: rgba(255, 255, 255, 0.6); }
+    &.is-muted { color: var(--fg2); }
   }
 
   &__sub {
     font-size: var(--mantis-fs-xs);
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--fg3);
     line-height: 1.3;
   }
 

@@ -298,7 +298,7 @@
     &-pct {
       font-size: var(--mantis-fs-sm);
       font-weight: 500;
-      color: rgba(255, 255, 255, 0.55);
+      color: var(--fg-faint);
     }
   }
 
@@ -309,7 +309,7 @@
     font-size: var(--mantis-fs-xs);
     color: var(--mantis-text-muted);
     border: 1px dashed var(--mantis-border-default);
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--mantis-ghost-1);
   }
 }
 
@@ -363,7 +363,7 @@
 
     &.is-warn    { color: var(--mantis-warning); }
     &.is-ok      { color: var(--mantis-neon); }
-    &.is-neutral { color: rgba(255, 255, 255, 0.7); }
+    &.is-neutral { color: var(--fg2); }
   }
 }
 

@@ -46,7 +46,7 @@
     margin: 0;
     font-size: var(--mantis-fs-body);
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.85);
+    color: var(--fg1);
     letter-spacing: 0.02em;
   }
 
@@ -60,7 +60,7 @@
   &__tabs {
     display: inline-flex;
     gap: 4px;
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--mantis-ghost-1);
     border: 1px solid var(--mantis-border-subtle);
     border-radius: var(--mantis-radius-sm);
     padding: 2px;
@@ -86,7 +86,7 @@
 
   &:hover:not(.is-active) {
     color: var(--mantis-text-primary);
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--mantis-ghost-1);
   }
 
   &:focus-visible {
@@ -205,7 +205,7 @@
       height: 2px;
 
       &.is-equity { background: var(--mantis-neon); }
-      &.is-peak   { background: rgba(255, 255, 255, 0.6); }
+      &.is-peak   { background: var(--fg2); }
       &.is-dd     { background: var(--mantis-loss); }
     }
   }
@@ -275,7 +275,7 @@
     left: 6px;
     bottom: 8px;
     font-size: var(--mantis-fs-xxs);
-    color: rgba(255, 255, 255, 0.35);
+    color: var(--fg-soft);
     letter-spacing: 0.04em;
     pointer-events: none;
   }

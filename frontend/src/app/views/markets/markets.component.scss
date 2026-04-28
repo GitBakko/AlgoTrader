@@ -45,7 +45,7 @@
   .chart-placeholder {
     padding: 3rem 1rem;
     text-align: center;
-    color: var(--mantis-text-muted, rgba(255, 255, 255, 0.4));
+    color: var(--mantis-text-muted, var(--fg3));
   }
 
   // Mobile table min-width
