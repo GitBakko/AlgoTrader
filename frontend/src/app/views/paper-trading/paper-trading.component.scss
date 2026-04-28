@@ -17,6 +17,21 @@
 
   @media (min-width: 576px) { margin-inline: -1rem; }
   @media (min-width: 992px) { margin-inline: -1.5rem; }
+
+  // Chrome heights used by the right rail to bound its sticky height to
+  // the visible area (avoid double scrollbar between the live-feed panel
+  // and the page itself). Tuneable in one place if the global header /
+  // footer change.
+  --pt-app-header:     56px;  // CoreUI sticky header above the route
+  --pt-cockpit-header: 68px;  // local <app-cockpit-header>
+  --pt-app-footer:     32px;  // <app-default-footer>
+  --pt-host-pull-up:   24px;  // host margin-top: -1.5rem
+  --pt-chrome: calc(
+    var(--pt-app-header)
+    - var(--pt-host-pull-up)
+    + var(--pt-cockpit-header)
+    + var(--pt-app-footer)
+  );
 }
 
 .pt2 {
@@ -55,15 +70,21 @@
 }
 
 // Right rail is the longest panel of the page (live signals feed). Pin
-// it to the viewport so it owns its internal scroll and never triggers
-// a second page-level scrollbar regardless of how tall the left rail
-// (KPI / position / ML Models cards) gets.
+// it to the visible area below the CoreUI app header so it owns its
+// internal scroll and never triggers a second page-level scrollbar.
+//
+// • top = CoreUI app header + 14px breathing space (so the rail's top
+//   does not slip under the sticky app header when scrolled).
+// • height = 100dvh minus all chrome above & below the grid (CoreUI
+//   header + cockpit-header + app-footer, with the host margin-top
+//   pull-up subtracted) so the rail's bottom never extends past the
+//   visible viewport in either initial or scrolled state.
 .pt2-rail-right {
   position: sticky;
-  top: 14px;
+  top: calc(var(--pt-app-header) + 14px);
   align-self: flex-start;
-  height: calc(100vh - 28px);
-  max-height: calc(100vh - 28px);
+  height: calc(100dvh - var(--pt-chrome));
+  max-height: calc(100dvh - var(--pt-chrome));
   min-height: 0;
   overflow: hidden;
 }
