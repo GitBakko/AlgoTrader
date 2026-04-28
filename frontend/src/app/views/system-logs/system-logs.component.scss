@@ -45,7 +45,7 @@
 
     .score-max {
       font-size: var(--mantis-fs-body);
-      color: var(--mantis-text-muted, rgba(255, 255, 255, 0.5));
+      color: var(--mantis-text-muted, var(--fg3));
     }
   }
 }
@@ -53,7 +53,7 @@
 // Metric Cards
 .metric-card {
   background: var(--mantis-surface-2, #161b22);
-  border: 1px solid var(--mantis-border-default, var(--mantis-border-default));
+  border: 1px solid var(--mantis-border-default);
   transition: all 0.3s ease;
 
   &:hover {
@@ -65,7 +65,7 @@
   h3 {
     font-size: var(--mantis-fs-4xl);
     font-weight: 700;
-    color: var(--mantis-text-primary, white);
+    color: var(--mantis-text-primary);
   }
 
   .metric-detail {
@@ -78,12 +78,12 @@
   padding: 1rem;
   background: var(--mantis-surface-2, #161b22);
   border-radius: var(--mantis-radius-md);
-  border: 1px solid var(--mantis-border-default, var(--mantis-border-default));
+  border: 1px solid var(--mantis-border-default);
   text-align: center;
 
   .metric-label {
     font-size: var(--mantis-fs-md);
-    color: var(--mantis-text-secondary, rgba(255, 255, 255, 0.6));
+    color: var(--mantis-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 0.5rem;
@@ -92,23 +92,23 @@
   .metric-value {
     font-size: var(--mantis-fs-3xl);
     font-weight: 700;
-    color: var(--mantis-text-primary, white);
+    color: var(--mantis-text-primary);
   }
 }
 
 // Table Enhancements
 table {
   th {
-    color: var(--mantis-text-secondary, rgba(255, 255, 255, 0.7));
+    color: var(--mantis-text-secondary);
     font-weight: 600;
     font-size: var(--mantis-fs-body);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    border-color: var(--mantis-border-default, var(--mantis-border-default));
+    border-color: var(--mantis-border-default);
   }
 
   td {
-    border-color: var(--mantis-border-subtle, rgba(255, 255, 255, 0.05));
+    border-color: var(--mantis-border-subtle);
   }
 
   tbody tr {
@@ -123,15 +123,15 @@ table {
 // Cards
 c-card {
   background: var(--mantis-surface-2, #161b22);
-  border-color: var(--mantis-border-default, var(--mantis-border-default));
+  border-color: var(--mantis-border-default);
 }
 
 c-card-header {
   background: rgba(0, 0, 0, 0.2);
-  border-bottom-color: var(--mantis-border-default, var(--mantis-border-default));
+  border-bottom-color: var(--mantis-border-default);
 
   h5, h6 {
-    color: var(--mantis-text-primary, white);
+    color: var(--mantis-text-primary);
   }
 }
 
