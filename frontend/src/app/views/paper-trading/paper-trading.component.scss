@@ -54,15 +54,15 @@
   min-width: 0;
 }
 
-// Right rail height is synced to the left-rail content via a CSS variable
-// set from TS (ResizeObserver). Falls back to viewport-bounded sticky if
-// the variable is not yet computed (first paint), so the column never
-// overflows past the page bottom border.
+// Right rail is the longest panel of the page (live signals feed). Pin
+// it to the viewport so it owns its internal scroll and never triggers
+// a second page-level scrollbar regardless of how tall the left rail
+// (KPI / position / ML Models cards) gets.
 .pt2-rail-right {
   position: sticky;
   top: 14px;
   align-self: flex-start;
-  height: var(--rail-left-height, calc(100vh - 28px));
+  height: calc(100vh - 28px);
   max-height: calc(100vh - 28px);
   min-height: 0;
   overflow: hidden;

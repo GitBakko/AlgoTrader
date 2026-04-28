@@ -13,7 +13,7 @@
 
   <section class="pt2-grid" aria-label="Cockpit body">
 
-    <aside #leftRail class="pt2-rail-left" aria-label="Bot rail">
+    <aside class="pt2-rail-left" aria-label="Bot rail">
       <app-bot-vitals-panel
         [vitals]="botVitals()"
         [heartbeat]="heartbeatNonce()">
@@ -47,7 +47,7 @@
       </app-signals-heatmap>
     </section>
 
-    <aside #rightRail class="pt2-rail-right" aria-label="Live feed rail">
+    <aside class="pt2-rail-right" aria-label="Live feed rail">
       <app-live-feed-timeline
         [events]="feedEvents()"
         [loading]="telemetryLoading()"

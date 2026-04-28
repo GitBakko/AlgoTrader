@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, ElementRef, inject, OnDestroy, OnInit, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 import { CockpitHeaderComponent, type CockpitMode, type CockpitState } from '../../shared/components/cockpit-header/cockpit-header.component';
@@ -350,12 +350,6 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
   private signalsTimer: ReturnType<typeof setInterval> | null = null;
   private knownDealIds = new Set<string>();
 
-  /** ResizeObserver bound to the left rail. Right rail height tracks it
-   *  via the `--rail-left-height` CSS variable so the feed never overflows
-   *  past the bottom of the ML Models card (last left-rail item). */
-  readonly leftRailRef = viewChild<ElementRef<HTMLElement>>('leftRail');
-  readonly rightRailRef = viewChild<ElementRef<HTMLElement>>('rightRail');
-  private leftRailObserver: ResizeObserver | null = null;
 
   ngOnInit(): void {
     this.trading.loadPaperStatus();
@@ -389,11 +383,6 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     // Kick the first fetch right after the position list lands so the
     // chart isn't blank for a full 30s.
     queueMicrotask(() => this.refreshPositionHistories());
-
-    // Start observing the left rail so the right rail's height stays
-    // pinned to the ML-Models card bottom. `viewChild()` resolves async
-    // after the first paint; queueMicrotask gives Angular one tick.
-    queueMicrotask(() => this.attachLeftRailObserver());
   }
 
   ngOnDestroy(): void {
@@ -421,28 +410,6 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
       clearInterval(this.signalsTimer);
       this.signalsTimer = null;
     }
-    if (this.leftRailObserver) {
-      this.leftRailObserver.disconnect();
-      this.leftRailObserver = null;
-    }
-  }
-
-  private attachLeftRailObserver(): void {
-    if (typeof ResizeObserver === 'undefined') return;
-    const left = this.leftRailRef()?.nativeElement;
-    const right = this.rightRailRef()?.nativeElement;
-    if (!left || !right) {
-      // First paint hasn't materialized the views yet — retry one frame later.
-      queueMicrotask(() => this.attachLeftRailObserver());
-      return;
-    }
-    const apply = (): void => {
-      const h = Math.round(left.getBoundingClientRect().height);
-      if (h > 0) right.style.setProperty('--rail-left-height', `${h}px`);
-    };
-    this.leftRailObserver = new ResizeObserver(apply);
-    this.leftRailObserver.observe(left);
-    apply();
   }
 
   /** Re-fetch per-position P&L history. Called on a timer + every time
