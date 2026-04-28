@@ -265,7 +265,25 @@ export class TradingService {
 
   loadPaperPositions(): void {
     this.api.get<PaperPosition[]>('/api/trading/positions')
-      .subscribe({ next: data => this.paperPositions.set(data), error: () => {} });
+      .subscribe({
+        next: (data) => {
+          this.paperPositions.set(data);
+          // Prune positionPnlHistory keys that no longer correspond to a
+          // broker-live deal_id. Without this, the cockpit chart can
+          // resurface points from a previously closed position whose
+          // dealId rotated (Capital.com d6→d7 mutation) into a key that
+          // now collides with the new live position.
+          const live = new Set((data ?? []).map((p) => p.deal_id));
+          this.positionPnlHistory.update((h) => {
+            const next: Record<string, PositionPnlHistoryResponse> = {};
+            for (const [k, v] of Object.entries(h)) {
+              if (live.has(k)) next[k] = v;
+            }
+            return next;
+          });
+        },
+        error: () => {},
+      });
   }
 
   loadPaperSignals(): void {
