@@ -54,11 +54,10 @@
   min-width: 0;
 }
 
-// Right rail = max(left rail height, center column height). Grid items
-// in the same row stretch to the tallest sibling by default, so we just
-// need `min-height: 0` + `overflow: hidden` so the live-feed panel owns
-// its internal scroll rather than overflowing the rail's natural box.
+// Right rail — fixed 792px height per UX spec. Live-feed owns its
+// internal scroll so longer feed lists do not overflow the rail.
 .pt2-rail-right {
+  height: 792px;
   min-height: 0;
   overflow: hidden;
 }
