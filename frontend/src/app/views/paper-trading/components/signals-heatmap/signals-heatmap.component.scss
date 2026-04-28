@@ -36,14 +36,14 @@
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, .55);
+  color: var(--fg-faint);
 }
 
 .pv-heatmap__count {
   font-size: var(--mantis-fs-xxs);
   font-weight: 600;
   letter-spacing: .14em;
-  color: rgba(255, 255, 255, .35);
+  color: var(--fg-soft);
   font-feature-settings: 'tnum' 1;
 }
 
@@ -61,9 +61,9 @@
   font-weight: 700;
   letter-spacing: .1em;
   text-transform: uppercase;
-  background: rgba(255, 255, 255, .03);
-  color: rgba(255, 255, 255, .5);
-  border: 1px solid rgba(255, 255, 255, .08);
+  background: var(--mantis-ghost-1);
+  color: var(--fg3);
+  border: 1px solid var(--mantis-border-soft);
   cursor: pointer;
   transition: filter 120ms ease, color 120ms ease, border-color 120ms ease;
 
@@ -95,7 +95,7 @@
   align-items: center;
   gap: 8px;
   padding: 6px 8px;
-  background: rgba(255, 255, 255, .015);
+  background: var(--mantis-ghost-1);
   border: 1px solid var(--mantis-border-subtle);
   border-radius: var(--mantis-radius-sm, 4px);
   cursor: pointer;
@@ -123,7 +123,7 @@
     .pv-heatmap__dir { color: p.$mantis-neutral; background: rgba(139, 148, 158, .12); border-color: rgba(139, 148, 158, .26); }
   }
   &[data-direction='—'] {
-    .pv-heatmap__dir { color: rgba(255, 255, 255, .35); background: rgba(255, 255, 255, .04); border-color: rgba(255, 255, 255, .08); }
+    .pv-heatmap__dir { color: var(--fg-soft); background: var(--mantis-ghost-1); border-color: var(--mantis-border-soft); }
   }
 
   // State overlays + state pill colors
@@ -209,7 +209,7 @@
 .pv-heatmap__bar {
   display: block;
   height: 2px;
-  background: rgba(255, 255, 255, .06);
+  background: var(--mantis-border-subtle);
   border-radius: 1px;
   overflow: hidden;
 }
@@ -236,7 +236,7 @@
 
 .pv-heatmap__conf {
   font-size: var(--mantis-fs-xxs);
-  color: rgba(255, 255, 255, .55);
+  color: var(--fg-faint);
   font-feature-settings: 'tnum' 1;
 }
 
@@ -252,9 +252,9 @@
   display: block;
   background: linear-gradient(
     90deg,
-    rgba(255, 255, 255, .04) 0%,
-    rgba(255, 255, 255, .12) 50%,
-    rgba(255, 255, 255, .04) 100%
+    var(--mantis-ghost-1) 0%,
+    var(--mantis-ghost-3) 50%,
+    var(--mantis-ghost-1) 100%
   );
   background-size: 200% 100%;
   animation: heatmap-shimmer 1.4s ease-in-out infinite;
