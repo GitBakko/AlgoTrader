@@ -853,6 +853,125 @@ async def get_pnl_history(
     )
 
 
+@router.get("/positions/{deal_id}/events")
+async def get_position_events(
+    deal_id: str,
+    session=Depends(get_db_session),
+):
+    """Per-position event timeline (open, modify, close).
+
+    Powers the position-detail-drawer's History tab. Returns rows sourced
+    from the immutable `trades` audit table joined with the parent
+    `positions` row, so a position with no Trade rows still surfaces its
+    OPEN/CLOSE events synthesised from the Position itself.
+    """
+    if session is None:
+        return success_response(
+            {"deal_id": deal_id, "events": [], "position": None, "source": "no-db"}
+        )
+
+    from src.database.repositories.position_repository import PositionRepository
+    from src.database.repositories.trade_repository import TradeRepository
+
+    pos_repo = PositionRepository(session)
+    position = await pos_repo.get_by_deal_id(deal_id)
+    if position is None:
+        return success_response(
+            {"deal_id": deal_id, "events": [], "position": None, "source": "not-found"}
+        )
+
+    trade_repo = TradeRepository(session)
+    trades = await trade_repo.get_by_position(position.id) if position.id else []
+
+    events: list[dict] = []
+    seen_open = False
+    seen_close = False
+
+    for t in trades:
+        ev_type = (t.trade_type or "").upper()
+        if ev_type == "OPEN":
+            seen_open = True
+        elif ev_type == "CLOSE":
+            seen_close = True
+        events.append(
+            {
+                "ts": t.executed_at.isoformat() if t.executed_at else None,
+                "type": ev_type or "TRADE",
+                "deal_reference": t.deal_reference,
+                "size": float(t.size) if t.size is not None else None,
+                "price": float(t.price) if t.price is not None else None,
+                "profit_loss": float(t.profit_loss) if t.profit_loss is not None else None,
+                "commission": float(t.commission) if t.commission is not None else None,
+            }
+        )
+
+    # Synthesise OPEN/CLOSE from the Position row when the trades audit
+    # table missed them (older positions, mid-failure persistence).
+    if not seen_open:
+        events.append(
+            {
+                "ts": position.opened_at.isoformat() if position.opened_at else None,
+                "type": "OPEN",
+                "deal_reference": position.deal_reference,
+                "size": float(position.size) if position.size is not None else None,
+                "price": float(position.entry_price) if position.entry_price is not None else None,
+                "profit_loss": None,
+                "commission": None,
+                "synthesised": True,
+            }
+        )
+    if not seen_close and position.status == "CLOSED":
+        events.append(
+            {
+                "ts": position.closed_at.isoformat() if position.closed_at else None,
+                "type": "CLOSE",
+                "deal_reference": None,
+                "size": float(position.size) if position.size is not None else None,
+                "price": None,
+                "profit_loss": (
+                    float(position.profit_loss) if position.profit_loss is not None else None
+                ),
+                "commission": None,
+                "close_reason": position.close_reason,
+                "synthesised": True,
+            }
+        )
+
+    # Sort chronologically; rows with no timestamp sink to the bottom so
+    # the UI never has to handle nulls in the middle of the timeline.
+    events.sort(key=lambda e: (e["ts"] is None, e["ts"] or ""))
+
+    return success_response(
+        {
+            "deal_id": deal_id,
+            "events": events,
+            "position": {
+                "id": position.id,
+                "epic": position.epic,
+                "direction": position.direction,
+                "status": position.status,
+                "opened_at": position.opened_at.isoformat() if position.opened_at else None,
+                "closed_at": position.closed_at.isoformat() if position.closed_at else None,
+                "close_reason": position.close_reason,
+                "entry_price": (
+                    float(position.entry_price) if position.entry_price is not None else None
+                ),
+                "stop_loss": (
+                    float(position.stop_loss) if position.stop_loss is not None else None
+                ),
+                "take_profit": (
+                    float(position.take_profit) if position.take_profit is not None else None
+                ),
+                "profit_loss": (
+                    float(position.profit_loss) if position.profit_loss is not None else None
+                ),
+                "size": float(position.size) if position.size is not None else None,
+            },
+            "source": "trades+position",
+        }
+    )
+
+
 @router.get("/positions/{deal_id}/pnl-history")
 async def get_position_pnl_history(
     deal_id: str,

@@ -30,6 +30,7 @@ import {
   SwapAccumResponse,
   PaperPnlHistoryResponse,
   PositionPnlHistoryResponse,
+  PositionEventsResponse,
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -318,6 +319,13 @@ export class TradingService {
       },
       error: () => {},
     });
+  }
+
+  /** Drawer History tab — open/modify/close audit timeline for a deal. */
+  fetchPositionEvents(dealId: string) {
+    return this.api.get<PositionEventsResponse>(
+      `/api/trading/positions/${dealId}/events`,
+    );
   }
 
   // ── Closed Positions & Performance ──

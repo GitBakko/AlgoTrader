@@ -1,16 +1,21 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   HostListener,
   computed,
+  effect,
   inject,
   input,
   output,
   signal,
 } from '@angular/core';
-import { CommonModule, DecimalPipe } from '@angular/common';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
 import { EpicLogoComponent } from '../../../../shared/components/epic-logo/epic-logo.component';
 import { SignalAuditService } from '../../../../core/services/signal-audit.service';
+import { TradingService } from '../../../../core/services/trading.service';
+import type { PositionEvent } from '../../../../core/models';
 import type { PaperTradingPosition } from '../../../../core/models/paper-trading';
 
 type DrawerTab = 'overview' | 'audit' | 'history';
@@ -24,12 +29,14 @@ type DrawerTab = 'overview' | 'audit' | 'history';
   selector: 'app-position-detail-drawer',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, DecimalPipe, EpicLogoComponent],
+  imports: [CommonModule, DatePipe, DecimalPipe, EpicLogoComponent],
   templateUrl: './position-detail-drawer.component.html',
   styleUrls: ['./position-detail-drawer.component.scss'],
 })
 export class PositionDetailDrawerComponent {
   private readonly auditService = inject(SignalAuditService);
+  private readonly trading = inject(TradingService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly position = input<PaperTradingPosition | null>(null);
   readonly currency = input<string>('USD');
@@ -37,6 +44,53 @@ export class PositionDetailDrawerComponent {
   readonly closed = output<void>();
 
   readonly activeTab = signal<DrawerTab>('overview');
+
+  /** Event timeline for the History tab. Reset whenever the drawer's
+   *  position changes, refetched on demand the first time the History tab
+   *  becomes visible (lazy — keeps Overview-only opens cheap). */
+  readonly events = signal<PositionEvent[] | null>(null);
+  readonly eventsLoading = signal<boolean>(false);
+  readonly eventsError = signal<string | null>(null);
+  private lastFetchedDealId: string | null = null;
+
+  constructor() {
+    // Reset event state when the drawer's position changes (different deal).
+    effect(() => {
+      const id = this.position()?.id ?? null;
+      if (id !== this.lastFetchedDealId) {
+        this.events.set(null);
+        this.eventsError.set(null);
+      }
+    });
+
+    // Lazily fetch when History tab is first opened for the current deal.
+    effect(() => {
+      const tab = this.activeTab();
+      const id = this.position()?.id;
+      if (tab === 'history' && id && this.lastFetchedDealId !== id) {
+        this.fetchEvents(id);
+      }
+    });
+  }
+
+  private fetchEvents(dealId: string): void {
+    this.lastFetchedDealId = dealId;
+    this.eventsLoading.set(true);
+    this.eventsError.set(null);
+    this.trading
+      .fetchPositionEvents(dealId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (data) => {
+          this.events.set(data?.events ?? []);
+          this.eventsLoading.set(false);
+        },
+        error: () => {
+          this.eventsError.set('Caricamento eventi fallito');
+          this.eventsLoading.set(false);
+        },
+      });
+  }
 
   /** Static tab list — frozen so the template `@for` keeps a stable
    *  array reference across renders. */

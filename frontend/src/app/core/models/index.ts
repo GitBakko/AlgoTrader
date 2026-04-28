@@ -637,6 +637,38 @@ export interface PositionPnlHistoryResponse {
   source: string;
 }
 
+export interface PositionEvent {
+  ts: string | null;
+  type: string;
+  deal_reference: string | null;
+  size: number | null;
+  price: number | null;
+  profit_loss: number | null;
+  commission: number | null;
+  close_reason?: string | null;
+  synthesised?: boolean;
+}
+
+export interface PositionEventsResponse {
+  deal_id: string;
+  events: PositionEvent[];
+  position: {
+    id: number | null;
+    epic: string;
+    direction: string;
+    status: string;
+    opened_at: string | null;
+    closed_at: string | null;
+    close_reason: string | null;
+    entry_price: number | null;
+    stop_loss: number | null;
+    take_profit: number | null;
+    profit_loss: number | null;
+    size: number | null;
+  } | null;
+  source: string;
+}
+
 // Notifications
 export * from './notification.model';
 
