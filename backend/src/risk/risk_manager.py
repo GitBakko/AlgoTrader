@@ -251,18 +251,8 @@ class RiskManager:
             multiplier=stop_mult,
         )
 
-        # Use signal's suggested stop if tighter
-        # CRITICAL FIX: Inverted logic was causing SL above entry for longs!
-        # For BUY: SL must be BELOW entry, so we want the MIN (closer to entry)
-        # For SELL: SL must be ABOVE entry, so we want the MAX (closer to entry)
-        if signal.suggested_stop is not None:
-            if signal.direction.value == "BUY":
-                stop_loss = min(stop_loss, signal.suggested_stop)
-            else:
-                stop_loss = max(stop_loss, signal.suggested_stop)
-            adjustments.append("Using tighter suggested stop-loss")
-
-        # 4. Calculate take-profit (uses same dynamic multiplier for consistency)
+        # 4. Calculate take-profit (default ATR-based, used when strategy
+        #    didn't pair suggested_stop with suggested_tp).
         rr_ratio = _risk_settings.scalp_tp_risk_reward if _risk_settings.scalp_mode_enabled else 2.5
         take_profit = StopManager.calculate_take_profit(
             direction=signal.direction.value,
@@ -272,7 +262,35 @@ class RiskManager:
             risk_reward=rr_ratio,
         )
 
-        if signal.suggested_tp is not None:
+        # 4-bis. Reconcile strategy-suggested SL/TP with risk-manager defaults.
+        #
+        # BUG FIX 2026-04-28: previous logic used `min()` for BUY-SL and
+        # `max()` for SELL-SL with a comment claiming this picked the
+        # *tighter* stop.  Both inversions were wrong:
+        #   - BUY-SL is below entry → tighter SL has the LARGER price
+        #     (closer to entry going up from below) → use `max()`.
+        #   - SELL-SL is above entry → tighter SL has the SMALLER price → `min()`.
+        # Combined with an unconditional TP override from `suggested_tp`,
+        # this produced the inverted R:R seen in production (SL ~3-4×ATR
+        # from risk_mgr, TP ~0.75×ATR from MR strategy → R:R 0.13-0.30).
+        #
+        # New rule: when the strategy paired suggested_stop AND
+        # suggested_tp, trust the pair as-is — strategy authors calibrate
+        # them together for an intentional R:R.  When only one side is
+        # suggested, take the genuinely-tighter of the pair.
+        if signal.suggested_stop is not None and signal.suggested_tp is not None:
+            stop_loss = signal.suggested_stop
+            take_profit = signal.suggested_tp
+            adjustments.append("Using strategy-calibrated SL/TP pair")
+        elif signal.suggested_stop is not None:
+            if signal.direction.value == "BUY":
+                # BUY-SL below entry → tighter = larger value
+                stop_loss = max(stop_loss, signal.suggested_stop)
+            else:
+                # SELL-SL above entry → tighter = smaller value
+                stop_loss = min(stop_loss, signal.suggested_stop)
+            adjustments.append("Using tighter suggested stop-loss")
+        elif signal.suggested_tp is not None:
             take_profit = signal.suggested_tp
             adjustments.append("Using signal suggested take-profit")
 

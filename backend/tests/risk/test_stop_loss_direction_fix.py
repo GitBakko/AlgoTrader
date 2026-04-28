@@ -163,8 +163,12 @@ def test_sell_position_sl_above_entry(mock_check_exposure, _mock_settings):
 
 @patch("src.risk.risk_manager.get_settings", side_effect=lambda: _non_scalp_settings())
 @patch("src.risk.risk_manager.CorrelationGuard.check_exposure")
-def test_buy_with_suggested_stop_chooses_min(mock_check_exposure, _mock_settings):
-    """Test that BUY with suggested stop chooses the MIN (tighter stop)."""
+def test_buy_with_suggested_stop_chooses_tighter(mock_check_exposure, _mock_settings):
+    """BUY with suggested_stop only: SL must be the TIGHTER (closer-to-entry) value.
+
+    For BUY, SL is below entry → tighter SL has the LARGER value.
+    Bug fix 2026-04-28 — see risk_manager.py §4-bis.
+    """
 
     # Mock static method for correlation check
     mock_check_exposure.return_value = (1.0, [])  # No correlation warnings
@@ -217,16 +221,20 @@ def test_buy_with_suggested_stop_chooses_min(mock_check_exposure, _mock_settings
         trade_history=[],
     )
 
-    # For BUY: min() chooses the LOWER value (further from entry = more conservative)
-    # ATR SL = 1980, suggested = 1990 → min(1980, 1990) = 1980
-    assert result.stop_loss == min(1980.0, 1990.0)  # = 1980
+    # For BUY (SL below entry), tighter = larger value (closer to entry).
+    # ATR SL = 1980, suggested = 1990 → max(1980, 1990) = 1990 (tighter).
+    assert result.stop_loss == max(1980.0, 1990.0)  # = 1990
     assert result.stop_loss < signal.entry_price
 
 
 @patch("src.risk.risk_manager.get_settings", side_effect=lambda: _non_scalp_settings())
 @patch("src.risk.risk_manager.CorrelationGuard.check_exposure")
-def test_sell_with_suggested_stop_chooses_max(mock_check_exposure, _mock_settings):
-    """Test that SELL with suggested stop chooses the MAX (tighter stop)."""
+def test_sell_with_suggested_stop_chooses_tighter(mock_check_exposure, _mock_settings):
+    """SELL with suggested_stop only: SL must be the TIGHTER (closer-to-entry) value.
+
+    For SELL, SL is above entry → tighter SL has the SMALLER value.
+    Bug fix 2026-04-28 — see risk_manager.py §4-bis.
+    """
 
     # Mock static method for correlation check
     mock_check_exposure.return_value = (1.0, [])  # No correlation warnings
@@ -278,7 +286,66 @@ def test_sell_with_suggested_stop_chooses_max(mock_check_exposure, _mock_setting
         trade_history=[],
     )
 
-    # For SELL: max() gives HIGHER value (further from entry = more conservative)
-    # ATR SL = 2020, suggested = 2010 → max(2020, 2010) = 2020
-    assert result.stop_loss == max(2020.0, 2010.0)  # = 2020
+    # For SELL (SL above entry), tighter = smaller value (closer to entry).
+    # ATR SL = 2020, suggested = 2010 → min(2020, 2010) = 2010 (tighter).
+    assert result.stop_loss == min(2020.0, 2010.0)  # = 2010
     assert result.stop_loss > signal.entry_price
+
+
+@patch("src.risk.risk_manager.get_settings", side_effect=lambda: _non_scalp_settings())
+@patch("src.risk.risk_manager.CorrelationGuard.check_exposure")
+def test_paired_suggested_sl_tp_used_as_is(mock_check_exposure, _mock_settings):
+    """Strategy that pairs suggested_stop + suggested_tp keeps both as-is.
+
+    Bug fix 2026-04-28: previously the risk manager mixed its own ATR-derived
+    SL with the strategy's TP, producing inverted R:R (e.g. 0.13 instead of
+    the calibrated 0.75). When both sides are suggested, trust the pair.
+    """
+    mock_check_exposure.return_value = (1.0, [])
+    risk_manager = RiskManager()
+    risk_manager.circuit_breakers = MagicMock()
+    risk_manager.circuit_breakers.check_epic.return_value = (True, None)
+    risk_manager.circuit_breakers.check_all.return_value = (True, [])
+    state_mock = Mock()
+    state_mock.daily_start_equity = 10000.0
+    state_mock.max_daily_drawdown_pct = 0.05
+    state_mock.circuit_breaker_reason = None
+    risk_manager.drawdown_monitor = MagicMock()
+    risk_manager.drawdown_monitor.state = state_mock
+    risk_manager.drawdown_monitor.is_circuit_breaker_active.return_value = False
+    risk_manager.drawdown_monitor.check_all.return_value = []
+    risk_manager.drawdown_monitor.check_limits.return_value = (True, None)
+    risk_manager.drawdown_monitor.update.return_value = None
+    risk_manager.correlation_guard = MagicMock()
+    risk_manager.correlation_guard.check_exposure_dynamic.return_value = (1.0, [])
+    risk_manager.correlation_guard.calculate_correlation_multiplier.return_value = 1.0
+    risk_manager.equity_curve_filter = MagicMock()
+    risk_manager.equity_curve_filter.get_size_multiplier.return_value = 1.0
+
+    # MR-style calibrated pair: tight SL+TP both close to entry.
+    # ATR SL would be 1980 (wide); strategy says SL=1995 + TP=2010.
+    signal = TradingSignal(
+        epic="XAUUSD",
+        direction=Direction.BUY,
+        entry_price=2000.0,
+        confidence=0.65,
+        suggested_stop=1995.0,
+        suggested_tp=2010.0,
+        signal_class=SignalClass.BUY,
+    )
+
+    result = risk_manager.check_trade(
+        signal=signal,
+        equity=10000.0,
+        atr=10.0,
+        open_positions=[],
+        trade_history=[],
+    )
+
+    # Paired SL+TP must be used verbatim — strategy's calibrated R:R survives.
+    assert result.stop_loss == 1995.0
+    assert result.take_profit == 2010.0
+    sl_dist = signal.entry_price - result.stop_loss
+    tp_dist = result.take_profit - signal.entry_price
+    assert sl_dist == 5.0 and tp_dist == 10.0
+    assert tp_dist / sl_dist == 2.0  # calibrated R:R preserved
