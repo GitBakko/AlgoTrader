@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { EpicLogoComponent } from '../../../../shared/components/epic-logo/epic-logo.component';
+import { PriceFormatPipe } from '../../../../shared/pipes/price-format.pipe';
 import type { PaperTradingPosition } from '../../../../core/models/paper-trading';
 
 /**
@@ -16,7 +17,7 @@ import type { PaperTradingPosition } from '../../../../core/models/paper-trading
   selector: 'app-position-card',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, DecimalPipe, EpicLogoComponent],
+  imports: [CommonModule, DecimalPipe, EpicLogoComponent, PriceFormatPipe],
   templateUrl: './position-card.component.html',
   styleUrls: ['./position-card.component.scss'],
 })

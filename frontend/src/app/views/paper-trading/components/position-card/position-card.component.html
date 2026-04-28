@@ -49,19 +49,19 @@
     <div class="pv-pc__triplet">
       <div class="pv-pc__triplet-cell pv-pc__triplet-cell--sl">
         <span class="pv-pc__triplet-label mantis-mono">STOP LOSS</span>
-        <span class="pv-pc__triplet-price mantis-mono">{{ position().stopLoss }}</span>
+        <span class="pv-pc__triplet-price mantis-mono">{{ position().stopLoss | priceFormat:position().ticker }}</span>
         <span class="pv-pc__triplet-meta mantis-mono">
           {{ distToSlPct() | number:'1.2-2':'it-IT' }}%
         </span>
       </div>
       <div class="pv-pc__triplet-cell pv-pc__triplet-cell--entry">
         <span class="pv-pc__triplet-label mantis-mono">ENTRY</span>
-        <span class="pv-pc__triplet-price mantis-mono">{{ position().entry }}</span>
+        <span class="pv-pc__triplet-price mantis-mono">{{ position().entry | priceFormat:position().ticker }}</span>
         <span class="pv-pc__triplet-meta mantis-mono">marker ⬤</span>
       </div>
       <div class="pv-pc__triplet-cell pv-pc__triplet-cell--tp">
         <span class="pv-pc__triplet-label mantis-mono">TAKE PROFIT</span>
-        <span class="pv-pc__triplet-price mantis-mono">{{ position().takeProfit }}</span>
+        <span class="pv-pc__triplet-price mantis-mono">{{ position().takeProfit | priceFormat:position().ticker }}</span>
         <span class="pv-pc__triplet-meta mantis-mono">
           {{ distToTpPct() | number:'1.2-2':'it-IT' }}%
         </span>
@@ -87,7 +87,7 @@
         <span class="pv-pc__pnl-pct mantis-mono">
           {{ position().pnlPct >= 0 ? '+' : '' }}{{ position().pnlPct | number:'1.3-3':'it-IT' }}%
         </span>
-        <span class="pv-pc__pnl-quote mantis-mono">quote {{ position().current }}</span>
+        <span class="pv-pc__pnl-quote mantis-mono">quote {{ position().current | priceFormat:position().ticker }}</span>
       </div>
       <div class="pv-pc__pnl-chart">
         @if (trendPath()) {
