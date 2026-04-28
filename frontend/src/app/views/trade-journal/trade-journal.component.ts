@@ -37,20 +37,29 @@ type SortDir = 'asc' | 'desc';
     NewsWidgetComponent,
   ],
   template: `
-    <!-- Header -->
-    <div class="d-flex align-items-center justify-content-between mb-3 px-1">
-      <h5 class="mb-0 fw-semibold">Trade Journal</h5>
-      <div class="d-flex align-items-center gap-2">
-        <c-badge color="info">{{ filteredSignals().length }} risultati</c-badge>
-        <button cButton color="primary" variant="outline" size="sm"
+    <!-- HDR-02 (Bible §1.2) — eyebrow + title + meta + actions -->
+    <header class="tj-hdr">
+      <div class="tj-hdr__lead">
+        <span class="tj-hdr__eyebrow mantis-mono">Trading · Cronologia</span>
+        <h1 class="tj-hdr__title">Trade Journal</h1>
+        <span class="tj-hdr__meta mantis-mono">
+          {{ filteredSignals().length }} risultati ·
+          {{ executedCount() }} eseguiti ·
+          {{ rejectedCount() }} rifiutati
+        </span>
+      </div>
+      <div class="tj-hdr__actions">
+        <button type="button" class="tj-btn tj-btn--ghost"
                 [disabled]="filteredSignals().length === 0"
                 (click)="exportToCsv()">
-          <svg cIcon name="cilCloudDownload" size="sm" class="me-1"></svg>
+          <svg cIcon name="cilCloudDownload" size="sm"></svg>
           Esporta CSV
         </button>
-        <button cButton color="secondary" size="sm" (click)="resetFilters()">Reset filtri</button>
+        <button type="button" class="tj-btn tj-btn--secondary" (click)="resetFilters()">
+          Reset filtri
+        </button>
       </div>
-    </div>
+    </header>
 
     <!-- Filters -->
     <c-card class="mb-4 border-top border-top-3 border-top-primary">
@@ -266,15 +275,19 @@ type SortDir = 'asc' | 'desc';
 
           <!-- Pagination -->
           @if (totalPages() > 1) {
-            <div class="d-flex justify-content-between align-items-center px-3 py-2 border-top">
-              <span class="text-body-secondary small">
+            <div class="tj-pagination">
+              <span class="tj-pagination__label mantis-mono">
                 Pagina {{ currentPage() }} di {{ totalPages() }}
               </span>
-              <div class="d-flex gap-1">
-                <button cButton color="secondary" size="sm" [disabled]="currentPage() <= 1" (click)="currentPage.set(currentPage() - 1)">
+              <div class="tj-pagination__controls">
+                <button type="button" class="tj-btn tj-btn--ghost"
+                        [disabled]="currentPage() <= 1"
+                        (click)="currentPage.set(currentPage() - 1)">
                   &laquo; Prec
                 </button>
-                <button cButton color="secondary" size="sm" [disabled]="currentPage() >= totalPages()" (click)="currentPage.set(currentPage() + 1)">
+                <button type="button" class="tj-btn tj-btn--ghost"
+                        [disabled]="currentPage() >= totalPages()"
+                        (click)="currentPage.set(currentPage() + 1)">
                   Succ &raquo;
                 </button>
               </div>
