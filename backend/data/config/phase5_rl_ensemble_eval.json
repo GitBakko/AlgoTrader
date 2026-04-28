@@ -1,0 +1,45 @@
+{
+  "timeframe": "4h",
+  "ppo_steps": 50000,
+  "train_pct": 0.7,
+  "prune_pct": 0.5,
+  "per_epic": [
+    {
+      "epic": "BTCUSD",
+      "n_oos_bars": 2772,
+      "n_xgb_signals": 1897,
+      "n_kept": 847,
+      "sharpe_xgb": 5.357,
+      "sharpe_ens": 2.466,
+      "max_dd_xgb": 0.0087,
+      "max_dd_ens": 0.0117,
+      "return_xgb_pct": 17.09,
+      "return_ens_pct": 6.15,
+      "n_trades_xgb": 273,
+      "n_trades_ens": 108,
+      "sharpe_uplift_pct": -53.96,
+      "dd_increase_pct": 34.69
+    },
+    {
+      "epic": "SOLUSD",
+      "n_oos_bars": 2772,
+      "n_xgb_signals": 2215,
+      "n_kept": 294,
+      "sharpe_xgb": 6.962,
+      "sharpe_ens": 1.017,
+      "max_dd_xgb": 0.0139,
+      "max_dd_ens": 0.0181,
+      "return_xgb_pct": 46.54,
+      "return_ens_pct": 3.66,
+      "n_trades_xgb": 329,
+      "n_trades_ens": 64,
+      "sharpe_uplift_pct": -85.38,
+      "dd_increase_pct": 30.8
+    }
+  ],
+  "verdict": "FAIL",
+  "criteria": {
+    "uplift_pass": false,
+    "dd_pass": false
+  }
+}
