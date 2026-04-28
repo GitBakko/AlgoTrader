@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   BadgeComponent,
@@ -121,6 +121,12 @@ export class NotificationsComponent implements OnInit {
   get totalPages(): number {
     return Math.ceil(this.total() / this.pageSize);
   }
+
+  /** Stable list of page indices for the pagination row. Recomputed only
+   *  when totalPages changes (signal dependency on this.total()). */
+  readonly pageIndices = computed<readonly number[]>(() =>
+    Array.from({ length: Math.ceil(this.total() / this.pageSize) }, (_, i) => i + 1),
+  );
 
   severityColor(severity: string): string {
     switch (severity) {

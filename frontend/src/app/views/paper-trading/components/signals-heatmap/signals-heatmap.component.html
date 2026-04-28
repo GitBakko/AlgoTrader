@@ -5,13 +5,13 @@
     <span class="pv-heatmap__count mantis-mono">{{ cells().length }}</span>
 
     <div class="pv-heatmap__filters" role="group" aria-label="Filtra heatmap">
-      @for (chip of [{ id: 'all', label: 'ALL' }, { id: 'active', label: 'ACTIVE' }, { id: 'hold', label: 'HOLD' }]; track chip.id) {
+      @for (chip of filterChips; track chip.id) {
         <button
           type="button"
           class="pv-heatmap__filter"
           [class.pv-heatmap__filter--active]="filter() === chip.id"
           [attr.aria-pressed]="filter() === chip.id"
-          (click)="setFilter($any(chip.id))">
+          (click)="setFilter(chip.id)">
           {{ chip.label }}
         </button>
       }

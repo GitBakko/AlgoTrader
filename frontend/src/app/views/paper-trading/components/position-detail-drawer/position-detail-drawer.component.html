@@ -23,14 +23,14 @@
     </header>
 
     <nav class="pdd-tabs" role="tablist" aria-label="Sezioni dettaglio posizione">
-      @for (tab of ['overview', 'audit', 'history']; track tab) {
+      @for (tab of tabs; track tab) {
         <button type="button"
                 role="tab"
                 class="pdd-tab"
                 [class.pdd-tab--active]="activeTab() === tab"
                 [attr.aria-selected]="activeTab() === tab"
                 [attr.data-tab]="tab"
-                (click)="setTab($any(tab))">
+                (click)="setTab(tab)">
           @switch (tab) {
             @case ('overview') { Overview }
             @case ('audit')    { Audit }

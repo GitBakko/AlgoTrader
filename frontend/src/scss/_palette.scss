@@ -116,6 +116,7 @@ $mantis-duration-reveal:  600ms;
 $mantis-ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);     // reveals
 $mantis-ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1); // pops
 $mantis-ease-ripple:   cubic-bezier(0.37, 0.24, 0.53, 0.99); // header-button ripples
+$mantis-ease-pulse:    cubic-bezier(0.2, 0.8, 0.2, 1);    // ECG heartbeat / donut redraw — symmetric s-curve
 
 // ── Touch targets ──
 $touch-target-min: 44px;

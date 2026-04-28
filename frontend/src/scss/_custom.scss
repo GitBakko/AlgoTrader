@@ -126,6 +126,7 @@
   --mantis-ease-out-expo: #{$mantis-ease-out-expo};
   --mantis-ease-out-back: #{$mantis-ease-out-back};
   --mantis-ease-ripple:   #{$mantis-ease-ripple};
+  --mantis-ease-pulse:    #{$mantis-ease-pulse};
 
   // ── Semantic role aliases (convenient, theme-aware via the vars above) ──
   --fg1: var(--mantis-text-primary);

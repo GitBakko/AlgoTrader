@@ -57,6 +57,14 @@ export class SignalsHeatmapComponent {
 
   readonly filter = signal<HeatmapFilter>('all');
 
+  /** Static filter chips — frozen so each render reuses the same array
+   *  reference (avoids re-running `@for` track on every CD pass). */
+  readonly filterChips: readonly { id: HeatmapFilter; label: string }[] = [
+    { id: 'all',    label: 'ALL' },
+    { id: 'active', label: 'ACTIVE' },
+    { id: 'hold',   label: 'HOLD' },
+  ];
+
   /** Indexed by epic for quick lookup (latest signal per epic). */
   private readonly latestByEpic = computed<Record<string, TradingSignal>>(() => {
     const map: Record<string, TradingSignal> = {};

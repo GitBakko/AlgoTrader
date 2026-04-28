@@ -60,7 +60,7 @@ const TIMEFRAMES = [
     <!-- Asset Cards Grid -->
     <c-row class="mb-4 animate-in">
       @if (livePrices().length === 0) {
-        @for (_ of [1,2,3,4,5,6,7,8]; track $index) {
+        @for (_ of skeletonSlots; track $index) {
           <c-col xs="6" md="4" lg="3" class="mb-3">
             <app-skeleton-card [rows]="2" [showHeader]="false" />
           </c-col>
@@ -206,6 +206,9 @@ export class MarketsComponent implements OnInit {
   readonly selectedEpic = signal<string>('');
   readonly selectedTimeframe = signal<string>('HOUR');
   readonly assetNews = this.newsService.news;
+
+  /** 8-slot skeleton placeholder grid — stable reference. */
+  readonly skeletonSlots = Array.from({ length: 8 });
 
   constructor() {
     // Fetch news when asset selected

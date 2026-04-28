@@ -143,12 +143,12 @@
                 (click)="goToPage(page() - 1)">
                 Precedente
               </button>
-              @for (p of [].constructor(totalPages); track $index) {
+              @for (p of pageIndices(); track p) {
                 <button class="btn btn-sm"
-                  [class.btn-primary]="page() === $index + 1"
-                  [class.btn-outline-secondary]="page() !== $index + 1"
-                  (click)="goToPage($index + 1)">
-                  {{ $index + 1 }}
+                  [class.btn-primary]="page() === p"
+                  [class.btn-outline-secondary]="page() !== p"
+                  (click)="goToPage(p)">
+                  {{ p }}
                 </button>
               }
               <button class="btn btn-sm btn-outline-secondary"

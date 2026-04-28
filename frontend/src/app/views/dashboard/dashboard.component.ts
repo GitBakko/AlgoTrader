@@ -92,6 +92,11 @@ export class DashboardComponent implements OnInit {
   /** True until the first overview data arrives. */
   readonly loading = computed(() => this.overview() === null);
 
+  /** Stable arrays for skeleton placeholders — avoid recreating literals in
+   *  `@for` on every CD pass. */
+  readonly skeletonKpiSlots = Array.from({ length: 4 });
+  readonly skeletonPriceSlots = Array.from({ length: 8 });
+
   // Market headlines (US500 news)
   readonly marketNews = this.newsService.news;
 

@@ -105,7 +105,7 @@
   }
 
   .pv-bv__ecg-line--beat {
-    animation: pv-bv-beat 700ms cubic-bezier(.2, .8, .2, 1) forwards;
+    animation: pv-bv-beat 700ms var(--mantis-ease-pulse, cubic-bezier(.2, .8, .2, 1)) forwards;
   }
 }
 
@@ -187,7 +187,7 @@
 
 .pv-bv__donut-slice {
   stroke-width: 3;
-  transition: stroke-dasharray 360ms cubic-bezier(.2, .8, .2, 1);
+  transition: stroke-dasharray 360ms var(--mantis-ease-pulse, cubic-bezier(.2, .8, .2, 1));
 
   &--exec {
     stroke: p.$mantis-neon;

@@ -38,6 +38,10 @@ export class PositionDetailDrawerComponent {
 
   readonly activeTab = signal<DrawerTab>('overview');
 
+  /** Static tab list — frozen so the template `@for` keeps a stable
+   *  array reference across renders. */
+  readonly tabs: readonly DrawerTab[] = ['overview', 'audit', 'history'];
+
   readonly isOpen = computed(() => this.position() !== null);
 
   readonly currencySym = computed(() => {
