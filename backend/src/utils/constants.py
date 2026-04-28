@@ -33,19 +33,36 @@ ALL_ASSETS: list[str] = [
 ]
 
 # Assets excluded from trading.
-# Phase 0 OOS validation (2026-03-31) excluded 11 assets based on models with
-# 83 features (F1 ~0.23). After retrain on 2026-04-09 with 199 features (multi-TF),
-# all except NAS100 now have F1 > 0.53. Reactivated 8 with high confidence.
 #
-# Still excluded:
-# NAS100: insufficient historical data (3706 bars vs 8071 needed), F1=0.30
-# XAGUSD: F1=0.548 post-retrain but FAILED in live (23.5% WR, -$71 in 48h) — needs
-#          paper confirmation before reactivation
-# DASHUSD: F1=0.537 but known spread issues (MAX_SPREAD_PCT filter blocks most signals)
+# Pre-Phase-0 (2026-04-09): NAS100 / XAGUSD / DASHUSD excluded for data
+# shortage and historical live failures.
+#
+# Phase 0 OOS validation re-run on 2026-04-28 (timeframe 4h, no Monte Carlo,
+# 18 currently-tradable assets, walk-forward folds with purge+embargo).
+# See `docs/reports/2026-04-28_phase0_validation.md` for the full scorecard.
+#
+# Auto-excluded by the Phase 0 gate (`failed_criteria` non-empty AND
+# decision == EXCLUDE — Sharpe < 0.3, win-rate < 40%, max-DD > 30%):
+#     ICPUSD, NATGAS, EURUSD, DOGUSD, GBPUSD
+#
+# REVIEW (manual decision required, NOT auto-excluded):
+#     NVDA   — Sharpe 0.22, marginal miss vs 0.30 floor, 47.9% WR
+#     USDJPY — Sharpe -2.08 but tiny -0.7% return, micro-position symptom
+#     COPPER — Sharpe -4.57, 0.0% WR over 32 trades — likely model rot
+#
+# Reactivation criterion: re-run `scripts/batch_oos_scorecard.py` on
+# fresh data + retrained models; auto-promote when Sharpe > 0.3 and WR > 40%.
 _EXCLUDED_ASSETS = {
+    # Pre-Phase-0 exclusions (data / spread issues, unchanged)
     "NAS100",
     "XAGUSD",
     "DASHUSD",
+    # Phase 0 (2026-04-28) auto-cuts
+    "ICPUSD",
+    "NATGAS",
+    "EURUSD",
+    "DOGUSD",
+    "GBPUSD",
 }
 TRADABLE_ASSETS: list[str] = [a for a in ALL_ASSETS if a not in _EXCLUDED_ASSETS]
 
