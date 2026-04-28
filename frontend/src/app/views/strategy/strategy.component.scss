@@ -1,0 +1,132 @@
+// ═══════════════════════════════════════════════════════════
+// Strategy · Style Bible HDR-03 + form tokens
+// ═══════════════════════════════════════════════════════════
+
+:host {
+  display: block;
+
+  // ── HDR-03 strip ──────────────────────────────────────────
+  .stg-hdr {
+    display: flex;
+    align-items: baseline;
+    gap: var(--mantis-space-3);
+    padding: var(--mantis-space-3) var(--mantis-space-2);
+    border-bottom: 1px solid rgba(0, 217, 126, 0.18);
+    margin-bottom: var(--mantis-space-4);
+    flex-wrap: wrap;
+
+    &__eyebrow {
+      color: var(--mantis-green);
+      font-size: var(--mantis-fs-xxs);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      opacity: 0.85;
+    }
+
+    &__title {
+      color: var(--fg1);
+      font-size: var(--mantis-fs-xl);
+      font-weight: 700;
+      line-height: 1;
+      margin: 0;
+    }
+
+    &__meta {
+      margin-left: auto;
+      color: var(--fg3);
+      font-size: var(--mantis-fs-xxs);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+  }
+
+  // ── Section title for grouped cards ───────────────────────
+  .stg-section-title {
+    color: var(--fg2);
+    font-size: var(--mantis-fs-xs);
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    margin: var(--mantis-space-4) 0 var(--mantis-space-2);
+  }
+
+  // ── Card overrides (radius sm per Bible) ──────────────────
+  ::ng-deep c-card {
+    border-radius: var(--mantis-radius-sm);
+  }
+
+  ::ng-deep c-card-header strong {
+    color: var(--fg2);
+    font-size: var(--mantis-fs-xxs);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  // ── Form label uppercase mono (Bible FRM-01) ──────────────
+  .stg-label {
+    display: block;
+    color: var(--fg3);
+    font-size: var(--mantis-fs-xxs);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: var(--mantis-space-1);
+  }
+
+  // ── Bible Primary button (neon) for Save ──────────────────
+  .stg-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border: 1px solid transparent;
+    border-radius: var(--mantis-radius-sm);
+    font-family: inherit;
+    font-size: var(--mantis-fs-xxs);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 1;
+    cursor: pointer;
+    transition: all var(--mantis-dur-fast) var(--mantis-ease-out-expo);
+    margin-top: var(--mantis-space-2);
+
+    &--primary {
+      background: var(--mantis-neon, #39FF14);
+      border-color: var(--mantis-neon, #39FF14);
+      color: #0d1117;
+
+      &:hover {
+        filter: brightness(1.08);
+        box-shadow: 0 0 12px rgba(57, 255, 20, 0.4);
+      }
+    }
+  }
+
+  // ── Allocation rows ───────────────────────────────────────
+  .stg-alloc-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--mantis-space-1) 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: var(--mantis-fs-xs);
+
+    &:last-child { border-bottom: none; }
+
+    .stg-alloc-key {
+      color: var(--fg2);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .stg-alloc-val {
+      color: var(--mantis-cyan);
+      font-weight: 700;
+      font-feature-settings: 'tnum' 1;
+    }
+  }
+}
