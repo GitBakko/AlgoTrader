@@ -30,7 +30,12 @@ from src.monitoring.trade_logger import ExecutionStatus, RiskEventType, SignalTy
 from src.risk.asset_performance_tracker import AssetPerformanceTracker
 from src.risk.risk_manager import RiskManager
 from src.risk.stop_manager import StopManager
-from src.risk.trailing_stop_manager import TrailingPhase, TrailingStopConfig, TrailingStopManager
+from src.risk.trailing_stop_manager import (
+    PositionStopState,
+    TrailingPhase,
+    TrailingStopConfig,
+    TrailingStopManager,
+)
 from src.strategy.schemas import SignalDirection
 from src.strategy.strategy_manager import StrategyManager
 from src.utils.config import get_settings
@@ -372,12 +377,35 @@ class PaperTradingLoop:
             deal_id = pos.get("deal_id", "")
             state = self.trailing_stop_manager.get_state(deal_id)
             if state is None:
-                # Try matching by epic (broker deal_ids can differ)
+                # Capital.com rotates the dealId on TP/SL closes (see
+                # `project_capital_com_dealid_mutation` memo), so the manager
+                # may still hold the pre-rotation entry. Match on
+                # epic + direction (a single account very rarely has two open
+                # positions on the same epic and side at the same time, and
+                # we additionally tie-break on entry_price to be safe).
+                pos_epic = pos.get("epic")
+                pos_dir = pos.get("direction")
+                pos_entry = pos.get("level")
+                best: PositionStopState | None = None
+                best_dp = float("inf")
                 for tracked_id in self.trailing_stop_manager.tracked_positions:
                     ts = self.trailing_stop_manager.get_state(tracked_id)
-                    if ts and ts.epic == pos.get("epic"):
-                        state = ts
-                        break
+                    if not ts or ts.epic != pos_epic or ts.direction != pos_dir:
+                        continue
+                    # Closest entry price wins so two same-direction positions
+                    # on the same epic don't swap states.
+                    dp = abs(ts.entry_price - pos_entry) if pos_entry is not None else 0.0
+                    if dp < best_dp:
+                        best = ts
+                        best_dp = dp
+                if best is not None:
+                    state = best
+                    # Re-key the manager so subsequent lookups hit on the
+                    # current dealId without scanning. Avoids a stale entry
+                    # surviving forever as a phantom "?" in the UI.
+                    self.trailing_stop_manager._positions.pop(state.deal_id, None)
+                    state.deal_id = deal_id
+                    self.trailing_stop_manager._positions[deal_id] = state
             if state:
                 from src.risk.trailing_stop_manager import TrailingPhase
 
