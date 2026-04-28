@@ -67,6 +67,18 @@ class TimeoutError(CapitalComError):
     pass
 
 
+class NoPricesAvailableError(CapitalComError):
+    """Broker has no candles in the requested window.
+
+    Often a benign mid-bar edge case on Capital.com demo: requesting a
+    HOUR_4 window that starts in the second half of an in-progress 4h bar
+    returns 404 `error.prices.not-found` even though the market is healthy.
+    Callers should treat this as "no data" rather than a hard failure.
+    """
+
+    pass
+
+
 # Error code mapping
 ERROR_CODE_MAP: dict[str, type[CapitalComError]] = {
     "error.invalid.session": SessionExpiredError,
@@ -75,6 +87,7 @@ ERROR_CODE_MAP: dict[str, type[CapitalComError]] = {
     "error.insufficient.funds": InsufficientFundsError,
     "error.market.invalid": InvalidMarketError,
     "error.order.rejected": OrderRejectedError,
+    "error.prices.not-found": NoPricesAvailableError,
 }
 
 

@@ -49,6 +49,11 @@ class SessionManager:
         self._ping_task: asyncio.Task | None = None
         self._http_client: httpx.AsyncClient | None = None
 
+        # Heartbeats — read by BackendHealthSentinel to detect a silently
+        # dying ping loop (the loop catches all exceptions, so it cannot
+        # fail-fast on its own; an external watchdog needs proof of life).
+        self.last_successful_ping_at: datetime | None = None
+
     async def _get_http_client(self) -> httpx.AsyncClient:
         """Get or create HTTP client with configured timeouts."""
         if self._http_client is None:
@@ -166,6 +171,7 @@ class SessionManager:
             )
 
             if response.status_code == 200:
+                self.last_successful_ping_at = datetime.now(UTC)
                 logger.debug("📡 Keep-alive ping successful")
                 return True
             else:

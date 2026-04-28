@@ -60,6 +60,14 @@ class DataScheduler:
                 self._timeframes.insert(0, scalp_tf)
             self._scalp_timeframe = scalp_tf
 
+        # Refresh-job heartbeat: last outcome of each periodic refresh, used by
+        # the BackendHealthSentinel to detect "ingest dead" without polling
+        # parquet timestamps. Updated on every job tick (success or failure).
+        self._last_hourly_count: int = 0
+        self._last_hourly_at: datetime | None = None
+        self._last_scalp_count: int = 0
+        self._last_scalp_at: datetime | None = None
+
     def setup(self) -> None:
         """Register all scheduled jobs."""
 
@@ -186,18 +194,44 @@ class DataScheduler:
 
         # Invalidate cache so trading loop sees fresh data
         self.data_access.invalidate_cache()
+        self._last_hourly_count = downloaded
+        self._last_hourly_at = datetime.now(UTC)
         logger.info(
             f"Hourly refresh complete: {downloaded} candles across {len(self._assets)} assets"
         )
 
+    # Look-back window for the every-hour scalp refresh. We size this to be
+    # at least one full candle plus a generous safety margin so the request
+    # window always crosses a closed bar — Capital.com demo returns
+    # `error.prices.not-found` (now mapped to NoPricesAvailableError) when
+    # the window starts in the second half of an in-progress bar. With a 4h
+    # resolution a 2-hour window failed every other refresh; 5h+resolution
+    # keeps the broker happy across the full 4h grid.
+    _SCALP_REFRESH_LOOKBACK = {
+        "1min": timedelta(hours=1),
+        "5min": timedelta(hours=1),
+        "15min": timedelta(hours=2),
+        "30min": timedelta(hours=2),
+        "1h": timedelta(hours=3),
+        "4h": timedelta(hours=5),
+        "1d": timedelta(days=2),
+    }
+
     async def job_scalp_refresh(self) -> None:
         """
-        Scalp candle refresh for scalp mode trading.
-        Downloads last 2 hours of scalp-timeframe candles for all tradable assets,
-        then invalidates cache so the trading loop detects new candles.
+        Scalp candle refresh for scalp / MR-primary mode trading.
+
+        Downloads the last `_SCALP_REFRESH_LOOKBACK[tf]` window of scalp-timeframe
+        candles for all tradable assets, then invalidates cache so the trading
+        loop detects new candles. The look-back is timeframe-aware so the
+        window always contains at least one closed bar (avoids broker mid-bar
+        404s on 4h).
         """
         logger.info(f"Running scalp candle refresh ({self._scalp_timeframe})...")
-        start_date = datetime.now(UTC) - timedelta(hours=2)
+        lookback = self._SCALP_REFRESH_LOOKBACK.get(
+            self._scalp_timeframe, timedelta(hours=3)
+        )
+        start_date = datetime.now(UTC) - lookback
         downloaded = 0
 
         for epic in self._assets:
@@ -212,6 +246,8 @@ class DataScheduler:
                 logger.error(f"Scalp refresh failed for {epic}: {e}")
 
         self.data_access.invalidate_cache()
+        self._last_scalp_count = downloaded
+        self._last_scalp_at = datetime.now(UTC)
         logger.info(
             f"Scalp refresh complete: {downloaded} candles across {len(self._assets)} assets"
         )

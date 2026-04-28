@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 from loguru import logger
 
 from src.broker.client import CapitalComClient
-from src.broker.exceptions import CapitalComError, RateLimitError
+from src.broker.exceptions import CapitalComError, NoPricesAvailableError, RateLimitError
 from src.broker.models import OHLCCandle
 from src.data.models import DataSource, DownloadProgress, OHLCBar
 from src.data.storage import ParquetStorageManager
@@ -285,6 +285,20 @@ class HistoricalDownloader:
                     max_candles=MAX_CANDLES_PER_REQUEST,
                 )
                 return candles
+
+            except NoPricesAvailableError:
+                # Capital.com demo emits 404 `error.prices.not-found` for benign
+                # mid-bar windows (e.g. requesting a HOUR_4 window that starts in
+                # the second half of an in-progress 4h bar). Treat as empty
+                # without retrying — retries cannot help; the bar simply has not
+                # closed yet. Suppress to DEBUG to avoid log spam.
+                logger.debug(
+                    f"No prices for {epic} in window "
+                    f"{from_date.isoformat(timespec='minutes')} → "
+                    f"{to_date.isoformat(timespec='minutes')} "
+                    f"(broker reported `error.prices.not-found`, treating as empty)"
+                )
+                return []
 
             except RateLimitError:
                 delay = self.retry_base_delay * (2 ** (attempt - 1))

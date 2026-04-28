@@ -478,12 +478,35 @@ async def lifespan(app: FastAPI):
         app.state.telegram_bot = tg_bot
         logger.info("Telegram bot poller started — /status, /reset, /stop, /help")
 
+    # Backend health sentinel — alert-only watchdog (no auto-restart).
+    try:
+        from src.monitoring.health_sentinel import BackendHealthSentinel
+
+        sentinel = BackendHealthSentinel(
+            paper_loop=getattr(app.state, "paper_loop", None),
+            data_scheduler=getattr(app.state, "data_scheduler", None),
+            broker_client=getattr(app.state, "broker_client", None),
+            alert_manager=alert_mgr,
+        )
+        sentinel.start()
+        app.state.health_sentinel = sentinel
+    except Exception as exc:
+        logger.warning(f"Health sentinel startup failed (non-fatal): {exc}")
+
     logger.success("✅ Application startup complete")
 
     yield
 
     # Shutdown
     logger.info("🛑 Shutting down AlgoTrader AI Backend...")
+
+    # Stop health sentinel before everything else so it doesn't fire alerts
+    # on the ordered shutdown of the loop / scheduler / broker.
+    if getattr(app.state, "health_sentinel", None):
+        try:
+            await app.state.health_sentinel.stop()
+        except Exception as e:
+            logger.warning(f"Health sentinel stop error: {e}")
 
     # Stop Telegram bot
     if getattr(app.state, "telegram_bot", None):
