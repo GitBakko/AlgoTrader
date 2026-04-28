@@ -61,8 +61,12 @@ const TYPE_BADGE_COLORS: Record<string, string> = {
     EpicLogoComponent,
   ],
   template: `
-    <!-- Header -->
-    <h5 class="mb-3 fw-semibold px-1">Sistema</h5>
+    <!-- HDR-03 (Bible §1.2) — eyebrow + title + meta -->
+    <header class="settings-hdr">
+      <span class="settings-hdr__eyebrow mantis-mono">Sistema · Configurazione</span>
+      <h1 class="settings-hdr__title">Impostazioni</h1>
+      <span class="settings-hdr__meta mantis-mono">{{ assets.length }} asset · {{ activeAssetsCount() }} attivi</span>
+    </header>
 
     <c-row>
       <!-- System Info -->
@@ -154,14 +158,13 @@ const TYPE_BADGE_COLORS: Record<string, string> = {
             </c-form-check>
 
             <!-- Alert type filters -->
-            <div class="small text-body-secondary mb-2">Filtra Notifiche In-App</div>
+            <span class="settings-label">Filtra Notifiche In-App</span>
             <div class="d-flex flex-wrap gap-1">
               @for (t of alertTypes; track t.key) {
-                <button class="btn btn-sm px-2 py-1"
-                  [class.btn-outline-secondary]="isAlertMuted(t.key)"
-                  [class.btn-primary]="!isAlertMuted(t.key)"
-                  [style.opacity]="isAlertMuted(t.key) ? '0.5' : '1'"
-                  (click)="toggleAlertType(t.key)">
+                <button type="button"
+                        class="settings-alert-chip"
+                        [class.is-active]="!isAlertMuted(t.key)"
+                        (click)="toggleAlertType(t.key)">
                   {{ t.emoji }} {{ t.label }}
                 </button>
               }
@@ -266,20 +269,22 @@ const TYPE_BADGE_COLORS: Record<string, string> = {
                   <td class="text-center">
                     <div class="d-flex gap-1 justify-content-center">
                       @if (!positionCounts()[a.epic]) {
-                        <button class="btn btn-sm py-0 px-2"
-                                [class.btn-outline-success]="excludedEpics().has(a.epic)"
-                                [class.btn-outline-secondary]="!excludedEpics().has(a.epic)"
+                        <button type="button"
+                                class="settings-btn"
+                                [class.settings-btn--success]="excludedEpics().has(a.epic)"
+                                [class.settings-btn--ghost]="!excludedEpics().has(a.epic)"
                                 (click)="toggleEpic(a.epic)">
-                          <small>{{ excludedEpics().has(a.epic) ? 'Attiva' : 'Escludi' }}</small>
+                          {{ excludedEpics().has(a.epic) ? 'Attiva' : 'Escludi' }}
                         </button>
                       }
-                      <button class="btn btn-sm btn-outline-info py-0 px-2"
+                      <button type="button"
+                              class="settings-btn settings-btn--secondary"
                               [disabled]="trainingEpics().has(a.epic)"
                               (click)="trainModel(a.epic)">
                         @if (trainingEpics().has(a.epic)) {
                           <span class="spinner-border spinner-border-sm settings-train-spinner"></span>
                         } @else {
-                          <small>Train</small>
+                          <span>Train</span>
                         }
                       </button>
                     </div>
@@ -332,6 +337,10 @@ export class SettingsComponent implements OnInit {
     new Set(JSON.parse(localStorage.getItem('mantis-excluded-epics') || '["EURUSD"]'))
   );
   readonly trainingEpics = signal<Set<string>>(new Set());
+
+  readonly activeAssetsCount = computed(() =>
+    this.assets.filter((a) => !this.excludedEpics().has(a.epic)).length,
+  );
 
   readonly positionCounts = computed(() => {
     const counts: Record<string, number> = {};

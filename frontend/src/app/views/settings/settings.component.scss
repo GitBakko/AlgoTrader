@@ -1,10 +1,64 @@
 // ═══════════════════════════════════════════════════════════
-// Settings Component Styles
-// Uses CSS custom properties (no SCSS palette import needed)
+// Settings Component Styles · Style Bible HDR-03 + tokens
 // ═══════════════════════════════════════════════════════════
 
 :host {
-  // Asset row hover + excluded state
+  display: block;
+
+  // ── HDR-03 strip (eyebrow + title + meta) ─────────────────
+  .settings-hdr {
+    display: flex;
+    align-items: baseline;
+    gap: var(--mantis-space-3);
+    padding: var(--mantis-space-3) var(--mantis-space-2);
+    border-bottom: 1px solid rgba(0, 217, 126, 0.18);
+    margin-bottom: var(--mantis-space-4);
+    flex-wrap: wrap;
+
+    &__eyebrow {
+      color: var(--mantis-green);
+      font-size: var(--mantis-fs-xxs);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      opacity: 0.85;
+    }
+
+    &__title {
+      color: var(--fg1);
+      font-size: var(--mantis-fs-xl);
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    &__meta {
+      margin-left: auto;
+      color: var(--fg3);
+      font-size: var(--mantis-fs-xxs);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+  }
+
+  // ── Card header overrides (mono uppercase + tracking) ─────
+  ::ng-deep c-card-header .fw-semibold {
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: var(--mantis-fs-xxs);
+  }
+
+  // ── Form labels uppercase mono (Bible FRM-01) ─────────────
+  .settings-label {
+    display: block;
+    color: var(--fg3);
+    font-size: var(--mantis-fs-xxs);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: var(--mantis-space-1);
+  }
+
+  // ── Asset row hover + excluded state ──────────────────────
   .settings-asset-row {
     transition: background-color 0.1s ease;
 
@@ -17,13 +71,79 @@
     }
   }
 
-  // Train button spinner size
+  // ── Train spinner ─────────────────────────────────────────
   .settings-train-spinner {
     width: 0.75rem;
     height: 0.75rem;
   }
 
-  // Mobile table min-width
+  // ── Action buttons (Bible BTN-* tokens) ───────────────────
+  .settings-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--mantis-space-1);
+    padding: 4px 10px;
+    border: 1px solid transparent;
+    border-radius: var(--mantis-radius-sm);
+    font-size: var(--mantis-fs-xxs);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 1;
+    cursor: pointer;
+    transition: filter var(--mantis-dur-fast) var(--mantis-ease-out-expo);
+    background: transparent;
+
+    &:hover { filter: brightness(1.08); }
+    &:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    &--secondary {
+      background: rgba(0, 229, 255, 0.08);
+      border-color: rgba(0, 229, 255, 0.4);
+      color: var(--mantis-cyan);
+    }
+
+    &--ghost {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.85);
+    }
+
+    &--success {
+      background: rgba(57, 255, 20, 0.10);
+      border-color: rgba(57, 255, 20, 0.45);
+      color: var(--mantis-neon);
+    }
+  }
+
+  // ── Alert filter chips ────────────────────────────────────
+  .settings-alert-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mantis-space-1);
+    padding: 4px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--mantis-radius-pill);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.6);
+    font-size: var(--mantis-fs-xxs);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all var(--mantis-dur-fast) var(--mantis-ease-out-expo);
+
+    &.is-active {
+      background: rgba(0, 217, 126, 0.12);
+      border-color: rgba(0, 217, 126, 0.45);
+      color: var(--mantis-green);
+    }
+
+    &:hover { filter: brightness(1.08); }
+  }
+
+  // ── Mobile table min-width ────────────────────────────────
   @media (max-width: 991.98px) {
     table[cTable] {
       min-width: 600px;
