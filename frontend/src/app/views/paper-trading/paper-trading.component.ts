@@ -149,7 +149,8 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     const positionHistory = this.trading.positionPnlHistory();
     return [
       status?.iteration_count ?? 0,
-      status?.last_run ?? '',
+      status?.check_count ?? 0,
+      status?.last_check_at ?? status?.last_run ?? '',
       status?.signal_count ?? 0,
       positions.length,
       paperHistory?.points.length ?? 0,
@@ -184,8 +185,14 @@ export class PaperTradingComponent implements OnInit, OnDestroy {
     return (raw === 'LIVE' || raw === 'PAPER') ? raw : 'DEMO';
   });
 
+  /** Seconds since the last *housekeeping* tick — the broker reconciliation
+   *  loop fires every 15min regardless of candle resolution, so this is the
+   *  right field to feed the "last tick" cockpit chip. Falls back to
+   *  `last_run` (4h cadence on mr_primary) if the backend hasn't yet
+   *  produced a `last_check_at` (older payloads). */
   readonly lastTickAgo = computed<number | null>(() => {
-    const iso = this.status()?.last_run;
+    const s = this.status();
+    const iso = s?.last_check_at ?? s?.last_run;
     if (!iso) return null;
     const ts = Date.parse(iso);
     if (Number.isNaN(ts)) return null;

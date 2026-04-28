@@ -38,7 +38,7 @@ import { Injectable, signal } from '@angular/core';
   providedIn: 'root',
 })
 export class LogoService {
-  private readonly CACHE_KEY = 'mantis-logos-v4';
+  private readonly CACHE_KEY = 'mantis-logos-v5';
   private readonly CACHE_TTL_MS = 24 * 60 * 60 * 1000;
   private cache = new Map<string, { urls: string[]; ts: number }>();
 
@@ -212,11 +212,13 @@ export class LogoService {
     coin = false,
     whiteCircleBg = false,
   ): string {
-    // Optional white-disc backdrop behind the path — used when the glyph
-    // colour is too dark to be legible on the 10%-tinted-square background
-    // (e.g. WTI's black oil drop on a dark theme would otherwise vanish).
+    // Optional white rounded-square backdrop behind the path — used when
+    // the glyph colour is too dark to be legible on the 10%-tinted-square
+    // background (e.g. WTI's black oil drop on a dark theme would
+    // otherwise vanish). Sized slightly inset (28×28 of the 32 frame) so
+    // the colour-tinted ring is still visible around the white panel.
     const backdrop = whiteCircleBg
-      ? `<circle cx="16" cy="16" r="11" fill="#ffffff"/>`
+      ? `<rect x="2" y="2" width="28" height="28" rx="5" fill="#ffffff"/>`
       : '';
     const inner = coin
       ? `<circle cx="16" cy="16" r="11" fill="${fill}" stroke="${accent ?? 'rgba(0,0,0,.25)'}" stroke-width="1.5"/>

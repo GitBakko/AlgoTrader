@@ -162,6 +162,13 @@ class PaperTradingLoop:
         self._running = False
         self._task: asyncio.Task | None = None
         self._last_run: datetime | None = None
+        # Timestamp of the most recent housekeeping check — updated every
+        # `interval_seconds` regardless of candle resolution. Reconciliation,
+        # broker sync, trailing-stop updates and SL violations run on this
+        # cadence even though signal generation only fires on a new candle
+        # close. Exposed in `get_status()` as `last_check_at` so the cockpit
+        # `last tick` chip can show real liveness on 4h-resolution loops.
+        self._last_check_at: datetime | None = None
         # Timestamp of the most recent successful start() — surfaced in
         # get_status() as "started_at"/"uptime_seconds" so the Dashboard v2
         # operational-strip tile can show real uptime (replaces the
@@ -1813,6 +1820,7 @@ class PaperTradingLoop:
             force: If True, process all epics regardless of candle status.
         """
         self._check_count += 1
+        self._last_check_at = datetime.now(UTC)
 
         # Phase 8: circuit breaker heartbeat (resets timeout counter)
         self.risk_manager.circuit_breakers.heartbeat()
@@ -3422,6 +3430,7 @@ class PaperTradingLoop:
             "iteration_count": self._iteration_count,
             "check_count": self._check_count,
             "last_run": self._last_run.isoformat() if self._last_run else None,
+            "last_check_at": self._last_check_at.isoformat() if self._last_check_at else None,
             "started_at": self._started_at.isoformat() if self._started_at else None,
             "uptime_seconds": uptime_seconds,
             "signal_count": self._signal_count,

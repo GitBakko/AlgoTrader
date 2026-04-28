@@ -270,7 +270,15 @@ export interface PaperTradingStatus {
   epics: string[];
   iteration_count: number;
   check_count: number;
+  /** ISO timestamp of the last *signal-generation* iteration (only fires when
+   *  a new candle of the configured resolution closes — every 4h on
+   *  mr_primary). Use `last_check_at` for housekeeping liveness. */
   last_run: string | null;
+  /** ISO timestamp of the last housekeeping check (broker sync, reconciliation,
+   *  trailing-stop update, SL violation, spread refresh). Updates every
+   *  `interval_seconds` (15min by default) regardless of candle close —
+   *  this is the right field to feed the cockpit "last tick" chip. */
+  last_check_at?: string | null;
   /** ISO timestamp of the last successful loop start (Dashboard v2 uptime). */
   started_at?: string | null;
   /** Seconds since the loop started (Dashboard v2 uptime). */
