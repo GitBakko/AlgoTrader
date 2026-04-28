@@ -24,9 +24,25 @@ import type { PaperTradingPosition } from '../../../../core/models/paper-trading
 export class PositionCardComponent {
   readonly position = input.required<PaperTradingPosition>();
   readonly currency = input<string>('USD');
+  /** Live account equity (broker). When 0/undefined, exposure % renders as
+   *  a dash and only the notional is shown. */
+  readonly equity = input<number>(0);
 
   readonly closeClicked = output<PaperTradingPosition>();
   readonly detailsClicked = output<PaperTradingPosition>();
+
+  /** Raw notional value of the position in account currency (size × current). */
+  readonly notional = computed(() => {
+    const p = this.position();
+    return Math.abs(p.size * p.current);
+  });
+
+  /** Exposure as percent of live account equity. Null when equity unknown. */
+  readonly exposurePct = computed<number | null>(() => {
+    const eq = this.equity();
+    if (!eq || !Number.isFinite(eq)) return null;
+    return (this.notional() / eq) * 100;
+  });
 
   readonly currencySym = computed(() => {
     const code = (this.currency() ?? 'USD').replace(/d$/, '');

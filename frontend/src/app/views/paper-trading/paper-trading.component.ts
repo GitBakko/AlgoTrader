@@ -99,6 +99,8 @@ export class PaperTradingComponent implements OnInit {
   readonly status = this.trading.paperStatus;
   readonly overview = this.trading.overview;
   readonly currency = computed<string>(() => this.overview()?.currency ?? 'USD');
+  /** Live broker equity for the exposure-% indicator on position cards. */
+  readonly liveEquity = computed<number>(() => this.overview()?.equity ?? 0);
 
   /** Live broker positions surfaced verbatim (no adapter). The heatmap
    *  needs the raw `PaperPosition[]` shape to overlay live state per epic. */

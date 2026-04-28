@@ -33,6 +33,7 @@
         [positions]="positions()"
         [signalsTotal]="kpiStrip().signalsTotal"
         [currency]="currency()"
+        [equity]="liveEquity()"
         [loading]="isInitialLoading()"
         (closeRequested)="onClosePosition($event)"
         (detailsRequested)="onPositionDetails($event)">

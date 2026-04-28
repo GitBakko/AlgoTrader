@@ -109,6 +109,15 @@
 
   <!-- COL 4 — Meta + Close -->
   <div class="pv-pc__col pv-pc__col--meta">
+    <div class="pv-pc__meta-row pv-pc__meta-row--exposure">
+      <span class="pv-pc__meta-label mantis-mono">EXP</span>
+      <span class="pv-pc__meta-value mantis-mono">
+        {{ currencySym() }}{{ notional() | number:'1.0-0':'it-IT' }}
+        @if (exposurePct() !== null) {
+          <small class="pv-pc__meta-sub">{{ exposurePct() | number:'1.1-1':'it-IT' }}%</small>
+        }
+      </span>
+    </div>
     <div class="pv-pc__meta-row">
       <span class="pv-pc__meta-label mantis-mono">R:R</span>
       <span class="pv-pc__meta-value mantis-mono">1:{{ position().rr | number:'1.2-2':'it-IT' }}</span>

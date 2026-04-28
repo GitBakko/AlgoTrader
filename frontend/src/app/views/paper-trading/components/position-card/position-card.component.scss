@@ -403,6 +403,19 @@
   &.is-loss   { color: p.$mantis-loss; }
 }
 
+.pv-pc__meta-sub {
+  margin-left: 6px;
+  color: var(--fg3);
+  font-size: var(--mantis-fs-xxs);
+  font-weight: 500;
+}
+
+.pv-pc__meta-row--exposure {
+  .pv-pc__meta-value {
+    color: var(--mantis-cyan);
+  }
+}
+
 .pv-pc__close {
   margin-top: 2px;
   padding: 4px 8px;

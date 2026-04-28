@@ -22,6 +22,9 @@ export class ActivePositionsCockpitComponent {
   readonly positions = input.required<PaperTradingPosition[]>();
   readonly signalsTotal = input<number>(0);
   readonly currency = input<string>('USD');
+  /** Live broker equity — passed down to position-card so each card can show
+   *  its exposure as a percent of total equity. */
+  readonly equity = input<number>(0);
   /** True when the broker positions feed has not produced its first response
    *  yet — render skeleton cards instead of the empty state to avoid telling
    *  the user "nessuna posizione" while we are still loading. */
