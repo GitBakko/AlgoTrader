@@ -51,7 +51,7 @@
     position: absolute;
     inset: 0 0 auto 0;
     height: 3px;
-    background: rgba(255, 255, 255, .1);
+    background: var(--mantis-border-default);
   }
   &[data-status='executed']::before { background: p.$mantis-neon; box-shadow: 0 0 8px rgba(57, 255, 20, .55); }
   &[data-status='rejected']::before { background: p.$mantis-loss; box-shadow: 0 0 8px rgba(255, 61, 87, .45); }
@@ -77,7 +77,7 @@
   font-weight: 700;
   letter-spacing: .16em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, .55);
+  color: var(--fg-faint);
 }
 
 .ad-head__close {
@@ -85,8 +85,8 @@
   width: 28px;
   height: 28px;
   border-radius: var(--mantis-radius-sm, 4px);
-  border: 1px solid rgba(255, 255, 255, .08);
-  background: rgba(255, 255, 255, .04);
+  border: 1px solid var(--mantis-border-soft);
+  background: var(--mantis-ghost-1);
   color: var(--fg2);
   font-size: var(--mantis-fs-body);
   cursor: pointer;
@@ -122,7 +122,7 @@
 
 .ad-head__ts {
   font-size: var(--mantis-fs-xs);
-  color: rgba(255, 255, 255, .48);
+  color: var(--fg3);
   letter-spacing: .04em;
 }
 
@@ -151,7 +151,7 @@
   font-size: var(--mantis-fs-xxs);
   font-weight: 700;
   letter-spacing: .16em;
-  color: rgba(255, 255, 255, .55);
+  color: var(--fg-faint);
 
   .ad-head__verdict[data-status='EXECUTED'] & { color: p.$mantis-neon; }
   .ad-head__verdict[data-status='REJECTED'] & { color: p.$mantis-loss; }
@@ -165,7 +165,7 @@
   align-items: center;
   margin-top: 14px;
   padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, .04);
+  border-top: 1px solid var(--mantis-ghost-1);
 }
 
 .ad-pipe--conf {
@@ -181,7 +181,7 @@
   font-size: var(--mantis-fs-xxs);
   font-weight: 700;
   letter-spacing: .14em;
-  color: rgba(255, 255, 255, .5);
+  color: var(--fg3);
 }
 
 .ad-pipe__value {
@@ -192,8 +192,8 @@
 
   &[data-tone='high'] { color: p.$mantis-neon; }
   &[data-tone='mid']  { color: p.$mantis-warning; }
-  &[data-tone='low']  { color: rgba(255, 255, 255, .55); }
-  &[data-tone='none'] { color: rgba(255, 255, 255, .35); }
+  &[data-tone='low']  { color: var(--fg-faint); }
+  &[data-tone='none'] { color: var(--fg-soft); }
 }
 
 .ad-pipe__bar {
@@ -201,7 +201,7 @@
   position: relative;
   height: 4px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, .06);
+  background: var(--mantis-border-subtle);
   overflow: hidden;
 }
 
@@ -210,12 +210,12 @@
   inset: 0 auto 0 0;
   width: var(--w, 0%);
   border-radius: 2px;
-  background: rgba(255, 255, 255, .25);
+  background: var(--fg-disabled);
   transition: width 320ms var(--mantis-ease-out-expo, cubic-bezier(.16, 1, .3, 1));
 
   &[data-tone='high'] { background: p.$mantis-neon; box-shadow: 0 0 6px rgba(57, 255, 20, .45); }
   &[data-tone='mid']  { background: p.$mantis-warning; }
-  &[data-tone='low']  { background: rgba(255, 255, 255, .25); }
+  &[data-tone='low']  { background: var(--fg-disabled); }
 }
 
 .ad-pipe__chain {
@@ -235,7 +235,7 @@
     left: 12%;
     right: 12%;
     height: 1px;
-    background: rgba(255, 255, 255, .08);
+    background: var(--mantis-ghost-2);
     pointer-events: none;
   }
 }
@@ -252,7 +252,7 @@
   height: 10px;
   border-radius: 100px;
   background: p.$mantis-surface-1;
-  border: 2px solid rgba(255, 255, 255, .2);
+  border: 2px solid var(--mantis-border-medium);
   transition: all 220ms ease;
 
   .ad-pipe__step[data-state='passed']  & { border-color: p.$mantis-neon; box-shadow: 0 0 5px rgba(57, 255, 20, .4); }
@@ -264,7 +264,7 @@
   font-size: var(--mantis-fs-xxs);
   font-weight: 700;
   letter-spacing: .14em;
-  color: rgba(255, 255, 255, .5);
+  color: var(--fg3);
   text-transform: uppercase;
 
   .ad-pipe__step[data-state='passed']  & { color: p.$mantis-neon; }
@@ -278,7 +278,7 @@
   justify-content: center;
   gap: 10px;
   padding: 20px;
-  color: rgba(255, 255, 255, .55);
+  color: var(--fg-faint);
   font-size: var(--mantis-fs-sm);
   letter-spacing: .12em;
   text-transform: uppercase;
@@ -305,7 +305,7 @@
 .ad-card {
   position: relative;
   background: p.$mantis-surface-2;
-  border: 1px solid rgba(255, 255, 255, .04);
+  border: 1px solid var(--mantis-ghost-1);
   border-top: 2px solid rgba(p.$mantis-green, .25);
   border-radius: var(--mantis-radius-md, 6px);
   padding: 12px 14px;
@@ -368,7 +368,7 @@
   font-weight: 700;
   letter-spacing: .16em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, .55);
+  color: var(--fg-faint);
 }
 
 .ad-card__title {
@@ -410,8 +410,8 @@
 }
 
 .ad-kpi {
-  background: rgba(255, 255, 255, .03);
-  border: 1px solid rgba(255, 255, 255, .04);
+  background: var(--mantis-ghost-1);
+  border: 1px solid var(--mantis-ghost-1);
   border-radius: var(--mantis-radius-sm, 4px);
   padding: 8px 10px;
   display: flex;
@@ -462,7 +462,7 @@
   &[data-tone='success']   { color: p.$mantis-neon; background: rgba(57, 255, 20, .12); border-color: rgba(57, 255, 20, .3); }
   &[data-tone='warning']   { color: p.$mantis-warning; background: rgba(255, 176, 32, .12); border-color: rgba(255, 176, 32, .3); }
   &[data-tone='danger']    { color: p.$mantis-loss; background: rgba(255, 61, 87, .14); border-color: rgba(255, 61, 87, .35); }
-  &[data-tone='secondary'] { color: rgba(255, 255, 255, .55); background: rgba(255, 255, 255, .04); border-color: rgba(255, 255, 255, .08); }
+  &[data-tone='secondary'] { color: var(--fg-faint); background: var(--mantis-ghost-1); border-color: var(--mantis-border-soft); }
 }
 
 // ── Vote weight bars ──────────────────────────────────────────────
@@ -495,7 +495,7 @@
   position: relative;
   height: 6px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, .04);
+  background: var(--mantis-ghost-1);
   overflow: hidden;
 }
 
@@ -505,7 +505,7 @@
   bottom: 0;
   left: 50%;
   width: 1px;
-  background: rgba(255, 255, 255, .15);
+  background: var(--mantis-ghost-3);
   transform: translateX(-50%);
   z-index: 1;
 }
@@ -531,7 +531,7 @@
 
   &[data-direction='BUY']  { color: p.$mantis-neon; }
   &[data-direction='SELL'] { color: p.$mantis-loss; }
-  &[data-direction='NONE'] { color: rgba(255, 255, 255, .3); }
+  &[data-direction='NONE'] { color: var(--fg-soft); }
 }
 
 // ── Gates timeline ────────────────────────────────────────────────
@@ -552,7 +552,7 @@
     top: 12px;
     bottom: 12px;
     width: 1px;
-    background: rgba(255, 255, 255, .06);
+    background: var(--mantis-border-subtle);
   }
 }
 
@@ -570,7 +570,7 @@
   height: 10px;
   border-radius: 100px;
   background: p.$mantis-surface-2;
-  border: 2px solid rgba(255, 255, 255, .25);
+  border: 2px solid var(--mantis-border-medium);
   z-index: 1;
 
   .ad-gate-row[data-pass='true']  & { border-color: p.$mantis-neon; box-shadow: 0 0 5px rgba(57, 255, 20, .35); }
@@ -613,7 +613,7 @@
   height: 22px;
   border-radius: var(--mantis-radius-sm, 4px);
   overflow: hidden;
-  background: rgba(255, 255, 255, .04);
+  background: var(--mantis-ghost-1);
   margin-top: 4px;
 }
 
@@ -677,13 +677,13 @@
 
   .ad-related__row[data-direction='BUY']  & { color: p.$mantis-neon; }
   .ad-related__row[data-direction='SELL'] & { color: p.$mantis-loss; }
-  .ad-related__row[data-direction='HOLD'] & { color: rgba(255, 255, 255, .35); }
+  .ad-related__row[data-direction='HOLD'] & { color: var(--fg-soft); }
 }
 
 .ad-related__conf {
   font-size: var(--mantis-fs-sm);
   font-feature-settings: 'tnum' 1;
-  color: rgba(255, 255, 255, .8);
+  color: var(--fg1);
 }
 
 .ad-related__status {

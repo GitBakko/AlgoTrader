@@ -54,16 +54,23 @@
   --mantis-text-secondary: #{$mantis-text-secondary};
   --mantis-text-muted:     #{$mantis-text-muted};
   --mantis-text-disabled:  #{$mantis-text-disabled};
+  --mantis-text-faint:     #{$mantis-text-faint};
+  --mantis-text-soft:      #{$mantis-text-soft};
 
   // Borders (dark defaults)
   --mantis-border-subtle:  #{$mantis-border-subtle};
   --mantis-border-default: #{$mantis-border-default};
+  --mantis-border-soft:    #{$mantis-border-soft};
+  --mantis-border-medium:  #{$mantis-border-medium};
   --mantis-border-accent:  #{$mantis-border-accent};
   --mantis-border-strong:  #{$mantis-border-strong};
 
   // Glass / tint backgrounds
   --mantis-glass-bg:    rgba(22, 27, 34, 0.6);
   --mantis-tint-subtle: rgba(255, 255, 255, 0.04);
+  --mantis-ghost-1:     #{$mantis-ghost-1};
+  --mantis-ghost-2:     #{$mantis-ghost-2};
+  --mantis-ghost-3:     #{$mantis-ghost-3};
 
   // Shadows (dark defaults)
   --mantis-shadow-sm: #{$mantis-shadow-sm};
@@ -124,6 +131,8 @@
   --fg1: var(--mantis-text-primary);
   --fg2: var(--mantis-text-secondary);
   --fg3: var(--mantis-text-muted);
+  --fg-faint:    var(--mantis-text-faint);
+  --fg-soft:     var(--mantis-text-soft);
   --fg-disabled: var(--mantis-text-disabled);
   --fg-accent:   var(--mantis-neon);
 
