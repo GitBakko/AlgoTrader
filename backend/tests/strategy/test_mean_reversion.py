@@ -41,28 +41,29 @@ def mock_settings():
 
 class TestSellSignal:
     def test_sell_signal_overbought(self, strategy):
-        """z > 2, RSI > 70, ADX < 30 -> SELL with TP at mean (capped at 4 ATR)."""
-        # Use a wider ATR so that TP at mean (5 below) is within the 4*ATR cap
+        """z > 2, RSI > 70, ADX < 30 -> SELL with TP capped at TP_MAX_ATR."""
+        # Default class (no epic) = forex params: SL_ATR=2.0, TP_MAX_ATR=1.5
         data = _make_market_data(
             current_price=105.0,
             vwap_z_score=2.5,
             rsi=75.0,
             adx=20.0,
             vwap=100.0,
-            atr=2.0,  # 4*ATR cap = 8, so TP at 100 (5 below) is valid
+            atr=2.0,
         )
         sig = strategy.generate_signal(data)
 
         assert sig.direction == "SELL"
-        assert sig.tp_level == 100.0  # TP at VWAP (within cap)
+        # raw_tp=100 (VWAP), min_tp=entry-1.5*ATR=102 → capped at 102
+        assert sig.tp_level == 102.0
         assert sig.stop_level is not None
-        # SL = entry + 2*ATR = 105 + 4 = 109
+        # SL = entry + SL_ATR*ATR = 105 + 2.0*2.0 = 109
         assert sig.stop_level == 109.0
         assert sig.confidence >= 0.5
         assert "above mean" in sig.reason
 
     def test_sell_signal_tp_capped(self, strategy):
-        """When mean is too far, TP is capped at 4 ATR from entry."""
+        """When mean is too far, TP capped at TP_MAX_ATR from entry."""
         data = _make_market_data(
             current_price=105.0,
             vwap_z_score=2.5,
@@ -74,29 +75,31 @@ class TestSellSignal:
         sig = strategy.generate_signal(data)
 
         assert sig.direction == "SELL"
-        # TP capped at 4 ATR = 105 - 4 = 101
-        assert sig.tp_level == 101.0
-        # SL = entry + 2 ATR = 107
+        # TP capped at TP_MAX_ATR(1.5) * ATR = 1.5 → 105 - 1.5 = 103.5
+        assert sig.tp_level == 103.5
+        # SL = entry + SL_ATR*ATR = 105 + 2.0*1.0 = 107
         assert sig.stop_level == 107.0
 
 
 class TestBuySignal:
     def test_buy_signal_oversold(self, strategy):
-        """z < -2, RSI < 30, ADX < 30 -> BUY with TP at mean (capped at 4 ATR)."""
+        """z < -2, RSI < 30, ADX < 30 -> BUY with TP capped at TP_MAX_ATR."""
+        # Default class (no epic) = forex params: SL_ATR=2.0, TP_MAX_ATR=1.5
         data = _make_market_data(
             current_price=95.0,
             vwap_z_score=-2.5,
             rsi=25.0,
             adx=20.0,
             vwap=100.0,
-            atr=2.0,  # 4*ATR cap = 8, so TP at 100 (5 above) is valid
+            atr=2.0,
         )
         sig = strategy.generate_signal(data)
 
         assert sig.direction == "BUY"
-        assert sig.tp_level == 100.0  # TP at VWAP (within cap)
+        # raw_tp=100, max_tp=entry+1.5*ATR=98 → tp = min(100, 98) = 98 (capped)
+        assert sig.tp_level == 98.0
         assert sig.stop_level is not None
-        # SL = entry - 2*ATR = 95 - 4 = 91
+        # SL = entry - SL_ATR*ATR = 95 - 2.0*2.0 = 91
         assert sig.stop_level == 91.0
         assert sig.confidence >= 0.5
         assert "below mean" in sig.reason
