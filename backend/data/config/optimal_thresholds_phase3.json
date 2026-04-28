@@ -1,0 +1,66 @@
+{
+  "generated_at": "2026-04-28T13:43:02.188753+00:00",
+  "default_confidence": 0.4,
+  "per_asset": {
+    "SOLUSD": {
+      "min_confidence": 0.3,
+      "decision": "KEEP",
+      "sharpe": 4.956,
+      "sortino": 6.48,
+      "win_rate": 0.692,
+      "max_drawdown": 0.022,
+      "profit_factor": 2.668,
+      "total_trades": 308,
+      "total_return_pct": 34.23,
+      "failed_criteria": []
+    },
+    "BTCUSD": {
+      "min_confidence": 0.3,
+      "decision": "KEEP",
+      "sharpe": 6.579,
+      "sortino": 10.885,
+      "win_rate": 0.703,
+      "max_drawdown": 0.005,
+      "profit_factor": 3.879,
+      "total_trades": 259,
+      "total_return_pct": 19.78,
+      "failed_criteria": []
+    },
+    "ETHUSD": {
+      "min_confidence": 0.48,
+      "decision": "KEEP",
+      "sharpe": 4.968,
+      "sortino": 7.647,
+      "win_rate": 0.728,
+      "max_drawdown": 0.011,
+      "profit_factor": 3.589,
+      "total_trades": 173,
+      "total_return_pct": 24.05,
+      "failed_criteria": []
+    },
+    "XAUUSD": {
+      "min_confidence": 0.55,
+      "decision": "KEEP",
+      "sharpe": 3.286,
+      "sortino": 4.586,
+      "win_rate": 0.637,
+      "max_drawdown": 0.008,
+      "profit_factor": 2.586,
+      "total_trades": 80,
+      "total_return_pct": 3.73,
+      "failed_criteria": []
+    },
+    "BNBUSD": {
+      "min_confidence": 0.45,
+      "decision": "KEEP",
+      "sharpe": 1.953,
+      "sortino": 2.586,
+      "win_rate": 0.578,
+      "max_drawdown": 0.013,
+      "profit_factor": 1.547,
+      "total_trades": 185,
+      "total_return_pct": 7.15,
+      "failed_criteria": []
+    }
+  }
+}

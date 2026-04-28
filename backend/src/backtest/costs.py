@@ -5,20 +5,41 @@ Models spread, slippage, and overnight fees for Capital.com CFDs.
 
 from datetime import datetime, timedelta
 
-# Capital.com typical FULL bid-ask spreads (in price units)
+# Capital.com typical FULL bid-ask spreads (in price units).
 # These represent the full spread (ask - bid), not the half-spread.
+# Calibrated 2026-04-28 from live broker snapshots × 1.2x buffer for off-hours
+# widening. See docs/reports/2026-04-28_phase3_real_costs.md.
 ASSET_SPREADS = {
-    "XAUUSD": 0.40,  # ~0.40 USD full spread on Gold
-    "BTCUSD": 50.0,  # ~50 USD full spread on Bitcoin
-    "US500": 0.50,  # ~0.50 points full spread on S&P 500
+    "XAUUSD": 0.60,   # snap 0.50 × 1.2
+    "BTCUSD": 60.0,   # snap 50.0 × 1.2
+    "ETHUSD": 2.10,   # snap 1.75 × 1.2 (was hidden behind default 0.5)
+    "SOLUSD": 0.50,   # snap 0.42 × 1.2
+    "BNBUSD": 3.75,   # snap 3.11 × 1.2 (was hidden behind default 0.5)
+    "US500": 0.50,
+    # Other top-13 KEEP basket spreads — conservative defaults pending
+    # Phase 3-bis sweep:
+    "WTIUSD": 0.04,   # ~0.04 USD on $100 oil
+    "DE40": 1.00,     # ~1.0 point on DAX
+    "PLATINUM": 1.00,
+    "TSLA": 0.10,
+    "NVDA": 0.10,
 }
 
-# Typical overnight swap rates (daily, as fraction of position value)
-# Long/Short rates differ; these are approximations for Capital.com demo
+# Typical overnight swap rates (daily, as fraction of position value).
+# Long/Short rates differ; weekend Fri/Sat charged 3x (handled in engine).
+# Sources: Capital.com demo public swap tables (2026-04-28 sample).
 OVERNIGHT_RATES = {
-    "XAUUSD": {"long": -0.000015, "short": -0.000010},
-    "BTCUSD": {"long": -0.000020, "short": -0.000015},
-    "US500": {"long": -0.000012, "short": -0.000008},
+    "XAUUSD":   {"long": -0.000015, "short": -0.000010},
+    "BTCUSD":   {"long": -0.000020, "short": -0.000015},
+    "ETHUSD":   {"long": -0.000018, "short": -0.000013},
+    "SOLUSD":   {"long": -0.000022, "short": -0.000017},
+    "BNBUSD":   {"long": -0.000020, "short": -0.000015},
+    "US500":    {"long": -0.000012, "short": -0.000008},
+    "WTIUSD":   {"long": -0.000015, "short": -0.000012},
+    "DE40":     {"long": -0.000010, "short": -0.000007},
+    "PLATINUM": {"long": -0.000015, "short": -0.000011},
+    "TSLA":     {"long": -0.000018, "short": -0.000014},
+    "NVDA":     {"long": -0.000018, "short": -0.000014},
 }
 
 # Slippage as fraction of spread (additional cost on top of spread)
