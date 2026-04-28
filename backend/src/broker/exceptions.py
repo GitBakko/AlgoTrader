@@ -4,13 +4,23 @@ Maps Capital.com error codes to Python exceptions.
 """
 
 
-class CapitalComError(Exception):
-    """Base exception for all Capital.com API errors."""
+class BrokerError(Exception):
+    """Generic broker-agnostic exception (Capital.com / Bybit / mocks).
+
+    All broker-specific error classes inherit from this so callers can
+    `except BrokerError` without caring which broker raised it.
+    """
 
     def __init__(self, message: str, error_code: str | None = None):
         self.message = message
         self.error_code = error_code
         super().__init__(self.message)
+
+
+class CapitalComError(BrokerError):
+    """Base exception for all Capital.com API errors."""
+
+    pass
 
 
 class AuthenticationError(CapitalComError):
