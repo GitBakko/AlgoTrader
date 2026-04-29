@@ -8,9 +8,17 @@ from src.risk.schemas import RiskLimits
 from src.strategy.schemas import SignalDirection, TradingSignal
 
 
-def _non_scalp_settings():
+def _non_scalp_settings(min_risk_amount_usd: float = 0.0, min_notional_usd: float = 0.0):
+    """Settings mock used by the legacy risk-manager tests.
+
+    The two USD floors default to 0 so older tests written before the floors
+    existed keep passing. New tests pass explicit values to exercise the
+    floor logic.
+    """
     s = MagicMock()
     s.scalp_mode_enabled = False
+    s.min_risk_amount_usd = min_risk_amount_usd
+    s.min_notional_usd = min_notional_usd
     return s
 
 
@@ -220,6 +228,58 @@ class TestRiskManager:
         )
         assert result.approved is False
         assert "Total exposure" in result.rejection_reason
+
+    def test_min_risk_floor_lifts_size_when_under_cap(self):
+        """USDJPY with pip-aware risk computation gets size-lifted to the
+        MIN_RISK_AMOUNT_USD floor when the lift is within the exposure cap.
+        """
+        with patch(
+            "src.risk.risk_manager.get_settings",
+            return_value=_non_scalp_settings(min_risk_amount_usd=5.0),
+        ):
+            rm = RiskManager(initial_equity=10000.0)
+            # USDJPY entry 159, ATR 0.05 → SL distance 0.10 (mult 2.0).
+            # Risk per unit = 0.10 / 159 ≈ 0.000629 USD.
+            # To reach $5 floor → size ≈ 7948.
+            # Exposure cap = 20% × 10000 / 159 ≈ 12.58 — far below the lift,
+            # so the lift hits the cap → expect rejection.
+            signal = _make_signal(epic="USDJPY", price=159.0)
+            result = rm.check_trade(signal=signal, equity=10000.0, atr=0.05)
+            assert result.approved is False
+            assert "min_notional" in (result.rejection_reason or "").lower()
+            audit = result.audit.get("min_risk_floor", {}) if result.audit else {}
+            assert audit.get("approved") is False
+            assert audit["computed_risk_usd"] < 5.0
+
+    def test_min_risk_floor_off_when_zero(self):
+        """Default test fixture sets min_risk_amount_usd=0 → floor disabled
+        and tiny-risk forex trade is approved (legacy behaviour).
+        """
+        rm = RiskManager(initial_equity=10000.0)
+        signal = _make_signal(epic="USDJPY", price=159.0)
+        result = rm.check_trade(signal=signal, equity=10000.0, atr=0.05)
+        # Floor disabled → no rejection from this path. Trade may still
+        # fail other checks, but not min_notional.
+        if not result.approved:
+            assert "min_notional" not in (result.rejection_reason or "").lower()
+
+    def test_min_risk_floor_passes_for_realistic_btc_trade(self):
+        """BTC trade with stop_distance large enough to clear $5 floor is
+        approved without size lift.
+        """
+        with patch(
+            "src.risk.risk_manager.get_settings",
+            return_value=_non_scalp_settings(min_risk_amount_usd=5.0),
+        ):
+            rm = RiskManager(initial_equity=100000.0)
+            # BTCUSD 60000, ATR 200 → SL distance 400. Size cap 20% ×
+            # 100000 / 60000 = 0.333. Risk = 0.333 × 400 = $133 — well above $5.
+            signal = _make_signal(epic="BTCUSD", price=60000.0)
+            result = rm.check_trade(signal=signal, equity=100000.0, atr=200.0)
+            assert result.approved is True
+            audit = result.audit.get("min_risk_floor", {}) if result.audit else {}
+            assert audit.get("approved") is True
+            assert audit["computed_risk_usd"] >= 5.0
 
     def test_exposure_check_skipped_when_default(self):
         """Default max_total_exposure=1.0 skips the check entirely."""

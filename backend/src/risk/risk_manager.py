@@ -17,6 +17,37 @@ from src.risk.schemas import DrawdownState, RiskCheckResult, RiskLimits
 from src.risk.stop_manager import StopManager
 from src.strategy.schemas import TradingSignal
 from src.utils.config import get_settings
+from src.utils.constants import FOREX_ASSETS
+
+
+def _compute_risk_usd(
+    epic: str, entry: float, stop_loss: float, size: float
+) -> float:
+    """Compute USD-denominated risk on a trade given size + stop distance.
+
+    Non-forex (stocks/crypto/commodities/indices): price is in USD per
+    unit, so ``size * |entry - SL|`` is already a USD figure.
+
+    Forex with USD as **base** (USDJPY): ``size * stop_distance`` is in
+    the quote currency (JPY); convert to USD by dividing by the entry
+    price (USDJPY ≈ JPY-per-USD).
+
+    Forex with USD as **quote** (EURUSD, GBPUSD): ``size * stop_distance``
+    is already in USD because the quote leg is USD.
+
+    Returns ``0.0`` defensively when the inputs cannot produce a number.
+    """
+    try:
+        stop_distance = abs(float(entry) - float(stop_loss))
+        size_f = float(size)
+    except (TypeError, ValueError):
+        return 0.0
+    if stop_distance <= 0 or size_f <= 0:
+        return 0.0
+    if epic in FOREX_ASSETS and epic.startswith("USD") and float(entry) > 0:
+        # USD-base, foreign quote → loss is in quote currency, convert to USD
+        return (size_f * stop_distance) / float(entry)
+    return size_f * stop_distance
 
 
 def _position_notional_account_ccy(
@@ -379,6 +410,57 @@ class RiskManager:
                 rejection_reason="Calculated position size is zero",
                 audit=audit,
             )
+
+        # 7-bis. Minimum *risk* amount floor (USD).
+        # MIN_NOTIONAL_USD already lifts the notional, but for forex pairs
+        # with a non-USD quote (USDJPY) the realised USD risk of the
+        # trade can still be a fraction of a dollar. We compute the true
+        # USD risk via `_compute_risk_usd` (which respects the quote leg),
+        # then either lift the size up to the floor (bounded by the
+        # exposure cap) or reject with `error.min_notional`.
+        min_risk_floor = float(_risk_settings.min_risk_amount_usd or 0)
+        if min_risk_floor > 0:
+            risk_amount_usd = _compute_risk_usd(
+                epic=signal.epic,
+                entry=signal.entry_price,
+                stop_loss=stop_loss,
+                size=position_size,
+            )
+            if risk_amount_usd > 0 and risk_amount_usd < min_risk_floor:
+                risk_per_unit = risk_amount_usd / position_size
+                lifted_size = min_risk_floor / risk_per_unit
+                max_size_by_exposure = (
+                    equity * self.limits.max_position_pct
+                ) / signal.entry_price if signal.entry_price else 0.0
+                if 0 < lifted_size <= max_size_by_exposure:
+                    adjustments.append(
+                        f"Lifted size for MIN_RISK_AMOUNT_USD floor "
+                        f"({position_size:.4f} → {lifted_size:.4f}, "
+                        f"risk ${risk_amount_usd:.2f} → ${min_risk_floor:.2f})"
+                    )
+                    position_size = lifted_size
+                    risk_amount_usd = min_risk_floor
+                else:
+                    audit["min_risk_floor"] = {
+                        "computed_risk_usd": round(risk_amount_usd, 4),
+                        "floor_usd": min_risk_floor,
+                        "lifted_size": round(lifted_size, 6),
+                        "max_size_by_exposure": round(max_size_by_exposure, 6),
+                        "approved": False,
+                    }
+                    return RiskCheckResult(
+                        approved=False,
+                        rejection_reason=(
+                            f"error.min_notional risk_amount=${risk_amount_usd:.2f} "
+                            f"< floor=${min_risk_floor:.2f}"
+                        ),
+                        audit=audit,
+                    )
+            audit["min_risk_floor"] = {
+                "computed_risk_usd": round(risk_amount_usd, 4),
+                "floor_usd": min_risk_floor,
+                "approved": True,
+            }
 
         # 8. Calculate multi-target TP1/TP2
         risk_distance = abs(signal.entry_price - stop_loss)

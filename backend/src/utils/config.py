@@ -246,6 +246,15 @@ class Settings(BaseSettings):
     # The floor lifts the size up to a meaningful $200 minimum, still
     # bounded by `max_position_pct` so it can't blow past the risk cap.
     min_notional_usd: float = Field(default=200.0, alias="MIN_NOTIONAL_USD")
+    # Minimum *risk* amount in USD (post-sizing).
+    # MIN_NOTIONAL_USD lifts the position notional but, on forex pairs
+    # where the quote currency is not USD (USDJPY), the actual USD risk
+    # of a trade can still be a few cents because notional ≠ risk.
+    # Risk is `position_size × stop_distance` converted to USD via the
+    # quote currency. Trades whose computed risk falls below this floor
+    # are first lifted (capped by `max_position_pct`) and rejected with
+    # `error.min_notional` if the lift would breach the exposure cap.
+    min_risk_amount_usd: float = Field(default=5.0, alias="MIN_RISK_AMOUNT_USD")
 
     # Regime Gate (Phase 2)
     regime_gate_enabled: bool = Field(default=False, alias="REGIME_GATE_ENABLED")
