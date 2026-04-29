@@ -145,7 +145,14 @@
             @if (eventsLoading()) {
               <div class="pdd-paragraph mantis-mono">Caricamento eventi…</div>
             } @else if (eventsError(); as err) {
-              <div class="pdd-paragraph pdd-paragraph--loss">{{ err }}</div>
+              <div class="pdd-paragraph pdd-paragraph--loss">
+                {{ err }}
+                <button type="button"
+                        class="pdd-btn pdd-btn--ghost"
+                        (click)="retryFetchEvents()">
+                  Riprova
+                </button>
+              </div>
             } @else if (events(); as ev) {
               @if (ev.length === 0) {
                 <div class="pdd-empty">
@@ -156,6 +163,11 @@
                     Filtra i <em>System Logs</em> per
                     <span class="mantis-mono">{{ p.id }}</span> per dettagli.
                   </span>
+                  <button type="button"
+                          class="pdd-btn pdd-btn--ghost"
+                          (click)="retryFetchEvents()">
+                    Ricarica eventi
+                  </button>
                 </div>
               } @else {
                 <ul class="pdd-events">

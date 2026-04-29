@@ -876,6 +876,14 @@ async def get_position_events(
     pos_repo = PositionRepository(session)
     position = await pos_repo.get_by_deal_id(deal_id)
     if position is None:
+        # Frontend opened the drawer for a deal_id that's live at the broker
+        # but missing from our positions table — likely a state-recovery
+        # ghost or a freshly opened position whose persist hasn't committed
+        # yet. Log so the gap surfaces in monitoring.
+        logger.warning(
+            f"[events] position not found in DB for deal_id={deal_id} "
+            f"— returning empty timeline (frontend will see 'Nessun evento')"
+        )
         return success_response(
             {"deal_id": deal_id, "events": [], "position": None, "source": "not-found"}
         )

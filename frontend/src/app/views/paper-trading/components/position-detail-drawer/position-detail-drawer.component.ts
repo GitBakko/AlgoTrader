@@ -45,36 +45,48 @@ export class PositionDetailDrawerComponent {
 
   readonly activeTab = signal<DrawerTab>('overview');
 
-  /** Event timeline for the History tab. Reset whenever the drawer's
-   *  position changes, refetched on demand the first time the History tab
-   *  becomes visible (lazy — keeps Overview-only opens cheap). */
+  /** Event timeline for the History tab. Refetched every time the History
+   *  tab becomes visible for the current position (no `lastFetchedDealId`
+   *  caching) — the endpoint is cheap and a stale empty state is more
+   *  user-hostile than one extra GET. */
   readonly events = signal<PositionEvent[] | null>(null);
   readonly eventsLoading = signal<boolean>(false);
   readonly eventsError = signal<string | null>(null);
-  private lastFetchedDealId: string | null = null;
+  /** Track which deal we are currently fetching for, so a stale in-flight
+   *  response from a previous deal cannot overwrite the new deal's events. */
+  private inflightDealId: string | null = null;
 
   constructor() {
     // Reset event state when the drawer's position changes (different deal).
     effect(() => {
       const id = this.position()?.id ?? null;
-      if (id !== this.lastFetchedDealId) {
+      if (id !== this.inflightDealId) {
         this.events.set(null);
         this.eventsError.set(null);
       }
     });
 
-    // Lazily fetch when History tab is first opened for the current deal.
+    // Fetch whenever the History tab is active for the current deal.
+    // No caching — the response is small and freshness is more important
+    // than skipping a HTTP round-trip.
     effect(() => {
       const tab = this.activeTab();
       const id = this.position()?.id;
-      if (tab === 'history' && id && this.lastFetchedDealId !== id) {
+      if (tab === 'history' && id) {
         this.fetchEvents(id);
       }
     });
   }
 
+  retryFetchEvents(): void {
+    const id = this.position()?.id;
+    if (id) {
+      this.fetchEvents(id);
+    }
+  }
+
   private fetchEvents(dealId: string): void {
-    this.lastFetchedDealId = dealId;
+    this.inflightDealId = dealId;
     this.eventsLoading.set(true);
     this.eventsError.set(null);
     this.trading
@@ -82,10 +94,13 @@ export class PositionDetailDrawerComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (data) => {
+          // Drop responses for stale deal IDs (drawer switched mid-flight).
+          if (this.inflightDealId !== dealId) return;
           this.events.set(data?.events ?? []);
           this.eventsLoading.set(false);
         },
         error: () => {
+          if (this.inflightDealId !== dealId) return;
           this.eventsError.set('Caricamento eventi fallito');
           this.eventsLoading.set(false);
         },
