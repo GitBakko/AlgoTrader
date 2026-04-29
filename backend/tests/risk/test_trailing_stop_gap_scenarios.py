@@ -49,7 +49,7 @@ class TestTrailingStopGapScenarios:
         new_stop, phase = manager.update_price("DEAL-1", 2010.0, 10.0)
         assert phase == TrailingPhase.BREAKEVEN
         assert new_stop is not None
-        assert new_stop > 2000.0  # Breakeven + offset
+        assert new_stop == pytest.approx(2000.0)  # Pure breakeven (offset_pct=0 default)
 
         # Price reaches TP2 → Move to TP1_LOCK
         new_stop, phase = manager.update_price("DEAL-1", 2030.0, 10.0)
@@ -129,7 +129,7 @@ class TestTrailingStopGapScenarios:
 
         # Should move to BREAKEVEN (not TP1_LOCK)
         assert phase == TrailingPhase.BREAKEVEN
-        assert new_stop > 2000.0
+        assert new_stop == pytest.approx(2000.0)
 
     def test_sell_gap_through_both_tp_levels(self):
         """
@@ -209,7 +209,7 @@ class TestTrailingStopGapScenarios:
 
         # Should move to BREAKEVEN (not TP1_LOCK)
         assert phase == TrailingPhase.BREAKEVEN
-        assert new_stop < 2000.0
+        assert new_stop == pytest.approx(2000.0)
 
     def test_breakeven_to_tp2_gap(self):
         """

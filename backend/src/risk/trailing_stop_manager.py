@@ -24,7 +24,16 @@ class TrailingStopConfig(BaseModel):
     tp1_risk_multiple: float = Field(default=0.5, ge=0.1, le=5.0)
     tp2_risk_multiple: float = Field(default=1.5, ge=0.5, le=10.0)
     trailing_atr_multiplier: float = Field(default=1.5, ge=0.5, le=5.0)
-    breakeven_offset_pct: float = Field(default=0.001, ge=0.0, le=0.01)
+    # 0.0 = pure breakeven (SL exactly at entry, maximum buffer between
+    # current price and SL). Non-zero values lock a small profit at the
+    # cost of a tighter buffer — fine on calm assets, but on noisy or
+    # tight-stop instruments (NVDA mean-reversion at TP1 distance ~0.5
+    # USD) a 0.1% offset chops the post-TP1 buffer in half and triggers
+    # SL on a single tick of retracement. Default flipped from 0.001 to
+    # 0.0 (2026-04-29) per live observation: BREAKEVEN was firing then
+    # closing for $0.02 because the buffer was sub-spread. Set non-zero
+    # via env BREAKEVEN_OFFSET_PCT only if you have a specific reason.
+    breakeven_offset_pct: float = Field(default=0.0, ge=0.0, le=0.01)
 
 
 class PositionStopState(BaseModel):
