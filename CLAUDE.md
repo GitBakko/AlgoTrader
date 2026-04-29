@@ -25,6 +25,7 @@ Free to edit: SCSS (`_palette.scss`, `_custom.scss` entry + themed partials `_si
 4. **Emergency kill switch**: `POST /api/trading/emergency-stop` stops loop + closes all + fires CRITICAL alert.
 5. **State recovery**: PAPER → Postgres only. DEMO/LIVE → broker `list_positions()` authoritative, DB fallback only if broker unreachable.
 6. **SL/TP reconciliation rule** (post 2026-04-28 fix `745f2ee`): when a `TradingSignal` carries BOTH `suggested_stop` and `suggested_tp`, `RiskManager.check_trade` MUST use the pair as-is — strategy authors calibrate the R:R intentionally. Only when one side is missing does the risk-manager ATR default fill in. **Never** mix risk-mgr SL with strategy TP (or vice-versa) — that path produced inverted R:R 0.13–0.30 in production. For BUY-SL the *tighter* value is the LARGER one (closer to entry from below); for SELL-SL it is the SMALLER. See `src/risk/risk_manager.py` §4-bis.
+7. **Two-tier sizing floors** (post 2026-04-29 fix `e6efede`): `MIN_NOTIONAL_USD` (default `$200`) lifts notional in `PositionSizer`/`KellySizer`. `MIN_RISK_AMOUNT_USD` (default `$5`) is the **post-sizing** floor in `RiskManager.check_trade` step 7-bis — uses pip-aware USD risk via `_compute_risk_usd(epic, entry, sl, size)` (USDJPY USD-base = `(size × stop) / entry` JPY→USD; EURUSD/GBPUSD USD-quote + non-forex = `size × stop` already USD). On under-floor: lift size proportionally, capped by `max_position_pct`; if cap blocks the lift → reject with `error.min_notional`, surface in audit + rejected-signals feed.
 
 ## Backend Gotchas
 
@@ -99,25 +100,28 @@ Free to edit: SCSS (`_palette.scss`, `_custom.scss` entry + themed partials `_si
 
 ## Active revamp tracks
 
-Stato delle 13 pagine MANTIS al 27/04/2026 (sintesi — vedi `STYLE_BIBLE.md` §4 per la lista completa con violazioni per pagina).
+Stato delle 14 pagine MANTIS al 29/04/2026 — Style Bible audit pass complete.
 
-| # | Pagina | Stato | Documento |
+| # | Pagina | Stato | Commit |
 |---|---|---|---|
 | 01 | Dashboard | ✅ DONE (v2 cockpit, in `views/dashboard-v2/`) | — |
-| 02 | **Paper Trading** | 🚧 PR #8/9/10/11 stacked + EXP indicator (`65ce137`) · PR5 drawer pending | `docs/handoff/paper-trading/HANDOFF.md` |
-| 03 | Posizioni | 🟡 PARZIALE | tba |
-| 04 | Trade Journal | ✅ DONE (`2f0d273`, HDR-02 + Bible buttons) | — |
-| 05 | Segnali AI | 🟡 PARZIALE | tba |
-| 06 | Backtest | 🟡 PARZIALE | tba |
-| 07 | Strategia | ✅ DONE (`81de886`, HDR-03 + form tokens) | — |
-| 08 | Modelli AI | 🟡 PARZIALE | tba |
-| 09 | Risk Manager | 🟡 PARZIALE | tba |
-| 10 | Broker | 🟡 PARZIALE | tba |
-| 11 | Notifications | 🟡 PARZIALE | tba |
-| 12 | Settings | ✅ DONE (`c8d1724`, HDR-03 + Bible buttons + form tokens) | — |
-| 13 | Login · 14 System Logs | ✅ CONFORME | — |
+| 02 | Paper Trading | ✅ DONE (PR #8/9/10/11 + Bible §3 audit `a8971b6`) | `docs/handoff/paper-trading/STYLE_BIBLE_AUDIT_2026-04-29.md` |
+| 03 | Posizioni | ✅ DONE (HDR-02 + sticky thead + zebra off) | `a26b558` |
+| 04 | Trade Journal | ✅ DONE (HDR-02 + Bible buttons) | `2f0d273` |
+| 05 | Segnali AI | ✅ DONE (HDR-02 + Bible buttons + zebra off) | `ada2af9` |
+| 06 | Backtest | ✅ DONE (HDR-02 + Bible buttons + skeleton loading + form labels) | `592c017` |
+| 07 | Strategia | ✅ DONE (HDR-03 + form tokens) | `81de886` |
+| 08 | Modelli AI | ✅ DONE (HDR-03 + Bible buttons + VIO-08 fix) | `96e7041` |
+| 09 | Risk Manager | ✅ COVERED (no standalone view — content in Strategia + Settings) | — |
+| 10 | Broker | ✅ COVERED (Capital.com config in Settings) | — |
+| 11 | Notifications | ✅ DONE (HDR-02 + Bible buttons + FRM-01 labels) | `0724dd9` |
+| 12 | Settings | ✅ DONE (HDR-03 + Bible buttons + form tokens) | `c8d1724` |
+| 13 | Login | ✅ CONFORME | — |
+| 14 | System Logs | ✅ CONFORME | — |
 
-**Priorità refactor restante (2026-04-28):** Posizioni (#03) → Modelli AI (#08) → Risk Manager (#09) → Broker (#10) → Notifications (#11) → Segnali AI (#05) → Backtest (#06). Tutte le PARZIALE da promuovere a CONFORME via HDR-02/03 + tokens.
+**Audit complete.** Tutte le pagine ora CONFORME alla Bible §3 (VIO-01..12). Future audit: applicare check on each new view.
+
+CoreUI template demo purge 2026-04-29 (`1acc795`): rimossi `views/notifications/{alerts,badges,modals,toasters}/` + `src/components/{docs-callout,docs-components,docs-example,docs-icons,docs-link}/` (zero consumer esterni).
 
 ## Git / CI
 
