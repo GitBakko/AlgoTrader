@@ -225,6 +225,18 @@ class Settings(BaseSettings):
     # DB writes and alerting). Promotion to primary happens after 24h of
     # zero-disagreement shadow traffic.
     close_detection_v2_enabled: bool = Field(default=False, alias="CLOSE_DETECTION_V2_ENABLED")
+    # Dedicated reconciler sub-loop. When True, broker-position reconciliation
+    # (_detect_broker_closed, _update_trailing_stops, _check_stop_losses) runs
+    # in a separate asyncio.Task at RECONCILER_INTERVAL_SECONDS cadence,
+    # decoupled from the strategy signal loop. When False (default), legacy
+    # behavior: all three calls happen inside _run_iteration at the strategy
+    # tick cadence (SCALP_CHECK_INTERVAL).
+    reconciler_dedicated_enabled: bool = Field(
+        default=False, alias="RECONCILER_DEDICATED_ENABLED"
+    )
+    reconciler_interval_seconds: int = Field(
+        default=15, alias="RECONCILER_INTERVAL_SECONDS"
+    )
 
     # Mean Reversion Strategy
     mr_primary_enabled: bool = Field(default=False, alias="MR_PRIMARY_ENABLED")

@@ -264,6 +264,17 @@ class PaperTradingLoop:
                 logger.warning(f"Orchestrator init failed: {e!r} — agents disabled")
                 self._agents_enabled = False
 
+        # Dedicated reconciler sub-loop (flag-gated, default off — see plan
+        # docs/handoff/reconciler_split_PLAN.md). When enabled, broker-position
+        # reconciliation runs in a separate task at reconciler_interval_seconds
+        # cadence. The lock guards against overlapping reconciler ticks if a
+        # tick exceeds the interval; data sharing with the strategy loop relies
+        # on asyncio's cooperative-model atomicity (see plan §1).
+        self._reconciler_enabled: bool = _init_settings.reconciler_dedicated_enabled
+        self._reconciler_interval: int = _init_settings.reconciler_interval_seconds
+        self._reconciler_task: asyncio.Task | None = None
+        self._reconciler_lock: asyncio.Lock = asyncio.Lock()
+
     @property
     def is_running(self) -> bool:
         return self._running
