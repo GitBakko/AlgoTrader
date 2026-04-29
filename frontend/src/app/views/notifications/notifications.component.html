@@ -1,9 +1,23 @@
 <c-container fluid>
-  <c-row class="mb-3">
-    <c-col>
-      <h4 class="mb-0">Notifiche</h4>
-    </c-col>
-  </c-row>
+  <!-- HDR-02 (Bible §1.2) — eyebrow + title + meta + actions -->
+  <header class="notif-hdr">
+    <div class="notif-hdr__lead">
+      <span class="notif-hdr__eyebrow mantis-mono">Sistema · Eventi</span>
+      <h1 class="notif-hdr__title">Notifiche</h1>
+      <span class="notif-hdr__meta mantis-mono">
+        {{ total() }} totali
+        @if (totalPages > 1) { · pagina {{ page() }} di {{ totalPages }} }
+      </span>
+    </div>
+    <div class="notif-hdr__actions">
+      <button type="button" class="notif-btn notif-btn--ghost" (click)="resetFilters()">
+        Reset filtri
+      </button>
+      <button type="button" class="notif-btn notif-btn--primary" (click)="markAllRead()">
+        Segna tutte lette
+      </button>
+    </div>
+  </header>
 
   <!-- Filter Bar -->
   <c-row class="mb-3">
@@ -12,7 +26,7 @@
         <c-card-body class="p-3">
           <div class="d-flex flex-wrap align-items-end gap-3">
             <div>
-              <label class="form-label small text-body-secondary mb-1">Tipo</label>
+              <label class="notif-form-label">Tipo</label>
               <select cSelect class="form-select form-select-sm notif-filter-type"
                 [value]="filterAlertType()"
                 (change)="filterAlertType.set($any($event.target).value); applyFilters()">
@@ -23,7 +37,7 @@
               </select>
             </div>
             <div>
-              <label class="form-label small text-body-secondary mb-1">Severità</label>
+              <label class="notif-form-label">Severità</label>
               <select cSelect class="form-select form-select-sm notif-filter-severity"
                 [value]="filterSeverity()"
                 (change)="filterSeverity.set($any($event.target).value); applyFilters()">
@@ -34,7 +48,7 @@
               </select>
             </div>
             <div>
-              <label class="form-label small text-body-secondary mb-1">Asset</label>
+              <label class="notif-form-label">Asset</label>
               <input type="text" class="form-control form-control-sm notif-filter-epic"
                 placeholder="es. XAUUSD"
                 [value]="filterEpic()"
@@ -46,10 +60,6 @@
                 (change)="filterUnreadOnly.set($any($event.target).checked); applyFilters()">
               <label class="form-check-label small" for="unreadOnly">Solo non lette</label>
             </div>
-            <button class="btn btn-sm btn-outline-secondary" (click)="resetFilters()">Reset</button>
-            <button class="btn btn-sm btn-outline-primary ms-auto" (click)="markAllRead()">
-              Segna tutte lette
-            </button>
           </div>
         </c-card-body>
       </c-card>
@@ -60,15 +70,10 @@
   <c-row>
     <c-col>
       <c-card class="border-top border-top-3 border-top-primary">
-        <c-card-header class="d-flex align-items-center justify-content-between py-2">
+        <c-card-header class="py-2">
           <span class="fw-semibold small text-body-secondary">
             {{ total() }} notifiche totali
           </span>
-          @if (totalPages > 1) {
-            <span class="small text-body-secondary">
-              Pagina {{ page() }} di {{ totalPages }}
-            </span>
-          }
         </c-card-header>
         <c-card-body class="p-0">
           <div class="table-responsive">
@@ -109,12 +114,14 @@
                     <td class="small text-body-secondary">{{ timeAgo(n.created_at) }}</td>
                     <td class="text-end">
                       @if (!n.is_read) {
-                        <button class="btn btn-sm btn-ghost-primary p-1" title="Segna come letta"
+                        <button type="button" class="notif-btn notif-btn--icon notif-btn--secondary"
+                          title="Segna come letta"
                           (click)="markAsRead(n.id)">
                           <svg cIcon name="cilCheckAlt" size="sm"></svg>
                         </button>
                       }
-                      <button class="btn btn-sm btn-ghost-danger p-1" title="Elimina"
+                      <button type="button" class="notif-btn notif-btn--icon notif-btn--ghost"
+                        title="Elimina"
                         (click)="deleteNotification(n.id)">
                         <svg cIcon name="cilTrash" size="sm"></svg>
                       </button>
@@ -138,20 +145,21 @@
           <!-- Pagination -->
           @if (totalPages > 1) {
             <div class="d-flex justify-content-center gap-2 py-3">
-              <button class="btn btn-sm btn-outline-secondary"
+              <button type="button" class="notif-btn notif-btn--ghost"
                 [disabled]="page() <= 1"
                 (click)="goToPage(page() - 1)">
                 Precedente
               </button>
               @for (p of pageIndices(); track p) {
-                <button class="btn btn-sm"
-                  [class.btn-primary]="page() === p"
-                  [class.btn-outline-secondary]="page() !== p"
+                <button type="button"
+                  class="notif-btn"
+                  [class.notif-btn--primary]="page() === p"
+                  [class.notif-btn--ghost]="page() !== p"
                   (click)="goToPage(p)">
                   {{ p }}
                 </button>
               }
-              <button class="btn btn-sm btn-outline-secondary"
+              <button type="button" class="notif-btn notif-btn--ghost"
                 [disabled]="page() >= totalPages"
                 (click)="goToPage(page() + 1)">
                 Successiva
