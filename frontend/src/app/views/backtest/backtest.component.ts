@@ -22,19 +22,22 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
   imports: [
     CommonModule, FormsModule, DecimalPipe,
     CardComponent, CardBodyComponent, CardHeaderComponent,
-    ColComponent, RowComponent, TableDirective, ButtonDirective,
+    ColComponent, RowComponent, TableDirective,
     FormControlDirective,
     BadgeComponent, SpinnerComponent,
     TvChartComponent
   ],
   template: `
-    <!-- ═══════ ROW 1: Header ═══════ -->
-    <div class="d-flex align-items-center justify-content-between mb-3 px-1">
-      <h5 class="mb-0 fw-semibold">Backtest Engine</h5>
-      @if (runs().length > 0) {
-        <span class="text-body-secondary small">{{ runs().length }} run salvati</span>
-      }
-    </div>
+    <!-- HDR-02 (Bible §1.2) — eyebrow + title + meta -->
+    <header class="bt-hdr">
+      <div class="bt-hdr__lead">
+        <span class="bt-hdr__eyebrow mantis-mono">Analisi · Backtest</span>
+        <h1 class="bt-hdr__title">Backtest Engine</h1>
+        <span class="bt-hdr__meta mantis-mono">
+          @if (runs().length > 0) { {{ runs().length }} run salvati } @else { Nessun run ancora · configura e avvia }
+        </span>
+      </div>
+    </header>
 
     <c-row>
       <!-- ═══════ Config Panel ═══════ -->
@@ -43,7 +46,7 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
           <c-card-header class="py-2"><span class="fw-semibold small text-body-secondary">Configurazione</span></c-card-header>
           <c-card-body>
             <div class="mb-3">
-              <label cFormLabel class="small">Asset</label>
+              <label class="bt-form-label">Asset</label>
               <select cFormSelect [(ngModel)]="config.epic" class="form-select-sm">
                 <!-- Existing 8 assets (EURUSD excluded) -->
                 <option value="XAUUSD">Gold (XAUUSD)</option>
@@ -70,7 +73,7 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
               </select>
             </div>
             <div class="mb-3">
-              <label cFormLabel class="small">Timeframe</label>
+              <label class="bt-form-label">Timeframe</label>
               <select cFormSelect [(ngModel)]="config.timeframe" class="form-select-sm">
                 <option value="1h">1 Hour</option>
                 <option value="4h">4 Hours</option>
@@ -78,15 +81,15 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
               </select>
             </div>
             <div class="mb-3">
-              <label cFormLabel class="small">Capitale ($)</label>
+              <label class="bt-form-label">Capitale ($)</label>
               <input cFormControl type="number" [(ngModel)]="config.initial_equity" class="form-control-sm" />
             </div>
             <div class="mb-3">
-              <label cFormLabel class="small">Rischio/Trade (%)</label>
+              <label class="bt-form-label">Rischio/Trade (%)</label>
               <input cFormControl type="number" step="0.01" [(ngModel)]="config.risk_per_trade" class="form-control-sm" />
             </div>
             <div class="mb-3">
-              <label cFormLabel class="small">Strategia</label>
+              <label class="bt-form-label">Strategia</label>
               <select cFormSelect [(ngModel)]="config.strategy" class="form-select-sm">
                 <option value="ml_ensemble">ML Ensemble</option>
                 <option value="squeeze_breakout">Squeeze Breakout</option>
@@ -94,9 +97,10 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
                 <option value="auto">Auto (Router)</option>
               </select>
             </div>
-            <button cButton color="primary" size="sm" (click)="runBacktest()" [disabled]="running()" class="w-100">
+            <button type="button" class="bt-btn bt-btn--primary bt-btn--block"
+                    (click)="runBacktest()" [disabled]="running()">
               @if (running()) {
-                <c-spinner size="sm" class="me-1"></c-spinner> In corso...
+                <c-spinner size="sm" class="me-1"></c-spinner> In corso…
               } @else {
                 Avvia Backtest
               }
@@ -116,9 +120,11 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
                 <div class="empty-state__hint">Configura i parametri e avvia un backtest.</div>
               </div>
             } @else if (runs().length === 0 && running()) {
-              <div class="text-center py-4">
-                <c-spinner color="primary" size="sm"></c-spinner>
-                <p class="text-body-secondary mt-2 mb-0 small">Generazione segnali ML e simulazione...</p>
+              <div class="bt-running-skeleton" aria-busy="true" aria-label="Backtest in corso">
+                <span class="bt-skel-row"></span>
+                <span class="bt-skel-row"></span>
+                <span class="bt-skel-row"></span>
+                <p class="text-body-secondary mt-2 mb-0 small text-center">Generazione segnali ML e simulazione…</p>
               </div>
             } @else {
               <div class="table-responsive-mobile">

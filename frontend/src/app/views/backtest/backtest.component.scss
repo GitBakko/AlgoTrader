@@ -1,9 +1,129 @@
 // ═══════════════════════════════════════════════════════════
-// Backtest Component Styles
-// Uses CSS custom properties (no SCSS palette import needed)
+// Backtest · Style Bible HDR-02 + tokens
 // ═══════════════════════════════════════════════════════════
 
 :host {
+  display: block;
+
+  // ── HDR-02 strip (Bible §1.2) ─────────────────────────────
+  .bt-hdr {
+    display: flex;
+    align-items: center;
+    gap: var(--mantis-space-3);
+    padding: var(--mantis-space-3) var(--mantis-space-2);
+    border-bottom: 1px solid rgba(0, 217, 126, 0.18);
+    margin-bottom: var(--mantis-space-3);
+    flex-wrap: wrap;
+
+    &__lead {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1 1 auto;
+    }
+
+    &__eyebrow {
+      color: var(--mantis-green);
+      font-size: var(--mantis-fs-xxs);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      opacity: 0.85;
+    }
+
+    &__title {
+      color: var(--fg1);
+      font-size: var(--mantis-fs-xl);
+      font-weight: 700;
+      line-height: 1;
+      margin: 0;
+    }
+
+    &__meta {
+      color: var(--fg3);
+      font-size: var(--mantis-fs-xxs);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+  }
+
+  // ── Bible BTN-01 (primary) + secondary ────────────────────
+  .bt-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid transparent;
+    border-radius: var(--mantis-radius-sm);
+    font-family: inherit;
+    font-size: var(--mantis-fs-xxs);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    line-height: 1;
+    cursor: pointer;
+    background: transparent;
+    transition: filter var(--mantis-dur-fast) var(--mantis-ease-out-expo);
+
+    &:hover { filter: brightness(1.1); }
+    &:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    &--primary {
+      background: var(--mantis-neon);
+      border-color: var(--mantis-neon);
+      color: #0d1117;
+    }
+
+    &--secondary {
+      background: rgba(0, 229, 255, 0.08);
+      border-color: rgba(0, 229, 255, 0.4);
+      color: var(--mantis-cyan);
+    }
+
+    &--block { width: 100%; }
+  }
+
+  // ── FRM-01 form labels (Bible §1.6) ──────────────────────
+  .bt-form-label {
+    font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
+    font-size: var(--mantis-fs-xxs);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+    margin-bottom: 4px;
+    display: block;
+  }
+
+  // ── Skeleton placeholder for in-progress run (replaces center spinner) ──
+  .bt-running-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mantis-space-2);
+    padding: var(--mantis-space-4);
+
+    .bt-skel-row {
+      height: 14px;
+      background: linear-gradient(90deg,
+        var(--mantis-surface-2) 0%,
+        var(--mantis-surface-3) 50%,
+        var(--mantis-surface-2) 100%);
+      background-size: 200% 100%;
+      border-radius: var(--mantis-radius-sm);
+      animation: bt-skel-shimmer 1.4s ease-in-out infinite;
+
+      &:nth-child(1) { width: 80%; }
+      &:nth-child(2) { width: 60%; }
+      &:nth-child(3) { width: 70%; }
+    }
+  }
+
+  @keyframes bt-skel-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
   // Clickable result rows
   .bt-result-row {
     cursor: pointer;
@@ -28,7 +148,7 @@
     font-size: var(--mantis-fs-sm);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.14em;
     color: var(--mantis-text-secondary, var(--fg3));
     margin-bottom: 0.25rem;
   }
