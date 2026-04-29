@@ -1,9 +1,107 @@
 // ═══════════════════════════════════════════════════════════
-// Positions Component Styles
+// Positions · Style Bible HDR-02 + tokens
 // Uses CSS custom properties (no SCSS palette import needed)
 // ═══════════════════════════════════════════════════════════
 
 :host {
+  display: block;
+
+  // ── HDR-02 strip (Bible §1.2) ─────────────────────────────
+  .pos-hdr {
+    display: flex;
+    align-items: center;
+    gap: var(--mantis-space-3);
+    padding: var(--mantis-space-3) var(--mantis-space-2);
+    border-bottom: 1px solid rgba(0, 217, 126, 0.18);
+    margin-bottom: var(--mantis-space-4);
+    flex-wrap: wrap;
+
+    &__lead {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1 1 auto;
+    }
+
+    &__eyebrow {
+      color: var(--mantis-green);
+      font-size: var(--mantis-fs-xxs);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      opacity: 0.85;
+    }
+
+    &__title {
+      color: var(--fg1);
+      font-size: var(--mantis-fs-xl);
+      font-weight: 700;
+      line-height: 1;
+      margin: 0;
+    }
+
+    &__meta {
+      color: var(--fg3);
+      font-size: var(--mantis-fs-xxs);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    &__actions {
+      display: flex;
+      align-items: center;
+      gap: var(--mantis-space-2);
+    }
+  }
+
+  // ── Bible-compliant action buttons ────────────────────────
+  .pos-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid transparent;
+    border-radius: var(--mantis-radius-sm);
+    font-family: inherit;
+    font-size: var(--mantis-fs-xxs);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    line-height: 1;
+    cursor: pointer;
+    background: transparent;
+    transition: filter var(--mantis-dur-fast) var(--mantis-ease-out-expo);
+
+    &:hover { filter: brightness(1.1); }
+    &:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    &--ghost {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.85);
+    }
+
+    &--secondary {
+      background: rgba(0, 229, 255, 0.08);
+      border-color: rgba(0, 229, 255, 0.4);
+      color: var(--mantis-cyan);
+    }
+  }
+
+  // ── Sticky thead + scroll container (TBL-01 §1.3) ─────────
+  .pos-scroll-container {
+    max-height: 600px;
+    overflow-y: auto;
+  }
+
+  .pos-sticky-thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--cui-card-bg, var(--mantis-surface-1, #0d1117));
+  }
+
   // ── Tab bar ──
   .pos-tabs {
     display: flex;

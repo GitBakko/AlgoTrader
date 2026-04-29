@@ -31,6 +31,28 @@ type Tab = 'open' | 'history';
     IconDirective,
   ],
   template: `
+    <!-- HDR-02 (Bible §1.2) — eyebrow + title + meta + actions -->
+    <header class="pos-hdr">
+      <div class="pos-hdr__lead">
+        <span class="pos-hdr__eyebrow mantis-mono">Trading · Operatività</span>
+        <h1 class="pos-hdr__title">Posizioni</h1>
+        <span class="pos-hdr__meta mantis-mono">
+          {{ livePositions().length }} aperte ·
+          {{ trading.closedTotal() }} chiuse
+        </span>
+      </div>
+      <div class="pos-hdr__actions">
+        @if (activeTab() === 'history' && trading.closedPositions().length > 0) {
+          <button type="button" class="pos-btn pos-btn--ghost"
+                  [disabled]="exporting()"
+                  (click)="exportHistoryCsv()">
+            <svg cIcon name="cilCloudDownload" size="sm"></svg>
+            {{ exporting() ? 'Esportando…' : 'Esporta CSV' }}
+          </button>
+        }
+      </div>
+    </header>
+
     <!-- Tab bar -->
     <div class="pos-tabs mb-3">
       <button class="pos-tab" [class.pos-tab--active]="activeTab() === 'open'"
@@ -132,9 +154,9 @@ type Tab = 'open' | 'history';
             </div>
 
             <!-- Desktop table -->
-            <div class="d-none d-md-block table-responsive-mobile">
-              <table cTable [small]="true" [hover]="true" [striped]="true" class="mb-0">
-                <thead>
+            <div class="d-none d-md-block table-responsive-mobile pos-scroll-container">
+              <table cTable [small]="true" [hover]="true" class="mb-0">
+                <thead class="pos-sticky-thead">
                   <tr class="text-body-secondary">
                     <th class="fw-semibold small">Asset</th>
                     <th class="fw-semibold small">Dir</th>
@@ -326,21 +348,13 @@ type Tab = 'open' | 'history';
 
       <!-- Closed positions table -->
       <c-card class="mb-4 border-top border-top-3 border-top-primary animate-in">
-        <c-card-header class="d-flex align-items-center justify-content-between">
+        <c-card-header>
           <span class="fw-semibold small text-body-secondary">
             Storico Posizioni Chiuse
             @if (trading.closedTotal() > 0) {
               <span class="text-body-secondary ms-1">({{ trading.closedTotal() }})</span>
             }
           </span>
-          @if (trading.closedPositions().length > 0) {
-            <button cButton color="primary" variant="outline" size="sm"
-                    [disabled]="exporting()"
-                    (click)="exportHistoryCsv()">
-              <svg cIcon name="cilCloudDownload" size="sm" class="me-1"></svg>
-              {{ exporting() ? 'Esportando...' : 'Esporta CSV' }}
-            </button>
-          }
         </c-card-header>
         <c-card-body class="p-0">
           @if (trading.closedPositions().length === 0) {
@@ -389,9 +403,9 @@ type Tab = 'open' | 'history';
             </div>
 
             <!-- Desktop table -->
-            <div class="d-none d-md-block table-responsive-mobile">
-              <table cTable [small]="true" [hover]="true" [striped]="true" class="mb-0">
-                <thead>
+            <div class="d-none d-md-block table-responsive-mobile pos-scroll-container">
+              <table cTable [small]="true" [hover]="true" class="mb-0">
+                <thead class="pos-sticky-thead">
                   <tr class="text-body-secondary">
                     <th class="fw-semibold small">Asset</th>
                     <th class="fw-semibold small">Dir</th>
