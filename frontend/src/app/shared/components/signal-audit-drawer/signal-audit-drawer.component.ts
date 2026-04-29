@@ -42,17 +42,6 @@ export class SignalAuditDrawerComponent {
     const audit = this.auditService.currentAudit();
     return !!(audit && audit.status === 'EXECUTED' && audit.deal_id);
   });
-  /** Reset to overview whenever a different EXECUTED audit is loaded.
-   *  When the drawer flips into a no-tabs state (REJECTED), keep
-   *  activeTab on 'audit' so the body falls back to the audit content. */
-  private readonly _tabResetEffect = effect(() => {
-    const audit = this.auditService.currentAudit();
-    if (audit?.status === 'EXECUTED' && audit.deal_id) {
-      this.activeTab.set('overview');
-    } else if (audit) {
-      this.activeTab.set('audit');
-    }
-  });
 
   readonly events = signal<PositionEvent[] | null>(null);
   readonly eventsLoading = signal<boolean>(false);
@@ -60,27 +49,39 @@ export class SignalAuditDrawerComponent {
   /** Track which deal we're fetching for so a stale in-flight response
    *  cannot overwrite the new deal's events when the drawer is reused. */
   private inflightDealId: string | null = null;
+  /** The deal we last reset state for, so opening the same drawer twice
+   *  doesn't drop a successful fetch. */
+  private lastSeenDealId: string | null = null;
 
-  /** Lazy events fetch when the History tab becomes active for an
-   *  EXECUTED audit with a known deal_id. Mirrors PositionDetailDrawer's
-   *  pattern (no caching — endpoint is cheap, freshness wins). */
-  private readonly _historyFetchEffect = effect(() => {
-    const tab = this.activeTab();
+  /** Reactively respond to the audit changing — pure read, no signal
+   *  writes inside the effect (writes inside effects can cycle when the
+   *  written signal is also tracked elsewhere). The actual state mutations
+   *  happen in the synchronous helper called below from a microtask. */
+  private readonly _auditChangeEffect = effect(() => {
     const audit = this.auditService.currentAudit();
     const dealId = audit?.deal_id ?? null;
-    if (tab === 'history' && dealId && audit?.status === 'EXECUTED') {
-      this.fetchEvents(dealId);
-    }
+    const status = audit?.status ?? null;
+    // Defer mutations out of the reactive context.
+    queueMicrotask(() => this._onAuditChanged(dealId, status));
   });
 
-  /** Reset events state whenever the audit changes. */
-  private readonly _eventsResetEffect = effect(() => {
-    const dealId = this.auditService.currentAudit()?.deal_id ?? null;
-    if (dealId !== this.inflightDealId) {
-      this.events.set(null);
-      this.eventsError.set(null);
+  private _onAuditChanged(
+    dealId: string | null,
+    status: string | null,
+  ): void {
+    if (dealId === this.lastSeenDealId) return;
+    this.lastSeenDealId = dealId;
+    // Reset events buffer for the new deal.
+    this.events.set(null);
+    this.eventsError.set(null);
+    this.inflightDealId = null;
+    // Default tab depends on whether we have tabs at all.
+    if (status === 'EXECUTED' && dealId) {
+      this.activeTab.set('overview');
+    } else {
+      this.activeTab.set('audit');
     }
-  });
+  }
 
   // Live position for this epic (if open on broker)
   readonly livePosition = computed<PaperPosition | null>(() => {
@@ -116,13 +117,21 @@ export class SignalAuditDrawerComponent {
 
   setTab(tab: AuditDrawerTab): void {
     this.activeTab.set(tab);
+    // Trigger a fetch only when transitioning into history AND we have not
+    // already fetched (or just-finished fetching) for this deal. Caller-
+    // driven instead of effect-driven to avoid signal-write loops.
+    if (tab !== 'history') return;
+    const dealId = this.auditService.currentAudit()?.deal_id;
+    if (!dealId) return;
+    if (this.inflightDealId === dealId) return; // already fetching
+    if (this.events() !== null) return; // already have data; user can Riprova for fresh
+    this.fetchEvents(dealId);
   }
 
   retryFetchEvents(): void {
     const dealId = this.auditService.currentAudit()?.deal_id;
-    if (dealId) {
-      this.fetchEvents(dealId);
-    }
+    if (!dealId) return;
+    this.fetchEvents(dealId);
   }
 
   private fetchEvents(dealId: string): void {
