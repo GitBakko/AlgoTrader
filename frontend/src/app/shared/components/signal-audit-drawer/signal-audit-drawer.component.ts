@@ -1,11 +1,23 @@
-import { Component, ChangeDetectionStrategy, inject, HostListener, computed } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  DestroyRef,
+  HostListener,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { SignalAuditService } from '../../../core/services/signal-audit.service';
 import { TradingService } from '../../../core/services/trading.service';
 import { EpicLogoComponent } from '../epic-logo/epic-logo.component';
 import { SpinnerComponent } from '@coreui/angular';
-import { SlCooldownInfo, PaperPosition } from '../../../core/models';
+import { SlCooldownInfo, PaperPosition, PositionEvent } from '../../../core/models';
 import { WebSocketService } from '../../../core/services/websocket.service';
+
+type AuditDrawerTab = 'overview' | 'audit' | 'history';
 
 @Component({
   selector: 'app-signal-audit-drawer',
@@ -19,6 +31,56 @@ export class SignalAuditDrawerComponent {
   readonly auditService = inject(SignalAuditService);
   private readonly trading = inject(TradingService);
   private readonly ws = inject(WebSocketService);
+  private readonly destroyRef = inject(DestroyRef);
+
+  /** Tabbed view mirrors PositionDetailDrawer for EXECUTED signals.
+   *  REJECTED signals (no position) skip tabs and show the audit body
+   *  directly — tabs would be misleading without a position to overview
+   *  or a history timeline. */
+  readonly activeTab = signal<AuditDrawerTab>('overview');
+  readonly hasTabs = computed<boolean>(() => {
+    const audit = this.auditService.currentAudit();
+    return !!(audit && audit.status === 'EXECUTED' && audit.deal_id);
+  });
+  /** Reset to overview whenever a different EXECUTED audit is loaded.
+   *  When the drawer flips into a no-tabs state (REJECTED), keep
+   *  activeTab on 'audit' so the body falls back to the audit content. */
+  private readonly _tabResetEffect = effect(() => {
+    const audit = this.auditService.currentAudit();
+    if (audit?.status === 'EXECUTED' && audit.deal_id) {
+      this.activeTab.set('overview');
+    } else if (audit) {
+      this.activeTab.set('audit');
+    }
+  });
+
+  readonly events = signal<PositionEvent[] | null>(null);
+  readonly eventsLoading = signal<boolean>(false);
+  readonly eventsError = signal<string | null>(null);
+  /** Track which deal we're fetching for so a stale in-flight response
+   *  cannot overwrite the new deal's events when the drawer is reused. */
+  private inflightDealId: string | null = null;
+
+  /** Lazy events fetch when the History tab becomes active for an
+   *  EXECUTED audit with a known deal_id. Mirrors PositionDetailDrawer's
+   *  pattern (no caching — endpoint is cheap, freshness wins). */
+  private readonly _historyFetchEffect = effect(() => {
+    const tab = this.activeTab();
+    const audit = this.auditService.currentAudit();
+    const dealId = audit?.deal_id ?? null;
+    if (tab === 'history' && dealId && audit?.status === 'EXECUTED') {
+      this.fetchEvents(dealId);
+    }
+  });
+
+  /** Reset events state whenever the audit changes. */
+  private readonly _eventsResetEffect = effect(() => {
+    const dealId = this.auditService.currentAudit()?.deal_id ?? null;
+    if (dealId !== this.inflightDealId) {
+      this.events.set(null);
+      this.eventsError.set(null);
+    }
+  });
 
   // Live position for this epic (if open on broker)
   readonly livePosition = computed<PaperPosition | null>(() => {
@@ -51,6 +113,38 @@ export class SignalAuditDrawerComponent {
     }
     return null;
   });
+
+  setTab(tab: AuditDrawerTab): void {
+    this.activeTab.set(tab);
+  }
+
+  retryFetchEvents(): void {
+    const dealId = this.auditService.currentAudit()?.deal_id;
+    if (dealId) {
+      this.fetchEvents(dealId);
+    }
+  }
+
+  private fetchEvents(dealId: string): void {
+    this.inflightDealId = dealId;
+    this.eventsLoading.set(true);
+    this.eventsError.set(null);
+    this.trading
+      .fetchPositionEvents(dealId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (data) => {
+          if (this.inflightDealId !== dealId) return;
+          this.events.set(data?.events ?? []);
+          this.eventsLoading.set(false);
+        },
+        error: () => {
+          if (this.inflightDealId !== dealId) return;
+          this.eventsError.set('Caricamento eventi fallito');
+          this.eventsLoading.set(false);
+        },
+      });
+  }
 
   @HostListener('document:keydown.escape')
   onEscape(): void {

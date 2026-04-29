@@ -558,6 +558,10 @@ export interface SignalAudit {
   stop_loss: number | null;
   take_profit: number | null;
   position_id: number | null;
+  /** Broker deal_id resolved from position_id at audit fetch time.
+   *  Present only when status='EXECUTED' AND the signal is wired to a
+   *  positions row. Used to drive the History tab in the audit drawer. */
+  deal_id?: string | null;
   features: SignalFeatures;
 }
 

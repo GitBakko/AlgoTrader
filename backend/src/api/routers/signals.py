@@ -246,10 +246,31 @@ async def predict_and_execute(
 # ── Decision Audit Trail Endpoints ──
 
 
+async def _resolve_deal_id_for_position(
+    position_id: int | None, session
+) -> str | None:
+    """Look up the broker deal_id for a Position FK, used to wire the
+    audit drawer's History tab to /api/trading/positions/{deal_id}/events.
+    """
+    if position_id is None or session is None:
+        return None
+    try:
+        from sqlalchemy import select
+
+        from src.database.models import Position as PositionModel
+
+        stmt = select(PositionModel.deal_id).where(PositionModel.id == position_id)
+        row = (await session.execute(stmt)).scalar_one_or_none()
+        return row
+    except Exception:
+        return None
+
+
 @router.get("/audit/{signal_id}")
 async def get_signal_audit(
     signal_id: int = Path(..., ge=1),
     signal_repo=Depends(get_signal_repo),
+    session=Depends(get_db_session),
 ):
     """Get full audit trail for a specific signal by ID."""
     if signal_repo is None:
@@ -258,6 +279,8 @@ async def get_signal_audit(
     signal = await signal_repo.get_by_id(signal_id)
     if signal is None:
         return error_response(f"Signal {signal_id} not found", 404)
+
+    deal_id = await _resolve_deal_id_for_position(signal.position_id, session)
 
     return success_response(
         {
@@ -271,6 +294,7 @@ async def get_signal_audit(
             "stop_loss": float(signal.stop_loss_price) if signal.stop_loss_price else None,
             "take_profit": float(signal.take_profit_price) if signal.take_profit_price else None,
             "position_id": signal.position_id,
+            "deal_id": deal_id,
             "features": signal.features or {},
         }
     )
@@ -281,6 +305,7 @@ async def get_signal_by_position(
     deal_id: str = Path(...),
     epic: str = Query(default=None),
     signal_repo=Depends(get_signal_repo),
+    session=Depends(get_db_session),
 ):
     """Get audit trail for the signal linked to a position by deal_id.
 
@@ -296,6 +321,12 @@ async def get_signal_by_position(
     if signal is None:
         return error_response(f"No signal found for position {deal_id}", 404)
 
+    resolved_deal_id = await _resolve_deal_id_for_position(signal.position_id, session)
+    # Prefer the freshly-resolved value (handles deal_id rotation between
+    # signal write and current broker state); fall back to the requested
+    # path param so the response always carries a deal_id when EXECUTED.
+    response_deal_id = resolved_deal_id or deal_id
+
     return success_response(
         {
             "id": signal.id,
@@ -308,6 +339,7 @@ async def get_signal_by_position(
             "stop_loss": float(signal.stop_loss_price) if signal.stop_loss_price else None,
             "take_profit": float(signal.take_profit_price) if signal.take_profit_price else None,
             "position_id": signal.position_id,
+            "deal_id": response_deal_id,
             "features": signal.features or {},
         }
     )
