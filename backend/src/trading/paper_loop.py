@@ -1698,6 +1698,20 @@ class PaperTradingLoop:
             f"epics={self.epics})"
         )
 
+        # Spawn dedicated reconciler task when flag is on. The reconciler
+        # owns _detect_broker_closed + _update_trailing_stops +
+        # _check_stop_losses; the strategy loop above gates these calls
+        # out of _run_iteration when self._reconciler_enabled is True.
+        if self._reconciler_enabled:
+            self._reconciler_task = asyncio.create_task(
+                self._run_reconciler_loop(), name="paper_reconciler_loop"
+            )
+            self._reconciler_task.add_done_callback(self._on_reconciler_done)
+            logger.info(
+                f"Paper reconciler loop started "
+                f"(interval={self._reconciler_interval}s)"
+            )
+
     def stop(self) -> None:
         """Stop the paper trading loop."""
         if not self._running:
@@ -1707,6 +1721,9 @@ class PaperTradingLoop:
         self._running = False
         if self._task and not self._task.done():
             self._task.cancel()
+        if self._reconciler_task is not None and not self._reconciler_task.done():
+            self._reconciler_task.cancel()
+        self._reconciler_task = None
         logger.info("Paper trading loop stopped")
 
     def _on_task_done(self, task: asyncio.Task) -> None:
@@ -1988,14 +2005,19 @@ class PaperTradingLoop:
             logger.warning(f"Position fetch timed out/failed ({e}), using local cache")
             current_positions = self.get_paper_positions()
 
-        # Detect positions closed by broker (SL/TP hit on Capital.com side)
-        await self._detect_broker_closed(current_positions)
+        # Reconciliation block. When the dedicated reconciler sub-loop is
+        # enabled, these three calls move to _run_reconciler_tick (which
+        # runs at self._reconciler_interval cadence, decoupled from the
+        # strategy tick). When disabled, legacy behavior is preserved.
+        if not self._reconciler_enabled:
+            # Detect positions closed by broker (SL/TP hit on Capital.com side)
+            await self._detect_broker_closed(current_positions)
 
-        # Phase 8: update trailing stops for open positions
-        await self._update_trailing_stops(current_positions)
+            # Phase 8: update trailing stops for open positions
+            await self._update_trailing_stops(current_positions)
 
-        # CRITICAL: Check and auto-close positions with violated stop losses
-        await self._check_stop_losses(current_positions)
+            # CRITICAL: Check and auto-close positions with violated stop losses
+            await self._check_stop_losses(current_positions)
 
         # Refresh spread blocks hourly — unblock epics whose spread improved
         await self._refresh_spread_blocks()
