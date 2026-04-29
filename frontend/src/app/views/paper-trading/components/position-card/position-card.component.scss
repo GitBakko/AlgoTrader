@@ -89,7 +89,7 @@
 .pv-pc__age-label {
   color: var(--fg-soft);
   font-weight: 700;
-  letter-spacing: .12em;
+  letter-spacing: .14em;
   text-transform: uppercase;
 }
 
@@ -111,7 +111,7 @@
   border-radius: 3px;
   font-size: var(--mantis-fs-xxs);
   font-weight: 700;
-  letter-spacing: .12em;
+  letter-spacing: .14em;
   text-transform: uppercase;
   border: 1px solid transparent;
 
@@ -218,7 +218,7 @@
 .pv-pc__triplet-label {
   font-size: var(--mantis-fs-xxs);
   font-weight: 700;
-  letter-spacing: .12em;
+  letter-spacing: .14em;
   text-transform: uppercase;
   color: var(--fg3);
 
@@ -366,7 +366,7 @@
   justify-content: center;
   height: 44px;
   font-size: var(--mantis-fs-xxs);
-  letter-spacing: .12em;
+  letter-spacing: .14em;
   text-transform: uppercase;
   color: var(--fg-soft);
 }
@@ -391,7 +391,7 @@
 .pv-pc__meta-label {
   color: var(--fg3);
   font-weight: 700;
-  letter-spacing: .08em;
+  letter-spacing: .14em;
   text-transform: uppercase;
 }
 
@@ -422,7 +422,7 @@
   border-radius: 3px;
   font-size: var(--mantis-fs-xxs);
   font-weight: 700;
-  letter-spacing: .08em;
+  letter-spacing: .14em;
   text-transform: uppercase;
   color: p.$mantis-loss;
   background: rgba(255, 61, 87, .08);

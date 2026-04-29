@@ -59,7 +59,7 @@
   font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
   font-size: var(--mantis-fs-xxs);
   font-weight: 700;
-  letter-spacing: .1em;
+  letter-spacing: .14em;
   text-transform: uppercase;
   background: var(--mantis-ghost-1);
   color: var(--fg3);
@@ -243,7 +243,7 @@
 .pv-heatmap__state {
   font-size: var(--mantis-fs-xxs);
   font-weight: 700;
-  letter-spacing: .08em;
+  letter-spacing: .14em;
   text-transform: uppercase;
 }
 
