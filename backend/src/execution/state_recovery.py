@@ -397,6 +397,19 @@ class StateRecoveryService:
                 position_ids = {p["deal_id"] for p in positions}
                 restored_count = 0
 
+                # Index strategy take_profit by deal_id so the trailing manager
+                # can re-anchor its phase ladder to the live strategy TP on
+                # restart, overriding any persisted tp1/tp2 computed with the
+                # legacy risk_multiple ladder.
+                position_tp_by_id: dict[str, float | None] = {
+                    p["deal_id"]: (
+                        float(p["take_profit"])
+                        if p.get("take_profit") is not None
+                        else None
+                    )
+                    for p in positions
+                }
+
                 # Collect stale states for bulk deletion (performance optimization)
                 stale_deal_ids = [
                     state.deal_id for state in states if state.deal_id not in position_ids
@@ -424,6 +437,7 @@ class StateRecoveryService:
                                 float(state.highest_price) if state.highest_price else None
                             ),
                             lowest_price=float(state.lowest_price) if state.lowest_price else None,
+                            take_profit=position_tp_by_id.get(state.deal_id),
                         )
                         restored_count += 1
 

@@ -614,3 +614,121 @@ def test_full_lifecycle_sell_initial_to_trailing(manager):
     assert state.phase == TrailingPhase.TRAILING
     assert state.current_stop == pytest.approx(49150.0)
     assert state.lowest_price == pytest.approx(48700.0)
+
+
+# =============================================================================
+# STRATEGY-ANCHORED TP LADDER (take_profit override)
+# =============================================================================
+
+
+@pytest.mark.unit
+@pytest.mark.risk
+def test_register_position_with_take_profit_anchors_tp1_at_midpoint_buy(manager):
+    """When take_profit is supplied, TP1 = midpoint(entry, TP), TP2 = TP."""
+    state = manager.register_position(
+        deal_id="DEAL-TP-BUY",
+        epic="XAUUSD",
+        direction="BUY",
+        entry_price=2000.0,
+        stop_loss=1980.0,  # risk = 20
+        atr=10.0,
+        take_profit=2010.0,  # strategy R:R = 0.5 (well below 1× risk_multiple)
+    )
+    # Strategy-anchored: TP1 = (2000 + 2010) / 2 = 2005, TP2 = 2010.
+    assert state.tp1_level == pytest.approx(2005.0)
+    assert state.tp2_level == pytest.approx(2010.0)
+    # Risk distance is unchanged — only the TP ladder is re-anchored.
+    assert state.risk_distance == pytest.approx(20.0)
+
+
+@pytest.mark.unit
+@pytest.mark.risk
+def test_register_position_with_take_profit_anchors_tp1_at_midpoint_sell(manager):
+    """SELL variant — strategy-TP-anchored ladder is below entry."""
+    state = manager.register_position(
+        deal_id="DEAL-TP-SELL",
+        epic="NVDA",
+        direction="SELL",
+        entry_price=211.36,
+        stop_loss=215.667,  # risk = 4.307
+        atr=2.0,
+        take_profit=210.2833,  # strategy R:R = 0.25 — TP < TP1 of legacy ladder
+    )
+    # TP1 = (211.36 + 210.2833) / 2 = 210.82165
+    assert state.tp1_level == pytest.approx(210.82165, abs=1e-4)
+    # TP2 = 210.2833 (= strategy TP, broker would close here)
+    assert state.tp2_level == pytest.approx(210.2833, abs=1e-4)
+    # Critical regression guard: legacy risk_multiple ladder would have placed
+    # TP1 at 211.36 - 4.307 = 207.053, BELOW the strategy TP. The trailing
+    # ladder would never advance because the broker would close on TP first.
+    legacy_tp1 = 211.36 - 4.307 * manager.config.tp1_risk_multiple
+    assert state.tp1_level > legacy_tp1
+    assert state.tp1_level > state.tp2_level  # SELL: TP1 above TP2 (closer to entry)
+
+
+@pytest.mark.unit
+@pytest.mark.risk
+def test_register_position_falls_back_to_risk_multiple_when_take_profit_none(manager):
+    """take_profit=None preserves legacy risk_multiple behavior."""
+    state = manager.register_position(
+        deal_id="DEAL-LEGACY",
+        epic="XAUUSD",
+        direction="BUY",
+        entry_price=2000.0,
+        stop_loss=1980.0,
+        atr=10.0,
+        take_profit=None,
+    )
+    # Legacy: TP1 = entry + risk * tp1_risk_multiple (1.0) = 2020
+    assert state.tp1_level == pytest.approx(2020.0)
+    assert state.tp2_level == pytest.approx(2040.0)
+
+
+@pytest.mark.unit
+@pytest.mark.risk
+def test_restore_state_with_take_profit_overrides_persisted_levels(manager):
+    """On restart, supplying take_profit must override stale persisted tp1/tp2
+    levels — this is the migration path for positions that were registered
+    with the legacy risk_multiple ladder before the strategy-anchored fix.
+    """
+    # Persisted (stale) tp1/tp2 — computed with legacy ladder, OUTSIDE the
+    # strategy TP (impossible target for a 0.25R strategy).
+    state = manager.restore_state(
+        deal_id="NVDA-STALE",
+        epic="NVDA",
+        direction="SELL",
+        entry_price=211.36,
+        current_stop=215.667,
+        phase=TrailingPhase.INITIAL,
+        tp1_level=209.2065,  # stale — would never fire
+        tp2_level=204.8995,  # stale
+        take_profit=210.2833,  # live strategy TP
+    )
+    # Override applied: TP1 at midpoint, TP2 at strategy TP.
+    assert state.tp1_level == pytest.approx(210.82165, abs=1e-4)
+    assert state.tp2_level == pytest.approx(210.2833, abs=1e-4)
+
+
+@pytest.mark.unit
+@pytest.mark.risk
+def test_phase_advances_on_strategy_tp_progress_sell(manager):
+    """End-to-end: SELL position with strategy-anchored TP advances to
+    BREAKEVEN at 50% strategy progress, not at 1× risk_multiple."""
+    deal_id = "DEAL-E2E"
+    manager.register_position(
+        deal_id=deal_id,
+        epic="NVDA",
+        direction="SELL",
+        entry_price=211.36,
+        stop_loss=215.667,
+        atr=2.0,
+        take_profit=210.2833,
+    )
+    # Price drops to midpoint (210.82) — should fire BREAKEVEN.
+    new_stop, phase = manager.update_price(
+        deal_id=deal_id, current_price=210.82, current_atr=2.0
+    )
+    assert phase == TrailingPhase.BREAKEVEN
+    # SELL breakeven SL = entry - offset (entry * breakeven_offset_pct = 0.001).
+    expected_sl = 211.36 - 211.36 * manager.config.breakeven_offset_pct
+    assert new_stop == pytest.approx(expected_sl, abs=1e-3)

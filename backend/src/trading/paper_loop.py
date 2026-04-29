@@ -2779,6 +2779,9 @@ class PaperTradingLoop:
 
             # Phase 8: register position for trailing stop management.
             # _sl is the broker-confirmed SL (post-fill modify aligned to MR levels).
+            # _tp is the strategy-calibrated TP — pass it through so the trailing
+            # ladder anchors to the strategy's actual target rather than the
+            # generic risk_multiple (matters when strategy R:R < 2× risk_multiple).
             if exec_result.deal_id:
                 self.trailing_stop_manager.register_position(
                     deal_id=exec_result.deal_id,
@@ -2787,6 +2790,7 @@ class PaperTradingLoop:
                     entry_price=actual_entry,
                     stop_loss=_sl,
                     atr=market_data["atr"],
+                    take_profit=_tp,
                 )
                 # Phase 14: persist trailing stop state
                 await self._persist_trailing_stop_state(exec_result.deal_id)
@@ -2981,6 +2985,7 @@ class PaperTradingLoop:
                         entry_price=actual_entry,
                         stop_loss=_r_sl,
                         atr=market_data["atr"],
+                        take_profit=_r_tp,
                     )
                     await self._persist_trailing_stop_state(exec_result.deal_id)
                 await self._persist_position_open(
@@ -3174,6 +3179,7 @@ class PaperTradingLoop:
                                     entry_price=state.entry_price,
                                     stop_loss=state.current_stop,
                                     atr=None,
+                                    take_profit=state.tp2_level,
                                 )
                                 logger.info(
                                     f"[{epic}] Trailing stop migrated: "

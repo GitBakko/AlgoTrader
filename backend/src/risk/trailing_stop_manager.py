@@ -66,6 +66,7 @@ class TrailingStopManager:
         entry_price: float,
         stop_loss: float,
         atr: float,
+        take_profit: float | None = None,
     ) -> PositionStopState:
         """
         Register a new position for trailing stop management.
@@ -77,18 +78,25 @@ class TrailingStopManager:
             entry_price: Entry price
             stop_loss: Initial stop-loss level
             atr: Current ATR value
+            take_profit: Strategy-calibrated take-profit level. When supplied,
+                the trailing manager anchors its phase ladder to the strategy's
+                actual TP rather than a generic risk_multiple — TP1 fires at the
+                midpoint between entry and TP (50% progress to target), TP2
+                fires at the strategy TP itself. This matters when the strategy
+                R:R is below 2× the trailing manager's risk_multiple defaults
+                (e.g., MR strategies running at 0.25R targets), where the
+                broker would close on TP before the trailing ladder ever
+                advanced. When None, falls back to the legacy
+                risk_multiple-based ladder.
 
         Returns:
             PositionStopState for the registered position
         """
         risk_distance = abs(entry_price - stop_loss)
 
-        if direction == "BUY":
-            tp1 = entry_price + risk_distance * self.config.tp1_risk_multiple
-            tp2 = entry_price + risk_distance * self.config.tp2_risk_multiple
-        else:
-            tp1 = entry_price - risk_distance * self.config.tp1_risk_multiple
-            tp2 = entry_price - risk_distance * self.config.tp2_risk_multiple
+        tp1, tp2 = self._derive_tp_levels(
+            direction, entry_price, risk_distance, take_profit
+        )
 
         state = PositionStopState(
             deal_id=deal_id,
@@ -167,6 +175,33 @@ class TrailingStopManager:
         """Get current stop state for a position."""
         return self._positions.get(deal_id)
 
+    def _derive_tp_levels(
+        self,
+        direction: str,
+        entry_price: float,
+        risk_distance: float,
+        take_profit: float | None,
+    ) -> tuple[float, float]:
+        """Compute (tp1, tp2) for the trailing phase ladder.
+
+        When ``take_profit`` is provided, anchor the ladder to the strategy's
+        actual TP: TP1 = midpoint(entry, TP) (= 50% progress to target),
+        TP2 = TP. When ``take_profit`` is None, fall back to the legacy
+        risk_multiple ladder (TP1 = risk_multiple × risk_distance from entry).
+        """
+        if take_profit is not None and take_profit > 0:
+            tp2 = float(take_profit)
+            tp1 = entry_price + (tp2 - entry_price) * 0.5
+            return tp1, tp2
+
+        if direction == "BUY":
+            tp1 = entry_price + risk_distance * self.config.tp1_risk_multiple
+            tp2 = entry_price + risk_distance * self.config.tp2_risk_multiple
+        else:
+            tp1 = entry_price - risk_distance * self.config.tp1_risk_multiple
+            tp2 = entry_price - risk_distance * self.config.tp2_risk_multiple
+        return tp1, tp2
+
     def restore_state(
         self,
         deal_id: str,
@@ -179,6 +214,7 @@ class TrailingStopManager:
         tp2_level: float | None = None,
         highest_price: float | None = None,
         lowest_price: float | None = None,
+        take_profit: float | None = None,
     ) -> PositionStopState:
         """
         Restore a trailing stop state from persisted data (for recovery).
@@ -190,28 +226,38 @@ class TrailingStopManager:
             entry_price: Entry price
             current_stop: Current stop-loss level
             phase: Current trailing phase (0-3)
-            tp1_level: First take profit level
-            tp2_level: Second take profit level
+            tp1_level: First take profit level (from DB)
+            tp2_level: Second take profit level (from DB)
             highest_price: Highest price reached (for longs)
             lowest_price: Lowest price reached (for shorts)
+            take_profit: When provided, the strategy's current TP overrides any
+                persisted tp1/tp2 levels — re-derives the ladder anchored to
+                the strategy's actual TP. Use this on startup to migrate
+                positions whose persisted tp1/tp2 were computed with the legacy
+                risk_multiple ladder before the strategy-anchored fix.
 
         Returns:
             Restored PositionStopState
         """
         risk_distance = abs(entry_price - current_stop)
 
-        # Use provided TP levels or calculate from entry
-        if tp1_level is None:
-            if direction == "BUY":
-                tp1_level = entry_price + risk_distance * self.config.tp1_risk_multiple
-            else:
-                tp1_level = entry_price - risk_distance * self.config.tp1_risk_multiple
+        # Strategy-anchored TP overrides any persisted ladder.
+        if take_profit is not None and take_profit > 0:
+            tp1_level, tp2_level = self._derive_tp_levels(
+                direction, entry_price, risk_distance, take_profit
+            )
+        else:
+            if tp1_level is None:
+                if direction == "BUY":
+                    tp1_level = entry_price + risk_distance * self.config.tp1_risk_multiple
+                else:
+                    tp1_level = entry_price - risk_distance * self.config.tp1_risk_multiple
 
-        if tp2_level is None:
-            if direction == "BUY":
-                tp2_level = entry_price + risk_distance * self.config.tp2_risk_multiple
-            else:
-                tp2_level = entry_price - risk_distance * self.config.tp2_risk_multiple
+            if tp2_level is None:
+                if direction == "BUY":
+                    tp2_level = entry_price + risk_distance * self.config.tp2_risk_multiple
+                else:
+                    tp2_level = entry_price - risk_distance * self.config.tp2_risk_multiple
 
         state = PositionStopState(
             deal_id=deal_id,
