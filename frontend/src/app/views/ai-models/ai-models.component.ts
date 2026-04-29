@@ -26,27 +26,25 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
     CommonModule, CardComponent, CardBodyComponent, CardHeaderComponent,
     ColComponent, RowComponent, BadgeComponent,
     ProgressComponent, ProgressBarComponent,
-    TableDirective, NavModule, ButtonDirective, IconDirective,
+    TableDirective, NavModule, IconDirective,
     EpicLogoComponent,
     NewsWidgetComponent,
     LoadingButtonComponent,
     FormsModule,
   ],
   template: `
-    <!-- Header -->
-    <div class="d-flex align-items-center justify-content-between mb-3 px-1">
-      <div class="d-flex align-items-center gap-2">
-        <h5 class="mb-0 fw-semibold">Modelli AI</h5>
-        <c-badge color="primary">{{ models().length }} modelli</c-badge>
+    <!-- HDR-03 (Bible §1.2) — eyebrow + title + meta + tab strip -->
+    <header class="am-hdr">
+      <div class="am-hdr__lead">
+        <span class="am-hdr__eyebrow mantis-mono">Sistema · Intelligenza</span>
+        <h1 class="am-hdr__title">Modelli AI</h1>
+        <span class="am-hdr__meta mantis-mono">
+          {{ models().length }} modelli ·
+          @if (avgF1() > 0) { F1 medio {{ avgF1() | number:'1.3-3' }} · }
+          XGBoost 3-classi
+        </span>
       </div>
-      <div class="d-flex gap-2 text-body-secondary small">
-        @if (avgF1() > 0) {
-          <span>F1 medio: <strong class="text-success">{{ avgF1() | number:'1.3-3' }}</strong></span>
-          <span>|</span>
-        }
-        <span>Tipo: XGBoost 3-classi</span>
-      </div>
-    </div>
+    </header>
 
     <!-- Tab Navigation -->
     <c-nav variant="tabs" class="mb-3">
@@ -377,7 +375,7 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
                         }
                       </td>
                       <td class="text-end">
-                        <button cButton color="primary" variant="outline" size="sm"
+                        <button type="button" class="am-btn am-btn--secondary"
                                 [disabled]="trainingRunning()"
                                 (click)="retrainSingle(item.epic)">
                           Retrain
@@ -435,7 +433,7 @@ import { LoadingButtonComponent } from '../../shared/components/loading-button/l
 
                 <!-- Backtest button for completed jobs -->
                 @if (job.status === 'completed') {
-                  <button cButton color="primary" variant="outline" size="sm" class="mt-2"
+                  <button type="button" class="am-btn am-btn--secondary mt-2"
                           (click)="launchBacktest(job.epic); $event.stopPropagation()">
                     Backtest
                   </button>
