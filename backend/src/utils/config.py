@@ -237,6 +237,18 @@ class Settings(BaseSettings):
     reconciler_interval_seconds: int = Field(
         default=15, alias="RECONCILER_INTERVAL_SECONDS"
     )
+    # Forex with USD as the base currency (USDJPY, USDCHF, USDCAD) has a
+    # pip value much smaller than $1 per micro-unit, so the standard
+    # max_position_pct (~20% notional) caps the size at a level where
+    # SL/TP P&L is only a few cents — uneconomical against spread+slippage.
+    # This multiplier scales the per-trade exposure cap for USD-base
+    # forex pairs only, leveraging the broker's higher leverage tier
+    # (Capital.com forex demo: 30:1). Default 30.0 produces a USDJPY cap
+    # of ~30x the stock-equivalent cap. Stocks/crypto/commodities/indices
+    # are unaffected.
+    forex_usd_base_size_multiplier: float = Field(
+        default=30.0, alias="FOREX_USD_BASE_SIZE_MULTIPLIER"
+    )
 
     # Mean Reversion Strategy
     mr_primary_enabled: bool = Field(default=False, alias="MR_PRIMARY_ENABLED")

@@ -8,17 +8,24 @@ from src.risk.schemas import RiskLimits
 from src.strategy.schemas import SignalDirection, TradingSignal
 
 
-def _non_scalp_settings(min_risk_amount_usd: float = 0.0, min_notional_usd: float = 0.0):
+def _non_scalp_settings(
+    min_risk_amount_usd: float = 0.0,
+    min_notional_usd: float = 0.0,
+    forex_usd_base_size_multiplier: float = 1.0,
+):
     """Settings mock used by the legacy risk-manager tests.
 
     The two USD floors default to 0 so older tests written before the floors
     existed keep passing. New tests pass explicit values to exercise the
-    floor logic.
+    floor logic. ``forex_usd_base_size_multiplier`` defaults to 1.0 so the
+    leverage-aware cap behaves identically to the legacy stock cap unless
+    a test opts in.
     """
     s = MagicMock()
     s.scalp_mode_enabled = False
     s.min_risk_amount_usd = min_risk_amount_usd
     s.min_notional_usd = min_notional_usd
+    s.forex_usd_base_size_multiplier = forex_usd_base_size_multiplier
     return s
 
 
@@ -256,6 +263,33 @@ class TestRiskManager:
             assert audit["actual_size"] <= audit["max_size_by_exposure"] + 1e-6
             assert audit["computed_risk_usd"] < 5.0  # floor not reached
             assert audit["computed_risk_usd"] > 0  # but a real position
+
+    def test_min_risk_floor_leverage_aware_cap_for_usdjpy(self):
+        """With ``forex_usd_base_size_multiplier=30``, the cap on USDJPY
+        is 30× the stock cap, allowing a materially larger position and
+        a higher residual risk on the cap-fallback path.
+        """
+        with patch(
+            "src.risk.risk_manager.get_settings",
+            return_value=_non_scalp_settings(
+                min_risk_amount_usd=5.0,
+                forex_usd_base_size_multiplier=30.0,
+            ),
+        ):
+            rm = RiskManager(initial_equity=10000.0)
+            signal = _make_signal(epic="USDJPY", price=159.0)
+            result = rm.check_trade(signal=signal, equity=10000.0, atr=0.05)
+            assert result.approved is True
+            audit = result.audit.get("min_risk_floor", {}) if result.audit else {}
+            assert audit.get("approved") is True
+            # 30× cap: max_size = 10000 × 0.20 × 30 / 159 ≈ 377.
+            assert audit["max_size_by_exposure"] > 350
+            assert audit["max_size_by_exposure"] < 400
+            # Residual risk scales with size — at multiplier 30, USDJPY
+            # entry 159 stop_distance 0.10 produces ≈ $0.24. That's still
+            # below the $5 floor (broker stop-distance constraints), but
+            # ~10× the stock-cap baseline of $0.02 — material improvement.
+            assert audit["computed_risk_usd"] > 0.20
 
     def test_min_risk_floor_rejects_only_when_exposure_cap_is_non_positive(self):
         """Defensive guard: zero or negative equity makes the exposure cap

@@ -118,6 +118,8 @@ class AdaptiveKellySizer:
         trade_history: list[dict],
         max_position_pct: float = 0.05,
         min_notional_usd: float | None = None,
+        epic: str | None = None,
+        forex_usd_base_size_multiplier: float = 1.0,
     ) -> tuple[float, str]:
         """
         Calculate position size using Kelly or fixed-fractional fallback.
@@ -129,6 +131,9 @@ class AdaptiveKellySizer:
             confidence: Model confidence (0.0-1.0)
             trade_history: List of past trades with 'pnl' key
             max_position_pct: Max position as fraction of equity
+            min_notional_usd: Optional notional floor.
+            epic: Asset epic — enables pip-aware sizing for USD-base forex.
+            forex_usd_base_size_multiplier: Cap multiplier for USD-base forex.
 
         Returns:
             Tuple of (position_size, sizing_method)
@@ -140,13 +145,32 @@ class AdaptiveKellySizer:
         if stop_distance < 1e-10:
             return 0.0, "invalid"
 
+        # Local import avoids a circular dep (position_sizer imports nothing
+        # from kelly_sizer, but symmetry is cheap here).
+        from src.risk.position_sizer import (
+            _max_position_pct_for_epic,
+            _stop_distance_usd,
+        )
+
+        stop_distance_usd = _stop_distance_usd(epic, entry_price, stop_loss)
+        if stop_distance_usd < 1e-12:
+            return 0.0, "invalid"
+
+        effective_pct = _max_position_pct_for_epic(
+            epic, max_position_pct, forex_usd_base_size_multiplier
+        )
+
         stats = self.compute_stats(trade_history)
 
         if stats is None:
             # Fallback: fixed-fractional (same as PositionSizer)
             return (
                 self._fixed_fractional(
-                    equity, stop_distance, entry_price, confidence, max_position_pct
+                    equity,
+                    stop_distance_usd,
+                    entry_price,
+                    confidence,
+                    effective_pct,
                 ),
                 "fixed_fractional",
             )
@@ -162,7 +186,11 @@ class AdaptiveKellySizer:
             # 2-week paper soak validates intermediate.
             fallback = (
                 self._fixed_fractional(
-                    equity, stop_distance, entry_price, confidence, max_position_pct
+                    equity,
+                    stop_distance_usd,
+                    entry_price,
+                    confidence,
+                    effective_pct,
                 )
                 * 0.75
             )
@@ -177,11 +205,11 @@ class AdaptiveKellySizer:
         # Note: confidence scaling is handled by RiskManager.confidence_size_multiplier()
         risk_amount = equity * kelly_frac
 
-        # Position size from risk / stop distance
-        size = risk_amount / stop_distance
+        # Position size from risk / stop distance (USD-converted)
+        size = risk_amount / stop_distance_usd
 
-        # Cap at max position percentage
-        max_size = (equity * max_position_pct) / entry_price
+        # Cap at max position percentage (leverage-aware for USD-base forex)
+        max_size = (equity * effective_pct) / entry_price
         if size > max_size:
             size = max_size
 

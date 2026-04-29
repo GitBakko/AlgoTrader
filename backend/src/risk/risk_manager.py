@@ -359,6 +359,10 @@ class RiskManager:
                 trade_history=trade_history,
                 max_position_pct=self.limits.max_position_pct,
                 min_notional_usd=_risk_settings.min_notional_usd,
+                epic=signal.epic,
+                forex_usd_base_size_multiplier=(
+                    _risk_settings.forex_usd_base_size_multiplier
+                ),
             )
             if sizing_method != "fixed_fractional":
                 adjustments.append(f"Sizing: {sizing_method}")
@@ -376,6 +380,10 @@ class RiskManager:
                 confidence=signal.confidence,
                 max_position_pct=self.limits.max_position_pct,
                 min_notional_usd=_risk_settings.min_notional_usd,
+                epic=signal.epic,
+                forex_usd_base_size_multiplier=(
+                    _risk_settings.forex_usd_base_size_multiplier
+                ),
             )
 
         # Apply correlation multiplier
@@ -435,8 +443,24 @@ class RiskManager:
             if risk_amount_usd > 0 and risk_amount_usd < min_risk_floor:
                 risk_per_unit = risk_amount_usd / position_size
                 lifted_size = min_risk_floor / risk_per_unit
+                # Mirror the leverage-aware cap used by PositionSizer / KellySizer
+                # so the floor lift respects the same per-trade budget that
+                # produced ``position_size``. Without this, USD-base forex
+                # signals would be capped at the stock-equivalent cap here
+                # even though the sizer was allowed up to leverage_multiplier ×.
+                effective_pct = self.limits.max_position_pct
+                if (
+                    signal.epic in FOREX_ASSETS
+                    and signal.epic.startswith("USD")
+                ):
+                    try:
+                        _fx_mult = float(_risk_settings.forex_usd_base_size_multiplier)
+                    except (TypeError, ValueError):
+                        _fx_mult = 1.0
+                    if _fx_mult > 1.0:
+                        effective_pct = self.limits.max_position_pct * _fx_mult
                 max_size_by_exposure = (
-                    equity * self.limits.max_position_pct
+                    equity * effective_pct
                 ) / signal.entry_price if signal.entry_price else 0.0
                 # Final size = the lift if the cap allows it, else the cap.
                 # PositionSizer already enforces ``size <= max_size_by_exposure``
