@@ -1733,6 +1733,115 @@ class PaperTradingLoop:
         logger.info("🔄 Auto-restarting paper trading loop now...")
         self.start()
 
+    # ===== Dedicated reconciler sub-loop (flag-gated) =====
+    # When self._reconciler_enabled is True, broker-position reconciliation
+    # runs in this dedicated task at self._reconciler_interval cadence,
+    # decoupled from the strategy signal tick. See plan
+    # `docs/handoff/reconciler_split_PLAN.md` for state ownership and
+    # concurrency analysis.
+
+    async def _run_reconciler_loop(self) -> None:
+        """Reconciler outer coroutine. Mirrors `_run_loop` shape."""
+        import random
+
+        consecutive_errors = 0
+        max_consecutive_errors = 10
+
+        # Startup jitter to desync from the strategy loop's first tick
+        # (avoids two simultaneous broker.list_positions() bursts).
+        await asyncio.sleep(random.uniform(2.0, 5.0))
+
+        try:
+            async with self._reconciler_lock:
+                await self._run_reconciler_tick()
+            consecutive_errors = 0
+        except asyncio.CancelledError:
+            return
+        except Exception as e:
+            consecutive_errors += 1
+            logger.error(f"Reconciler first tick failed: {e}")
+
+        while self._running:
+            try:
+                await asyncio.sleep(self._reconciler_interval)
+                if not self._running:
+                    break
+                async with self._reconciler_lock:
+                    await self._run_reconciler_tick()
+                consecutive_errors = 0
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                consecutive_errors += 1
+                logger.error(
+                    f"Reconciler tick error "
+                    f"({consecutive_errors}/{max_consecutive_errors}): {e}"
+                )
+                if consecutive_errors >= max_consecutive_errors:
+                    logger.error(
+                        f"🚨 {max_consecutive_errors} consecutive reconciler errors — "
+                        f"stopping reconciler for auto-restart"
+                    )
+                    raise
+                backoff = min(30 * (2 ** (consecutive_errors - 1)), 300)
+                logger.info(f"Reconciler waiting {backoff}s before next attempt...")
+                await asyncio.sleep(backoff)
+
+    async def _run_reconciler_tick(self) -> None:
+        """Single reconciler tick: positions fetch + 3-tier close detection
+        + trailing stops + SL/TP/time-stop checks. Same call order as
+        legacy `_run_iteration` so `_broker_closed_deals` sequencing is
+        preserved (filled by `_detect_broker_closed`, read by
+        `_check_stop_losses`).
+        """
+        try:
+            current_positions = await asyncio.wait_for(
+                self.get_positions_async(), timeout=10.0
+            )
+        except (TimeoutError, Exception) as e:
+            logger.warning(
+                f"Reconciler position fetch failed ({e}), using local cache"
+            )
+            current_positions = self.get_paper_positions()
+
+        await self._detect_broker_closed(current_positions)
+        await self._update_trailing_stops(current_positions)
+        await self._check_stop_losses(current_positions)
+
+    def _on_reconciler_done(self, task: asyncio.Task) -> None:
+        """Done callback. Crash in reconciler must NOT kill strategy loop."""
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc:
+            logger.error(f"🚨 Reconciler loop crashed: {exc}")
+            logger.info("🔄 Auto-restarting reconciler loop in 30 seconds...")
+            try:
+                loop = asyncio.get_event_loop()
+                loop.call_later(30.0, self._auto_restart_reconciler)
+            except RuntimeError:
+                logger.error(
+                    "Cannot auto-restart reconciler: no event loop available"
+                )
+
+    def _auto_restart_reconciler(self) -> None:
+        """Auto-restart the reconciler loop after a crash.
+
+        Skips if the strategy loop has been stopped or if a fresh
+        reconciler task is already running (manual restart raced us).
+        """
+        if not self._running:
+            return
+        if self._reconciler_task is not None and not self._reconciler_task.done():
+            return
+        if not self._reconciler_enabled:
+            return
+        self._reconciler_task = asyncio.create_task(
+            self._run_reconciler_loop(), name="paper_reconciler_loop"
+        )
+        self._reconciler_task.add_done_callback(self._on_reconciler_done)
+        logger.warning("🔄 Reconciler loop auto-restarted")
+
     async def _run_loop(self) -> None:
         """Main loop: check for new candles at fixed intervals."""
         consecutive_errors = 0
