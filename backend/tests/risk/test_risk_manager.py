@@ -229,9 +229,11 @@ class TestRiskManager:
         assert result.approved is False
         assert "Total exposure" in result.rejection_reason
 
-    def test_min_risk_floor_lifts_size_when_under_cap(self):
-        """USDJPY with pip-aware risk computation gets size-lifted to the
-        MIN_RISK_AMOUNT_USD floor when the lift is within the exposure cap.
+    def test_min_risk_floor_caps_lift_at_exposure_cap_for_usdjpy(self):
+        """USDJPY pip-aware risk is so small that the floor cannot be met
+        within max_position_pct. Rather than rejecting, the manager takes
+        the cap-bounded size and approves with risk < floor (audit flag
+        ``lift_bounded_by_cap=True``).
         """
         with patch(
             "src.risk.risk_manager.get_settings",
@@ -239,17 +241,37 @@ class TestRiskManager:
         ):
             rm = RiskManager(initial_equity=10000.0)
             # USDJPY entry 159, ATR 0.05 → SL distance 0.10 (mult 2.0).
-            # Risk per unit = 0.10 / 159 ≈ 0.000629 USD.
-            # To reach $5 floor → size ≈ 7948.
-            # Exposure cap = 20% × 10000 / 159 ≈ 12.58 — far below the lift,
-            # so the lift hits the cap → expect rejection.
+            # Risk per unit ≈ 0.000629 USD. Lift to $5 needs size ≈ 7948.
+            # Exposure cap = 20% × 10000 / 159 ≈ 12.58 — far below the lift.
+            # Behavior: take cap-bounded size, accept residual risk.
             signal = _make_signal(epic="USDJPY", price=159.0)
             result = rm.check_trade(signal=signal, equity=10000.0, atr=0.05)
-            assert result.approved is False
-            assert "min_notional" in (result.rejection_reason or "").lower()
+            assert result.approved is True, (
+                f"USDJPY signal must approve under cap-fallback "
+                f"(rejection: {result.rejection_reason})"
+            )
             audit = result.audit.get("min_risk_floor", {}) if result.audit else {}
-            assert audit.get("approved") is False
-            assert audit["computed_risk_usd"] < 5.0
+            assert audit.get("approved") is True
+            assert audit.get("lift_bounded_by_cap") is True
+            assert audit["actual_size"] <= audit["max_size_by_exposure"] + 1e-6
+            assert audit["computed_risk_usd"] < 5.0  # floor not reached
+            assert audit["computed_risk_usd"] > 0  # but a real position
+
+    def test_min_risk_floor_rejects_only_when_exposure_cap_is_non_positive(self):
+        """Defensive guard: zero or negative equity makes the exposure cap
+        non-positive, so neither lift nor cap-fallback can produce a real
+        position. Reject in this corner case.
+        """
+        with patch(
+            "src.risk.risk_manager.get_settings",
+            return_value=_non_scalp_settings(min_risk_amount_usd=5.0),
+        ):
+            rm = RiskManager(initial_equity=10000.0)
+            signal = _make_signal(epic="USDJPY", price=159.0)
+            # Equity 0 → cap 0 → final_size 0 → reject from min_notional
+            # path (or from upstream sizing path that hits zero first).
+            result = rm.check_trade(signal=signal, equity=0.0, atr=0.05)
+            assert result.approved is False
 
     def test_min_risk_floor_off_when_zero(self):
         """Default test fixture sets min_risk_amount_usd=0 → floor disabled

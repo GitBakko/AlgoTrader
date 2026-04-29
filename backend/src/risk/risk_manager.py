@@ -416,8 +416,14 @@ class RiskManager:
         # with a non-USD quote (USDJPY) the realised USD risk of the
         # trade can still be a fraction of a dollar. We compute the true
         # USD risk via `_compute_risk_usd` (which respects the quote leg),
-        # then either lift the size up to the floor (bounded by the
-        # exposure cap) or reject with `error.min_notional`.
+        # then lift size proportionally to clear the floor. The lift is
+        # capped by ``max_position_pct``: if the floor cannot be met under
+        # the cap (typical for USDJPY where pip-risk on a 0.06 lot is
+        # ~$0.02 and clearing $5 would need 250x size), we **fall back to
+        # the cap-bounded size** rather than rejecting the signal — a
+        # small-but-real position is closer to user intent than a blocked
+        # one. The shortfall is surfaced in audit so monitoring catches
+        # systematic floor mismatches.
         min_risk_floor = float(_risk_settings.min_risk_amount_usd or 0)
         if min_risk_floor > 0:
             risk_amount_usd = _compute_risk_usd(
@@ -432,15 +438,19 @@ class RiskManager:
                 max_size_by_exposure = (
                     equity * self.limits.max_position_pct
                 ) / signal.entry_price if signal.entry_price else 0.0
-                if 0 < lifted_size <= max_size_by_exposure:
-                    adjustments.append(
-                        f"Lifted size for MIN_RISK_AMOUNT_USD floor "
-                        f"({position_size:.4f} → {lifted_size:.4f}, "
-                        f"risk ${risk_amount_usd:.2f} → ${min_risk_floor:.2f})"
-                    )
-                    position_size = lifted_size
-                    risk_amount_usd = min_risk_floor
-                else:
+                # Final size = the lift if the cap allows it, else the cap.
+                # PositionSizer already enforces ``size <= max_size_by_exposure``
+                # so ``position_size <= max_size_by_exposure`` is invariant on
+                # the entry to this branch — final_size is therefore always
+                # >= position_size and we never *shrink* the position here.
+                final_size = (
+                    min(lifted_size, max_size_by_exposure)
+                    if max_size_by_exposure > 0
+                    else 0.0
+                )
+                if final_size <= 0:
+                    # Cap is zero (zero or negative equity) — reject
+                    # defensively. Should not happen in normal operation.
                     audit["min_risk_floor"] = {
                         "computed_risk_usd": round(risk_amount_usd, 4),
                         "floor_usd": min_risk_floor,
@@ -452,15 +462,49 @@ class RiskManager:
                         approved=False,
                         rejection_reason=(
                             f"error.min_notional risk_amount=${risk_amount_usd:.2f} "
-                            f"< floor=${min_risk_floor:.2f}"
+                            f"< floor=${min_risk_floor:.2f} and exposure cap "
+                            f"is non-positive"
                         ),
                         audit=audit,
                     )
-            audit["min_risk_floor"] = {
-                "computed_risk_usd": round(risk_amount_usd, 4),
-                "floor_usd": min_risk_floor,
-                "approved": True,
-            }
+                final_risk = _compute_risk_usd(
+                    epic=signal.epic,
+                    entry=signal.entry_price,
+                    stop_loss=stop_loss,
+                    size=final_size,
+                )
+                lift_bounded_by_cap = final_size < lifted_size
+                if lift_bounded_by_cap:
+                    adjustments.append(
+                        f"MIN_RISK_AMOUNT_USD floor capped by exposure cap "
+                        f"({position_size:.4f} → {final_size:.4f}, "
+                        f"risk ${risk_amount_usd:.2f} → ${final_risk:.2f}, "
+                        f"floor=${min_risk_floor:.2f} not reached)"
+                    )
+                else:
+                    adjustments.append(
+                        f"Lifted size for MIN_RISK_AMOUNT_USD floor "
+                        f"({position_size:.4f} → {final_size:.4f}, "
+                        f"risk ${risk_amount_usd:.2f} → ${final_risk:.2f})"
+                    )
+                position_size = final_size
+                risk_amount_usd = final_risk
+                audit["min_risk_floor"] = {
+                    "computed_risk_usd": round(risk_amount_usd, 4),
+                    "floor_usd": min_risk_floor,
+                    "intended_lifted_size": round(lifted_size, 6),
+                    "actual_size": round(position_size, 6),
+                    "max_size_by_exposure": round(max_size_by_exposure, 6),
+                    "approved": True,
+                    "lift_bounded_by_cap": lift_bounded_by_cap,
+                }
+            else:
+                audit["min_risk_floor"] = {
+                    "computed_risk_usd": round(risk_amount_usd, 4),
+                    "floor_usd": min_risk_floor,
+                    "approved": True,
+                    "lift_bounded_by_cap": False,
+                }
 
         # 8. Calculate multi-target TP1/TP2
         risk_distance = abs(signal.entry_price - stop_loss)
