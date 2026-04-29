@@ -20,22 +20,30 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
   imports: [
     CommonModule, CardComponent, CardBodyComponent, CardHeaderComponent,
     RowComponent, ColComponent,
-    TableDirective, BadgeComponent,
-    ButtonDirective, ProgressComponent, ProgressBarComponent,
+    TableDirective,
+    ProgressComponent, ProgressBarComponent,
     PriceFormatPipe, EpicLogoComponent,
   ],
   template: `
+    <!-- HDR-02 (Bible §1.2) — eyebrow + title + meta + actions -->
+    <header class="sig-hdr">
+      <div class="sig-hdr__lead">
+        <span class="sig-hdr__eyebrow mantis-mono">Trading · Intelligenza</span>
+        <h1 class="sig-hdr__title">Segnali AI</h1>
+        <span class="sig-hdr__meta mantis-mono">
+          {{ totalSignals() }} totali · {{ executedPct() }}% eseguiti · conf. media {{ avgConfidence() }}%
+        </span>
+      </div>
+      <div class="sig-hdr__actions">
+        <button type="button" class="sig-btn sig-btn--secondary" (click)="generateTestSignal()">
+          Test Signal
+        </button>
+      </div>
+    </header>
+
     <c-card class="mb-4 border-top border-top-3 border-top-primary animate-in">
-      <c-card-header>
-        <div class="d-flex align-items-center justify-content-between">
-          <div class="d-flex align-items-center gap-2">
-            <span class="fw-semibold small text-body-secondary">Segnali di Trading</span>
-            <c-badge color="info" class="mantis-badge-animated">{{ signals().length }}</c-badge>
-          </div>
-          <button cButton color="primary" size="sm" (click)="generateTestSignal()">
-            Test Signal
-          </button>
-        </div>
+      <c-card-header class="py-2">
+        <span class="fw-semibold small text-body-secondary">Segnali di Trading ({{ signals().length }})</span>
       </c-card-header>
 
       <!-- KPI Summary Row -->
@@ -84,7 +92,7 @@ import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.c
         } @else {
           <div class="signals-scroll-container">
             <div class="table-responsive-mobile">
-              <table cTable [small]="true" [hover]="true" [striped]="true" class="mb-0">
+              <table cTable [small]="true" [hover]="true" class="mb-0">
                 <thead class="signals-sticky-thead">
                   <tr class="text-body-secondary">
                     <th class="fw-semibold small">Asset</th>
