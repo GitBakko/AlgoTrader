@@ -83,7 +83,16 @@ export interface FeedEvent {
   /** Human-readable reason or context (rejection reason, close reason+pnl). */
   detail?: string | null;
   title: string;
+  /** Free-form caption (close_reason for position-close, strategy for
+   *  signals). NEVER use as routing key — `deal_id` carries that. */
   meta?: string | null;
+  /** Broker deal_id for position-open and position-close events.
+   *  Routes the click handler to `signalAudit.openByDealId(...)`
+   *  authoritatively, so pos-close- rows don't fall through to the
+   *  openLatestByEpic fallback (which would surface the most recent
+   *  signal — usually a HOLD reject — instead of the actual closed
+   *  position's source signal). */
+  deal_id?: string | null;
   severity?: 'info' | 'warning' | 'error' | 'critical' | string | null;
 }
 

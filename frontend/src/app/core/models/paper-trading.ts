@@ -177,7 +177,16 @@ export interface FeedEvent {
   ts: string;
   kind: FeedKind;
   title: string;
+  /** Free-form caption (e.g. close_reason for position-close, strategy
+   *  for signal rows). NEVER use it as a routing key — broker deal_id
+   *  always lives in `deal_id` instead. */
   meta?: string;
+  /** Optional epic — populated for signal-* and position-* rows so
+   *  click-handlers can route to the correct audit drawer. */
+  epic?: string | null;
+  /** Broker deal_id — populated for position-open and position-close.
+   *  Authoritative routing key for `signalAudit.openByDealId(...)`. */
+  deal_id?: string | null;
 }
 
 /** GET /api/paper/state — composite live status. */

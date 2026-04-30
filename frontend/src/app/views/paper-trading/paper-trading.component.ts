@@ -503,10 +503,17 @@ export class PaperTradingComponent implements OnInit {
       }
     }
     if (id.startsWith('pos-open-') || id.startsWith('pos-close-')) {
-      // `meta` carries the broker deal_id for position-open events; the
-      // open-by-deal endpoint walks back to the source signal via the
-      // signal_id FK so we can render the same audit panel.
-      const dealId = event.meta && id.startsWith('pos-open-') ? event.meta : null;
+      // The authoritative deal_id lives in event.deal_id for BOTH
+      // pos-open- and pos-close- rows (added 2026-04-30 — previously only
+      // pos-open- routed correctly because pos-close- overloaded `meta`
+      // with close_reason, which made the dealId fall through to the
+      // openLatestByEpic fallback below and surfaced the most recent
+      // SIGNAL — usually a HOLD reject — instead of the actual closed
+      // position's source signal). Keep `meta` legacy-fallback for older
+      // backend payloads that still embed the dealId there for pos-open-.
+      const dealId =
+        event.deal_id ||
+        (id.startsWith('pos-open-') && event.meta ? event.meta : null);
       if (dealId) {
         this.signalAudit.openByDealId(dealId, event.epic ?? undefined);
         return;

@@ -267,6 +267,7 @@ async def trading_events(
                         "detail": "aperta",
                         "title": f"{direction} {row['epic']} aperta",
                         "meta": row["deal_id"],
+                        "deal_id": row["deal_id"],
                         "severity": "info",
                     }
                 )
@@ -289,7 +290,12 @@ async def trading_events(
                         "strategy": strategy,
                         "detail": f"{close_reason} · {pnl_str}",
                         "title": f"{direction} {row['epic']} chiusa · {pnl_str}",
+                        # `meta` keeps the close_reason for the UI badge.
+                        # `deal_id` is the authoritative deal identifier for
+                        # routing the click to the audit drawer — never
+                        # overload `meta` for that role.
                         "meta": close_reason,
+                        "deal_id": row["deal_id"],
                         "severity": kind_severity,
                     }
                 )
