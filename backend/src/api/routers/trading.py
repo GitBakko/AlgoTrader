@@ -853,9 +853,124 @@ async def get_pnl_history(
     )
 
 
+async def _auto_heal_broker_only_position(
+    *, request: Request, deal_id: str, session
+):
+    """Persist a broker-reported position that is missing from our `positions`
+    table. Returns the freshly-created Position row, or None when the broker
+    does not have the deal either (genuinely unknown).
+
+    Path of least surprise: the History tab should never lie about the
+    broker's reality. When `bcdb` is alive on Capital.com but never made it
+    into our DB (state-recovery loaded it from `broker.list_positions` at
+    startup but the open path that calls `_persist_position_open` was bypassed),
+    the user opening the drawer should see the OPEN event seeded from
+    broker truth, plus a `recovered=True` marker so they understand the
+    history begins at first observation rather than at original open.
+
+    On any error (broker unreachable, persistence failure) the helper
+    returns None and the caller falls through to the "not-found" branch.
+    """
+    try:
+        from datetime import UTC as _UTC
+        from datetime import datetime as _dt
+        from decimal import Decimal as _Dec
+
+        from src.database.models import Position as _PositionModel
+        from src.database.models import Trade as _TradeModel
+        from src.database.repositories.position_repository import (
+            PositionRepository as _PositionRepository,
+        )
+
+        loop = _get_loop(request)
+        if loop is None:
+            return None
+        try:
+            broker_positions = await asyncio.wait_for(
+                loop.get_positions_async(), timeout=_BROKER_TIMEOUT
+            )
+        except (TimeoutError, Exception) as e:
+            logger.debug(f"[auto-heal] broker fetch failed: {e}")
+            return None
+
+        match = next(
+            (p for p in broker_positions if p.get("deal_id") == deal_id),
+            None,
+        )
+        if match is None:
+            return None
+
+        epic = match.get("epic") or "UNKNOWN"
+        direction = match.get("direction") or "BUY"
+        size = float(match.get("size") or 0)
+        entry = float(match.get("level") or 0)
+        stop_level = match.get("stop_level")
+        profit_level = match.get("profit_level")
+        opened_at_raw = match.get("opened_at")
+        try:
+            if isinstance(opened_at_raw, str):
+                opened_at = _dt.fromisoformat(opened_at_raw)
+                if opened_at.tzinfo is not None:
+                    opened_at = opened_at.astimezone(_UTC).replace(tzinfo=None)
+            elif opened_at_raw is not None and hasattr(opened_at_raw, "tzinfo"):
+                opened_at = (
+                    opened_at_raw.astimezone(_UTC).replace(tzinfo=None)
+                    if opened_at_raw.tzinfo is not None
+                    else opened_at_raw
+                )
+            else:
+                opened_at = _dt.now(_UTC).replace(tzinfo=None)
+        except (ValueError, TypeError):
+            opened_at = _dt.now(_UTC).replace(tzinfo=None)
+
+        repo = _PositionRepository(session)
+        pos = _PositionModel(
+            deal_id=deal_id,
+            deal_reference=match.get("deal_reference"),
+            epic=epic,
+            direction=direction,
+            size=_Dec(str(size)),
+            entry_price=_Dec(str(entry)) if entry else _Dec("0"),
+            stop_loss=_Dec(str(stop_level)) if stop_level is not None else None,
+            take_profit=_Dec(str(profit_level)) if profit_level is not None else None,
+            status="OPEN",
+            opened_at=opened_at,
+        )
+        pos = await repo.create(pos)
+        # Seed an OPEN trade row so the History tab opens with a real audit
+        # entry rather than only the synthesised fallback.
+        trade = _TradeModel(
+            position_id=pos.id,
+            deal_reference=deal_id,
+            trade_type="OPEN",
+            epic=epic,
+            direction=direction,
+            size=_Dec(str(size)),
+            price=_Dec(str(entry)) if entry else _Dec("0"),
+            executed_at=opened_at,
+            notes=(
+                "Auto-heal: position recovered from broker live snapshot "
+                "(was missing from DB — likely state-recovery ghost from "
+                "a prior session)."
+            ),
+        )
+        session.add(trade)
+        await session.commit()
+        logger.warning(
+            f"[auto-heal] Persisted broker-only position "
+            f"{deal_id} ({epic} {direction} size={size} entry={entry}) "
+            f"on first /events request — seeded OPEN trade row"
+        )
+        return pos
+    except Exception as e:
+        logger.warning(f"[auto-heal] failed for {deal_id}: {e}")
+        return None
+
+
 @router.get("/positions/{deal_id}/events")
 async def get_position_events(
     deal_id: str,
+    request: Request,
     session=Depends(get_db_session),
 ):
     """Per-position event timeline (open, modify, close).
@@ -864,6 +979,14 @@ async def get_position_events(
     from the immutable `trades` audit table joined with the parent
     `positions` row, so a position with no Trade rows still surfaces its
     OPEN/CLOSE events synthesised from the Position itself.
+
+    Auto-heal: when the deal_id is missing from `positions` but the broker
+    still reports it (state-recovery ghost from a previous session), the
+    endpoint persists a fresh `positions` + OPEN `trades` row inline using
+    the broker's live snapshot. This guarantees the History tab is never
+    empty for a position the broker considers open, and seeds the audit
+    trail forward — subsequent trailing transitions will append to the
+    same lineage.
     """
     if session is None:
         return success_response(
@@ -876,17 +999,23 @@ async def get_position_events(
     pos_repo = PositionRepository(session)
     position = await pos_repo.get_by_deal_id(deal_id)
     if position is None:
-        # Frontend opened the drawer for a deal_id that's live at the broker
-        # but missing from our positions table — likely a state-recovery
-        # ghost or a freshly opened position whose persist hasn't committed
-        # yet. Log so the gap surfaces in monitoring.
-        logger.warning(
-            f"[events] position not found in DB for deal_id={deal_id} "
-            f"— returning empty timeline (frontend will see 'Nessun evento')"
+        # Try auto-heal: if the broker still has this position, persist it.
+        position = await _auto_heal_broker_only_position(
+            request=request, deal_id=deal_id, session=session
         )
-        return success_response(
-            {"deal_id": deal_id, "events": [], "position": None, "source": "not-found"}
-        )
+        if position is None:
+            logger.warning(
+                f"[events] position not found in DB for deal_id={deal_id} "
+                f"and not present at broker — returning empty timeline"
+            )
+            return success_response(
+                {
+                    "deal_id": deal_id,
+                    "events": [],
+                    "position": None,
+                    "source": "not-found",
+                }
+            )
 
     trade_repo = TradeRepository(session)
     trades = await trade_repo.get_by_position(position.id) if position.id else []
