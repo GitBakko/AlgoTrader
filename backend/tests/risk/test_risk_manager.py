@@ -12,24 +12,21 @@ def _non_scalp_settings(
     min_risk_amount_usd: float = 0.0,
     min_notional_usd: float = 0.0,
     forex_usd_base_size_multiplier: float = 1.0,
-    forex_strict_min_risk: bool = False,
+    forex_max_leverage_multiplier: float = 1.0,
 ):
     """Settings mock used by the legacy risk-manager tests.
 
-    The two USD floors default to 0 so older tests written before the floors
-    existed keep passing. New tests pass explicit values to exercise the
-    floor logic. ``forex_usd_base_size_multiplier`` defaults to 1.0 so the
-    leverage-aware cap behaves identically to the legacy stock cap unless
-    a test opts in. ``forex_strict_min_risk`` defaults to False so legacy
-    cap-fallback approve path is exercised; opt in to verify the strict
-    reject path.
+    Defaults preserve legacy behavior so older tests written before the
+    floors existed keep passing. New tests pass explicit values to exercise
+    the floor logic. ``forex_max_leverage_multiplier`` defaults to 1.0 so
+    the auto-leverage path is a no-op unless a test opts in.
     """
     s = MagicMock()
     s.scalp_mode_enabled = False
     s.min_risk_amount_usd = min_risk_amount_usd
     s.min_notional_usd = min_notional_usd
     s.forex_usd_base_size_multiplier = forex_usd_base_size_multiplier
-    s.forex_strict_min_risk = forex_strict_min_risk
+    s.forex_max_leverage_multiplier = forex_max_leverage_multiplier
     return s
 
 
@@ -323,50 +320,63 @@ class TestRiskManager:
         if not result.approved:
             assert "min_notional" not in (result.rejection_reason or "").lower()
 
-    def test_forex_strict_min_risk_rejects_when_cap_blocks_floor(self):
-        """User invariant (2026-04-30): with forex_strict_min_risk=True,
-        a forex pair whose cap-bounded risk falls below MIN_RISK_AMOUNT_USD
-        must be REJECTED instead of approved at sub-floor. Non-forex pairs
-        keep the cap-fallback approve path.
+    def test_forex_dynamic_leverage_lifts_to_floor_via_max_cap(self):
+        """User invariant (2026-04-30 v2): when standard forex multiplier
+        cannot reach MIN_RISK_AMOUNT_USD, auto-elevate per-trade exposure
+        cap up to `forex_max_leverage_multiplier`. Never reject a high-
+        confidence signal because the day-one cap was conservative — the
+        floor is meant to LIFT, not BLOCK.
         """
         with patch(
             "src.risk.risk_manager.get_settings",
             return_value=_non_scalp_settings(
                 min_risk_amount_usd=10.0,
                 forex_usd_base_size_multiplier=60.0,
-                forex_strict_min_risk=True,
+                forex_max_leverage_multiplier=200.0,
             ),
         ):
             rm = RiskManager(initial_equity=11000.0)
-            # USDJPY entry 159, ATR 0.05 → SL distance 0.10. Cap with 60×
-            # multiplier ≈ 830 units. Risk ≈ (830 × 0.10) / 159 ≈ $0.52,
-            # far below $10 floor. Must reject under strict mode.
-            signal = _make_signal(epic="USDJPY", price=159.0)
-            result = rm.check_trade(signal=signal, equity=11000.0, atr=0.05)
-            assert result.approved is False
-            assert "min_risk" in (result.rejection_reason or "").lower()
-            audit = result.audit.get("min_risk_floor", {}) if result.audit else {}
-            assert audit.get("approved") is False
-            assert audit.get("rejection") == "forex_strict_min_risk"
-
-    def test_forex_strict_min_risk_off_still_approves_with_cap_fallback(self):
-        """Backwards compat: when forex_strict_min_risk=False (legacy),
-        cap-fallback approve path is exercised even on forex.
-        """
-        with patch(
-            "src.risk.risk_manager.get_settings",
-            return_value=_non_scalp_settings(
-                min_risk_amount_usd=10.0,
-                forex_usd_base_size_multiplier=60.0,
-                forex_strict_min_risk=False,
-            ),
-        ):
-            rm = RiskManager(initial_equity=11000.0)
+            # USDJPY entry 159, ATR 0.05, SL distance 0.10. To clear $10
+            # floor: lifted_size ≈ 15.9k. Standard 60× cap allows ~830
+            # units (~$0.52 risk). With max_leverage 200×, cap rises to
+            # ~2768 units (~$1.74 risk) — still below 15.9k → cap_hit=True
+            # but mult was elevated and risk improved >3× the baseline.
+            # Signal MUST approve (no rejection).
             signal = _make_signal(epic="USDJPY", price=159.0)
             result = rm.check_trade(signal=signal, equity=11000.0, atr=0.05)
             assert result.approved is True
             audit = result.audit.get("min_risk_floor", {}) if result.audit else {}
-            assert audit.get("lift_bounded_by_cap") is True
+            assert audit.get("approved") is True
+            assert audit.get("effective_multiplier_used", 0) >= 60.0
+            assert audit.get("max_leverage_cap_hit") is True
+            # Realised risk strictly higher than the 60×-baseline.
+            assert audit.get("computed_risk_usd", 0) > 1.0
+
+    def test_forex_dynamic_leverage_meets_floor_when_required_below_max(self):
+        """When `required_mult` to clear floor is below max_leverage, the
+        cap is elevated only as much as needed and the floor is met.
+        """
+        with patch(
+            "src.risk.risk_manager.get_settings",
+            return_value=_non_scalp_settings(
+                min_risk_amount_usd=10.0,
+                forex_usd_base_size_multiplier=60.0,
+                forex_max_leverage_multiplier=300.0,
+            ),
+        ):
+            rm = RiskManager(initial_equity=11000.0)
+            # Wider stop_distance: ATR 1.0, SL distance 2.0. To clear $10
+            # floor: lifted_size = 10 × 159 / 2.0 = 795 units. Cap with
+            # 60× mult = 11000 × 0.20 × 60 / 159 ≈ 830 → fits within
+            # standard cap, no elevation needed. Floor exactly met.
+            signal = _make_signal(epic="USDJPY", price=159.0)
+            result = rm.check_trade(signal=signal, equity=11000.0, atr=1.0)
+            assert result.approved is True
+            audit = result.audit.get("min_risk_floor", {}) if result.audit else {}
+            assert audit.get("approved") is True
+            assert audit.get("max_leverage_cap_hit") is False
+            # Floor exactly met (within rounding).
+            assert audit.get("computed_risk_usd", 0) >= 9.99
 
     def test_min_risk_floor_passes_for_realistic_btc_trade(self):
         """BTC trade with stop_distance large enough to clear $5 floor is

@@ -286,14 +286,20 @@ class Settings(BaseSettings):
     # SL/TP hit (≈ $11 on $11k initial). Sub-$10 forex trades produced
     # $0.02–$1.46 P&L per hit in production — uneconomical noise.
     min_risk_amount_usd: float = Field(default=10.0, alias="MIN_RISK_AMOUNT_USD")
-    # Forex-specific: when True (default) the cap-fallback approve path
-    # in RiskManager step 7-bis is DISABLED for forex pairs. Sub-floor
-    # forex signals are rejected outright instead of opening micro-trades
-    # whose realised risk is < MIN_RISK_AMOUNT_USD. Non-forex still uses
-    # cap-fallback (legacy behavior preserved). User invariant: never
-    # open forex positions with sub-$10 USD risk per hit.
-    forex_strict_min_risk: bool = Field(
-        default=True, alias="FOREX_STRICT_MIN_RISK"
+    # Maximum dynamic leverage multiplier the floor-lift path may push to
+    # in step 7-bis when the standard `forex_usd_base_size_multiplier` cap
+    # cannot reach `min_risk_amount_usd`. Set higher than the standard
+    # multiplier so a 97%-confidence forex signal with a tight stop never
+    # gets rejected just because the conservative day-one cap (60×) only
+    # produced ~$4 risk — instead the cap is auto-elevated up to this
+    # ceiling for that single trade. Capital.com forex demo / pro tier
+    # supports up to ~200:1 effective; 200× keeps the worst-case single-
+    # position margin around 60–70% of equity (still leaves room for one
+    # concurrent non-forex trade). Audit shows the actual multiplier used
+    # so monitoring can spot trades that need very high leverage to clear
+    # the floor.
+    forex_max_leverage_multiplier: float = Field(
+        default=200.0, alias="FOREX_MAX_LEVERAGE_MULTIPLIER"
     )
 
     # Regime Gate (Phase 2)

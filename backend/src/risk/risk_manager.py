@@ -443,30 +443,68 @@ class RiskManager:
             if risk_amount_usd > 0 and risk_amount_usd < min_risk_floor:
                 risk_per_unit = risk_amount_usd / position_size
                 lifted_size = min_risk_floor / risk_per_unit
-                # Mirror the leverage-aware cap used by PositionSizer / KellySizer
-                # so the floor lift respects the same per-trade budget that
-                # produced ``position_size``. Without this, USD-base forex
-                # signals would be capped at the stock-equivalent cap here
-                # even though the sizer was allowed up to leverage_multiplier ×.
-                effective_pct = self.limits.max_position_pct
-                if (
-                    signal.epic in FOREX_ASSETS
-                    and signal.epic.startswith("USD")
-                ):
+                # Standard multiplier used by PositionSizer / KellySizer for
+                # USD-base forex pairs.
+                base_fx_mult = 1.0
+                is_usd_base_forex = (
+                    signal.epic in FOREX_ASSETS and signal.epic.startswith("USD")
+                )
+                if is_usd_base_forex:
                     try:
-                        _fx_mult = float(_risk_settings.forex_usd_base_size_multiplier)
+                        base_fx_mult = float(
+                            _risk_settings.forex_usd_base_size_multiplier
+                        )
                     except (TypeError, ValueError):
-                        _fx_mult = 1.0
-                    if _fx_mult > 1.0:
-                        effective_pct = self.limits.max_position_pct * _fx_mult
+                        base_fx_mult = 1.0
+                    if base_fx_mult < 1.0:
+                        base_fx_mult = 1.0
+                effective_pct = self.limits.max_position_pct * base_fx_mult
                 max_size_by_exposure = (
                     equity * effective_pct
                 ) / signal.entry_price if signal.entry_price else 0.0
-                # Final size = the lift if the cap allows it, else the cap.
-                # PositionSizer already enforces ``size <= max_size_by_exposure``
-                # so ``position_size <= max_size_by_exposure`` is invariant on
-                # the entry to this branch — final_size is therefore always
-                # >= position_size and we never *shrink* the position here.
+                # Step 7-bis-A — DYNAMIC LEVERAGE for USD-base forex.
+                #
+                # Intent of MIN_RISK_AMOUNT_USD: open a meaningful position
+                # ($10+ realised P&L per SL/TP hit), NOT block valid signals
+                # because the day-one conservative cap is too low. When the
+                # standard cap blocks the floor lift on a forex pair, auto-
+                # elevate the per-trade exposure cap up to
+                # `forex_max_leverage_multiplier` (default 200×) for THIS
+                # signal so the lift can land. We never shrink — only raise.
+                #
+                # Audit surfaces `effective_multiplier_used` so monitoring
+                # can spot signals that consistently need very high leverage
+                # (a hint to widen the strategy stop_distance instead).
+                effective_mult_used = base_fx_mult
+                max_leverage_cap_hit = False
+                if is_usd_base_forex and lifted_size > max_size_by_exposure > 0:
+                    try:
+                        max_fx_mult = float(
+                            _risk_settings.forex_max_leverage_multiplier
+                        )
+                    except (TypeError, ValueError):
+                        max_fx_mult = base_fx_mult
+                    max_fx_mult = max(max_fx_mult, base_fx_mult)
+                    # Required multiplier to fit lifted_size in the cap.
+                    required_mult = (
+                        lifted_size * signal.entry_price
+                    ) / (equity * self.limits.max_position_pct)
+                    target_mult = min(required_mult, max_fx_mult)
+                    if target_mult > base_fx_mult:
+                        effective_mult_used = target_mult
+                        effective_pct = self.limits.max_position_pct * target_mult
+                        max_size_by_exposure = (
+                            equity * effective_pct
+                        ) / signal.entry_price if signal.entry_price else 0.0
+                    if required_mult > max_fx_mult:
+                        max_leverage_cap_hit = True
+
+                # Final size = the lift if the (possibly elevated) cap allows
+                # it, else the cap. PositionSizer already enforces
+                # ``size <= max_size_by_exposure`` so ``position_size <=
+                # max_size_by_exposure`` is invariant on entry to this branch
+                # — final_size is therefore always >= position_size and we
+                # never *shrink* the position here.
                 final_size = (
                     min(lifted_size, max_size_by_exposure)
                     if max_size_by_exposure > 0
@@ -493,46 +531,6 @@ class RiskManager:
                     )
                 lift_bounded_by_cap = final_size < lifted_size
 
-                # FOREX strict mode: when the cap blocks the floor lift on a
-                # forex pair, REJECT instead of approving a sub-floor trade.
-                # Rationale: forex positions whose realised SL/TP P&L is sub-
-                # $10 are noise vs. spread+slippage and clutter the audit
-                # without producing meaningful equity moves. User invariant:
-                # forex positions must risk ≥ MIN_RISK_AMOUNT_USD per hit.
-                # Non-forex still falls through to the legacy cap-fallback
-                # approve so that single-share trades on expensive stocks
-                # (NVDA, TSLA) can still go through during low-equity periods.
-                forex_strict = bool(_risk_settings.forex_strict_min_risk)
-                is_forex = signal.epic in FOREX_ASSETS
-                if lift_bounded_by_cap and forex_strict and is_forex:
-                    final_risk_under_cap = _compute_risk_usd(
-                        epic=signal.epic,
-                        entry=signal.entry_price,
-                        stop_loss=stop_loss,
-                        size=final_size,
-                    )
-                    audit["min_risk_floor"] = {
-                        "computed_risk_usd": round(risk_amount_usd, 4),
-                        "floor_usd": min_risk_floor,
-                        "intended_lifted_size": round(lifted_size, 6),
-                        "cap_bounded_size": round(final_size, 6),
-                        "cap_bounded_risk_usd": round(final_risk_under_cap, 4),
-                        "max_size_by_exposure": round(max_size_by_exposure, 6),
-                        "approved": False,
-                        "rejection": "forex_strict_min_risk",
-                    }
-                    return RiskCheckResult(
-                        approved=False,
-                        rejection_reason=(
-                            f"error.min_risk forex {signal.epic} cap-bounded "
-                            f"risk ${final_risk_under_cap:.2f} < floor "
-                            f"${min_risk_floor:.2f} (intended size {lifted_size:.4f}, "
-                            f"cap-bounded {final_size:.4f}). Widen stop_distance "
-                            f"or raise FOREX_USD_BASE_SIZE_MULTIPLIER."
-                        ),
-                        audit=audit,
-                    )
-
                 final_risk = _compute_risk_usd(
                     epic=signal.epic,
                     entry=signal.entry_price,
@@ -541,15 +539,17 @@ class RiskManager:
                 )
                 if lift_bounded_by_cap:
                     adjustments.append(
-                        f"MIN_RISK_AMOUNT_USD floor capped by exposure cap "
-                        f"({position_size:.4f} → {final_size:.4f}, "
+                        f"MIN_RISK_AMOUNT_USD floor capped by max-leverage "
+                        f"({signal.epic} mult={effective_mult_used:.1f}× "
+                        f"size {position_size:.4f} → {final_size:.4f}, "
                         f"risk ${risk_amount_usd:.2f} → ${final_risk:.2f}, "
-                        f"floor=${min_risk_floor:.2f} not reached)"
+                        f"floor=${min_risk_floor:.2f})"
                     )
                 else:
                     adjustments.append(
                         f"Lifted size for MIN_RISK_AMOUNT_USD floor "
-                        f"({position_size:.4f} → {final_size:.4f}, "
+                        f"({signal.epic} mult={effective_mult_used:.1f}× "
+                        f"size {position_size:.4f} → {final_size:.4f}, "
                         f"risk ${risk_amount_usd:.2f} → ${final_risk:.2f})"
                     )
                 position_size = final_size
@@ -560,6 +560,8 @@ class RiskManager:
                     "intended_lifted_size": round(lifted_size, 6),
                     "actual_size": round(position_size, 6),
                     "max_size_by_exposure": round(max_size_by_exposure, 6),
+                    "effective_multiplier_used": round(effective_mult_used, 2),
+                    "max_leverage_cap_hit": max_leverage_cap_hit,
                     "approved": True,
                     "lift_bounded_by_cap": lift_bounded_by_cap,
                 }
@@ -569,6 +571,8 @@ class RiskManager:
                     "floor_usd": min_risk_floor,
                     "approved": True,
                     "lift_bounded_by_cap": False,
+                    "effective_multiplier_used": 1.0,
+                    "max_leverage_cap_hit": False,
                 }
 
         # 8. Calculate multi-target TP1/TP2
