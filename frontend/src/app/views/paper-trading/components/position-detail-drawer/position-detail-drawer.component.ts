@@ -55,27 +55,31 @@ export class PositionDetailDrawerComponent {
   /** Track which deal we are currently fetching for, so a stale in-flight
    *  response from a previous deal cannot overwrite the new deal's events. */
   private inflightDealId: string | null = null;
+  /** Last deal_id we reset state for. Distinct from `inflightDealId` so that
+   *  a successful fetch is not invalidated by every poll-cycle re-emission of
+   *  the `position` input (parent rebuilds the array each tick → object
+   *  identity changes even when deal_id is stable). */
+  private lastSeenDealId: string | null = null;
 
   constructor() {
-    // Reset event state when the drawer's position changes (different deal).
+    // Reset event buffer ONLY when the underlying deal_id actually changes.
+    // Read-only effect that defers state mutations via queueMicrotask — same
+    // pattern as signal-audit-drawer (commit 1cdd48f). Writing signals inside
+    // a tracking effect that other effects also read causes Angular's signal
+    // scheduler to re-evaluate endlessly when the input is rebuilt every poll
+    // (here: trading.service rebuilds positions[] every 10s).
     effect(() => {
       const id = this.position()?.id ?? null;
-      if (id !== this.inflightDealId) {
-        this.events.set(null);
-        this.eventsError.set(null);
-      }
+      queueMicrotask(() => this._onDealChanged(id));
     });
+  }
 
-    // Fetch whenever the History tab is active for the current deal.
-    // No caching — the response is small and freshness is more important
-    // than skipping a HTTP round-trip.
-    effect(() => {
-      const tab = this.activeTab();
-      const id = this.position()?.id;
-      if (tab === 'history' && id) {
-        this.fetchEvents(id);
-      }
-    });
+  private _onDealChanged(dealId: string | null): void {
+    if (dealId === this.lastSeenDealId) return;
+    this.lastSeenDealId = dealId;
+    this.events.set(null);
+    this.eventsError.set(null);
+    this.inflightDealId = null;
   }
 
   retryFetchEvents(): void {
@@ -151,6 +155,17 @@ export class PositionDetailDrawerComponent {
 
   setTab(tab: DrawerTab): void {
     this.activeTab.set(tab);
+    // Caller-driven fetch — never trigger from an effect that reads `position`,
+    // because the parent component rebuilds the positions array on every poll
+    // and that creates a new PaperTradingPosition object identity each tick,
+    // which would refire the effect → infinite refetch loop (same root cause
+    // as the signal-audit-drawer regression fixed in 1cdd48f).
+    if (tab !== 'history') return;
+    const id = this.position()?.id;
+    if (!id) return;
+    if (this.inflightDealId === id) return; // already fetching
+    if (this.events() !== null) return; // already have data; user can Riprova for fresh
+    this.fetchEvents(id);
   }
 
   /** Opens the global signal-audit drawer wired by `SignalAuditService`,
