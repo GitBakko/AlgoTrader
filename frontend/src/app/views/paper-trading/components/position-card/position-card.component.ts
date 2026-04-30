@@ -70,6 +70,52 @@ export class PositionCardComponent {
 
   readonly ageLabel = computed(() => formatAge(this.position().ageSec));
 
+  /** Trailing-stop phase badge: short label + tone + tooltip explaining why
+   *  the position is in this state. Returns null when phase is INITIAL or
+   *  the manager is not tracking the position (no badge rendered). */
+  readonly phaseBadge = computed<{
+    label: string;
+    tone: 'neutral' | 'profit' | 'lock' | 'trail';
+    tooltip: string;
+  } | null>(() => {
+    const p = this.position();
+    const phase = p.trailingPhase;
+    if (!phase || phase === 'INITIAL') return null;
+    if (phase === 'BREAKEVEN') {
+      return {
+        label: 'BE',
+        tone: 'profit',
+        tooltip:
+          `Break-even attivato — prezzo ha raggiunto TP1 ` +
+          `(midpoint strategy TP), 50% chiuso e SL spostato a entry ` +
+          `${p.entry.toFixed(4)}. Da qui non perdi più capitale ` +
+          `sulla restante metà.`,
+      };
+    }
+    if (phase === 'TP1_LOCK') {
+      return {
+        label: 'TP1 LOCK',
+        tone: 'lock',
+        tooltip:
+          `Profitto bloccato a TP1 — prezzo ha raggiunto TP2, ` +
+          `SL alzato al livello di TP1. Anche col retrace il P&L ` +
+          `chiude positivo.`,
+      };
+    }
+    if (phase === 'TRAILING') {
+      return {
+        label: 'TRAIL',
+        tone: 'trail',
+        tooltip:
+          `Trailing ATR-anchored attivo — SL ratchetta dietro il prezzo ` +
+          `con multiplier ATR ` +
+          `${p.direction === 'BUY' ? '(highest − ATR×1.5)' : '(lowest + ATR×1.5)'}. ` +
+          `Massimizza il run senza dare back tutto il guadagno.`,
+      };
+    }
+    return null;
+  });
+
   readonly rangeMarkers = computed(() => buildRangeMarkers(this.position()));
 
   readonly trendPath = computed(() => buildSparkPath(this.position().pricePath));

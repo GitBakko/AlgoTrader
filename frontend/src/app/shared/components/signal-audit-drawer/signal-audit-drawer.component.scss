@@ -821,7 +821,7 @@
 
 .ad-history__item {
   display: grid;
-  grid-template-columns: 60px 130px 80px 1fr auto;
+  grid-template-columns: 90px 130px 80px 1fr auto;
   align-items: center;
   gap: var(--mantis-space-2);
   padding: var(--mantis-space-2);
@@ -829,9 +829,23 @@
   border-radius: var(--mantis-radius-sm, 4px);
   font-size: var(--mantis-fs-xs);
 
-  &[data-type="OPEN"] { border-left: 2px solid var(--mantis-cyan, #00E5FF); }
-  &[data-type="CLOSE"] { border-left: 2px solid var(--mantis-neon, #39FF14); }
+  &[data-type="OPEN"]      { border-left: 2px solid var(--mantis-cyan, #00E5FF); }
+  &[data-type="CLOSE"]     { border-left: 2px solid var(--mantis-neon, #39FF14); }
+  &[data-type="BREAKEVEN"] { border-left: 2px solid var(--mantis-profit, #00d97e); }
+  &[data-type="TP1_HIT"]   { border-left: 2px solid var(--mantis-profit, #00d97e); }
+  &[data-type="TP1_LOCK"]  { border-left: 2px solid var(--mantis-neon, #39FF14); }
+  &[data-type="TRAIL_UPD"] { border-left: 2px solid var(--mantis-cyan, #00E5FF); }
   &--synth { opacity: 0.7; font-style: italic; }
+}
+
+.ad-history__note {
+  grid-column: 1 / -1;
+  color: var(--fg2);
+  font-size: var(--mantis-fs-xxs);
+  font-style: italic;
+  padding-top: var(--mantis-space-1);
+  line-height: 1.4;
+  cursor: help;
 }
 
 // ==== Outcome badge in header (GOING / TP / SL / MANUAL / UNRECONCILED) ====

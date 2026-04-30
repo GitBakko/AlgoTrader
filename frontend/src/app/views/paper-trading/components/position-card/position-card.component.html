@@ -30,6 +30,13 @@
             [attr.data-on]="position().trailing">
         {{ position().trailing ? 'TRAIL ●' : 'TRAIL ○' }}
       </span>
+      @if (phaseBadge(); as pb) {
+        <span class="pv-pc__chip pv-pc__chip--phase mantis-mono"
+              [attr.data-tone]="pb.tone"
+              [title]="pb.tooltip">
+          {{ pb.label }}
+        </span>
+      }
     </div>
   </div>
 

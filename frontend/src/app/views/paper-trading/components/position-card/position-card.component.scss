@@ -153,6 +153,36 @@
       border-color: var(--mantis-border-soft);
     }
   }
+
+  &--phase {
+    border-radius: 2px;
+    font-size: var(--mantis-fs-xxs);
+    cursor: help;
+
+    &[data-tone='profit'] {
+      color: p.$mantis-green;
+      background: rgba(0, 217, 126, .14);
+      border-color: rgba(0, 217, 126, .42);
+    }
+
+    &[data-tone='lock'] {
+      color: p.$mantis-neon;
+      background: rgba(57, 255, 20, .12);
+      border-color: rgba(57, 255, 20, .4);
+    }
+
+    &[data-tone='trail'] {
+      color: p.$mantis-cyan;
+      background: rgba(0, 229, 255, .14);
+      border-color: rgba(0, 229, 255, .42);
+    }
+
+    &[data-tone='neutral'] {
+      color: var(--fg2);
+      background: var(--mantis-ghost-1);
+      border-color: var(--mantis-border-soft);
+    }
+  }
 }
 
 // COL 2 — range visualization + triplet

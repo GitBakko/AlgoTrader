@@ -650,6 +650,12 @@ export interface PositionPnlHistoryResponse {
 
 export interface PositionEvent {
   ts: string | null;
+  /** Audit trail event type. Trailing-stop transitions:
+   *   BREAKEVEN  — INITIAL → BREAKEVEN (price reached TP1, SL → entry)
+   *   TP1_LOCK   — BREAKEVEN → TP1_LOCK (price reached TP2, SL → TP1)
+   *   TP1_HIT    — partial close 50% at TP1 midpoint
+   *   TRAIL_UPD  — ATR ratchet within TRAILING phase
+   * Plus the legacy OPEN / CLOSE / MODIFY codes. */
   type: string;
   deal_reference: string | null;
   size: number | null;
@@ -657,6 +663,9 @@ export interface PositionEvent {
   profit_loss: number | null;
   commission: number | null;
   close_reason?: string | null;
+  /** Free-form audit reason. For trailing transitions this carries the
+   *  human-readable explanation rendered as a tooltip in the drawer. */
+  notes?: string | null;
   synthesised?: boolean;
 }
 

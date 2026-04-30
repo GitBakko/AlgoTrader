@@ -576,7 +576,9 @@ function adaptPosition(
   const risk = Math.abs(p.level - stopLoss) || 1;
   const reward = Math.abs(takeProfit - p.level);
   const rr = reward / risk;
-  const trailing = !!p.trailing_stop_phase && p.trailing_stop_phase !== 'INITIAL';
+  const phaseRaw = p.trailing_stop_phase as
+    | 'INITIAL' | 'BREAKEVEN' | 'TP1_LOCK' | 'TRAILING' | undefined;
+  const trailing = !!phaseRaw && phaseRaw !== 'INITIAL';
   // Real history from `position_pnl_snapshots`. Empty until the 60s
   // scheduler has captured at least one row; the chart honours that
   // and shows a "in attesa di tick…" placeholder rather than fabricating
@@ -598,6 +600,7 @@ function adaptPosition(
     pnlPct,
     ageSec,
     trailing,
+    trailingPhase: phaseRaw,
     rr,
     pricePath,
   };

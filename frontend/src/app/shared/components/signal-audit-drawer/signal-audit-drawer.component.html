@@ -429,7 +429,8 @@
                 @for (e of ev; track e.ts; let i = $index) {
                   <li class="ad-history__item"
                       [attr.data-type]="e.type"
-                      [class.ad-history__item--synth]="e.synthesised">
+                      [class.ad-history__item--synth]="e.synthesised"
+                      [title]="e.notes || ''">
                     <span class="ad-history__type mantis-mono">{{ e.type }}</span>
                     <span class="ad-history__ts mantis-mono">
                       {{ e.ts ? (e.ts | date:'dd/MM HH:mm:ss') : '—' }}
@@ -448,6 +449,9 @@
                     }
                     @if (e.close_reason) {
                       <span class="ad-history__reason mantis-mono">{{ e.close_reason }}</span>
+                    }
+                    @if (e.notes) {
+                      <span class="ad-history__note">{{ e.notes }}</span>
                     }
                   </li>
                 }

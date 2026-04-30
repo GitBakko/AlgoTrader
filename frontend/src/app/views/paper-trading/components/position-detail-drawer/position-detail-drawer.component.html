@@ -174,7 +174,8 @@
                   @for (e of ev; track e.ts; let i = $index) {
                     <li class="pdd-events__item"
                         [attr.data-type]="e.type"
-                        [class.pdd-events__item--synth]="e.synthesised">
+                        [class.pdd-events__item--synth]="e.synthesised"
+                        [title]="e.notes || ''">
                       <span class="pdd-events__type mantis-mono">{{ e.type }}</span>
                       <span class="pdd-events__ts mantis-mono">
                         {{ e.ts ? (e.ts | date:'dd/MM HH:mm:ss') : '—' }}
@@ -195,6 +196,9 @@
                       }
                       @if (e.close_reason) {
                         <span class="pdd-events__reason mantis-mono">{{ e.close_reason }}</span>
+                      }
+                      @if (e.notes) {
+                        <span class="pdd-events__note">{{ e.notes }}</span>
                       }
                     </li>
                   }

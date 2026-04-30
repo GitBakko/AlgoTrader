@@ -149,6 +149,10 @@ export interface PaperTradingPosition {
   /** Position uptime in seconds. */
   ageSec: number;
   trailing: boolean;
+  /** Current trailing-stop phase from the backend's TrailingStopManager.
+   *  Drives the colored phase badge on the card + tooltip explanation.
+   *  Undefined when the position is not under trailing management. */
+  trailingPhase?: 'INITIAL' | 'BREAKEVEN' | 'TP1_LOCK' | 'TRAILING';
   /** Risk-reward ratio achieved at current price. */
   rr: number;
   /** 60-point sparkline of price since entry. */

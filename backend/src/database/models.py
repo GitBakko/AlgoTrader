@@ -143,13 +143,19 @@ class Trade(SQLModel, table=True):
         sa_column=Column(BigInteger, ForeignKey("positions.id"), nullable=False, index=True)
     )
     deal_reference: str | None = Field(default=None, max_length=100)
-    trade_type: str = Field(max_length=10, nullable=False)  # OPEN, CLOSE, MODIFY
+    # 20 chars holds BREAKEVEN / TP1_LOCK / TRAIL_UPD / TP1_HIT trailing
+    # transition codes alongside the legacy OPEN / CLOSE / MODIFY.
+    trade_type: str = Field(max_length=20, nullable=False)
     epic: str = Field(max_length=50, nullable=False)
     direction: str = Field(max_length=4, nullable=False)  # BUY, SELL
     size: Decimal = Field(max_digits=10, decimal_places=4, nullable=False)
     price: Decimal = Field(max_digits=15, decimal_places=4, nullable=False)
     profit_loss: Decimal | None = Field(default=None, max_digits=15, decimal_places=2)
     commission: Decimal | None = Field(default=None, max_digits=10, decimal_places=4)
+    # Free-form audit note. Used by the trailing-stop manager to record the
+    # reason for a phase transition ("TP1 hit at 1973.37 → SL → 1964.40 BE").
+    # Surfaced verbatim in the position-detail-drawer History tab tooltip.
+    notes: str | None = Field(default=None, max_length=255)
     executed_at: datetime = Field(nullable=False, index=True)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),

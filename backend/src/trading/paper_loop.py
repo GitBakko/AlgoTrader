@@ -1664,6 +1664,76 @@ class PaperTradingLoop:
             except Exception as alert_err:
                 logger.warning(f"Unreconciled close alert failed: {alert_err}")
 
+    async def _persist_trailing_event(
+        self,
+        deal_id: str,
+        epic: str,
+        direction: str,
+        size: float,
+        price: float,
+        trade_type: str,
+        notes: str,
+        profit_loss: float | None = None,
+    ) -> None:
+        """Persist a trailing-stop transition (BREAKEVEN, TP1_LOCK, TRAIL_UPD,
+        TP1_HIT) as a row in the immutable `trades` audit table so the
+        position-detail-drawer History tab can render the full lineage with
+        a human-readable reason in `notes`.
+
+        `trade_type` is short (≤20 chars). `notes` carries the explanation
+        rendered as a tooltip in the UI.
+
+        Idempotent within a single position-id+trade_type combo would be
+        nice but is not enforced — phase transitions only fire once per
+        position lifecycle in `_update_trailing_stops`, and the trailing
+        manager's `unregister_position` removes state on close so a re-fire
+        of the same transition can't happen for an already-closed deal.
+        """
+        if self._db_session_factory is None:
+            return
+        try:
+            from decimal import Decimal
+
+            from src.database.models import Trade
+            from src.database.repositories import PositionRepository
+
+            async with self._db_session_factory() as session:
+                pos_repo = PositionRepository(session)
+                position = await pos_repo.get_by_deal_id(deal_id)
+                if position is None or position.id is None:
+                    logger.debug(
+                        f"[{epic}] _persist_trailing_event: position "
+                        f"{deal_id} not in DB — skipping {trade_type} row"
+                    )
+                    return
+                trade = Trade(
+                    position_id=position.id,
+                    deal_reference=deal_id,
+                    trade_type=trade_type,
+                    epic=epic,
+                    direction=direction,
+                    size=Decimal(str(size)),
+                    price=Decimal(str(price)),
+                    profit_loss=(
+                        Decimal(str(round(profit_loss, 2)))
+                        if profit_loss is not None
+                        else None
+                    ),
+                    notes=notes[:255] if notes else None,
+                    executed_at=datetime.now(UTC).replace(tzinfo=None),
+                )
+                session.add(trade)
+                await session.commit()
+                logger.info(
+                    f"[{epic}] Trailing event persisted: {trade_type} "
+                    f"@ {price:.4f} ({notes})"
+                )
+        except Exception as e:
+            logger.warning(
+                f"Trailing event persistence failed for {deal_id} "
+                f"({trade_type}): {e}"
+            )
+
     async def _persist_trailing_stop_state(self, deal_id: str) -> None:
         """
         Persist trailing stop state for a specific position.
@@ -3170,6 +3240,7 @@ class PaperTradingLoop:
             phase_before = (
                 TrailingPhase(state_before.phase) if state_before else TrailingPhase.INITIAL
             )
+            stop_before = float(state_before.current_stop) if state_before else None
 
             new_stop, phase = self.trailing_stop_manager.update_price(
                 deal_id=deal_id,
@@ -3186,12 +3257,97 @@ class PaperTradingLoop:
                 except Exception as e:
                     logger.debug(f"[{epic}] Stop update failed: {e}")
 
+                # Audit: persist trailing transition / SL move so the
+                # position-detail-drawer History tab can render the lineage
+                # with a human-readable reason. Phase transition codes:
+                #   BREAKEVEN  — INITIAL → BREAKEVEN (price reached TP1)
+                #   TP1_LOCK   — BREAKEVEN → TP1_LOCK (price reached TP2)
+                #   TRAIL_UPD  — ATR ratchet within TRAILING phase
+                # Same-phase SL move (ATR ratchet inside TRAILING) shows up
+                # as TRAIL_UPD with the new stop level in `notes`.
+                pos_size_now = float(position.get("size", 0) or 0)
+                pos_dir_now = position.get("direction", "BUY")
+                if phase != phase_before:
+                    if phase == TrailingPhase.BREAKEVEN:
+                        trade_type = "BREAKEVEN"
+                        reason = (
+                            f"TP1 hit at {current_price:.4f} → SL moved "
+                            f"to break-even {new_stop:.4f} (was {stop_before:.4f})"
+                        )
+                    elif phase == TrailingPhase.TP1_LOCK:
+                        trade_type = "TP1_LOCK"
+                        reason = (
+                            f"TP2 reached at {current_price:.4f} → SL "
+                            f"locked at TP1 {new_stop:.4f} (was {stop_before:.4f})"
+                        )
+                    elif phase == TrailingPhase.TRAILING:
+                        trade_type = "TRAIL_UPD"
+                        reason = (
+                            f"Trailing engaged at {current_price:.4f} "
+                            f"(ATR-anchored) → SL {new_stop:.4f} "
+                            f"(was {stop_before:.4f})"
+                        )
+                    else:
+                        trade_type = "MODIFY"
+                        reason = (
+                            f"SL moved to {new_stop:.4f} (was {stop_before:.4f}) "
+                            f"in phase {phase.name}"
+                        )
+                    await self._persist_trailing_event(
+                        deal_id=deal_id,
+                        epic=epic,
+                        direction=pos_dir_now,
+                        size=pos_size_now,
+                        price=current_price,
+                        trade_type=trade_type,
+                        notes=reason,
+                    )
+                elif phase == TrailingPhase.TRAILING and stop_before is not None:
+                    # ATR ratchet within TRAILING — log delta for audit, but
+                    # only when the move is meaningful (>0.5% of stop_before)
+                    # to avoid log spam on every minor recompute.
+                    rel = abs(new_stop - stop_before) / max(abs(stop_before), 1e-9)
+                    if rel >= 0.005:
+                        await self._persist_trailing_event(
+                            deal_id=deal_id,
+                            epic=epic,
+                            direction=pos_dir_now,
+                            size=pos_size_now,
+                            price=current_price,
+                            trade_type="TRAIL_UPD",
+                            notes=(
+                                f"ATR ratchet at {current_price:.4f} → SL "
+                                f"{new_stop:.4f} (was {stop_before:.4f})"
+                            ),
+                        )
+
             # Phase 8: partial close at TP1 (INITIAL → BREAKEVEN transition)
             if phase == TrailingPhase.BREAKEVEN and phase_before == TrailingPhase.INITIAL:
                 try:
                     result = await self.execution_engine.partial_close(deal_id, 0.5, "TP1_HIT")
                     if result.success:
                         logger.info(f"[{epic}] TP1 hit: closed 50% of position")
+                        # Audit: persist the TP1 partial close as its own
+                        # row so the drawer can show the realized profit
+                        # alongside the BREAKEVEN SL move.
+                        partial_pnl = None
+                        try:
+                            partial_pnl = float(getattr(result, "profit_loss", None) or 0) or None
+                        except (TypeError, ValueError):
+                            partial_pnl = None
+                        await self._persist_trailing_event(
+                            deal_id=deal_id,
+                            epic=epic,
+                            direction=position.get("direction", "BUY"),
+                            size=float(position.get("size", 0) or 0) * 0.5,
+                            price=current_price,
+                            trade_type="TP1_HIT",
+                            notes=(
+                                f"TP1 partial close 50% at {current_price:.4f} "
+                                f"— strategy-anchored TP ladder midpoint reached"
+                            ),
+                            profit_loss=partial_pnl,
+                        )
                         # In DEMO/LIVE mode, partial_close returns a NEW deal_id
                         # (close + reopen). Update trailing stop tracking if changed.
                         new_deal_id = result.deal_id

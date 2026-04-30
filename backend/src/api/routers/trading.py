@@ -910,6 +910,7 @@ async def get_position_events(
                 "price": float(t.price) if t.price is not None else None,
                 "profit_loss": float(t.profit_loss) if t.profit_loss is not None else None,
                 "commission": float(t.commission) if t.commission is not None else None,
+                "notes": t.notes,
             }
         )
 
