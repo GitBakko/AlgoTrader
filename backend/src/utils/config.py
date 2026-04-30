@@ -243,11 +243,15 @@ class Settings(BaseSettings):
     # SL/TP P&L is only a few cents — uneconomical against spread+slippage.
     # This multiplier scales the per-trade exposure cap for USD-base
     # forex pairs only, leveraging the broker's higher leverage tier
-    # (Capital.com forex demo: 30:1). Default 30.0 produces a USDJPY cap
-    # of ~30x the stock-equivalent cap. Stocks/crypto/commodities/indices
-    # are unaffected.
+    # (Capital.com forex demo: 30:1 retail, can be higher pro-tier).
+    # Default 60.0 (post 2026-04-30) produces a USDJPY cap of ~60x the
+    # stock-equivalent cap so the post-sizing risk floor (MIN_RISK_AMOUNT_USD)
+    # can actually be met under typical MR stop_distance (~0.5–1 JPY).
+    # Bumped from 30.0 after live observation: USDJPY landed at ~$1.46 risk
+    # under cap-bounded sizing, far below the user-target ~$10/hit.
+    # Stocks/crypto/commodities/indices unaffected.
     forex_usd_base_size_multiplier: float = Field(
-        default=30.0, alias="FOREX_USD_BASE_SIZE_MULTIPLIER"
+        default=60.0, alias="FOREX_USD_BASE_SIZE_MULTIPLIER"
     )
 
     # Mean Reversion Strategy
@@ -277,8 +281,20 @@ class Settings(BaseSettings):
     # Risk is `position_size × stop_distance` converted to USD via the
     # quote currency. Trades whose computed risk falls below this floor
     # are first lifted (capped by `max_position_pct`) and rejected with
-    # `error.min_notional` if the lift would breach the exposure cap.
-    min_risk_amount_usd: float = Field(default=5.0, alias="MIN_RISK_AMOUNT_USD")
+    # `error.min_risk` if the lift would breach the exposure cap.
+    # Bumped 2026-04-30: $5 → $10 to match user target of ~1‰ equity per
+    # SL/TP hit (≈ $11 on $11k initial). Sub-$10 forex trades produced
+    # $0.02–$1.46 P&L per hit in production — uneconomical noise.
+    min_risk_amount_usd: float = Field(default=10.0, alias="MIN_RISK_AMOUNT_USD")
+    # Forex-specific: when True (default) the cap-fallback approve path
+    # in RiskManager step 7-bis is DISABLED for forex pairs. Sub-floor
+    # forex signals are rejected outright instead of opening micro-trades
+    # whose realised risk is < MIN_RISK_AMOUNT_USD. Non-forex still uses
+    # cap-fallback (legacy behavior preserved). User invariant: never
+    # open forex positions with sub-$10 USD risk per hit.
+    forex_strict_min_risk: bool = Field(
+        default=True, alias="FOREX_STRICT_MIN_RISK"
+    )
 
     # Regime Gate (Phase 2)
     regime_gate_enabled: bool = Field(default=False, alias="REGIME_GATE_ENABLED")

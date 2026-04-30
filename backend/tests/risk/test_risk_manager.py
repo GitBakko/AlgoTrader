@@ -12,6 +12,7 @@ def _non_scalp_settings(
     min_risk_amount_usd: float = 0.0,
     min_notional_usd: float = 0.0,
     forex_usd_base_size_multiplier: float = 1.0,
+    forex_strict_min_risk: bool = False,
 ):
     """Settings mock used by the legacy risk-manager tests.
 
@@ -19,13 +20,16 @@ def _non_scalp_settings(
     existed keep passing. New tests pass explicit values to exercise the
     floor logic. ``forex_usd_base_size_multiplier`` defaults to 1.0 so the
     leverage-aware cap behaves identically to the legacy stock cap unless
-    a test opts in.
+    a test opts in. ``forex_strict_min_risk`` defaults to False so legacy
+    cap-fallback approve path is exercised; opt in to verify the strict
+    reject path.
     """
     s = MagicMock()
     s.scalp_mode_enabled = False
     s.min_risk_amount_usd = min_risk_amount_usd
     s.min_notional_usd = min_notional_usd
     s.forex_usd_base_size_multiplier = forex_usd_base_size_multiplier
+    s.forex_strict_min_risk = forex_strict_min_risk
     return s
 
 
@@ -318,6 +322,51 @@ class TestRiskManager:
         # fail other checks, but not min_notional.
         if not result.approved:
             assert "min_notional" not in (result.rejection_reason or "").lower()
+
+    def test_forex_strict_min_risk_rejects_when_cap_blocks_floor(self):
+        """User invariant (2026-04-30): with forex_strict_min_risk=True,
+        a forex pair whose cap-bounded risk falls below MIN_RISK_AMOUNT_USD
+        must be REJECTED instead of approved at sub-floor. Non-forex pairs
+        keep the cap-fallback approve path.
+        """
+        with patch(
+            "src.risk.risk_manager.get_settings",
+            return_value=_non_scalp_settings(
+                min_risk_amount_usd=10.0,
+                forex_usd_base_size_multiplier=60.0,
+                forex_strict_min_risk=True,
+            ),
+        ):
+            rm = RiskManager(initial_equity=11000.0)
+            # USDJPY entry 159, ATR 0.05 → SL distance 0.10. Cap with 60×
+            # multiplier ≈ 830 units. Risk ≈ (830 × 0.10) / 159 ≈ $0.52,
+            # far below $10 floor. Must reject under strict mode.
+            signal = _make_signal(epic="USDJPY", price=159.0)
+            result = rm.check_trade(signal=signal, equity=11000.0, atr=0.05)
+            assert result.approved is False
+            assert "min_risk" in (result.rejection_reason or "").lower()
+            audit = result.audit.get("min_risk_floor", {}) if result.audit else {}
+            assert audit.get("approved") is False
+            assert audit.get("rejection") == "forex_strict_min_risk"
+
+    def test_forex_strict_min_risk_off_still_approves_with_cap_fallback(self):
+        """Backwards compat: when forex_strict_min_risk=False (legacy),
+        cap-fallback approve path is exercised even on forex.
+        """
+        with patch(
+            "src.risk.risk_manager.get_settings",
+            return_value=_non_scalp_settings(
+                min_risk_amount_usd=10.0,
+                forex_usd_base_size_multiplier=60.0,
+                forex_strict_min_risk=False,
+            ),
+        ):
+            rm = RiskManager(initial_equity=11000.0)
+            signal = _make_signal(epic="USDJPY", price=159.0)
+            result = rm.check_trade(signal=signal, equity=11000.0, atr=0.05)
+            assert result.approved is True
+            audit = result.audit.get("min_risk_floor", {}) if result.audit else {}
+            assert audit.get("lift_bounded_by_cap") is True
 
     def test_min_risk_floor_passes_for_realistic_btc_trade(self):
         """BTC trade with stop_distance large enough to clear $5 floor is

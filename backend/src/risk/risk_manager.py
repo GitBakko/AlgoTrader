@@ -485,19 +485,60 @@ class RiskManager:
                     return RiskCheckResult(
                         approved=False,
                         rejection_reason=(
-                            f"error.min_notional risk_amount=${risk_amount_usd:.2f} "
+                            f"error.min_risk risk_amount=${risk_amount_usd:.2f} "
                             f"< floor=${min_risk_floor:.2f} and exposure cap "
                             f"is non-positive"
                         ),
                         audit=audit,
                     )
+                lift_bounded_by_cap = final_size < lifted_size
+
+                # FOREX strict mode: when the cap blocks the floor lift on a
+                # forex pair, REJECT instead of approving a sub-floor trade.
+                # Rationale: forex positions whose realised SL/TP P&L is sub-
+                # $10 are noise vs. spread+slippage and clutter the audit
+                # without producing meaningful equity moves. User invariant:
+                # forex positions must risk ≥ MIN_RISK_AMOUNT_USD per hit.
+                # Non-forex still falls through to the legacy cap-fallback
+                # approve so that single-share trades on expensive stocks
+                # (NVDA, TSLA) can still go through during low-equity periods.
+                forex_strict = bool(_risk_settings.forex_strict_min_risk)
+                is_forex = signal.epic in FOREX_ASSETS
+                if lift_bounded_by_cap and forex_strict and is_forex:
+                    final_risk_under_cap = _compute_risk_usd(
+                        epic=signal.epic,
+                        entry=signal.entry_price,
+                        stop_loss=stop_loss,
+                        size=final_size,
+                    )
+                    audit["min_risk_floor"] = {
+                        "computed_risk_usd": round(risk_amount_usd, 4),
+                        "floor_usd": min_risk_floor,
+                        "intended_lifted_size": round(lifted_size, 6),
+                        "cap_bounded_size": round(final_size, 6),
+                        "cap_bounded_risk_usd": round(final_risk_under_cap, 4),
+                        "max_size_by_exposure": round(max_size_by_exposure, 6),
+                        "approved": False,
+                        "rejection": "forex_strict_min_risk",
+                    }
+                    return RiskCheckResult(
+                        approved=False,
+                        rejection_reason=(
+                            f"error.min_risk forex {signal.epic} cap-bounded "
+                            f"risk ${final_risk_under_cap:.2f} < floor "
+                            f"${min_risk_floor:.2f} (intended size {lifted_size:.4f}, "
+                            f"cap-bounded {final_size:.4f}). Widen stop_distance "
+                            f"or raise FOREX_USD_BASE_SIZE_MULTIPLIER."
+                        ),
+                        audit=audit,
+                    )
+
                 final_risk = _compute_risk_usd(
                     epic=signal.epic,
                     entry=signal.entry_price,
                     stop_loss=stop_loss,
                     size=final_size,
                 )
-                lift_bounded_by_cap = final_size < lifted_size
                 if lift_bounded_by_cap:
                     adjustments.append(
                         f"MIN_RISK_AMOUNT_USD floor capped by exposure cap "
