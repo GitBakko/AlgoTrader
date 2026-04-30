@@ -562,6 +562,13 @@ export interface SignalAudit {
    *  Present only when status='EXECUTED' AND the signal is wired to a
    *  positions row. Used to drive the History tab in the audit drawer. */
   deal_id?: string | null;
+  /** Position lifecycle status from positions.status (OPEN/CLOSED).
+   *  Distinct from `status` (signal status: EXECUTED/REJECTED). */
+  position_status?: 'OPEN' | 'CLOSED' | null;
+  /** Position close_reason from positions.close_reason (TP/SL/MANUAL/...). */
+  close_reason?: string | null;
+  /** Realised P&L from positions.profit_loss (null while position is open). */
+  position_profit_loss?: number | null;
   features: SignalFeatures;
 }
 

@@ -56,12 +56,28 @@ export class SignalAuditDrawerComponent {
     const audit = this.auditService.currentAudit();
     if (!audit) return 'none';
     if (audit.status !== 'EXECUTED') return 'none';
-    // Live broker position present → trade still open.
+    // Authoritative source: positions.status from backend audit response.
+    // Falls back to events / livePosition only when the backend did not
+    // populate position_status (legacy audits, missing positions row).
+    const posStatus = audit.position_status;
+    if (posStatus === 'CLOSED') {
+      const reason = (audit.close_reason || '').toUpperCase();
+      if (reason === 'TP') return 'tp';
+      if (reason === 'SL') return 'sl';
+      if (reason === 'MANUAL') return 'manual';
+      if (reason === 'UNRECONCILED') return 'unreconciled';
+      // Fall back to realised P&L sign when close_reason is missing.
+      const pl = audit.position_profit_loss;
+      if (pl != null) return pl >= 0 ? 'tp' : 'sl';
+      return 'unreconciled';
+    }
+    if (posStatus === 'OPEN') return 'going';
+
+    // Legacy fallback (no position_status from backend): use livePosition
+    // matched by deal_id. Avoid epic-only matching — that falsely flags
+    // closed audits as GOING when a newer position on the same epic is
+    // currently open.
     if (this.livePosition()) return 'going';
-    // Inspect persisted events for close reason. The events list is fetched
-    // lazily so this falls back to 'going' until History tab loads — but the
-    // overview/audit body has the live position card to disambiguate when
-    // events are still null.
     const ev = this.events();
     if (ev) {
       const close = ev.find((e) => e.type === 'CLOSE');
@@ -70,12 +86,11 @@ export class SignalAuditDrawerComponent {
       if (reason === 'SL') return 'sl';
       if (reason === 'MANUAL') return 'manual';
       if (reason === 'UNRECONCILED') return 'unreconciled';
-      // Fall back to P&L sign when close_reason is missing.
       if (close?.profit_loss != null) {
         return close.profit_loss >= 0 ? 'tp' : 'sl';
       }
     }
-    return 'going';
+    return 'unreconciled';
   });
 
   outcomeBadgeLabel(badge: OutcomeBadge): string {
@@ -126,11 +141,15 @@ export class SignalAuditDrawerComponent {
     this.activeTab.set('audit');
   }
 
-  // Live position for this epic (if open on broker)
+  // Live position for THIS audit's deal_id (matches by deal_id, not epic
+  // — multiple positions on the same epic over time would otherwise all
+  // resolve to the currently-open one and falsely badge closed audits as
+  // GOING).
   readonly livePosition = computed<PaperPosition | null>(() => {
-    const epic = this.auditService.currentAudit()?.epic;
-    if (!epic) return null;
-    return this.trading.paperPositions().find(p => p.epic === epic) ?? null;
+    const audit = this.auditService.currentAudit();
+    const dealId = audit?.deal_id ?? null;
+    if (!dealId) return null;
+    return this.trading.paperPositions().find(p => p.deal_id === dealId) ?? null;
   });
 
   // Live P&L for open position
