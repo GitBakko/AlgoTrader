@@ -17,7 +17,8 @@ import { SpinnerComponent } from '@coreui/angular';
 import { SlCooldownInfo, PaperPosition, PositionEvent } from '../../../core/models';
 import { WebSocketService } from '../../../core/services/websocket.service';
 
-type AuditDrawerTab = 'overview' | 'audit' | 'history';
+type AuditDrawerTab = 'audit' | 'history';
+type OutcomeBadge = 'going' | 'tp' | 'sl' | 'manual' | 'unreconciled' | 'none';
 
 @Component({
   selector: 'app-signal-audit-drawer',
@@ -37,11 +38,56 @@ export class SignalAuditDrawerComponent {
    *  REJECTED signals (no position) skip tabs and show the audit body
    *  directly — tabs would be misleading without a position to overview
    *  or a history timeline. */
-  readonly activeTab = signal<AuditDrawerTab>('overview');
+  readonly activeTab = signal<AuditDrawerTab>('audit');
   readonly hasTabs = computed<boolean>(() => {
     const audit = this.auditService.currentAudit();
     return !!(audit && audit.status === 'EXECUTED' && audit.deal_id);
   });
+
+  /** Outcome badge for the header strip.
+   *  - going: position currently open at broker
+   *  - tp: closed at take-profit (or close_reason='TP')
+   *  - sl: closed at stop-loss (or close_reason='SL')
+   *  - manual: closed by user/admin
+   *  - unreconciled: close detected but P&L could not be reconciled
+   *  - none: signal rejected or no position info
+   */
+  readonly outcomeBadge = computed<OutcomeBadge>(() => {
+    const audit = this.auditService.currentAudit();
+    if (!audit) return 'none';
+    if (audit.status !== 'EXECUTED') return 'none';
+    // Live broker position present → trade still open.
+    if (this.livePosition()) return 'going';
+    // Inspect persisted events for close reason. The events list is fetched
+    // lazily so this falls back to 'going' until History tab loads — but the
+    // overview/audit body has the live position card to disambiguate when
+    // events are still null.
+    const ev = this.events();
+    if (ev) {
+      const close = ev.find((e) => e.type === 'CLOSE');
+      const reason = (close?.close_reason || '').toUpperCase();
+      if (reason === 'TP') return 'tp';
+      if (reason === 'SL') return 'sl';
+      if (reason === 'MANUAL') return 'manual';
+      if (reason === 'UNRECONCILED') return 'unreconciled';
+      // Fall back to P&L sign when close_reason is missing.
+      if (close?.profit_loss != null) {
+        return close.profit_loss >= 0 ? 'tp' : 'sl';
+      }
+    }
+    return 'going';
+  });
+
+  outcomeBadgeLabel(badge: OutcomeBadge): string {
+    switch (badge) {
+      case 'going': return 'GOING';
+      case 'tp': return 'TP';
+      case 'sl': return 'SL';
+      case 'manual': return 'MANUAL';
+      case 'unreconciled': return 'UNRECONCILED';
+      default: return '';
+    }
+  }
 
   readonly events = signal<PositionEvent[] | null>(null);
   readonly eventsLoading = signal<boolean>(false);
@@ -75,12 +121,9 @@ export class SignalAuditDrawerComponent {
     this.events.set(null);
     this.eventsError.set(null);
     this.inflightDealId = null;
-    // Default tab depends on whether we have tabs at all.
-    if (status === 'EXECUTED' && dealId) {
-      this.activeTab.set('overview');
-    } else {
-      this.activeTab.set('audit');
-    }
+    // Default tab is always 'audit' (overview was redundant — its content
+    // duplicated info already visible in the header + audit cards).
+    this.activeTab.set('audit');
   }
 
   // Live position for this epic (if open on broker)
@@ -144,7 +187,7 @@ export class SignalAuditDrawerComponent {
       .subscribe({
         next: (data) => {
           if (this.inflightDealId !== dealId) return;
-          this.events.set(data?.events ?? []);
+          this.events.set(this._dedupeEvents(data?.events ?? []));
           this.eventsLoading.set(false);
         },
         error: () => {
@@ -153,6 +196,40 @@ export class SignalAuditDrawerComponent {
           this.eventsLoading.set(false);
         },
       });
+  }
+
+  /** Defensive dedupe: when both v1 and v2 close detectors persist a CLOSE
+   *  Trade row for the same deal (or when reconciler ticks twice with the
+   *  same disappeared position), the API surfaces both. The duplicate row
+   *  often carries the entry price as a fallback when the broker exit
+   *  price was unknown. Keep the row whose price moves furthest from the
+   *  position's entry price (= the real fill); drop the other.
+   */
+  private _dedupeEvents(events: PositionEvent[]): PositionEvent[] {
+    const audit = this.auditService.currentAudit();
+    const entry = audit?.entry_price ?? null;
+    const closes = events.filter((e) => e.type === 'CLOSE');
+    if (closes.length <= 1) return events;
+    let keep: PositionEvent | null = null;
+    if (entry != null) {
+      // Real exit price diverges from entry; entry-fallback CLOSE rows match
+      // entry exactly, so prefer the row whose price is furthest from entry.
+      let bestDist = -Infinity;
+      for (const c of closes) {
+        const p = c.price;
+        if (p == null) continue;
+        const d = Math.abs(p - entry);
+        if (d > bestDist) {
+          bestDist = d;
+          keep = c;
+        }
+      }
+    }
+    // Fallback when no entry context: prefer the latest non-null-price row.
+    if (!keep) {
+      keep = closes.find((c) => c.price != null) ?? closes[0];
+    }
+    return events.filter((e) => e.type !== 'CLOSE' || e === keep);
   }
 
   @HostListener('document:keydown.escape')

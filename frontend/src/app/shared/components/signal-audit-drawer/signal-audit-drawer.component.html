@@ -26,6 +26,13 @@
             {{ audit.direction === 'BUY' ? '▲ BUY' : audit.direction === 'SELL' ? '▼ SELL' : '◇ HOLD' }}
           </span>
           <span class="ad-head__status mantis-mono">{{ audit.status }}</span>
+          @if (audit.status === 'EXECUTED' && outcomeBadge() !== 'none') {
+            <span class="ad-head__outcome mantis-mono"
+                  [attr.data-outcome]="outcomeBadge()"
+                  [attr.title]="'Outcome: ' + outcomeBadgeLabel(outcomeBadge())">
+              {{ outcomeBadgeLabel(outcomeBadge()) }}
+            </span>
+          }
         </div>
       </div>
 
@@ -76,12 +83,6 @@
         <button type="button"
                 class="ad-tab mantis-mono"
                 role="tab"
-                [attr.aria-selected]="activeTab() === 'overview'"
-                [class.ad-tab--active]="activeTab() === 'overview'"
-                (click)="setTab('overview')">Overview</button>
-        <button type="button"
-                class="ad-tab mantis-mono"
-                role="tab"
                 [attr.aria-selected]="activeTab() === 'audit'"
                 [class.ad-tab--active]="activeTab() === 'audit'"
                 (click)="setTab('audit')">Audit</button>
@@ -97,7 +98,7 @@
     <div class="ad-body">
 
       <!-- Rejection / outcome banner -->
-      @if (!hasTabs() || activeTab() === 'overview') {
+      @if (!hasTabs() || activeTab() === 'audit') {
       @if (audit.features.rejection_reason) {
         <section class="ad-card ad-card--reject" aria-label="Motivo rifiuto">
           <span class="ad-card__icon" aria-hidden="true">⨯</span>
@@ -118,7 +119,7 @@
       }
 
       <!-- Live position (broker) -->
-      @if (!hasTabs() || activeTab() === 'overview') {
+      @if (!hasTabs() || activeTab() === 'audit') {
       @if (livePosition(); as pos) {
         <section class="ad-card ad-card--live">
           <header class="ad-card__head">

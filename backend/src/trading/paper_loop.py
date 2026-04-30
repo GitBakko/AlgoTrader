@@ -688,23 +688,50 @@ class PaperTradingLoop:
                     await session.flush()
                     await session.refresh(pos)
 
-                # Create CLOSE trade record
-                trade = Trade(
-                    position_id=pos.id,
-                    deal_reference=deal_id,
-                    trade_type="CLOSE",
-                    epic=epic,
-                    direction=direction,
-                    size=Decimal(str(size)),
-                    price=Decimal(str(exit_price)),
-                    profit_loss=pnl_decimal,
-                    executed_at=datetime.now(UTC).replace(tzinfo=None),
-                )
-                session.add(trade)
-                await session.commit()
-                logger.info(
-                    f"Persisted CLOSED position to DB: {deal_id} ({epic} P&L={pnl_repr} reason={close_reason})"
-                )
+                # Idempotency: skip the CLOSE Trade row if one already exists
+                # for this position. Both v1 and v2 close detectors can fire
+                # for the same disappeared broker position (especially during
+                # the dealId-rotation second-chance path), and reconciler
+                # ticks may also re-detect a close already finalised in a
+                # previous tick. Without this guard the trades audit table
+                # accumulates duplicates: the first row with the real exit
+                # price, then a second row whose price falls back to the
+                # entry (because the second caller no longer has live broker
+                # context).
+                from sqlalchemy import select as _sa_select
+
+                existing_close_q = _sa_select(Trade).where(
+                    Trade.position_id == pos.id,
+                    Trade.trade_type == "CLOSE",
+                ).limit(1)
+                existing_close = (
+                    await session.execute(existing_close_q)
+                ).scalar_one_or_none()
+                if existing_close is not None:
+                    await session.commit()
+                    logger.info(
+                        f"Skip duplicate CLOSE Trade row for {deal_id} — "
+                        f"position {pos.id} already has trade {existing_close.id} "
+                        f"(idempotency guard)"
+                    )
+                else:
+                    # Create CLOSE trade record
+                    trade = Trade(
+                        position_id=pos.id,
+                        deal_reference=deal_id,
+                        trade_type="CLOSE",
+                        epic=epic,
+                        direction=direction,
+                        size=Decimal(str(size)),
+                        price=Decimal(str(exit_price)),
+                        profit_loss=pnl_decimal,
+                        executed_at=datetime.now(UTC).replace(tzinfo=None),
+                    )
+                    session.add(trade)
+                    await session.commit()
+                    logger.info(
+                        f"Persisted CLOSED position to DB: {deal_id} ({epic} P&L={pnl_repr} reason={close_reason})"
+                    )
         except Exception as e:
             logger.warning(f"Position close persistence failed for {deal_id}: {e}")
 
