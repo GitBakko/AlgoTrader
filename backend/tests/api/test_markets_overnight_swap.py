@@ -22,11 +22,19 @@ class TestOvernightSwap:
         assert data["next_charge_utc"].endswith("+00:00")
 
     def test_broker_rate_preferred_over_static(self, client):
+        # Capital.com schema: instrument.overnightFee.{longRate, shortRate}
+        # (per-interval percentages). Older test used overnightBuy /
+        # overnightSell which the route never reads.
+        # Capital.com schema: instrument.overnightFee.{longRate, shortRate}
+        # are **percentages** per `swapChargeInterval`. The route exposes a
+        # fraction-equivalent (`*_daily = pct / 100`) for legacy clients.
         broker = AsyncMock()
         broker.get_market_details = AsyncMock(return_value={
             "instrument": {
-                "overnightBuy": -0.000222,
-                "overnightSell": -0.000111,
+                "overnightFee": {
+                    "longRate": -0.0222,
+                    "shortRate": -0.0111,
+                },
                 "currency": "USD",
             },
             "snapshot": {"bid": 1, "offer": 1.01},
@@ -37,6 +45,8 @@ class TestOvernightSwap:
             assert resp.status_code == 200
             data = resp.json()["data"]
             assert data["source"] == "broker"
+            assert data["long_rate_pct"] == pytest.approx(-0.0222)
+            assert data["short_rate_pct"] == pytest.approx(-0.0111)
             assert data["long_rate_daily"] == pytest.approx(-0.000222)
             assert data["short_rate_daily"] == pytest.approx(-0.000111)
             assert data["currency"] == "USD"

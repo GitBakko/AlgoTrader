@@ -162,9 +162,13 @@ class TestPaperTradingLoop:
         assert "models_loaded" in status
         assert "open_positions" in status
 
-    def test_last_signals_tracked(self, paper_loop):
+    @pytest.mark.asyncio
+    async def test_last_signals_tracked(self, paper_loop):
         """Last signals per epic are tracked after iteration."""
-        asyncio.get_event_loop().run_until_complete(paper_loop._run_iteration())
+        # Was a sync test that called `asyncio.get_event_loop().run_until_complete`,
+        # which fights pytest-asyncio's per-test loop and broke when other
+        # async tests left scheduled coroutines pending in the policy loop.
+        await paper_loop._run_iteration()
 
         assert "XAUUSD" in paper_loop.last_signals
         signal_info = paper_loop.last_signals["XAUUSD"]

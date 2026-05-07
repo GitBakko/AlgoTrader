@@ -13,12 +13,21 @@ from src.execution.schemas import ExecutionResult
 
 @pytest.fixture
 def mock_paper_loop():
-    """Create a paper loop with mocked dependencies."""
+    """Create a paper loop with mocked dependencies.
+
+    Post 2026-05-04 fix: ``_check_stop_losses`` reads live price exclusively
+    from ``broker.get_market_details(epic).snapshot.{bid,offer}`` (candle
+    close was the source of a destructive partial-close loop on BTCUSD).
+    Tests mock the broker snapshot and use ``_set_broker_price`` helper to
+    drive the trigger logic.
+    """
     prediction_service = MagicMock()
     strategy_manager = MagicMock()
     risk_manager = MagicMock()
     execution_engine = MagicMock()
     data_access = MagicMock()
+    broker = MagicMock()
+    broker.get_market_details = AsyncMock(return_value={"snapshot": {"bid": 0.0, "offer": 0.0}})
 
     loop = PaperTradingLoop(
         prediction_service=prediction_service,
@@ -26,10 +35,19 @@ def mock_paper_loop():
         risk_manager=risk_manager,
         execution_engine=execution_engine,
         data_access=data_access,
+        broker=broker,
         epics=["XAUUSD", "BTCUSD"],
     )
 
     return loop
+
+
+def _set_broker_price(loop, price: float) -> None:
+    """Helper: configure mocked broker snapshot to return ``price`` as both
+    bid and offer so direction-based picking gives the same value."""
+    loop.broker.get_market_details = AsyncMock(
+        return_value={"snapshot": {"bid": price, "offer": price}}
+    )
 
 
 @pytest.mark.asyncio
@@ -47,10 +65,7 @@ async def test_long_position_sl_violated(mock_paper_loop):
     }
 
     # Current price = 1985 (BELOW SL → should close)
-    mock_paper_loop.data_access.get_latest_price.return_value = {
-        "timestamp": datetime.now(timezone.utc),
-        "close": 1985.0,
-    }
+    _set_broker_price(mock_paper_loop, 1985.0)
 
     # Mock close_position to succeed
     mock_paper_loop.execution_engine.close_position = AsyncMock(
@@ -86,10 +101,7 @@ async def test_short_position_sl_violated(mock_paper_loop):
     }
 
     # Current price = 2015 (ABOVE SL → should close)
-    mock_paper_loop.data_access.get_latest_price.return_value = {
-        "timestamp": datetime.now(timezone.utc),
-        "close": 2015.0,
-    }
+    _set_broker_price(mock_paper_loop, 2015.0)
 
     # Mock close_position to succeed
     mock_paper_loop.execution_engine.close_position = AsyncMock(
@@ -122,10 +134,7 @@ async def test_long_position_sl_not_violated(mock_paper_loop):
     }
 
     # Current price = 2005 (ABOVE SL → should NOT close)
-    mock_paper_loop.data_access.get_latest_price.return_value = {
-        "timestamp": datetime.now(timezone.utc),
-        "close": 2005.0,
-    }
+    _set_broker_price(mock_paper_loop, 2005.0)
 
     # Mock close_position
     mock_paper_loop.execution_engine.close_position = AsyncMock()
@@ -152,10 +161,7 @@ async def test_short_position_sl_not_violated(mock_paper_loop):
     }
 
     # Current price = 1995 (BELOW SL → should NOT close)
-    mock_paper_loop.data_access.get_latest_price.return_value = {
-        "timestamp": datetime.now(timezone.utc),
-        "close": 1995.0,
-    }
+    _set_broker_price(mock_paper_loop, 1995.0)
 
     # Mock close_position
     mock_paper_loop.execution_engine.close_position = AsyncMock()
@@ -182,10 +188,7 @@ async def test_position_without_sl_ignored(mock_paper_loop):
     }
 
     # Current price = 1900 (below entry, but no SL set)
-    mock_paper_loop.data_access.get_latest_price.return_value = {
-        "timestamp": datetime.now(timezone.utc),
-        "close": 1900.0,
-    }
+    _set_broker_price(mock_paper_loop, 1900.0)
 
     # Mock close_position
     mock_paper_loop.execution_engine.close_position = AsyncMock()

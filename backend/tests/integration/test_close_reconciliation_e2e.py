@@ -66,6 +66,13 @@ def loop_for_e2e():
     loop._on_position_closed = MagicMock()
     loop._log_source = "demo_trading"
 
+    # CloseDetector v2 lazy-init attrs (post-2026-04-22).  __init__ is
+    # bypassed via __new__, so set the contract surface manually so
+    # _get_close_detector returns None cleanly when broker is absent.
+    loop._close_detector = None
+    loop._account_currency = "USD"
+    loop.broker = None
+
     return loop
 
 

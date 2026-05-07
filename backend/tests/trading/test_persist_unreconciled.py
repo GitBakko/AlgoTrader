@@ -18,9 +18,16 @@ def loop_with_db():
     # Build a fake Position repo that returns None (position never persisted)
     repo = MagicMock()
     repo.get_by_deal_id = AsyncMock(return_value=None)
+    # 2026-04-23 dealId-rotation fallback also runs when get_by_deal_id is None.
+    # Auto-generated child mocks default to MagicMock — make this one
+    # AsyncMock explicitly so the `await` site does not blow up.
+    repo.find_open_by_epic_direction_entry = AsyncMock(return_value=None)
 
-    # create returns the Position it was given (populated with an id)
-    async def _create(p):
+    # create returns the Position it was given (populated with an id).
+    # NOTE: AsyncMock with an *async* side_effect returns the coroutine
+    # unawaited on Python 3.11; use a sync side_effect so AsyncMock
+    # returns the value directly.
+    def _create(p):
         p.id = 1
         return p
 
@@ -54,12 +61,17 @@ async def test_persist_with_pnl_none_writes_null(loop_with_db, monkeypatch):
     Trade.profit_loss is NULL, commit still succeeds, no round() crash."""
     loop, repo, session = loop_with_db
 
+    # Force the idempotency-guard SELECT to return None so the CLOSE Trade
+    # insert path actually runs (post-2026-04-30 commit `ce2c3e1`).
+    session.execute = AsyncMock(
+        return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None))
+    )
+
     captured = {"position": None, "trade": None}
 
     from src.database import models as _models
 
     real_position = _models.Position
-    real_trade = _models.Trade
 
     def _capture_position(**kw):
         p = real_position(**kw)
@@ -67,13 +79,15 @@ async def test_persist_with_pnl_none_writes_null(loop_with_db, monkeypatch):
         captured["position"] = p
         return p
 
-    def _capture_trade(**kw):
-        t = real_trade(**kw)
-        captured["trade"] = t
-        return t
-
     monkeypatch.setattr("src.database.models.Position", _capture_position)
-    monkeypatch.setattr("src.database.models.Trade", _capture_trade)
+
+    # Capture the Trade arg passed to session.add (Trade class stays
+    # untouched so SQLAlchemy can still resolve `Trade.position_id`).
+    def _capture_add(obj):
+        if obj.__class__.__name__ == "Trade":
+            captured["trade"] = obj
+
+    session.add.side_effect = _capture_add
 
     # Monkeypatch the repo class used inside the method
     from src.database import repositories as _repos

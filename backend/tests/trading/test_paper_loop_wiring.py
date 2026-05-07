@@ -181,13 +181,17 @@ class TestTrailingStopRegistration:
         with patch.object(loop.trailing_stop_manager, "register_position") as mock_reg:
             await loop._run_iteration(force=True)
 
+            # Post-fill drift normalization (2026-04-29): SL/TP shifted by
+            # (fill_price - signal.entry_price) to preserve R:R distance.
+            # Strategy-anchored ladder (8288cad): take_profit forwarded.
             mock_reg.assert_called_once_with(
                 deal_id="DEAL-001",
                 epic="XAUUSD",
                 direction="BUY",
                 entry_price=2001.0,
-                stop_loss=1980.0,
+                stop_loss=1981.0,
                 atr=20.0,
+                take_profit=2041.0,
             )
 
     @pytest.mark.asyncio
@@ -223,8 +227,16 @@ class TestTrailingStopUpdateIteration:
             atr=20.0,
         )
 
-        # Simulate an open position returned by execution engine
-        positions = [{"deal_id": "DEAL-100", "epic": "XAUUSD", "level": 2010.0}]
+        # Live price source is broker.get_market_details (post-2026-05-04 fix
+        # for BTCUSD partial-close loop). `position.level` is no longer used
+        # for the trailing tick — only deal_id + epic + direction.
+        loop.broker = MagicMock()
+        loop.broker.get_market_details = AsyncMock(
+            return_value={"snapshot": {"bid": 2010.0, "offer": 2010.0}}
+        )
+        positions = [
+            {"deal_id": "DEAL-100", "epic": "XAUUSD", "direction": "BUY", "level": 2010.0}
+        ]
 
         with patch.object(
             loop.trailing_stop_manager, "update_price", return_value=(None, TrailingPhase.INITIAL)
@@ -272,8 +284,16 @@ class TestTP1PartialClose:
             atr=20.0,
         )
 
-        # Price has reached TP1 (entry + risk_distance * tp1_multiple = 2000 + 20*0.5 = 2010)
-        positions = [{"deal_id": "DEAL-TP1", "epic": "XAUUSD", "level": 2025.0}]
+        # Live price comes from broker.get_market_details snapshot — well above
+        # TP1 (entry + risk_distance * tp1_multiple = 2010) to force the
+        # INITIAL → BREAKEVEN phase transition.
+        loop.broker = MagicMock()
+        loop.broker.get_market_details = AsyncMock(
+            return_value={"snapshot": {"bid": 2025.0, "offer": 2025.0}}
+        )
+        positions = [
+            {"deal_id": "DEAL-TP1", "epic": "XAUUSD", "direction": "BUY", "level": 2025.0}
+        ]
 
         await loop._update_trailing_stops(positions)
 

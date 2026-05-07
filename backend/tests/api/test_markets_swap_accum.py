@@ -39,10 +39,20 @@ def _fake_position(size: float, entry: float, direction: str = "LONG"):
 
 
 @pytest.fixture
-def repo_stub(client):
+def repo_stub(client, monkeypatch):
     repo = AsyncMock()
     repo.get_by_epic = AsyncMock(return_value=[_fake_position(2.0, 200.0, "LONG")])
     app.dependency_overrides[get_position_repo] = lambda: repo
+    # Force the swap-accum route to fall back to the broker stub by
+    # short-circuiting the DB snapshot lookup. Without this the route
+    # reads real `swap_snapshots` rows populated by the scheduler and
+    # the per-day rate drifts away from the broker stub's exact value.
+    from src.database.repositories import swap_snapshot_repository as _ssr
+
+    async def _no_rows(self, epic, days):
+        return []
+
+    monkeypatch.setattr(_ssr.SwapSnapshotRepository, "get_recent", _no_rows)
     yield repo
     app.dependency_overrides.pop(get_position_repo, None)
 

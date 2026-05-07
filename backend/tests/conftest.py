@@ -38,6 +38,34 @@ def _isolate_trade_logger(tmp_path):
     _trade_logger_module._trade_logger = None
 
 
+@pytest.fixture(autouse=True)
+def _disable_primaries_globally(monkeypatch):
+    """Force ``MR_PRIMARY_ENABLED`` and ``ML_PRIMARY_ENABLED`` OFF in every
+    test by default. Production ``.env`` ships both ``true`` so the
+    StrategyManager routes to the MR-Primary / ML-Primary chains, which
+    (with mocked / default market_data) all return HOLD and silently
+    break paper-loop, pipeline-e2e, and coverage tests that expected the
+    legacy ``_process_default`` path. Tests that explicitly want a
+    primary chain on can override the patched ``get_settings`` at the
+    module they care about."""
+    from unittest.mock import patch
+
+    real = get_settings()
+
+    class _Stub:
+        def __getattr__(self, name):
+            if name == "mr_primary_enabled":
+                return False
+            if name == "ml_primary_enabled":
+                return False
+            return getattr(real, name)
+
+    stub = _Stub()
+    with patch("src.strategy.strategy_manager.get_settings", return_value=stub), \
+         patch("src.strategy.mean_reversion_strategy.get_settings", return_value=stub):
+        yield
+
+
 @pytest.fixture
 def settings():
     """Get application settings."""

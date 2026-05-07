@@ -148,7 +148,15 @@ class TestPredictMultiTfFallback:
         result = svc.predict("XAUUSD")
         assert result is not None
         assert isinstance(result, PredictionResult)
-        da.get_candles.assert_called_once_with("XAUUSD", "1h", limit=300)
+        # 2026-04-26: predict() refreshes the indicator-cache via a
+        # second `get_candles` call after build_features_from_df so the
+        # downstream MR strategy sees fresh z-scores. Two calls expected,
+        # both for ("XAUUSD", "1h", limit=300).
+        from unittest.mock import call as _mock_call
+        da.get_candles.assert_has_calls(
+            [_mock_call("XAUUSD", "1h", limit=300)] * 2
+        )
+        assert da.get_candles.call_count == 2
         svc.feature_builder.build_features_from_df.assert_called_once()
 
 

@@ -31,13 +31,30 @@ def mock_paper_loop() -> PaperTradingLoop:
     risk_manager = MagicMock()
     execution_engine = MagicMock()
     data_access = MagicMock()
+    broker = MagicMock()
+    broker.get_market_details = AsyncMock(
+        return_value={"snapshot": {"bid": 0.0, "offer": 0.0}}
+    )
     return PaperTradingLoop(
         prediction_service=prediction_service,
         strategy_manager=strategy_manager,
         risk_manager=risk_manager,
         execution_engine=execution_engine,
         data_access=data_access,
+        broker=broker,
         epics=["XAUUSD", "BTCUSD"],
+    )
+
+
+def _set_broker_price(loop: PaperTradingLoop, price: float) -> None:
+    """Configure mocked broker snapshot for SL/TP trigger tests.
+
+    Post 2026-05-04 ``_check_stop_losses`` reads price exclusively from
+    ``broker.get_market_details(epic).snapshot.{bid,offer}``. Use both
+    sides identical so direction-based picking gives the same value.
+    """
+    loop.broker.get_market_details = AsyncMock(
+        return_value={"snapshot": {"bid": price, "offer": price}}
     )
 
 
@@ -54,10 +71,7 @@ class TestSlTpNoSyntheticPnl:
             "stop_level": 1990.0,
             "size": 1.0,
         }
-        mock_paper_loop.data_access.get_latest_price.return_value = {
-            "timestamp": datetime.now(UTC),
-            "close": 1985.0,  # below SL → trigger
-        }
+        _set_broker_price(mock_paper_loop, 1985.0)  # below SL → trigger
         mock_paper_loop.execution_engine.close_position = AsyncMock(
             return_value=ExecutionResult(success=True, deal_id="POS-SL-1")
         )
@@ -83,10 +97,7 @@ class TestSlTpNoSyntheticPnl:
             "stop_level": 1990.0,
             "size": 1.0,
         }
-        mock_paper_loop.data_access.get_latest_price.return_value = {
-            "timestamp": datetime.now(UTC),
-            "close": 1985.0,
-        }
+        _set_broker_price(mock_paper_loop, 1985.0)
         mock_paper_loop.execution_engine.close_position = AsyncMock(
             return_value=ExecutionResult(success=True, deal_id="POS-SL-2")
         )
@@ -111,10 +122,7 @@ class TestSlTpNoSyntheticPnl:
             "profit_level": 1990.0,
             "size": 1.0,
         }
-        mock_paper_loop.data_access.get_latest_price.return_value = {
-            "timestamp": datetime.now(UTC),
-            "close": 1985.0,  # below TP → trigger for SHORT
-        }
+        _set_broker_price(mock_paper_loop, 1985.0)  # below TP → trigger for SHORT
         mock_paper_loop.execution_engine.close_position = AsyncMock(
             return_value=ExecutionResult(success=True, deal_id="POS-TP-1")
         )
@@ -142,10 +150,7 @@ class TestSlTpNoSyntheticPnl:
             "stop_level": 1990.0,
             "size": 1.0,
         }
-        mock_paper_loop.data_access.get_latest_price.return_value = {
-            "timestamp": datetime.now(UTC),
-            "close": 1985.0,
-        }
+        _set_broker_price(mock_paper_loop, 1985.0)
         mock_paper_loop.execution_engine.close_position = AsyncMock(
             return_value=ExecutionResult(
                 success=False, deal_id="POS-SL-FAIL", error="network"
@@ -175,10 +180,7 @@ class TestTimeStopNoSyntheticPnl:
             "opened_at": opened_at,
             "market_status": "TRADEABLE",
         }
-        mock_paper_loop.data_access.get_latest_price.return_value = {
-            "timestamp": datetime.now(UTC),
-            "close": 2005.0,
-        }
+        _set_broker_price(mock_paper_loop, 2005.0)
         mock_paper_loop.execution_engine.close_position = AsyncMock(
             return_value=ExecutionResult(success=True, deal_id="POS-TIME-1")
         )

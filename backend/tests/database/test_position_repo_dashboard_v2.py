@@ -102,10 +102,15 @@ class TestBreakdownByDay:
         d_from = datetime(2026, 4, 20, tzinfo=UTC)
         d_to = datetime(2026, 4, 22, 23, 59, 59, tzinfo=UTC)
         days = await repo.get_breakdown_by_day(d_from, d_to)
-        # Open on each of 2026-04-20, 21, 22.
-        for d in days:
-            assert d["sell"]["going"] == 1
-            assert d["buy"]["going"] == 0
+        # Post-2026-04-24 fix (`25444fd`): `going` is bucketed on the
+        # opened_at day only, not spread across every day the position
+        # was open. Historical "was-open-at-that-moment" counts inflated
+        # quiet days; the cockpit only cares about the opening moment.
+        days_by_key = {d["date"]: d for d in days}
+        assert days_by_key["2026-04-20"]["sell"]["going"] == 1
+        assert days_by_key["2026-04-20"]["buy"]["going"] == 0
+        assert days_by_key["2026-04-21"]["sell"]["going"] == 0
+        assert days_by_key["2026-04-22"]["sell"]["going"] == 0
 
 
 class TestDurationMedians:
