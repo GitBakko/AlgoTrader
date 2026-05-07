@@ -1,0 +1,175 @@
+@use '../../../../scss/palette' as p;
+
+
+// Bible §1.10 · Toast / Notification
+// - Top-end placement, fixed
+// - Background surface-2, border-left 3px del color tipo, border tinted 30%
+// - Radius 5px, padding 10x12
+// - Icon left, text, close right
+// - Stack vertical gap 8px, max 4 visible (cap in component)
+// - z-index 1090 to layer above CoreUI modals (1050 reserved)
+
+:host ::ng-deep .mantis-toaster {
+  z-index: 1090;
+  padding: var(--mantis-space-3, 12px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantis-space-2, 8px);
+  // CoreUI's c-toaster wrapper sets pointer-events: none so clicks pass
+  // through the empty toaster region to the page underneath. Our toast
+  // children must opt back in (handled below on .mantis-toast).
+  pointer-events: none;
+}
+
+.mantis-toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 260px;
+  max-width: 380px;
+  padding: 10px 12px;
+  background: var(--mantis-surface-2, #161b22);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left-width: 3px;
+  border-radius: 5px;
+  box-shadow: var(--mantis-shadow-md, 0 4px 12px rgba(0, 0, 0, 0.30));
+  font-family: var(--mantis-font-ui, 'Plus Jakarta Sans', sans-serif);
+  font-size: var(--mantis-fs-md, 12px);
+  line-height: 1.4;
+  color: var(--fg1, rgba(255, 255, 255, 0.92));
+  // Re-enable pointer events on the toast itself (toaster wrapper kills
+  // them so the rest of the page stays clickable). Without this the close
+  // button's click was bubbling through the toast and hitting the page
+  // underneath.
+  pointer-events: auto;
+  animation: mantis-toast-in var(--mantis-duration-normal, 250ms)
+             var(--mantis-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+
+  // Variant tinting (border-left + border + icon-circle)
+  &--success {
+    border-color: rgba(57, 255, 20, 0.30);
+    border-left-color: var(--mantis-profit, #39FF14);
+    .mantis-toast__icon {
+      background: rgba(57, 255, 20, 0.15);
+      border-color: rgba(57, 255, 20, 0.40);
+      color: var(--mantis-profit, #39FF14);
+    }
+  }
+
+  &--info {
+    border-color: rgba(0, 229, 255, 0.30);
+    border-left-color: var(--mantis-cyan, #00E5FF);
+    .mantis-toast__icon {
+      background: rgba(0, 229, 255, 0.15);
+      border-color: rgba(0, 229, 255, 0.40);
+      color: var(--mantis-cyan, #00E5FF);
+    }
+  }
+
+  &--warning {
+    border-color: rgba(255, 176, 32, 0.30);
+    border-left-color: var(--mantis-warning, #FFB020);
+    .mantis-toast__icon {
+      background: rgba(255, 176, 32, 0.15);
+      border-color: rgba(255, 176, 32, 0.40);
+      color: var(--mantis-warning, #FFB020);
+    }
+  }
+
+  &--error {
+    border-color: rgba(255, 61, 87, 0.30);
+    border-left-color: var(--mantis-loss, #FF3D57);
+    .mantis-toast__icon {
+      background: rgba(255, 61, 87, 0.15);
+      border-color: rgba(255, 61, 87, 0.40);
+      color: var(--mantis-loss, #FF3D57);
+    }
+  }
+}
+
+// Status icon — tinted FILLED CIRCLE so the error glyph is visually a
+// status badge, not a button. The close X sits unboxed on the right and
+// can't be confused with this. Pointer-events disabled so accidental
+// clicks on the icon don't compete with the close button.
+.mantis-toast__icon {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.mantis-toast__text {
+  flex: 1 1 auto;
+  font-size: var(--mantis-fs-md, 12px);
+  color: var(--fg1, rgba(255, 255, 255, 0.92));
+  word-break: break-word;
+}
+
+.mantis-toast__close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 4px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--mantis-radius-sm, 4px);
+  color: var(--fg3, rgba(255, 255, 255, 0.45));
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color var(--mantis-duration-fast, 120ms) ease,
+              background var(--mantis-duration-fast, 120ms) ease;
+
+  &:hover {
+    color: var(--fg1, rgba(255, 255, 255, 0.92));
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--mantis-green, #00d97e);
+    outline-offset: 1px;
+  }
+}
+
+@keyframes mantis-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+// Light theme: lift surface, soften border, keep accent saturation
+[data-coreui-theme="light"] .mantis-toast {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.08);
+  color: rgba(0, 0, 0, 0.85);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.10);
+
+  .mantis-toast__text { color: rgba(0, 0, 0, 0.80); }
+  .mantis-toast__close {
+    color: rgba(0, 0, 0, 0.45);
+    &:hover { color: rgba(0, 0, 0, 0.85); background: rgba(0, 0, 0, 0.05); }
+  }
+}
+
+// Reduced-motion: kill the slide-in
+@media (prefers-reduced-motion: reduce) {
+  .mantis-toast { animation: none; }
+}

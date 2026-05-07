@@ -18,6 +18,7 @@ import { DurationScatterComponent } from './cockpit-bottom/duration-scatter.comp
 import { OvernightSwapComponent } from './cockpit-bottom/overnight-swap.component';
 import { CalendarHeatmapComponent } from './cockpit-bottom/calendar-heatmap.component';
 import { TradeBreakdownComponent } from './trade-breakdown/trade-breakdown.component';
+import { CbBannerComponent } from '../../../shared/components/cb-banner/cb-banner.component';
 import { currencySymbol } from './shared/currency.util';
 
 /**
@@ -44,6 +45,7 @@ import { currencySymbol } from './shared/currency.util';
     OvernightSwapComponent,
     CalendarHeatmapComponent,
     TradeBreakdownComponent,
+    CbBannerComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './dashboard-v2.component.html',

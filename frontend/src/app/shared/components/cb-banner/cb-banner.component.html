@@ -1,0 +1,37 @@
+@if (visible()) {
+  <section class="cb-banner" role="alert" aria-live="assertive">
+    <div class="cb-banner__lead">
+      <span class="cb-banner__icon" aria-hidden="true">
+        <svg cIcon name="cilShieldAlt" size="lg"></svg>
+      </span>
+      <div class="cb-banner__copy">
+        <strong class="cb-banner__title mantis-mono">TRADING BLOCCATO</strong>
+        <span class="cb-banner__hint">Circuit breaker attivo · risolvi o resetta per riprendere</span>
+      </div>
+    </div>
+
+    <ul class="cb-banner__list">
+      @for (cb of entries(); track cb.key) {
+        <li class="cb-banner__chip" [attr.title]="cb.reason">
+          <svg cIcon [name]="cb.icon" size="xs" aria-hidden="true"></svg>
+          <span class="cb-banner__chip-label mantis-mono">{{ cb.label }}</span>
+          <span class="cb-banner__chip-reason">{{ cb.reason }}</span>
+        </li>
+      }
+    </ul>
+
+    <button
+      type="button"
+      class="cb-banner__btn"
+      [disabled]="resetting()"
+      (click)="onReset()"
+    >
+      @if (resetting()) {
+        <span class="cb-banner__btn-spinner" aria-hidden="true"></span>
+        Reset in corso…
+      } @else {
+        Reset Circuit Breakers
+      }
+    </button>
+  </section>
+}

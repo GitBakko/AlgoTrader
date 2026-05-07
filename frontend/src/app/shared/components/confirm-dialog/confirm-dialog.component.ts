@@ -1,12 +1,13 @@
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   ModalComponent, ModalHeaderComponent, ModalBodyComponent,
-  ModalFooterComponent, ModalTitleDirective,
-  ButtonDirective,
+  ModalFooterComponent,
 } from '@coreui/angular';
 import { IconDirective } from '@coreui/icons-angular';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
+
+type DialogColor = 'danger' | 'warning' | 'primary' | 'info';
 
 @Component({
   selector: 'app-confirm-dialog',
@@ -14,82 +15,67 @@ import { ConfirmDialogService } from '../../services/confirm-dialog.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, ModalComponent, ModalHeaderComponent, ModalBodyComponent,
-    ModalFooterComponent, ModalTitleDirective,
-    ButtonDirective, IconDirective,
+    ModalFooterComponent, IconDirective,
   ],
   template: `
     <c-modal
+      class="mantis-confirm"
       [visible]="dialogService.visible()"
       (visibleChange)="onVisibleChange($event)"
       alignment="center"
       backdrop="static"
       [keyboard]="false"
     >
-      <c-modal-header class="confirm-dialog__header">
-        <h5 cModalTitle class="confirm-dialog__title">
+      <c-modal-header class="mantis-confirm__header">
+        <div class="mantis-confirm__icon mantis-confirm__icon--{{ variant() }}" aria-hidden="true">
           @if (dialogService.options().icon) {
-            <svg [cIcon]="dialogService.options().icon!" size="lg" class="me-2"></svg>
+            <svg [cIcon]="dialogService.options().icon!" size="lg"></svg>
+          } @else {
+            {{ glyph() }}
           }
-          {{ dialogService.options().title }}
-        </h5>
+        </div>
+        <h5 class="mantis-confirm__title">{{ dialogService.options().title }}</h5>
       </c-modal-header>
-      <c-modal-body class="confirm-dialog__body">
-        <p class="mb-0">{{ dialogService.options().message }}</p>
+
+      <c-modal-body class="mantis-confirm__body">
+        <p class="mantis-confirm__message">{{ dialogService.options().message }}</p>
       </c-modal-body>
-      <c-modal-footer class="confirm-dialog__footer">
-        <button cButton color="secondary" variant="outline" size="sm"
-                (click)="dialogService.resolve(false)">
+
+      <c-modal-footer class="mantis-confirm__footer">
+        <button
+          type="button"
+          class="mantis-btn mantis-btn--ghost"
+          (click)="dialogService.resolve(false)"
+        >
           {{ dialogService.options().cancelText }}
         </button>
-        <button cButton [color]="dialogService.options().color || 'danger'" size="sm"
-                class="mantis-btn-confirm"
-                (click)="dialogService.resolve(true)">
+        <button
+          type="button"
+          class="mantis-btn mantis-btn--{{ variant() }}"
+          (click)="dialogService.resolve(true)"
+        >
           {{ dialogService.options().confirmText }}
         </button>
       </c-modal-footer>
     </c-modal>
   `,
-  styles: [`
-    :host ::ng-deep .confirm-dialog__header {
-      background: var(--mantis-surface-3, #1c2128);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    }
-
-    :host ::ng-deep .confirm-dialog__title {
-      font-family: var(--mantis-font-ui);
-      font-size: var(--mantis-fs-lg);
-      font-weight: 600;
-      color: var(--cui-body-color);
-      display: flex;
-      align-items: center;
-    }
-
-    :host ::ng-deep .confirm-dialog__body {
-      background: var(--mantis-surface-2, #161b22);
-      font-size: var(--mantis-fs-md-lg);
-      line-height: 1.5;
-      padding: 1.25rem;
-    }
-
-    :host ::ng-deep .confirm-dialog__footer {
-      background: var(--mantis-surface-3, #1c2128);
-      border-top: 1px solid rgba(255, 255, 255, 0.06);
-      gap: 0.5rem;
-    }
-
-    :host ::ng-deep .mantis-btn-confirm {
-      min-width: 100px;
-    }
-
-    :host ::ng-deep .modal-content {
-      border: 1px solid rgba(255, 255, 255, 0.10);
-      border-radius: var(--mantis-radius-md);
-      overflow: hidden;
-    }
-  `],
+  styleUrls: ['./confirm-dialog.component.scss'],
 })
 export class ConfirmDialogComponent {
   readonly dialogService = inject(ConfirmDialogService);
+
+  readonly variant = computed<DialogColor>(
+    () => (this.dialogService.options().color ?? 'danger') as DialogColor,
+  );
+
+  readonly glyph = computed<string>(() => {
+    switch (this.variant()) {
+      case 'danger':  return '✕';
+      case 'warning': return '⚠';
+      case 'primary': return '✓';
+      case 'info':    return 'ⓘ';
+    }
+  });
 
   onVisibleChange(visible: boolean): void {
     if (!visible) {

@@ -419,4 +419,76 @@
       </div>
     </c-card-body>
   </c-card>
+
+  <!-- ═══════ COMPONENTS: TOAST (Bible §1.10) ═══════ -->
+  <div class="section-divider">
+    <span class="section-divider__label">Toast / Notification</span>
+    <div class="section-divider__line"></div>
+  </div>
+  <c-card class="mb-4 border-top border-top-3 border-top-primary">
+    <c-card-body>
+      <div class="ds-toast-grid">
+        <div class="mantis-toast mantis-toast--success" role="alert">
+          <span class="mantis-toast__icon">✓</span>
+          <span class="mantis-toast__text">Posizione aperta · EURUSD BUY · 0.10</span>
+          <button type="button" class="mantis-toast__close" aria-label="Chiudi">&times;</button>
+        </div>
+        <div class="mantis-toast mantis-toast--info" role="alert">
+          <span class="mantis-toast__icon">i</span>
+          <span class="mantis-toast__text">Segnale ML generato · BTCUSD HOLD</span>
+          <button type="button" class="mantis-toast__close" aria-label="Chiudi">&times;</button>
+        </div>
+        <div class="mantis-toast mantis-toast--warning" role="alert">
+          <span class="mantis-toast__icon">⚠</span>
+          <span class="mantis-toast__text">Circuit Breaker · Perdite Consecutive</span>
+          <button type="button" class="mantis-toast__close" aria-label="Chiudi">&times;</button>
+        </div>
+        <div class="mantis-toast mantis-toast--error" role="alert">
+          <span class="mantis-toast__icon">!</span>
+          <span class="mantis-toast__text">Connessione broker persa · retry in corso</span>
+          <button type="button" class="mantis-toast__close" aria-label="Chiudi">&times;</button>
+        </div>
+      </div>
+      <div class="ds-actions">
+        <button type="button" class="ds-btn ds-btn--ghost" (click)="emitToast('success')">Trigger Success</button>
+        <button type="button" class="ds-btn ds-btn--ghost" (click)="emitToast('info')">Trigger Info</button>
+        <button type="button" class="ds-btn ds-btn--ghost" (click)="emitToast('warning')">Trigger Warning</button>
+        <button type="button" class="ds-btn ds-btn--ghost" (click)="emitToast('error')">Trigger Error</button>
+      </div>
+    </c-card-body>
+  </c-card>
+
+  <!-- ═══════ COMPONENTS: MODAL (Bible §1.9 MDL-01) ═══════ -->
+  <div class="section-divider">
+    <span class="section-divider__label">Modal · Confirm Dialog</span>
+    <div class="section-divider__line"></div>
+  </div>
+  <c-card class="mb-4 border-top border-top-3 border-top-primary">
+    <c-card-body>
+      <p class="ds-hint">Static preview del MDL-01 (centrato, radius 8, border verde 25%, header con icon-circle, footer ghost+primary).</p>
+      <div class="ds-modal-preview" role="img" aria-label="Modal preview">
+        <div class="ds-modal-preview__card">
+          <div class="ds-modal-preview__header">
+            <div class="mantis-confirm__icon mantis-confirm__icon--danger" aria-hidden="true">✕</div>
+            <h5 class="mantis-confirm__title">Chiudere posizione?</h5>
+          </div>
+          <div class="ds-modal-preview__body">
+            <p class="mantis-confirm__message">
+              EURUSD BUY 0.10 verrà chiusa al market price corrente. L'azione è irreversibile.
+            </p>
+          </div>
+          <div class="ds-modal-preview__footer">
+            <button type="button" class="mantis-btn mantis-btn--ghost">Annulla</button>
+            <button type="button" class="mantis-btn mantis-btn--danger">Chiudi posizione</button>
+          </div>
+        </div>
+      </div>
+      <div class="ds-actions">
+        <button type="button" class="ds-btn ds-btn--ghost" (click)="openConfirm('danger')">Demo Danger</button>
+        <button type="button" class="ds-btn ds-btn--ghost" (click)="openConfirm('warning')">Demo Warning</button>
+        <button type="button" class="ds-btn ds-btn--ghost" (click)="openConfirm('primary')">Demo Primary</button>
+        <button type="button" class="ds-btn ds-btn--ghost" (click)="openConfirm('info')">Demo Info</button>
+      </div>
+    </c-card-body>
+  </c-card>
 </div>

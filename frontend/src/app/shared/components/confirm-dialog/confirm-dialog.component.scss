@@ -1,0 +1,224 @@
+@use '../../../../scss/palette' as p;
+
+// Bible §1.9 MDL-01 · Modal
+// - Backdrop semi-opaco rgba(0,0,0,.7)
+// - Card centrata, max-width 380-560px
+// - Background #161b22, border verde 25%, radius 8, shadow 0 24 48 black/.6
+// - Header: icona stato 28px circle tinted + title 15px 700
+// - Body: 12-13px white/65, line-height 1.5
+// - Footer: cancel ghost left, primary right, gap 8
+
+:host ::ng-deep .mantis-confirm {
+  // CoreUI overrides — backdrop tone + dialog footprint
+  .modal-backdrop {
+    background-color: rgba(0, 0, 0, 0.7);
+    --cui-backdrop-opacity: 1;
+  }
+
+  .modal-dialog { max-width: 480px; }
+
+  .modal-content {
+    background: var(--mantis-surface-2, #161b22);
+    border: 1px solid rgba(0, 217, 126, 0.25);
+    border-radius: var(--mantis-radius-md, 8px);
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+  }
+}
+
+// Header strip — icon circle + title
+.mantis-confirm__header {
+  display: flex;
+  align-items: center;
+  gap: var(--mantis-space-3, 12px);
+  padding: var(--mantis-space-4, 16px) var(--mantis-space-4, 16px) var(--mantis-space-3, 12px);
+  background: var(--mantis-surface-2, #161b22);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mantis-confirm__icon {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+
+  // CoreUI icon size when used inside the circle
+  svg { width: 16px; height: 16px; }
+
+  &--danger {
+    background: rgba(255, 61, 87, 0.15);
+    border: 1px solid rgba(255, 61, 87, 0.40);
+    color: var(--mantis-loss, #FF3D57);
+  }
+
+  &--warning {
+    background: rgba(255, 176, 32, 0.15);
+    border: 1px solid rgba(255, 176, 32, 0.40);
+    color: var(--mantis-warning, #FFB020);
+  }
+
+  &--primary {
+    background: rgba(57, 255, 20, 0.15);
+    border: 1px solid rgba(57, 255, 20, 0.40);
+    color: var(--mantis-neon, #39FF14);
+  }
+
+  &--info {
+    background: rgba(0, 229, 255, 0.15);
+    border: 1px solid rgba(0, 229, 255, 0.40);
+    color: var(--mantis-cyan, #00E5FF);
+  }
+}
+
+.mantis-confirm__title {
+  margin: 0;
+  font-family: var(--mantis-font-ui, 'Plus Jakarta Sans', sans-serif);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--fg1, rgba(255, 255, 255, 0.92));
+  line-height: 1.3;
+}
+
+.mantis-confirm__body {
+  padding: var(--mantis-space-4, 16px);
+  background: var(--mantis-surface-2, #161b22);
+}
+
+.mantis-confirm__message {
+  margin: 0;
+  font-family: var(--mantis-font-ui, 'Plus Jakarta Sans', sans-serif);
+  font-size: var(--mantis-fs-base, 13px);
+  line-height: 1.5;
+  color: var(--fg2, rgba(255, 255, 255, 0.65));
+}
+
+.mantis-confirm__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--mantis-space-2, 8px);
+  padding: var(--mantis-space-3, 12px) var(--mantis-space-4, 16px);
+  background: var(--mantis-surface-2, #161b22);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+// ── Buttons (Bible §1.4) — scoped to confirm dialog
+.mantis-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 96px;
+  padding: 6px 12px;
+  border-radius: var(--mantis-radius-sm, 4px);
+  border: 1px solid transparent;
+  font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
+  font-size: var(--mantis-fs-sm, 11px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: filter var(--mantis-duration-fast, 120ms) ease,
+              box-shadow var(--mantis-duration-fast, 120ms) ease,
+              background var(--mantis-duration-fast, 120ms) ease;
+
+  &:focus-visible {
+    outline: 2px solid var(--mantis-green, #00d97e);
+    outline-offset: 1px;
+  }
+
+  &--ghost {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.85);
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.20);
+    }
+  }
+
+  &--danger {
+    background: var(--mantis-loss, #FF3D57);
+    border-color: var(--mantis-loss, #FF3D57);
+    color: #fff;
+
+    &:hover {
+      filter: brightness(1.08);
+      box-shadow: 0 0 10px rgba(255, 61, 87, 0.45);
+    }
+  }
+
+  &--warning {
+    background: rgba(255, 176, 32, 0.10);
+    border-color: rgba(255, 176, 32, 0.50);
+    color: var(--mantis-warning, #FFB020);
+
+    &:hover {
+      background: rgba(255, 176, 32, 0.18);
+      box-shadow: 0 0 10px rgba(255, 176, 32, 0.35);
+    }
+  }
+
+  &--primary {
+    background: var(--mantis-neon, #39FF14);
+    border-color: var(--mantis-neon, #39FF14);
+    color: #0d1117;
+
+    &:hover {
+      filter: brightness(1.08);
+      box-shadow: 0 0 12px rgba(57, 255, 20, 0.45);
+    }
+  }
+
+  &--info {
+    background: rgba(0, 229, 255, 0.10);
+    border-color: rgba(0, 229, 255, 0.50);
+    color: var(--mantis-cyan, #00E5FF);
+
+    &:hover {
+      background: rgba(0, 229, 255, 0.18);
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.35);
+    }
+  }
+}
+
+// Light theme adjustments
+[data-coreui-theme="light"] {
+  :host ::ng-deep .mantis-confirm .modal-content {
+    background: #ffffff;
+    border-color: rgba(0, 0, 0, 0.10);
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
+  }
+
+  .mantis-confirm__header,
+  .mantis-confirm__body,
+  .mantis-confirm__footer {
+    background: #ffffff;
+  }
+
+  .mantis-confirm__header { border-bottom-color: rgba(0, 0, 0, 0.06); }
+  .mantis-confirm__footer { border-top-color: rgba(0, 0, 0, 0.06); }
+
+  .mantis-confirm__title { color: rgba(0, 0, 0, 0.92); }
+  .mantis-confirm__message { color: rgba(0, 0, 0, 0.65); }
+
+  .mantis-btn--ghost {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.12);
+    color: rgba(0, 0, 0, 0.80);
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.08);
+      border-color: rgba(0, 0, 0, 0.20);
+    }
+  }
+
+  .mantis-btn--primary { color: #0d1117; }
+}

@@ -10,6 +10,8 @@ import {
   RowComponent,
 } from '@coreui/angular';
 import { IconDirective } from '@coreui/icons-angular';
+import { ToastService } from '../../shared/services/toast.service';
+import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 
 interface Token {
   readonly name: string;
@@ -37,6 +39,8 @@ interface Token {
 })
 export class DesignSystemComponent {
   private readonly doc = inject(DOCUMENT);
+  private readonly toast = inject(ToastService);
+  private readonly confirmService = inject(ConfirmDialogService);
 
   readonly brandColors: readonly Token[] = [
     { name: 'Neon',    cssVar: '--mantis-neon',    description: 'Hero accent · dark only · profit', bright: true },
@@ -137,5 +141,40 @@ export class DesignSystemComponent {
 
   togglePulse(): void {
     this.pulseActive.set(!this.pulseActive());
+  }
+
+  /** Trigger live toast for design-system showcase. */
+  emitToast(variant: 'success' | 'info' | 'warning' | 'error'): void {
+    const messages: Record<string, string> = {
+      success: 'Posizione aperta · EURUSD BUY · 0.10',
+      info:    'Segnale ML generato · BTCUSD HOLD',
+      warning: 'Circuit Breaker · Perdite Consecutive',
+      error:   'Connessione broker persa · retry in corso',
+    };
+    const text = messages[variant];
+    switch (variant) {
+      case 'success': this.toast.success(text); break;
+      case 'info':    this.toast.info(text); break;
+      case 'warning': this.toast.warning(text); break;
+      case 'error':   this.toast.error(text); break;
+    }
+  }
+
+  /** Trigger live confirm dialog for design-system showcase. */
+  openConfirm(color: 'danger' | 'warning' | 'primary' | 'info'): void {
+    const presets: Record<string, { title: string; message: string; confirmText: string }> = {
+      danger:  { title: 'Chiudere posizione?', message: 'EURUSD BUY 0.10 verrà chiusa al market price corrente. L\'azione è irreversibile.', confirmText: 'Chiudi posizione' },
+      warning: { title: 'Stop bot di trading?',  message: 'Il bot smetterà di aprire nuove posizioni. Le posizioni aperte resteranno attive.', confirmText: 'Stop bot' },
+      primary: { title: 'Avviare paper trading?', message: 'Il sistema inizierà a generare segnali ML e a eseguire trade in modalità simulata.', confirmText: 'Avvia' },
+      info:    { title: 'Esportare CSV?',        message: 'Verrà scaricato un export delle posizioni filtrate (142 righe).', confirmText: 'Scarica' },
+    };
+    const opts = presets[color];
+    void this.confirmService.confirm({
+      title: opts.title,
+      message: opts.message,
+      confirmText: opts.confirmText,
+      cancelText: 'Annulla',
+      color,
+    });
   }
 }

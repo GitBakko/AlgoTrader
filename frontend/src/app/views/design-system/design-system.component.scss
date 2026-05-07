@@ -187,3 +187,237 @@
 }
 
 .ds-auth-sample { max-width: 180px; }
+
+// ── Toast showcase grid (Bible §1.10 inline samples) ──
+// Static toast samples render outside the live <c-toaster>, so the
+// .mantis-toast styling lives in toast-container.component.scss and is
+// not in scope here; we only handle layout and the trigger buttons.
+.ds-toast-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--mantis-space-2);
+  margin-bottom: var(--mantis-space-3);
+
+  .mantis-toast {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--mantis-surface-2);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-left-width: 3px;
+    border-radius: 5px;
+    font-family: var(--mantis-font-ui);
+    font-size: var(--mantis-fs-md);
+    line-height: 1.4;
+    color: var(--fg1);
+    box-shadow: var(--mantis-shadow-md);
+
+    &--success {
+      border-color: rgba(57, 255, 20, 0.30);
+      border-left-color: var(--mantis-profit);
+      .mantis-toast__icon { background: rgba(57, 255, 20, 0.15); border-color: rgba(57, 255, 20, 0.40); color: var(--mantis-profit); }
+    }
+    &--info {
+      border-color: rgba(0, 229, 255, 0.30);
+      border-left-color: var(--mantis-cyan);
+      .mantis-toast__icon { background: rgba(0, 229, 255, 0.15); border-color: rgba(0, 229, 255, 0.40); color: var(--mantis-cyan); }
+    }
+    &--warning {
+      border-color: rgba(255, 176, 32, 0.30);
+      border-left-color: var(--mantis-warning);
+      .mantis-toast__icon { background: rgba(255, 176, 32, 0.15); border-color: rgba(255, 176, 32, 0.40); color: var(--mantis-warning); }
+    }
+    &--error {
+      border-color: rgba(255, 61, 87, 0.30);
+      border-left-color: var(--mantis-loss);
+      .mantis-toast__icon { background: rgba(255, 61, 87, 0.15); border-color: rgba(255, 61, 87, 0.40); color: var(--mantis-loss); }
+    }
+  }
+
+  .mantis-toast__icon {
+    flex: 0 0 22px;
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1px solid transparent;
+    font-family: var(--mantis-font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .mantis-toast__text {
+    flex: 1 1 auto;
+    color: var(--fg1);
+  }
+
+  .mantis-toast__close {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    background: transparent;
+    border: 0;
+    color: var(--fg3);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 120ms ease;
+
+    &:hover { color: var(--fg1); }
+  }
+}
+
+// ── Modal preview (static visual reference of MDL-01) ──
+.ds-modal-preview {
+  display: flex;
+  justify-content: center;
+  padding: var(--mantis-space-6) var(--mantis-space-3);
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.015) 0px,
+      rgba(255, 255, 255, 0.015) 6px,
+      transparent 6px,
+      transparent 12px
+    ),
+    rgba(0, 0, 0, 0.45);
+  border-radius: var(--mantis-radius-md);
+  margin: var(--mantis-space-3) 0;
+
+  &__card {
+    width: 100%;
+    max-width: 480px;
+    background: var(--mantis-surface-2);
+    border: 1px solid rgba(0, 217, 126, 0.25);
+    border-radius: var(--mantis-radius-md);
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: var(--mantis-space-3);
+    padding: var(--mantis-space-4) var(--mantis-space-4) var(--mantis-space-3);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  &__body {
+    padding: var(--mantis-space-4);
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--mantis-space-2);
+    padding: var(--mantis-space-3) var(--mantis-space-4);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  // Reuse confirm-dialog primitives (icon-circle, title, message, btn)
+  .mantis-confirm__icon {
+    flex: 0 0 28px;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-family: var(--mantis-font-mono);
+    font-size: 14px;
+    font-weight: 700;
+
+    &--danger  { background: rgba(255, 61, 87, 0.15);  border: 1px solid rgba(255, 61, 87, 0.40);  color: var(--mantis-loss); }
+    &--warning { background: rgba(255, 176, 32, 0.15); border: 1px solid rgba(255, 176, 32, 0.40); color: var(--mantis-warning); }
+    &--primary { background: rgba(57, 255, 20, 0.15);  border: 1px solid rgba(57, 255, 20, 0.40);  color: var(--mantis-neon); }
+    &--info    { background: rgba(0, 229, 255, 0.15);  border: 1px solid rgba(0, 229, 255, 0.40);  color: var(--mantis-cyan); }
+  }
+
+  .mantis-confirm__title {
+    margin: 0;
+    font-family: var(--mantis-font-ui);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--fg1);
+  }
+
+  .mantis-confirm__message {
+    margin: 0;
+    font-family: var(--mantis-font-ui);
+    font-size: var(--mantis-fs-base);
+    line-height: 1.5;
+    color: var(--fg2);
+  }
+
+  .mantis-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 96px;
+    padding: 6px 12px;
+    border-radius: var(--mantis-radius-sm);
+    border: 1px solid transparent;
+    font-family: var(--mantis-font-mono);
+    font-size: var(--mantis-fs-sm);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+
+    &--ghost {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.85);
+    }
+    &--danger {
+      background: var(--mantis-loss);
+      border-color: var(--mantis-loss);
+      color: #fff;
+    }
+  }
+}
+
+// ── Trigger button row used in the toast/modal showcases ──
+.ds-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mantis-space-2);
+  margin-top: var(--mantis-space-3);
+}
+
+.ds-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: var(--mantis-radius-sm);
+  border: 1px solid transparent;
+  font-family: var(--mantis-font-mono);
+  font-size: var(--mantis-fs-sm);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+
+  &--ghost {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.85);
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.20);
+    }
+  }
+}
+
+.ds-hint {
+  margin: 0 0 var(--mantis-space-3);
+  font-size: var(--mantis-fs-md);
+  color: var(--fg3);
+}

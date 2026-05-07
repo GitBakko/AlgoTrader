@@ -1,0 +1,187 @@
+@use '../../../../scss/palette' as p;
+
+// Bible CARD-03 style banner with border-left 3px loss + Bible BTN-warning.
+// Pulse glow on the left border to draw the eye without animating the
+// numbers/text inside the row (Bible UI anti-pattern: don't animate
+// frequently-updating data).
+
+:host {
+  display: block;
+  margin-bottom: var(--mantis-space-3, 12px);
+}
+
+.cb-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--mantis-space-3, 12px);
+  padding: 10px 14px;
+  background: rgba(255, 61, 87, 0.10);
+  border: 1px solid rgba(255, 61, 87, 0.30);
+  border-left: 3px solid var(--mantis-loss, #FF3D57);
+  border-radius: var(--mantis-radius-md, 8px);
+  color: var(--fg1, rgba(255, 255, 255, 0.92));
+  flex-wrap: wrap;
+  animation: cb-banner-pulse 3s ease-in-out infinite;
+}
+
+.cb-banner__lead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.cb-banner__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 61, 87, 0.15);
+  border: 1px solid rgba(255, 61, 87, 0.40);
+  color: var(--mantis-loss, #FF3D57);
+
+  svg { width: 16px; height: 16px; }
+}
+
+.cb-banner__copy {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.cb-banner__title {
+  font-size: var(--mantis-fs-sm, 11px);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mantis-loss, #FF3D57);
+}
+
+.cb-banner__hint {
+  font-size: var(--mantis-fs-md, 12px);
+  color: var(--fg2, rgba(255, 255, 255, 0.65));
+}
+
+.cb-banner__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mantis-space-2, 8px);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.cb-banner__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: var(--mantis-radius-sm, 4px);
+  background: rgba(255, 61, 87, 0.12);
+  border: 1px solid rgba(255, 61, 87, 0.25);
+  font-size: var(--mantis-fs-md, 12px);
+  color: var(--fg1, rgba(255, 255, 255, 0.92));
+  max-width: 360px;
+
+  svg {
+    width: 12px;
+    height: 12px;
+    color: var(--mantis-warning, #FFB020);
+    flex: 0 0 12px;
+  }
+}
+
+.cb-banner__chip-label {
+  font-size: var(--mantis-fs-xxs, 9px);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mantis-loss, #FF3D57);
+  flex: 0 0 auto;
+}
+
+.cb-banner__chip-reason {
+  font-size: var(--mantis-fs-md, 12px);
+  color: var(--fg2, rgba(255, 255, 255, 0.65));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+// Bible BTN-warning (warning ghost) — reset is a reversible action.
+.cb-banner__btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(255, 176, 32, 0.10);
+  border: 1px solid rgba(255, 176, 32, 0.50);
+  border-radius: var(--mantis-radius-sm, 4px);
+  color: var(--mantis-warning, #FFB020);
+  font-family: var(--mantis-font-mono, 'IBM Plex Mono', monospace);
+  font-size: var(--mantis-fs-sm, 11px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    background var(--mantis-duration-fast, 120ms) ease,
+    box-shadow var(--mantis-duration-fast, 120ms) ease,
+    opacity var(--mantis-duration-fast, 120ms) ease;
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 176, 32, 0.18);
+    box-shadow: 0 0 10px rgba(255, 176, 32, 0.35);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--mantis-warning, #FFB020);
+    outline-offset: 1px;
+  }
+
+  &:disabled {
+    cursor: progress;
+    opacity: 0.7;
+  }
+}
+
+.cb-banner__btn-spinner {
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: cb-banner-spin 0.6s linear infinite;
+}
+
+@keyframes cb-banner-pulse {
+  0%, 100% { border-left-color: var(--mantis-loss, #FF3D57); }
+  50%      { border-left-color: rgba(255, 61, 87, 0.40); }
+}
+
+@keyframes cb-banner-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cb-banner { animation: none; }
+  .cb-banner__btn-spinner { animation-duration: 1.5s; }
+}
+
+// Light theme
+[data-coreui-theme="light"] .cb-banner {
+  background: rgba(255, 61, 87, 0.06);
+  color: rgba(0, 0, 0, 0.85);
+
+  .cb-banner__hint,
+  .cb-banner__chip-reason { color: rgba(0, 0, 0, 0.65); }
+}

@@ -1,5 +1,8 @@
 <main class="dv2" role="main" aria-label="Dashboard v2 cockpit">
 
+  <!-- 0. CIRCUIT BREAKER BANNER — only renders when paper-loop reports tripped breakers -->
+  <app-cb-banner></app-cb-banner>
+
   <!-- 1. OPERATIONAL STRIP (Live P&L · Open Positions · System) -->
   <app-operational-strip
     [killBusy]="killSwitchBusy()"

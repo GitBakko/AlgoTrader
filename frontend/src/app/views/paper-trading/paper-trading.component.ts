@@ -17,6 +17,7 @@ import type {
 } from '../../core/models/paper-trading';
 import { BotVitalsPanelComponent } from './components/bot-vitals-panel/bot-vitals-panel.component';
 import { RiskGaugeStackComponent } from './components/risk-gauge-stack/risk-gauge-stack.component';
+import { CbBannerComponent } from '../../shared/components/cb-banner/cb-banner.component';
 import { ModelsHealthPanelComponent } from './components/models-health-panel/models-health-panel.component';
 import { KpiStripCompactComponent } from './components/kpi-strip-compact/kpi-strip-compact.component';
 import { ActivePositionsCockpitComponent } from './components/active-positions-cockpit/active-positions-cockpit.component';
@@ -59,6 +60,7 @@ const SIGNALS_HISTORY_LIMIT = 300;
   imports: [
     CommonModule,
     CockpitHeaderComponent,
+    CbBannerComponent,
     BotVitalsPanelComponent,
     RiskGaugeStackComponent,
     ModelsHealthPanelComponent,
