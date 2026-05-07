@@ -237,6 +237,20 @@ class Settings(BaseSettings):
     reconciler_interval_seconds: int = Field(
         default=15, alias="RECONCILER_INTERVAL_SECONDS"
     )
+    # Strategy signal loop bar-alignment. When True, the strategy loop wakes
+    # at exact UTC bar-close boundaries (e.g. 4h grid → 00:00/04:00/08:00/
+    # 12:00/16:00/20:00 UTC) + a small offset to let the broker publish the
+    # new candle. Cuts up-to-`interval_seconds` jitter between bar close and
+    # signal generation. Requires RECONCILER_DEDICATED_ENABLED=true so SL
+    # guards keep running on the 15s reconciler task while the strategy loop
+    # waits for the next slot. When False (legacy), the loop sleeps a fixed
+    # `interval_seconds` regardless of bar boundaries.
+    signal_loop_align_to_bar: bool = Field(
+        default=True, alias="SIGNAL_LOOP_ALIGN_TO_BAR"
+    )
+    signal_loop_post_bar_offset_seconds: int = Field(
+        default=10, alias="SIGNAL_LOOP_POST_BAR_OFFSET_SECONDS"
+    )
     # Forex with USD as the base currency (USDJPY, USDCHF, USDCAD) has a
     # pip value much smaller than $1 per micro-unit, so the standard
     # max_position_pct (~20% notional) caps the size at a level where

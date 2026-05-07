@@ -97,6 +97,38 @@ def _validate_tp_side(direction: str, entry: float, tp: float) -> bool:
     return tp < entry  # SELL: TP must be below entry
 
 
+_RESOLUTION_SECONDS: dict[str, int] = {
+    "1min": 60,
+    "5min": 300,
+    "15min": 900,
+    "30min": 1800,
+    "1h": 3600,
+    "2h": 7200,
+    "4h": 14400,
+    "1d": 86400,
+    "day": 86400,
+}
+
+
+def _resolution_to_seconds(resolution: str) -> int | None:
+    """Parse candle resolution to seconds. None if unrecognized."""
+    return _RESOLUTION_SECONDS.get(resolution.strip().lower())
+
+
+def _seconds_to_next_aligned_slot(
+    now: datetime, grid_seconds: int, offset_seconds: int
+) -> float:
+    """Seconds from `now` to next UTC-aligned bar-close slot + offset.
+
+    Grid is anchored to the UTC epoch (1970-01-01 00:00). For grid=14400
+    (4h) the slots fall at 00/04/08/12/16/20 UTC. `offset_seconds` is added
+    so the broker has time to publish the freshly-closed candle.
+    """
+    ts = now.timestamp()
+    next_slot = (int(ts) // grid_seconds + 1) * grid_seconds + offset_seconds
+    return max(1.0, float(next_slot - ts))
+
+
 class PaperTradingLoop:
     """
     Controllable background loop that runs paper trading iterations.
@@ -274,6 +306,16 @@ class PaperTradingLoop:
         self._reconciler_interval: int = _init_settings.reconciler_interval_seconds
         self._reconciler_task: asyncio.Task | None = None
         self._reconciler_lock: asyncio.Lock = asyncio.Lock()
+
+        # Strategy loop bar-alignment. When active, _run_loop sleeps until
+        # the next UTC-aligned bar-close slot (+ offset) instead of a fixed
+        # interval — eliminating up-to-`interval_seconds` jitter between
+        # candle close and signal generation. Requires reconciler dedicated
+        # so SL guards keep running while the strategy loop waits.
+        self._signal_loop_align: bool = _init_settings.signal_loop_align_to_bar
+        self._signal_post_bar_offset: int = (
+            _init_settings.signal_loop_post_bar_offset_seconds
+        )
 
     @property
     def is_running(self) -> bool:
@@ -1956,8 +1998,41 @@ class PaperTradingLoop:
         self._reconciler_task.add_done_callback(self._on_reconciler_done)
         logger.warning("🔄 Reconciler loop auto-restarted")
 
+    def _aligned_mode_active(self) -> tuple[bool, int | None]:
+        """Decide whether the strategy loop should sleep until the next
+        UTC-aligned bar-close slot, and return the grid in seconds.
+
+        Falls back to interval-based scheduling (returns False, None) when:
+        - SIGNAL_LOOP_ALIGN_TO_BAR is disabled, OR
+        - the dedicated reconciler is OFF (legacy reconciliation runs in
+          the strategy loop — aligning to 4h would starve SL guards), OR
+        - the candle resolution is not in the known grid table.
+        """
+        if not self._signal_loop_align:
+            return False, None
+        grid = _resolution_to_seconds(self._candle_resolution)
+        if grid is None:
+            logger.warning(
+                f"Cannot align signal loop — resolution "
+                f"'{self._candle_resolution}' not parseable; "
+                f"falling back to interval={self.interval_seconds}s"
+            )
+            return False, None
+        if not self._reconciler_enabled:
+            logger.warning(
+                "SIGNAL_LOOP_ALIGN_TO_BAR=true requires "
+                "RECONCILER_DEDICATED_ENABLED=true (SL guards must run on "
+                "the dedicated reconciler task while the strategy loop "
+                "sleeps); falling back to interval="
+                f"{self.interval_seconds}s"
+            )
+            return False, None
+        return True, grid
+
     async def _run_loop(self) -> None:
-        """Main loop: check for new candles at fixed intervals."""
+        """Main loop: wake on each UTC-aligned bar-close slot (when
+        SIGNAL_LOOP_ALIGN_TO_BAR=true and reconciler dedicated) or on a
+        fixed interval (legacy path)."""
         consecutive_errors = 0
         max_consecutive_errors = 10
 
@@ -1970,9 +2045,24 @@ class PaperTradingLoop:
             consecutive_errors += 1
             logger.error(f"First iteration failed: {e}")
 
+        aligned, grid_seconds = self._aligned_mode_active()
+        if aligned and grid_seconds is not None:
+            logger.info(
+                f"Strategy loop aligned to {self._candle_resolution} "
+                f"bar-close grid (+{self._signal_post_bar_offset}s offset)"
+            )
+
         while self._running:
             try:
-                await asyncio.sleep(self.interval_seconds)
+                if aligned and grid_seconds is not None:
+                    sleep_for = _seconds_to_next_aligned_slot(
+                        datetime.now(UTC),
+                        grid_seconds,
+                        self._signal_post_bar_offset,
+                    )
+                else:
+                    sleep_for = float(self.interval_seconds)
+                await asyncio.sleep(sleep_for)
                 if not self._running:
                     break
                 await self._run_iteration(force=False)
