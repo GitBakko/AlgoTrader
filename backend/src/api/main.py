@@ -279,6 +279,34 @@ async def lifespan(app: FastAPI):
             f"{recovery_report.trade_history_count} trades"
         )
 
+    # MANTIS-FIX 2026-05-05: state recovery overwrites current_equity from
+    # the DB snapshot (state_recovery._restore_risk_state line 517), which
+    # silently undoes the broker-truth equity sync that ran before recovery.
+    # This caused the dashboard to show a stale equity value forever after
+    # any manual broker-side adjustment (demo top-up / withdrawal). Re-fetch
+    # broker equity now and override the snapshot value before the daily
+    # reset locks daily_start_equity to the (still-stale) value.
+    if app.state.broker_client is not None:
+        try:
+            accounts = await app.state.broker_client.get_accounts()
+            if accounts:
+                acc = accounts[0]
+                base = acc.deposit or acc.available or acc.balance
+                broker_equity = base + acc.profit_loss
+                if broker_equity > 0:
+                    dm = app.state.risk_manager.drawdown_monitor
+                    if abs(dm._state.current_equity - broker_equity) > 0.01:
+                        logger.info(
+                            f"Equity drift after state recovery: "
+                            f"DB snapshot={dm._state.current_equity:.2f} → "
+                            f"broker={broker_equity:.2f}; using broker truth"
+                        )
+                    dm._state.current_equity = broker_equity
+                    if broker_equity > dm._state.peak_equity:
+                        dm._state.peak_equity = broker_equity
+        except Exception as e:
+            logger.warning(f"Post-recovery broker equity sync failed: {e}")
+
     # MANTIS-FIX: Force daily reset after state recovery to prevent stale
     # daily_start_equity from tripping the daily loss circuit breaker.
     # This ensures daily P&L tracking starts fresh from current equity.

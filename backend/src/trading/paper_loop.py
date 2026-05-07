@@ -2177,6 +2177,19 @@ class PaperTradingLoop:
         # Phase 8: circuit breaker heartbeat (resets timeout counter)
         self.risk_manager.circuit_breakers.heartbeat()
 
+        # Refresh broker equity every tick (DEMO/LIVE: read from broker.get_accounts;
+        # PAPER: in-memory). Bug 2026-05-05: equity used to refresh ONLY when a
+        # signal hit risk-check or a position closed, so manual broker-side
+        # adjustments (demo top-up, withdrawal) and idle-period drift never
+        # surfaced in the dashboard until the next trade. Pulling once per
+        # iteration here keeps the dashboard within ~60s of broker truth even
+        # with zero signals.
+        try:
+            fresh_equity = await self._fetch_equity()
+            self.risk_manager.update_equity(fresh_equity)
+        except Exception as e:
+            logger.debug(f"Periodic equity refresh failed: {e}")
+
         # Daily reset: reset daily P&L tracking and daily circuit breakers at midnight UTC
         today_utc = datetime.now(UTC).strftime("%Y-%m-%d")
         if not hasattr(self, "_last_daily_reset_date") or self._last_daily_reset_date != today_utc:
@@ -3296,34 +3309,51 @@ class PaperTradingLoop:
                 self.trailing_stop_manager.unregister_position(deal_id)
                 continue
 
-            # Get CURRENT market price (NOT position.level which is the entry price).
-            # Prefer broker bid/offer; fall back to market_data current_price.
+            # Get CURRENT market price (NOT position.level which is the entry).
+            #
+            # Bug 2026-05-04: ``prediction_service.get_market_data`` returns
+            # ``last["close"]`` of the cached 1h candle (prediction_service.py
+            # line ~283). On BTCUSD that close diverged from the broker mark
+            # by ~800 points and triggered a runaway TP1 partial-close loop
+            # (~6 close/reopen cycles in seconds, slippage 50pt each).
+            #
+            # Hard rule for SL/TP triggering: live broker bid/offer is the
+            # ONLY allowed price source. ``prediction_service`` is consulted
+            # only for ATR (used by the ATR ratchet), never for price. If
+            # broker is unreachable, skip the trailing tick — never act on
+            # stale candle data.
             epic = position.get("epic", "")
             direction = position.get("direction", "BUY")
             current_price: float = 0.0
             atr = None
+
+            # ATR is OK from prediction_service (informational only — used
+            # to widen the trailing band, never to compare against price).
             try:
                 md = self.prediction_service.get_market_data(epic)
                 if md:
                     atr = md.get("atr")
-                    # For BUY positions: exit at bid; for SELL: exit at offer
-                    current_price = float(md.get("current_price", 0))
             except Exception:
-                pass
+                atr = None
 
-            # Fall back to broker market details for live bid/offer
-            if current_price <= 0 and self.broker:
+            # Live price from broker snapshot — PRIMARY.
+            if self.broker:
                 try:
                     details = await self.broker.get_market_details(epic)
                     snap = details.get("snapshot", {}) if isinstance(details, dict) else {}
-                    bid = snap.get("bid", 0)
-                    offer = snap.get("offer", 0)
+                    bid = snap.get("bid", 0) or 0
+                    offer = snap.get("offer", 0) or 0
                     if bid and offer:
+                        # For BUY positions: exit at bid; for SELL: exit at offer
                         current_price = float(bid) if direction == "BUY" else float(offer)
                 except Exception as e:
-                    logger.debug(f"[{epic}] Market details fetch failed: {e}")
+                    logger.debug(f"[{epic}] Trailing live-price fetch failed: {e}")
 
             if current_price <= 0:
+                logger.debug(
+                    f"[{epic}] Trailing tick skipped — no broker live price "
+                    f"(deal {deal_id})"
+                )
                 continue
 
             state_before = self.trailing_stop_manager.get_state(deal_id)
@@ -3444,20 +3474,40 @@ class PaperTradingLoop:
                         if new_deal_id and new_deal_id != deal_id:
                             state = self.trailing_stop_manager.get_state(deal_id)
                             if state:
-                                self.trailing_stop_manager.unregister_position(deal_id)
-                                self.trailing_stop_manager.register_position(
-                                    deal_id=new_deal_id,
-                                    epic=state.epic,
-                                    direction=state.direction,
-                                    entry_price=state.entry_price,
-                                    stop_loss=state.current_stop,
+                                # Bug 2026-05-04: original entry kept TP1 at a
+                                # level the price had already crossed → runaway
+                                # partial-close loop. Use broker-confirmed fill
+                                # price so TP1 recalibrates from the new mid.
+                                # Bug 2026-05-05/06: even with the new entry,
+                                # the strategy-anchored ladder compresses TP1
+                                # toward TP2 each cycle. ``register_migration``
+                                # bumps a counter and flips to the TRAILING
+                                # phase (pure ATR ratchet) once the configured
+                                # cap (``max_ladder_cycles``, default 2) is
+                                # reached — the residue then locks captured
+                                # profit instead of triggering another partial
+                                # on the compressed band.
+                                new_entry = (
+                                    float(getattr(result, "fill_price", None) or 0)
+                                    or float(state.entry_price)
+                                )
+                                migrated = self.trailing_stop_manager.register_migration(
+                                    old_deal_id=deal_id,
+                                    new_deal_id=new_deal_id,
+                                    new_entry=new_entry,
+                                    new_stop=state.current_stop,
                                     atr=None,
                                     take_profit=state.tp2_level,
                                 )
-                                logger.info(
-                                    f"[{epic}] Trailing stop migrated: "
-                                    f"{deal_id} -> {new_deal_id}"
-                                )
+                                if migrated is not None:
+                                    cap = self.trailing_stop_manager.config.max_ladder_cycles
+                                    logger.info(
+                                        f"[{epic}] Trailing stop migrated: "
+                                        f"{deal_id} -> {new_deal_id} "
+                                        f"(entry {state.entry_price:.4f} → "
+                                        f"{new_entry:.4f}, cycle "
+                                        f"{migrated.migration_count}/{cap})"
+                                    )
                 except Exception as e:
                     logger.warning(f"[{epic}] TP1 partial close failed: {e}")
 
@@ -3599,15 +3649,43 @@ class PaperTradingLoop:
             ):
                 continue
 
-            # Get current market price
-            try:
-                latest = self.data_access.get_latest_price(epic, timeframe="1h")
-                if latest is None:
-                    continue
+            # Get LIVE market price — broker bid/offer is the ONLY allowed
+            # source. Never the historical 1h candle close.
+            #
+            # Bug 2026-05-04 (twice): the first fix mistakenly trusted
+            # ``prediction_service.get_market_data().current_price`` as the
+            # primary live source. That field actually returns the cached
+            # 1h candle close (prediction_service.py:283) — the very value
+            # the fix was supposed to avoid. Result: BTCUSD looped through
+            # ~6 partial-close cycles within seconds, the candle close was
+            # ~800 points away from the broker mark, every tick re-tripped
+            # TP1, and slippage of ~50pt per fill bled equity continuously.
+            #
+            # Hard rule going forward: SL/TP triggering uses
+            # broker.get_market_details(epic).snapshot.{bid,offer} only. If
+            # the broker is unreachable, SKIP the check for this position
+            # this tick — never trade on stale data.
+            current_price: float = 0.0
 
-                current_price = latest.get("close", 0)
-                if current_price <= 0:
-                    continue
+            if self.broker is not None:
+                try:
+                    details = await self.broker.get_market_details(epic)
+                    snap = details.get("snapshot", {}) if isinstance(details, dict) else {}
+                    bid = snap.get("bid", 0) or 0
+                    offer = snap.get("offer", 0) or 0
+                    if bid and offer:
+                        current_price = float(bid) if direction == "BUY" else float(offer)
+                except Exception as e:
+                    logger.debug(f"[{epic}] SL/TP live-price fetch failed: {e}")
+
+            if current_price <= 0:
+                logger.debug(
+                    f"[{epic}] SL/TP check skipped — no broker live price "
+                    f"(deal {deal_id})"
+                )
+                continue
+
+            try:
 
                 # Check if stop loss violated
                 stop_violated = False

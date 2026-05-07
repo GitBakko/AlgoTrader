@@ -325,6 +325,44 @@ class RiskManager:
             take_profit = signal.suggested_tp
             adjustments.append("Using signal suggested take-profit")
 
+        # 4-ter. Backstop R:R floor on the final pair (post §4-bis).
+        # Rule 6 trusts the strategy's calibrated SL/TP pair as-is, but
+        # stale-snapshot bugs can still produce degenerate R:R (e.g.
+        # 2026-05-04 TSLA: entry 389.14, SL 396.77, TP 388.99 → 0.02 R:R
+        # because TP was anchored to a snapshot price 3 USD away from
+        # the actual fill). Reject — do NOT widen TP, since that would
+        # re-introduce the 2026-04-28 mix-and-match inversion bug.
+        sl_dist_check = abs(signal.entry_price - stop_loss)
+        tp_dist_check = abs(take_profit - signal.entry_price)
+        rr_check = (
+            tp_dist_check / sl_dist_check if sl_dist_check > 0 else 0.0
+        )
+        min_rr = float(_risk_settings.min_signal_rr_threshold)
+        if sl_dist_check > 0 and rr_check < min_rr:
+            reason = (
+                f"R:R below floor: {rr_check:.3f} < {min_rr:.2f} "
+                f"(entry={signal.entry_price:.5f} SL={stop_loss:.5f} "
+                f"TP={take_profit:.5f})"
+            )
+            logger.warning(f"[{signal.epic}] Trade rejected: {reason}")
+            audit["rr_floor"] = {
+                "passed": False,
+                "rr": round(rr_check, 4),
+                "threshold": min_rr,
+                "stop_loss": round(stop_loss, 5),
+                "take_profit": round(take_profit, 5),
+            }
+            return RiskCheckResult(
+                approved=False,
+                rejection_reason=reason,
+                audit=audit,
+            )
+        audit["rr_floor"] = {
+            "passed": True,
+            "rr": round(rr_check, 4),
+            "threshold": min_rr,
+        }
+
         audit["stop_loss"] = {
             "dynamic_multiplier": round(stop_mult, 4),
             "base_multiplier": base_sl,

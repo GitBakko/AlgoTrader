@@ -315,6 +315,19 @@ class Settings(BaseSettings):
     forex_max_leverage_multiplier: float = Field(
         default=200.0, alias="FOREX_MAX_LEVERAGE_MULTIPLIER"
     )
+    # Minimum acceptable Risk:Reward on a strategy-paired (suggested_stop +
+    # suggested_tp) signal. Backstop for stale-snapshot bugs where a
+    # strategy emits TP next to entry — produced 2026-05-04 TSLA trades
+    # with R:R 0.02–0.21 (entry 389.14, SL 396.77, TP 388.99). The pair-
+    # as-is rule (rule 6) trusted the strategy's calibration even when
+    # the calibration produced a degenerate ratio. This floor REJECTS
+    # such signals at risk-manager step 4-bis without mixing risk-mgr SL
+    # with strategy TP (which would re-introduce the 2026-04-28 inversion
+    # bug). Set to 0.40 = TP must be at least 40% of SL distance for the
+    # trade to clear.
+    min_signal_rr_threshold: float = Field(
+        default=0.40, alias="MIN_SIGNAL_RR_THRESHOLD"
+    )
 
     # Regime Gate (Phase 2)
     regime_gate_enabled: bool = Field(default=False, alias="REGIME_GATE_ENABLED")

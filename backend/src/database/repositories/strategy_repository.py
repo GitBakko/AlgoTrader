@@ -72,7 +72,8 @@ class StrategyRepository(BaseRepository[Strategy]):
             return None
 
         strategy.is_active = True
-        strategy.activated_at = datetime.now(UTC)
+        # Strip tz — asyncpg + TIMESTAMP WITHOUT TIME ZONE (CLAUDE.md gotcha)
+        strategy.activated_at = datetime.now(UTC).replace(tzinfo=None)
 
         await self.session.flush()
         await self.session.refresh(strategy)
@@ -93,7 +94,8 @@ class StrategyRepository(BaseRepository[Strategy]):
             return None
 
         strategy.is_active = False
-        strategy.deactivated_at = datetime.now(UTC)
+        # Strip tz — asyncpg + TIMESTAMP WITHOUT TIME ZONE (CLAUDE.md gotcha)
+        strategy.deactivated_at = datetime.now(UTC).replace(tzinfo=None)
 
         await self.session.flush()
         await self.session.refresh(strategy)

@@ -28,7 +28,9 @@ class TradeRepository(BaseRepository[Trade]):
         """Get trades executed in the last N hours."""
         from datetime import timedelta
 
-        cutoff = datetime.now(UTC) - timedelta(hours=hours)
+        # asyncpg rejects tz-aware datetimes against TIMESTAMP WITHOUT TIME ZONE
+        # columns — strip tzinfo (CLAUDE.md backend gotcha).
+        cutoff = (datetime.now(UTC) - timedelta(hours=hours)).replace(tzinfo=None)
         result = await self.session.execute(
             select(Trade).where(Trade.executed_at >= cutoff).order_by(Trade.executed_at.desc())
         )
@@ -36,10 +38,12 @@ class TradeRepository(BaseRepository[Trade]):
 
     async def get_trades_for_audit(self, start: datetime, end: datetime) -> list[Trade]:
         """Get trades in a date range for audit purposes."""
+        naive_start = start.replace(tzinfo=None) if start.tzinfo else start
+        naive_end = end.replace(tzinfo=None) if end.tzinfo else end
         result = await self.session.execute(
             select(Trade)
-            .where(Trade.executed_at >= start)
-            .where(Trade.executed_at <= end)
+            .where(Trade.executed_at >= naive_start)
+            .where(Trade.executed_at <= naive_end)
             .order_by(Trade.executed_at.asc())
         )
         return list(result.scalars().all())
@@ -51,14 +55,19 @@ class TradeRepository(BaseRepository[Trade]):
         Returns:
             Dict with total_pnl, trade_count, avg_pnl
         """
+        # Strip tz before binding — asyncpg refuses tz-aware values on
+        # TIMESTAMP WITHOUT TIME ZONE columns and was crashing the dashboard
+        # /overview endpoint on every request (CLAUDE.md backend gotcha).
+        naive_start = start.replace(tzinfo=None) if start.tzinfo else start
+        naive_end = end.replace(tzinfo=None) if end.tzinfo else end
         result = await self.session.execute(
             select(
                 func.sum(Trade.profit_loss).label("total_pnl"),
                 func.count(Trade.id).label("trade_count"),
                 func.avg(Trade.profit_loss).label("avg_pnl"),
             )
-            .where(Trade.executed_at >= start)
-            .where(Trade.executed_at <= end)
+            .where(Trade.executed_at >= naive_start)
+            .where(Trade.executed_at <= naive_end)
             .where(Trade.trade_type == "CLOSE")
         )
         row = result.one_or_none()

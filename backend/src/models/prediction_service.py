@@ -228,13 +228,33 @@ class PredictionService:
 
     def get_market_data(self, epic: str, timeframe: str = "1h") -> dict | None:
         """
-        Extract current price, ATR, ADX, RSI, regime, and scalp indicators.
+        Extract candle-derived indicators for strategy signal generation.
         Reuses cached candles from predict() when available to avoid double query.
 
+        ⚠️  CRITICAL — `current_price` is the CLOSE of the latest cached
+        candle (`timeframe`-bar, default 1h), NOT a live broker mark price.
+        It can lag broker truth by hundreds of points on volatile assets
+        between candle boundaries.
+
+        DO NOT use `current_price` (or its alias `last_close`) as a trigger
+        comparator for SL/TP / partial-close / trailing-stop logic. Bug
+        history (2026-05-04, twice): using this field caused a runaway
+        partial-close loop on BTCUSD that bled equity ~$8 in minutes.
+
+        For SL/TP triggering, the only sanctioned price source is
+        `broker.get_market_details(epic).snapshot.{bid,offer}` — see
+        `paper_loop._check_stop_losses` and `_update_trailing_stops`.
+
+        For signal generation (entry price stamping, indicator math, MR
+        z-score, ML inference, ATR-based SL distance), the candle close is
+        the correct anchor and matches what the model was trained on.
+
         Returns:
-            Dict with current_price, atr, adx, rsi, regime, and (when scalp mode)
-            ema_9, ema_21, macd, macd_signal, macd_histogram, volume, volume_sma_20,
-            bb_upper, bb_lower, bb_middle, keltner_upper, keltner_lower.
+            Dict with `current_price` / `last_close` (same value, alias for
+            clarity), atr, adx, rsi, regime, and — when scalp mode — ema_9,
+            ema_21, macd, macd_signal, macd_histogram, volume,
+            volume_sma_20, bb_upper, bb_lower, bb_middle, keltner_upper,
+            keltner_lower.
         """
         from src.features.regime import RegimeDetector
         from src.utils.config import get_settings
@@ -279,9 +299,16 @@ class PredictionService:
 
         last = df.tail(1).row(0, named=True)
 
+        # `current_price` retained for back-compat (~10 callers across
+        # strategy_manager/mean_reversion). `last_close` exposed alongside
+        # so new code can use the unambiguous name. Both fields hold the
+        # same value — the close of the latest cached candle. Never use
+        # for SL/TP triggering (see docstring).
+        last_close = float(last["close"])
         result = {
-            "current_price": float(last["close"]),
-            "atr": float(last.get("atr_14", last["close"] * 0.01)),
+            "current_price": last_close,
+            "last_close": last_close,
+            "atr": float(last.get("atr_14", last_close * 0.01)),
         }
 
         # ADX for strategy filtering

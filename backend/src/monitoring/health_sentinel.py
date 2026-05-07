@@ -227,11 +227,12 @@ class BackendHealthSentinel:
 
     async def _check_ping_heartbeat(self, now: datetime) -> None:
         client = self.broker_client
-        if client is None or client.session is None:
+        session_manager = getattr(client, "session_manager", None) if client else None
+        if session_manager is None:
             return
 
         last_ping: datetime | None = getattr(
-            client.session, "last_successful_ping_at", None
+            session_manager, "last_successful_ping_at", None
         )
         if last_ping is None:
             # No ping ever — still in warm-up window.

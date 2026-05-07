@@ -91,8 +91,14 @@ class SignalRepository(BaseRepository[Signal]):
         Returns:
             List of recent signals
         """
-        since = datetime.now(UTC).replace(microsecond=0)
-        since = since.replace(hour=since.hour - hours)
+        # Strip tz before bind — asyncpg rejects tz-aware on TIMESTAMP WITHOUT
+        # TIME ZONE columns (CLAUDE.md backend gotcha). Use timedelta to avoid
+        # the day-rollover bug where `since.hour - hours` produced negatives.
+        from datetime import timedelta
+
+        since = (datetime.now(UTC) - timedelta(hours=hours)).replace(
+            microsecond=0, tzinfo=None
+        )
 
         query = select(Signal).where(Signal.epic == epic).where(Signal.generated_at >= since)
         if direction:
@@ -284,7 +290,8 @@ class SignalRepository(BaseRepository[Signal]):
 
     async def expire_old_signals(self) -> int:
         """Expire pending signals past their expiration date."""
-        now = datetime.now(UTC)
+        # asyncpg rejects tz-aware on TIMESTAMP WITHOUT TIME ZONE columns.
+        now = datetime.now(UTC).replace(tzinfo=None)
         result = await self.session.execute(
             select(Signal).where(Signal.status == "PENDING").where(Signal.expires_at <= now)
         )

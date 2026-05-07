@@ -34,6 +34,23 @@ class TrailingStopConfig(BaseModel):
     # closing for $0.02 because the buffer was sub-spread. Set non-zero
     # via env BREAKEVEN_OFFSET_PCT only if you have a specific reason.
     breakeven_offset_pct: float = Field(default=0.0, ge=0.0, le=0.01)
+    # Max number of partial-close ladder cycles before the trailing
+    # ladder bows out and switches to a pure-ATR ratchet on the residue.
+    #
+    # Bug 2026-05-05/06: each TP1_HIT partial close re-registers the
+    # trailing with a new (closer) entry, which makes TP1=midpoint(entry,
+    # TP2) drift asymptotically toward TP2. After 3-4 cycles TP1 and TP2
+    # collapsed to ~14 cents on XAUUSD (4546.28 vs 4546.42) and SL fired
+    # on broker-side noise (sample: 44.4% of ladder sequences in the
+    # last 30 days ended in SL with avg net -$8.58/seq).
+    #
+    # When ``migration_count >= max_ladder_cycles`` ``register_migration``
+    # registers the residue directly in the TRAILING phase: SL ratchets
+    # with ATR from the latest extremum and the strategy-anchored TP1/TP2
+    # ladder is retired. This locks profit captured by the first N
+    # cycles while letting the runner ride the rest of the move under a
+    # noise-tolerant trailing band.
+    max_ladder_cycles: int = Field(default=2, ge=1, le=5)
 
 
 class PositionStopState(BaseModel):
@@ -51,6 +68,11 @@ class PositionStopState(BaseModel):
     phase: int = TrailingPhase.INITIAL
     highest_price: float = 0.0
     lowest_price: float = float("inf")
+    # Number of TP1_HIT partial-close cycles that produced this state.
+    # Bumped by ``register_migration`` so the manager can switch from the
+    # strategy-anchored ladder to a pure-ATR ratchet once the configured
+    # cap is reached (see ``TrailingStopConfig.max_ladder_cycles``).
+    migration_count: int = 0
 
 
 class TrailingStopManager:
@@ -127,6 +149,87 @@ class TrailingStopManager:
             f"[{epic}] Trailing stop registered: {direction} entry={entry_price:.2f} "
             f"SL={stop_loss:.2f} TP1={tp1:.2f} TP2={tp2:.2f}"
         )
+        return state
+
+    def register_migration(
+        self,
+        *,
+        old_deal_id: str,
+        new_deal_id: str,
+        new_entry: float,
+        new_stop: float,
+        atr: float | None = None,
+        take_profit: float | None = None,
+    ) -> PositionStopState | None:
+        """Re-register a partially-closed position under its new deal_id.
+
+        Bumps ``migration_count`` and switches the residue to the TRAILING
+        phase (pure ATR ratchet) once
+        ``state.migration_count >= self.config.max_ladder_cycles``. Below
+        that cap the ladder is retained: TP1/TP2 anchored to the (still
+        provided) strategy ``take_profit`` from ``new_entry``, phase reset
+        to INITIAL so the next BREAKEVEN→TP1_HIT can fire.
+
+        Returns the new ``PositionStopState`` (or ``None`` if the old
+        deal_id had no tracked state).
+        """
+        old_state = self._positions.get(old_deal_id)
+        if old_state is None:
+            return None
+
+        new_count = (old_state.migration_count or 0) + 1
+        epic = old_state.epic
+        direction = old_state.direction
+
+        # Drop the old entry in any case.
+        self._positions.pop(old_deal_id, None)
+
+        if new_count >= self.config.max_ladder_cycles:
+            # Bow out of the strategy-anchored ladder. Place the residue
+            # directly in TRAILING phase so the next ATR ratchet from the
+            # current extremum locks the captured profit without retrying
+            # another partial close that the compressed TP1/TP2 band would
+            # almost certainly fire on noise.
+            risk_distance = abs(new_entry - new_stop)
+            # Synthetic TP1/TP2 retained at the current extremum so any
+            # accidental phase comparison falls through cleanly.
+            tp1 = new_entry
+            tp2 = new_entry
+            state = PositionStopState(
+                deal_id=new_deal_id,
+                epic=epic,
+                direction=direction,
+                entry_price=new_entry,
+                initial_stop=new_stop,
+                current_stop=new_stop,
+                tp1_level=tp1,
+                tp2_level=tp2,
+                risk_distance=risk_distance,
+                phase=TrailingPhase.TRAILING,
+                highest_price=new_entry,
+                lowest_price=new_entry,
+                migration_count=new_count,
+            )
+            self._positions[new_deal_id] = state
+            logger.info(
+                f"[{epic}] Trailing migration cap reached "
+                f"({new_count}/{self.config.max_ladder_cycles}) — residue "
+                f"switched to TRAILING phase, ATR ratchet from entry "
+                f"{new_entry:.4f} SL {new_stop:.4f}"
+            )
+            return state
+
+        # Below cap — keep the ladder, anchored to the new entry.
+        state = self.register_position(
+            deal_id=new_deal_id,
+            epic=epic,
+            direction=direction,
+            entry_price=new_entry,
+            stop_loss=new_stop,
+            atr=atr or 0.0,
+            take_profit=take_profit if take_profit is not None else old_state.tp2_level,
+        )
+        state.migration_count = new_count
         return state
 
     def update_price(

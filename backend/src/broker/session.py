@@ -183,13 +183,23 @@ class SessionManager:
             return False
 
     async def _ping_loop(self) -> None:
-        """Background task to send periodic keep-alive pings."""
+        """Background task to send periodic keep-alive pings.
+
+        Ping ORDER: ping first, then sleep. The previous order (sleep first,
+        ping second) caused a 10-min gap whenever ``authenticate()`` ran the
+        token refresh (every ~10 min on Capital.com): each re-auth cancels
+        the existing task + spawns a new one, the new task slept 5 min
+        before its first ping, and combined with the previous task's last
+        ping ~5 min before the re-auth, ``last_successful_ping_at`` could
+        sit untouched for ~10 min — past the sentinel's 7-min threshold.
+        Pinging at task start closes that gap to 5 min.
+        """
         ping_interval = 5 * 60  # 5 minutes (before 10min timeout)
 
         while True:
             try:
-                await asyncio.sleep(ping_interval)
                 await self.ping()
+                await asyncio.sleep(ping_interval)
             except asyncio.CancelledError:
                 logger.info("Keep-alive ping task cancelled")
                 break
