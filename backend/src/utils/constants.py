@@ -73,18 +73,23 @@ _EXCLUDED_ASSETS = {
     "EURUSD",
     "DOGUSD",
     "GBPUSD",
-    # Phase 12 candidates — held out of TRADABLE_ASSETS until OOS scorecard
-    # passes the standard gate (Sharpe > 0.3, WR > 40%, max-DD < 30%). They
-    # remain in ALL_ASSETS so downloader / trainer / scorecard infrastructure
-    # treats them like first-class assets.
+    # Phase 12 stock candidates — STILL EXCLUDED.
+    # Even with 199-feature parity (multi-timeframe + cross-asset + SIL),
+    # validation training produced f1 0.30–0.38 vs baseline 0.51+. Root
+    # cause is data, not features: yfinance hourly is cash-equity only
+    # (~4.8 bars/cal-day) whereas NVDA/TSLA use Capital.com extended-
+    # hours feed (~10.6 bars/cal-day, ~2x density). Promotion requires
+    # Capital.com history backfill — Phase 14.
     "AAPL",
     "MSFT",
     "GOOGL",
     "AMZN",
     "META",
     "AMD",
-    "USDCHF",
-    "USDCAD",
+    # USDCHF + USDCAD PROMOTED on 2026-05-08 — multi-timeframe retrain
+    # produced f1 0.5945 / 0.6134 (above BTC baseline 0.57). Risk multi-
+    # plier left at default 1.0 until live PnL evidence justifies a
+    # boost à la USDJPY (1.5x). See backend/.env EPIC_RISK_MULTIPLIERS.
 }
 TRADABLE_ASSETS: list[str] = [a for a in ALL_ASSETS if a not in _EXCLUDED_ASSETS]
 
