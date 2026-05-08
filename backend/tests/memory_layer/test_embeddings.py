@@ -47,9 +47,15 @@ def _make_context(
 
 
 def test_embedding_dim_default():
-    """Default embedding dimension is 384 (MiniLM standard)."""
+    """Phase 14a: default embedding dimension follows the active LLMProvider.
+
+    With Ollama + bge-m3 (default since 2026-05-08) → 1024-dim. The
+    embedder probes the provider at construction so production code
+    sees the real number. If the provider is unreachable in CI, the
+    embedder falls back to MiniLM 384, so accept either as valid.
+    """
     embedder = MantisEmbedder()
-    assert embedder.embedding_dim == 384
+    assert embedder.embedding_dim in (1024, 384)
 
 
 # ---------------------------------------------------------------------------

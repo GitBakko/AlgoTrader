@@ -39,13 +39,20 @@ class VisionAgent:
 
     def __init__(
         self,
-        vision_model: str = "claude-sonnet-4-20250514",
+        vision_model: str | None = None,
         chart_config: ChartConfig | None = None,
         rag_max_tokens: int = 2000,
         news_lookback_hours: int = 4,
     ) -> None:
+        # Phase 14a (2026-05-08): vision_model is no longer plumbed
+        # through here. Backend + model are owned by the LLMProvider
+        # singleton (`src/llm_provider/factory.py`); switching providers
+        # is now an env flip (LLM_BACKEND, OLLAMA_VISION_MODEL). The
+        # parameter is kept for back-compat with callers that still
+        # pass it, but its value is ignored.
+        del vision_model  # unused — see comment above
         self.chart_generator = MantisChartGenerator(config=chart_config)
-        self.vision_analyzer = MantisVisionAnalyzer(model=vision_model)
+        self.vision_analyzer = MantisVisionAnalyzer()
         self.context_builder = MantisRAGContextBuilder(max_tokens=rag_max_tokens)
         self.news_ingester = MantisNewsIngester(lookback_hours=news_lookback_hours)
 

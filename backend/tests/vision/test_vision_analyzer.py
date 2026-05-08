@@ -1,33 +1,25 @@
-# MANTIS-EVOLUTION: Vision Analyzer Tests
-"""
-Tests for MantisVisionAnalyzer.
+# MANTIS-EVOLUTION: Vision Analyzer Tests (Phase 14a, provider-based)
+"""Tests for MantisVisionAnalyzer.
 
-All tests mock the anthropic API (package is not installed).
+Phase 14a (2026-05-08): the analyzer was refactored to call
+LLMProvider.analyze_image() instead of the anthropic client directly.
+Tests now inject a FakeProvider via the constructor — no live HTTP and
+no global singleton mutation. Coverage of the failure modes is
+preserved.
 """
 from __future__ import annotations
 
-import base64
 import hashlib
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-# Patch out the anthropic import before importing the module under test
-import sys
-import types
-
-# Create a minimal stub for the anthropic module so the import succeeds
-_anthropic_stub = types.ModuleType("anthropic")
-_anthropic_stub.AsyncAnthropic = MagicMock  # type: ignore[attr-defined]
-sys.modules.setdefault("anthropic", _anthropic_stub)
-
-from src.vision.vision_analyzer import MantisVisionAnalyzer, VISION_SYSTEM_PROMPT  # noqa: E402
-from src.vision.schemas import VisionReport  # noqa: E402
-
+from src.llm_provider.base import LLMProvider, LLMProviderError
+from src.vision.schemas import VisionReport
+from src.vision.vision_analyzer import MantisVisionAnalyzer
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Test fixtures
 # ---------------------------------------------------------------------------
 
 VALID_RESPONSE_PAYLOAD = {
@@ -44,28 +36,61 @@ VALID_RESPONSE_PAYLOAD = {
 CHART_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100  # fake PNG header + padding
 
 
-def _make_analyzer_with_mock_client(response_text: str) -> tuple[MantisVisionAnalyzer, AsyncMock]:
-    """Build an analyzer with a pre-configured mock client."""
-    mock_response = MagicMock()
-    mock_response.content = [MagicMock(text=response_text)]
+class FakeProvider(LLMProvider):
+    """In-memory LLMProvider double for tests.
 
-    mock_client = AsyncMock()
-    mock_client.messages.create = AsyncMock(return_value=mock_response)
+    Stores the last call arguments so tests can assert on them, and
+    returns a configurable response (string or exception).
+    """
 
-    analyzer = MantisVisionAnalyzer()
-    analyzer._client = mock_client
-    return analyzer, mock_client
+    def __init__(self, response: str | Exception):
+        self._response = response
+        self.last_image_bytes: bytes | None = None
+        self.last_prompt: str | None = None
+        self.last_system: str | None = None
+        self.last_json_mode: bool | None = None
+
+    async def generate(self, prompt, *, system=None, max_tokens=1500, temperature=0.0,
+                       json_mode=False, keep_alive=None):  # noqa: D401
+        if isinstance(self._response, Exception):
+            raise self._response
+        return self._response
+
+    async def analyze_image(self, prompt, image_bytes, *, system=None, max_tokens=1500,
+                            temperature=0.0, json_mode=False, keep_alive=None):
+        self.last_image_bytes = image_bytes
+        self.last_prompt = prompt
+        self.last_system = system
+        self.last_json_mode = json_mode
+        if isinstance(self._response, Exception):
+            raise self._response
+        return self._response
+
+    async def embed(self, texts):
+        return [[0.0] * self.embedding_dim for _ in texts]
+
+    async def health_check(self):
+        return True
+
+    @property
+    def embedding_dim(self) -> int:
+        return 1024
+
+
+def _analyzer_with(response: str | Exception) -> tuple[MantisVisionAnalyzer, FakeProvider]:
+    fake = FakeProvider(response)
+    return MantisVisionAnalyzer(provider=fake), fake
 
 
 # ---------------------------------------------------------------------------
-# Test 1: valid JSON response is parsed into VisionReport
+# Tests
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_analyze_chart_parses_response():
-    """A valid JSON response from the API is parsed into a VisionReport."""
-    analyzer, _ = _make_analyzer_with_mock_client(json.dumps(VALID_RESPONSE_PAYLOAD))
+    """Valid JSON response is parsed into a VisionReport."""
+    analyzer, _ = _analyzer_with(json.dumps(VALID_RESPONSE_PAYLOAD))
 
     report = await analyzer.analyze_chart(CHART_BYTES)
 
@@ -76,16 +101,11 @@ async def test_analyze_chart_parses_response():
     assert "DOUBLE_BOTTOM" in report.key_patterns
 
 
-# ---------------------------------------------------------------------------
-# Test 2: response wrapped in markdown fences is still parsed
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.asyncio
 async def test_analyze_chart_with_markdown_fences():
     """Responses wrapped in ```json ... ``` fences are stripped and parsed."""
     fenced = "```json\n" + json.dumps(VALID_RESPONSE_PAYLOAD) + "\n```"
-    analyzer, _ = _make_analyzer_with_mock_client(fenced)
+    analyzer, _ = _analyzer_with(fenced)
 
     report = await analyzer.analyze_chart(CHART_BYTES)
 
@@ -93,36 +113,24 @@ async def test_analyze_chart_with_markdown_fences():
     assert report.visual_confidence == 0.8
 
 
-# ---------------------------------------------------------------------------
-# Test 3: empty bytes → default report with low confidence
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.asyncio
 async def test_analyze_chart_empty_bytes():
-    """Empty chart bytes bypass the API and return a default low-confidence report."""
-    analyzer = MantisVisionAnalyzer()
+    """Empty chart bytes bypass the provider and return a default low-confidence report."""
+    analyzer, fake = _analyzer_with(json.dumps(VALID_RESPONSE_PAYLOAD))
 
     report = await analyzer.analyze_chart(b"")
 
     assert isinstance(report, VisionReport)
     assert report.visual_confidence == 0.1
     assert report.trend_direction == "NEUTRAL"
-
-
-# ---------------------------------------------------------------------------
-# Test 4: API failure → default report returned
-# ---------------------------------------------------------------------------
+    # Provider was never called
+    assert fake.last_image_bytes is None
 
 
 @pytest.mark.asyncio
-async def test_analyze_chart_api_failure():
-    """When the API raises an exception the default fallback report is returned."""
-    mock_client = AsyncMock()
-    mock_client.messages.create = AsyncMock(side_effect=RuntimeError("network error"))
-
-    analyzer = MantisVisionAnalyzer()
-    analyzer._client = mock_client
+async def test_analyze_chart_provider_error():
+    """Provider error → default fallback report (no exception leaks)."""
+    analyzer, _ = _analyzer_with(LLMProviderError("network down"))
 
     report = await analyzer.analyze_chart(CHART_BYTES)
 
@@ -130,15 +138,20 @@ async def test_analyze_chart_api_failure():
     assert report.actionable_insight == "Vision analysis unavailable"
 
 
-# ---------------------------------------------------------------------------
-# Test 5: invalid JSON in response → default report
-# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_analyze_chart_unexpected_exception():
+    """Non-LLMProviderError exceptions are also caught and fall back."""
+    analyzer, _ = _analyzer_with(RuntimeError("ollama crashed"))
+
+    report = await analyzer.analyze_chart(CHART_BYTES)
+
+    assert report.visual_confidence == 0.1
 
 
 @pytest.mark.asyncio
 async def test_analyze_chart_invalid_json():
-    """When the API returns non-JSON text the default report is returned."""
-    analyzer, _ = _make_analyzer_with_mock_client("This is not JSON at all.")
+    """Non-JSON response from provider → default report."""
+    analyzer, _ = _analyzer_with("This is not JSON at all.")
 
     report = await analyzer.analyze_chart(CHART_BYTES)
 
@@ -146,15 +159,20 @@ async def test_analyze_chart_invalid_json():
     assert report.trend_direction == "NEUTRAL"
 
 
-# ---------------------------------------------------------------------------
-# Test 6: chart_hash is set in returned report
-# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_analyze_chart_empty_response():
+    """Empty string from provider → default report."""
+    analyzer, _ = _analyzer_with("")
+
+    report = await analyzer.analyze_chart(CHART_BYTES)
+
+    assert report.visual_confidence == 0.1
 
 
 @pytest.mark.asyncio
 async def test_analyze_chart_hash_set():
-    """The chart_hash field in the returned report matches sha256[:16] of the input."""
-    analyzer, _ = _make_analyzer_with_mock_client(json.dumps(VALID_RESPONSE_PAYLOAD))
+    """chart_hash field matches sha256[:16] of the input bytes."""
+    analyzer, _ = _analyzer_with(json.dumps(VALID_RESPONSE_PAYLOAD))
 
     expected_hash = hashlib.sha256(CHART_BYTES).hexdigest()[:16]
     report = await analyzer.analyze_chart(CHART_BYTES)
@@ -162,64 +180,50 @@ async def test_analyze_chart_hash_set():
     assert report.chart_hash == expected_hash
 
 
-# ---------------------------------------------------------------------------
-# Test 7: default report has visual_confidence == 0.1
-# ---------------------------------------------------------------------------
-
-
 def test_default_report_low_confidence():
-    """_default_report returns a report with visual_confidence == 0.1."""
+    """_default_report returns visual_confidence == 0.1."""
     report = MantisVisionAnalyzer._default_report("abc123")
-
     assert report.visual_confidence == 0.1
 
 
-# ---------------------------------------------------------------------------
-# Test 8: default report trend is NEUTRAL
-# ---------------------------------------------------------------------------
-
-
 def test_default_report_neutral():
-    """_default_report returns a report with trend_direction == NEUTRAL."""
+    """_default_report returns trend_direction == NEUTRAL."""
     report = MantisVisionAnalyzer._default_report("abc123")
-
     assert report.trend_direction == "NEUTRAL"
 
 
-# ---------------------------------------------------------------------------
-# Test 9: image is sent as correct base64 in the API call
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.asyncio
-async def test_image_sent_as_base64():
-    """The chart bytes are base64-encoded and sent in the image source block."""
-    analyzer, mock_client = _make_analyzer_with_mock_client(json.dumps(VALID_RESPONSE_PAYLOAD))
+async def test_provider_receives_raw_bytes():
+    """The provider must receive the raw chart bytes (not pre-encoded)."""
+    analyzer, fake = _analyzer_with(json.dumps(VALID_RESPONSE_PAYLOAD))
 
     await analyzer.analyze_chart(CHART_BYTES)
 
-    call_kwargs = mock_client.messages.create.call_args.kwargs
-    user_messages = call_kwargs["messages"]
-    assert len(user_messages) == 1
-    content_blocks = user_messages[0]["content"]
-
-    image_block = next(b for b in content_blocks if b["type"] == "image")
-    expected_b64 = base64.b64encode(CHART_BYTES).decode("utf-8")
-    assert image_block["source"]["data"] == expected_b64
-    assert image_block["source"]["media_type"] == "image/png"
-
-
-# ---------------------------------------------------------------------------
-# Test 10: VISION_SYSTEM_PROMPT is used in the API call
-# ---------------------------------------------------------------------------
+    assert fake.last_image_bytes == CHART_BYTES
+    # The system prompt is the production constant — anchors visual
+    # output schema. Check by looking at the FakeProvider capture.
+    assert fake.last_system is not None
+    assert "trend_direction" in fake.last_system
+    # JSON mode hint must propagate so Ollama enforces format=json
+    assert fake.last_json_mode is True
 
 
 @pytest.mark.asyncio
-async def test_system_prompt_used():
-    """The VISION_SYSTEM_PROMPT constant is passed as the system parameter."""
-    analyzer, mock_client = _make_analyzer_with_mock_client(json.dumps(VALID_RESPONSE_PAYLOAD))
+async def test_default_context_prompt_when_none_provided():
+    """Empty additional_context falls back to the default user prompt."""
+    analyzer, fake = _analyzer_with(json.dumps(VALID_RESPONSE_PAYLOAD))
 
-    await analyzer.analyze_chart(CHART_BYTES)
+    await analyzer.analyze_chart(CHART_BYTES, additional_context="")
 
-    call_kwargs = mock_client.messages.create.call_args.kwargs
-    assert call_kwargs["system"] == VISION_SYSTEM_PROMPT
+    assert fake.last_prompt == "Analyze this trading chart."
+
+
+@pytest.mark.asyncio
+async def test_custom_context_passed_through():
+    """Caller-supplied context overrides the default user prompt."""
+    analyzer, fake = _analyzer_with(json.dumps(VALID_RESPONSE_PAYLOAD))
+
+    custom = "Focus on volume divergence around the 2025-06 lows."
+    await analyzer.analyze_chart(CHART_BYTES, additional_context=custom)
+
+    assert fake.last_prompt == custom

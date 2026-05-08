@@ -270,6 +270,42 @@ class Settings(BaseSettings):
     epic_risk_multipliers_str: str = Field(
         default="", alias="EPIC_RISK_MULTIPLIERS"
     )
+    # ===== LLM Provider (Phase 14: local Ollama, 2026-05-08) =====
+    # Backend abstraction for text gen + vision + embeddings. Default
+    # routes everything to the GX10 NVIDIA AI box on the LAN — zero
+    # token cost, sub-second warm latency on qwen3.6:35b. The Anthropic
+    # Claude API path is preserved as a future backend (not implemented
+    # in Phase 14a) for cloud deployments where the GX10 is not
+    # reachable.
+    llm_backend: str = Field(default="ollama", alias="LLM_BACKEND")
+    ollama_base_url: str = Field(
+        default="http://192.168.3.191:11434", alias="OLLAMA_BASE_URL"
+    )
+    ollama_generation_model: str = Field(
+        default="qwen3.6:35b", alias="OLLAMA_GENERATION_MODEL"
+    )
+    ollama_vision_model: str = Field(
+        default="qwen2.5vl:7b", alias="OLLAMA_VISION_MODEL"
+    )
+    ollama_embedding_model: str = Field(
+        default="bge-m3:latest", alias="OLLAMA_EMBEDDING_MODEL"
+    )
+    ollama_embedding_dim: int = Field(
+        default=1024, alias="OLLAMA_EMBEDDING_DIM"
+    )
+    # `keep_alive=-1` pins the generation model in VRAM forever so
+    # qwen3.6 doesn't get evicted by other tenants. Vision model
+    # tolerates eviction since cold start is ~25s and we run at most
+    # 90 inferences/day (15 epics × 6 four-hour bars).
+    ollama_keep_alive_generation: str | int = Field(
+        default=-1, alias="OLLAMA_KEEP_ALIVE_GENERATION"
+    )
+    ollama_keep_alive_vision: str = Field(
+        default="1h", alias="OLLAMA_KEEP_ALIVE_VISION"
+    )
+    ollama_timeout_seconds: float = Field(
+        default=60.0, alias="OLLAMA_TIMEOUT_SECONDS"
+    )
 
     @property
     def epic_risk_multipliers(self) -> dict[str, float]:
