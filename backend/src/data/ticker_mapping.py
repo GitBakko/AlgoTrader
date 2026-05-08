@@ -23,6 +23,16 @@ _YFINANCE_MAP: dict[str, str] = {
     "USDJPY": "JPY=X",
     "NVDA": "NVDA",
     "TSLA": "TSLA",
+    # Stock-expansion candidates (2026-05-08 backtest screening)
+    "AAPL": "AAPL",
+    "MSFT": "MSFT",
+    "GOOGL": "GOOGL",
+    "AMZN": "AMZN",
+    "META": "META",
+    "AMD": "AMD",
+    # Forex-expansion candidates
+    "USDCHF": "CHF=X",
+    "USDCAD": "CAD=X",
 }
 
 _CRYPTO_MAP: dict[str, tuple[str, str]] = {
@@ -57,6 +67,14 @@ _ASSET_CLASS: dict[str, str] = {
     "USDJPY": "forex",
     "NVDA": "stock",
     "TSLA": "stock",
+    "AAPL": "stock",
+    "MSFT": "stock",
+    "GOOGL": "stock",
+    "AMZN": "stock",
+    "META": "stock",
+    "AMD": "stock",
+    "USDCHF": "forex",
+    "USDCAD": "forex",
 }
 
 

@@ -30,6 +30,16 @@ ALL_ASSETS: list[str] = [
     "GBPUSD",
     "USDJPY",
     "NAS100",
+    # Phase 12 expansion candidates (2026-05-08 backtest screening)
+    # All gated in _EXCLUDED_ASSETS until Phase 0 OOS validation passes.
+    "AAPL",
+    "MSFT",
+    "GOOGL",
+    "AMZN",
+    "META",
+    "AMD",
+    "USDCHF",
+    "USDCAD",
 ]
 
 # Assets excluded from trading.
@@ -63,6 +73,18 @@ _EXCLUDED_ASSETS = {
     "EURUSD",
     "DOGUSD",
     "GBPUSD",
+    # Phase 12 candidates — held out of TRADABLE_ASSETS until OOS scorecard
+    # passes the standard gate (Sharpe > 0.3, WR > 40%, max-DD < 30%). They
+    # remain in ALL_ASSETS so downloader / trainer / scorecard infrastructure
+    # treats them like first-class assets.
+    "AAPL",
+    "MSFT",
+    "GOOGL",
+    "AMZN",
+    "META",
+    "AMD",
+    "USDCHF",
+    "USDCAD",
 }
 TRADABLE_ASSETS: list[str] = [a for a in ALL_ASSETS if a not in _EXCLUDED_ASSETS]
 
@@ -88,13 +110,15 @@ COMMODITY_ASSETS: set[str] = {
 }
 
 # Forex assets
-FOREX_ASSETS: set[str] = {"EURUSD", "GBPUSD", "USDJPY"}
+FOREX_ASSETS: set[str] = {"EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD"}
 
 # Index assets
 INDEX_ASSETS: set[str] = {"US500", "DE40", "NAS100"}
 
 # Stock assets
-STOCK_ASSETS: set[str] = {"NVDA", "TSLA"}
+STOCK_ASSETS: set[str] = {
+    "NVDA", "TSLA", "AAPL", "MSFT", "GOOGL", "AMZN", "META", "AMD",
+}
 
 # Cross-asset correlation clusters
 # Each asset maps to its cluster leader(s) — assets whose returns
@@ -126,4 +150,13 @@ ASSET_CLUSTERS: dict[str, list[str]] = {
     # Stocks: sector + index
     "NVDA": ["NAS100", "US500"],
     "TSLA": ["NAS100", "US500"],
+    "AAPL": ["NAS100", "US500"],
+    "MSFT": ["NAS100", "US500"],
+    "GOOGL": ["NAS100", "US500"],
+    "AMZN": ["NAS100", "US500"],
+    "META": ["NAS100", "US500"],
+    "AMD": ["NAS100", "NVDA"],
+    # Forex: USD index dynamics
+    "USDCHF": ["EURUSD", "USDJPY"],
+    "USDCAD": ["WTIUSD", "US500"],
 }

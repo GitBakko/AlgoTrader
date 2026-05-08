@@ -518,6 +518,140 @@ NAS100_CONFIG = AssetFeatureConfig(
 )
 
 
+# ===== Phase 12 expansion candidates (2026-05-08) =====
+# Stock candidates — same pattern as NVDA/TSLA: tech-heavy, sp500-correlated.
+
+AAPL_CONFIG = AssetFeatureConfig(
+    epic="AAPL",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={**DEFAULT_TECHNICAL_PARAMS},
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="sp500_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with S&P 500"},
+        ),
+    ],
+)
+
+MSFT_CONFIG = AssetFeatureConfig(
+    epic="MSFT",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={**DEFAULT_TECHNICAL_PARAMS},
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="sp500_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with S&P 500"},
+        ),
+    ],
+)
+
+GOOGL_CONFIG = AssetFeatureConfig(
+    epic="GOOGL",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={**DEFAULT_TECHNICAL_PARAMS},
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="sp500_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with S&P 500"},
+        ),
+    ],
+)
+
+AMZN_CONFIG = AssetFeatureConfig(
+    epic="AMZN",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={**DEFAULT_TECHNICAL_PARAMS},
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="sp500_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with S&P 500"},
+        ),
+    ],
+)
+
+META_CONFIG = AssetFeatureConfig(
+    epic="META",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={**DEFAULT_TECHNICAL_PARAMS},
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="sp500_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with S&P 500"},
+        ),
+    ],
+)
+
+AMD_CONFIG = AssetFeatureConfig(
+    epic="AMD",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={**DEFAULT_TECHNICAL_PARAMS},
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="sp500_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with S&P 500"},
+        ),
+    ],
+)
+
+# Forex candidates — same pattern as USDJPY/EURUSD/GBPUSD.
+
+USDCHF_CONFIG = AssetFeatureConfig(
+    epic="USDCHF",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={**DEFAULT_TECHNICAL_PARAMS},
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="dxy_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with DXY"},
+        ),
+    ],
+)
+
+USDCAD_CONFIG = AssetFeatureConfig(
+    epic="USDCAD",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={**DEFAULT_TECHNICAL_PARAMS},
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="oil_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with WTI crude"},
+        ),
+    ],
+)
+
+
 # Master config dict
 ASSET_FEATURE_CONFIGS: dict[str, AssetFeatureConfig] = {
     # Existing 9 assets
@@ -543,6 +677,15 @@ ASSET_FEATURE_CONFIGS: dict[str, AssetFeatureConfig] = {
     "GBPUSD": GBPUSD_CONFIG,
     "USDJPY": USDJPY_CONFIG,
     "NAS100": NAS100_CONFIG,
+    # Phase 12 expansion candidates
+    "AAPL": AAPL_CONFIG,
+    "MSFT": MSFT_CONFIG,
+    "GOOGL": GOOGL_CONFIG,
+    "AMZN": AMZN_CONFIG,
+    "META": META_CONFIG,
+    "AMD": AMD_CONFIG,
+    "USDCHF": USDCHF_CONFIG,
+    "USDCAD": USDCAD_CONFIG,
 }
 
 
