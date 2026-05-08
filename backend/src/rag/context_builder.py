@@ -3,8 +3,15 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+from loguru import logger
+
 from src.memory_layer.schemas import MemoryContext
 from src.rag.schemas import NewsItem, RAGContext
+
+if TYPE_CHECKING:
+    from src.llm_provider.base import LLMProvider
 
 
 class MantisRAGContextBuilder:
@@ -15,9 +22,24 @@ class MantisRAGContextBuilder:
 
     MAX_CONTEXT_TOKENS: int = 2000  # ~2000 tokens ≈ ~8000 chars
 
-    def __init__(self, max_tokens: int | None = None):
+    SUMMARY_SYSTEM_PROMPT: str = (
+        "You are a market-context summarization agent for the MANTIS AI "
+        "algorithmic trading system. Given recent news, macro signals, and "
+        "memory context, produce a 3-5 line executive summary highlighting "
+        "the most actionable insight for short-term trading. Be concise, "
+        "cite numerical evidence when relevant, and avoid recommendation "
+        "verbs (no 'buy', 'sell', 'enter'). Output plain text only — no "
+        "markdown headers."
+    )
+
+    def __init__(
+        self,
+        max_tokens: int | None = None,
+        provider: "LLMProvider | None" = None,
+    ):
         if max_tokens is not None:
             self.MAX_CONTEXT_TOKENS = max_tokens
+        self._provider = provider
 
     def build(
         self,
@@ -193,6 +215,74 @@ class MantisRAGContextBuilder:
             lines.append(f"- {len(memory.blacklist_conditions)} active blacklist conditions")
 
         return "\n".join(lines)
+
+    # ------------------------------------------------------------------
+    # Phase 14b: optional LLM-driven executive summary
+    # ------------------------------------------------------------------
+
+    async def build_with_summary(
+        self,
+        news: list[NewsItem] | None = None,
+        sil_data: dict | None = None,
+        memory_context: MemoryContext | None = None,
+        symbol: str = "",
+    ) -> RAGContext:
+        """Build context + add an LLM-driven executive summary.
+
+        Falls back to ``build()`` output (empty summary) on any provider
+        error — the trading loop must never crash on RAG failures.
+        """
+        ctx = self.build(news=news, sil_data=sil_data, memory_context=memory_context)
+        summary = await self._summarize(ctx, symbol)
+        if summary:
+            ctx.executive_summary = summary
+        return ctx
+
+    async def _summarize(self, ctx: RAGContext, symbol: str) -> str:
+        """Call the LLMProvider to produce the executive summary."""
+        if not (ctx.news_section or ctx.macro_section or ctx.memory_section):
+            return ""
+        try:
+            provider = self._get_provider()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(f"[RAG] provider unavailable for summary: {exc!r}")
+            return ""
+
+        prompt_parts: list[str] = []
+        if symbol:
+            prompt_parts.append(f"Asset: {symbol}")
+        if ctx.news_section:
+            prompt_parts.append(ctx.news_section)
+        if ctx.macro_section:
+            prompt_parts.append(ctx.macro_section)
+        if ctx.memory_section:
+            prompt_parts.append(ctx.memory_section)
+        prompt = "\n\n".join(prompt_parts)
+
+        from src.llm_provider.base import LLMProviderError  # noqa: PLC0415
+
+        try:
+            text = await provider.generate(
+                prompt,
+                system=self.SUMMARY_SYSTEM_PROMPT,
+                max_tokens=300,
+                temperature=0.2,
+                json_mode=False,
+            )
+            return (text or "").strip()
+        except LLMProviderError as exc:
+            logger.warning(f"[RAG] LLM summary failed for {symbol}: {exc!r}")
+            return ""
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"[RAG] unexpected error during summary: {exc!r}")
+            return ""
+
+    def _get_provider(self) -> "LLMProvider":
+        if self._provider is None:
+            from src.llm_provider.factory import get_llm_provider  # noqa: PLC0415
+
+            self._provider = get_llm_provider()
+        return self._provider
 
     def _truncate_sections(self, sections: list[str], max_tokens: int) -> list[str]:
         """Truncate sections to fit within token budget. Prioritize news > macro > memory."""

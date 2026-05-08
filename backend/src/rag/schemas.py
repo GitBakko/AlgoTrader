@@ -25,6 +25,7 @@ class RAGContext(BaseModel):
     news_section: str = ""
     macro_section: str = ""
     memory_section: str = ""
+    executive_summary: str = ""  # LLM-driven 3-5 line narrative (Phase 14b)
     total_tokens_estimate: int = 0
     sources_count: int = 0
 

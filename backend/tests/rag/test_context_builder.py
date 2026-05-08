@@ -376,3 +376,100 @@ def test_sources_count():
     # nothing: 0
     ctx4 = builder.build()
     assert ctx4.sources_count == 0
+
+
+# ---------------------------------------------------------------------------
+# Phase 14b: build_with_summary (LLM-driven exec summary)
+# ---------------------------------------------------------------------------
+
+
+from src.llm_provider.base import LLMProvider, LLMProviderError  # noqa: E402
+
+
+class _FakeProvider(LLMProvider):
+    def __init__(self, response):
+        self._response = response
+        self.calls = 0
+        self.last_prompt: str | None = None
+        self.last_system: str | None = None
+
+    async def generate(self, prompt, *, system=None, max_tokens=1500,
+                       temperature=0.0, json_mode=False, keep_alive=None):
+        self.calls += 1
+        self.last_prompt = prompt
+        self.last_system = system
+        if isinstance(self._response, Exception):
+            raise self._response
+        return self._response
+
+    async def analyze_image(self, prompt, image_bytes, *, system=None, max_tokens=1500,
+                            temperature=0.0, json_mode=False, keep_alive=None):
+        return ""
+
+    async def embed(self, texts):
+        return [[0.0] * self.embedding_dim for _ in texts]
+
+    async def health_check(self):
+        return True
+
+    @property
+    def embedding_dim(self) -> int:
+        return 1024
+
+
+@pytest.mark.asyncio
+async def test_build_with_summary_populates_executive_summary():
+    fake = _FakeProvider("Gold momentum building on safe-haven flows; macro tail-risk elevated.")
+    builder = MantisRAGContextBuilder(provider=fake)
+
+    ctx = await builder.build_with_summary(
+        news=[make_news_item()],
+        sil_data=make_sil_data(),
+        symbol="XAUUSD",
+    )
+
+    assert ctx.executive_summary.startswith("Gold momentum")
+    assert fake.calls == 1
+    assert fake.last_system is not None
+    assert "MANTIS" in fake.last_system
+    assert "XAUUSD" in (fake.last_prompt or "")
+
+
+@pytest.mark.asyncio
+async def test_build_with_summary_skips_when_no_sections():
+    fake = _FakeProvider("should not be called")
+    builder = MantisRAGContextBuilder(provider=fake)
+
+    ctx = await builder.build_with_summary(symbol="BTCUSD")
+
+    assert ctx.executive_summary == ""
+    assert fake.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_build_with_summary_falls_back_on_provider_error():
+    fake = _FakeProvider(LLMProviderError("network down"))
+    builder = MantisRAGContextBuilder(provider=fake)
+
+    ctx = await builder.build_with_summary(
+        news=[make_news_item()],
+        symbol="XAUUSD",
+    )
+
+    assert ctx.executive_summary == ""
+    # Template-only sections still populated
+    assert ctx.news_section != ""
+
+
+@pytest.mark.asyncio
+async def test_build_with_summary_falls_back_on_unexpected_error():
+    fake = _FakeProvider(RuntimeError("unexpected"))
+    builder = MantisRAGContextBuilder(provider=fake)
+
+    ctx = await builder.build_with_summary(
+        news=[make_news_item()],
+        symbol="XAUUSD",
+    )
+
+    assert ctx.executive_summary == ""
+    assert ctx.news_section != ""

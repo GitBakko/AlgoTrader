@@ -60,8 +60,8 @@ class VisionAgent:
         """
         Run the full vision + RAG pipeline:
         1. Generate chart from features
-        2. Analyze chart with Claude Vision
-        3. Build RAG context from news/SIL/memory
+        2. Analyze chart with the LLMProvider vision model
+        3. Build RAG context (template + LLM-driven exec summary)
         4. Return combined VisionSignal
 
         Never raises — returns default signal on failure.
@@ -70,14 +70,16 @@ class VisionAgent:
             # Step 1: Generate chart
             chart_bytes = self._generate_chart(context)
 
-            # Step 2: Vision analysis
-            rag_text = self._build_rag_context(context)
+            # Step 2: RAG context (LLM-driven exec summary, falls back
+            # to template-only on provider failure inside the builder).
+            rag_text = await self._build_rag_context_async(context)
+
+            # Step 3: Vision analysis
             vision_report = await self.vision_analyzer.analyze_chart(
                 chart_bytes,
                 additional_context=f"Asset: {context.epic}, Regime: {context.regime or 'unknown'}\n{rag_text[:500]}",
             )
 
-            # Step 3: Build full RAG context
             return VisionSignal(
                 vision_report=vision_report,
                 rag_context_summary=rag_text,
@@ -133,9 +135,34 @@ class VisionAgent:
             title=f"{context.epic} — {context.timeframe}",
         )
 
+    async def _build_rag_context_async(self, context: MarketContext) -> str:
+        """Build RAG context with optional LLM-driven exec summary."""
+        news_items = []
+        sil = context.sil_data or {}
+        raw_news = sil.get("news", [])
+        if raw_news:
+            news_items = self.news_ingester.ingest(raw_news, symbol=context.epic)
+
+        rag = await self.context_builder.build_with_summary(
+            news=news_items,
+            sil_data=sil.get("macro"),
+            symbol=context.epic,
+        )
+
+        parts: list[str] = []
+        if rag.executive_summary:
+            parts.append(f"## Summary\n{rag.executive_summary}")
+        if rag.news_section:
+            parts.append(rag.news_section)
+        if rag.macro_section:
+            parts.append(rag.macro_section)
+        if rag.memory_section:
+            parts.append(rag.memory_section)
+
+        return "\n\n".join(parts)
+
     def _build_rag_context(self, context: MarketContext) -> str:
-        """Build RAG context string from available data."""
-        # Process news from SIL data if available
+        """Sync template-only RAG (kept for back-compat with non-async callers)."""
         news_items = []
         sil = context.sil_data or {}
         raw_news = sil.get("news", [])
@@ -147,8 +174,7 @@ class VisionAgent:
             sil_data=sil.get("macro"),
         )
 
-        # Combine sections
-        parts = []
+        parts: list[str] = []
         if rag.news_section:
             parts.append(rag.news_section)
         if rag.macro_section:
