@@ -3,19 +3,27 @@
 MantisBaseAgent — abstract base class for all agents in the MANTIS AI
 multi-agent trading system.
 
+Phase 14b (2026-05-08): the LLM call site moved from the anthropic
+client to the provider-agnostic ``LLMProvider`` interface
+(``src/llm_provider``). Production runs against Ollama on GX10 by
+default; tests inject a FakeProvider via the constructor.
+
 Each agent subclass:
-  - Sets ``role`` (AgentRole) and ``output_schema`` (Pydantic BaseModel subclass)
-    as class variables.
-  - Implements ``get_system_prompt()`` to supply a role-specific system prompt.
-  - Implements ``_build_user_message()`` to format a MarketContext into a
-    natural-language user message.
+  - Sets ``role`` (AgentRole) and ``output_schema`` (Pydantic BaseModel
+    subclass) as class variables.
+  - Implements ``get_system_prompt()`` to supply a role-specific system
+    prompt.
+  - Implements ``_build_user_message()`` to format a MarketContext into
+    a natural-language user message.
 
 The base class handles:
-  - Lazy-initialisation of the Anthropic AsyncAnthropic client.
+  - Lazy resolution of the ``LLMProvider`` singleton.
   - Building the full system prompt (role prompt + JSON schema hint).
-  - Calling the Claude API and parsing the JSON response into ``output_schema``.
-  - Graceful failure: ``analyze()`` always returns None instead of crashing so
-    that a single-agent failure never brings down the whole pipeline.
+  - Calling ``provider.generate(json_mode=True)`` and parsing the JSON
+    response into ``output_schema``.
+  - Graceful failure: ``analyze()`` always returns ``None`` instead of
+    crashing so a single-agent failure never brings down the whole
+    pipeline.
 """
 
 from __future__ import annotations
@@ -27,36 +35,37 @@ from loguru import logger
 from pydantic import BaseModel
 
 from src.agents.schemas import AgentRole, MarketContext
+from src.llm_provider.base import LLMProvider
 
 
 class MantisBaseAgent(ABC):
     """
-    Abstract base agent.  Subclasses define:
+    Abstract base agent. Subclasses define:
 
     - ``role``: AgentRole enum (class variable)
-    - ``output_schema``: Pydantic model class for structured output (class variable)
+    - ``output_schema``: Pydantic model class for structured output
     - ``get_system_prompt()``: role-specific system prompt
     - ``_build_user_message()``: format MarketContext into user message
     """
 
-    # Subclasses must override these as class variables
     role: AgentRole
     output_schema: type[BaseModel]
 
     def __init__(
         self,
-        model: str = "claude-sonnet-4-20250514",
+        model: str | None = None,
         max_tokens: int = 2000,
         temperature: float = 0.2,
+        provider: LLMProvider | None = None,
     ) -> None:
+        # ``model`` is accepted for back-compat with callers that still
+        # pass an Anthropic identifier (orchestrator, tests). Ollama
+        # backend ignores it — model selection is owned by the
+        # LLMProvider configuration.
         self.model = model
         self.max_tokens = max_tokens
         self.temperature = temperature
-        self._client = None  # lazy-init anthropic.AsyncAnthropic client
-
-    # ------------------------------------------------------------------
-    # Abstract interface — subclasses must implement
-    # ------------------------------------------------------------------
+        self._provider = provider
 
     @abstractmethod
     def get_system_prompt(self) -> str:
@@ -65,47 +74,23 @@ class MantisBaseAgent(ABC):
 
     @abstractmethod
     def _build_user_message(self, context: MarketContext) -> str:
-        """
-        Format a MarketContext into the user-turn message that Claude will
-        analyse.  Subclasses control the exact structure and level of detail.
-        """
+        """Format a MarketContext into the user-turn message."""
         ...
 
-    # ------------------------------------------------------------------
-    # Public entry point
-    # ------------------------------------------------------------------
-
     async def analyze(self, context: MarketContext) -> BaseModel | None:
-        """
-        Run analysis on the given context.
-
-        Returns the parsed ``output_schema`` instance on success, or ``None``
-        on any failure.  This method NEVER raises — a single-agent failure
-        must not crash the broader pipeline.
-        """
+        """Run analysis. Returns parsed output_schema or None on any failure."""
         try:
             return await self._call_llm(context)
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"[{self.role.value}] Agent analysis failed: {exc!r}")
             return None
 
-    # ------------------------------------------------------------------
-    # LLM interaction
-    # ------------------------------------------------------------------
-
     async def _call_llm(self, context: MarketContext) -> BaseModel:
-        """
-        Call the Claude API, parse the JSON response and return a validated
-        ``output_schema`` instance.
-
-        Raises on any network, JSON-parse, or Pydantic validation error — the
-        caller (``analyze``) catches and converts to None.
-        """
-        client = self._get_client()
+        """Call the LLMProvider and parse the JSON response."""
+        provider = self._get_provider()
         system_prompt = self.get_system_prompt()
         user_message = self._build_user_message(context)
 
-        # Embed the JSON schema as a hint so the model knows the exact format
         schema_hint = json.dumps(self.output_schema.model_json_schema(), indent=2)
         full_system = (
             f"{system_prompt}\n\n"
@@ -113,39 +98,25 @@ class MantisBaseAgent(ABC):
             f"```json\n{schema_hint}\n```"
         )
 
-        response = await client.messages.create(
-            model=self.model,
+        text = await provider.generate(
+            user_message,
+            system=full_system,
             max_tokens=self.max_tokens,
             temperature=self.temperature,
-            system=full_system,
-            messages=[{"role": "user", "content": user_message}],
+            json_mode=True,
         )
 
-        text: str = response.content[0].text
-
-        # Strip markdown code fences that the model sometimes wraps output in
         if text.startswith("```"):
-            # Remove opening fence (```json\n or ```\n)
             text = text.split("\n", 1)[1]
-            # Remove closing fence
             text = text.rsplit("```", 1)[0]
 
         data = json.loads(text)
         return self.output_schema.model_validate(data)
 
-    # ------------------------------------------------------------------
-    # Client management
-    # ------------------------------------------------------------------
+    def _get_provider(self) -> LLMProvider:
+        """Return the injected provider or the configured singleton."""
+        if self._provider is None:
+            from src.llm_provider.factory import get_llm_provider  # noqa: PLC0415
 
-    def _get_client(self):
-        """
-        Lazy-initialise and return the Anthropic AsyncAnthropic client.
-
-        Raises ImportError if the ``anthropic`` package is not installed —
-        this surfaces as a clear error rather than a cryptic AttributeError.
-        """
-        if self._client is None:
-            import anthropic  # noqa: PLC0415 — intentional lazy import
-
-            self._client = anthropic.AsyncAnthropic()
-        return self._client
+            self._provider = get_llm_provider()
+        return self._provider

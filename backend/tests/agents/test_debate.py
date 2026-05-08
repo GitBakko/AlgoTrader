@@ -421,13 +421,17 @@ class TestLlmDisabledByDefault:
         debate = BullBearDebate()
         assert debate.use_llm is False
 
-    def test_model_default_is_set(self):
-        """BullBearDebate() should have a default model string."""
+    def test_model_default_is_none(self):
+        """Phase 14b: model param is back-compat only — defaults to None.
+
+        The active LLMProvider owns model selection now. The attribute
+        is kept on the class for callers that still pass an explicit
+        identifier; the default is None.
+        """
         from src.agents.debate import BullBearDebate  # noqa: PLC0415
 
         debate = BullBearDebate()
-        assert isinstance(debate.model, str)
-        assert len(debate.model) > 0
+        assert debate.model is None
 
     def test_llm_path_raises_not_implemented(self):
         """_llm_debate() stub should raise NotImplementedError."""

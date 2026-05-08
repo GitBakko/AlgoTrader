@@ -45,13 +45,14 @@ class BullBearDebate:
         If True, attempt the LLM path first and fall through to heuristic on
         any exception.  Defaults to False (heuristic only).
     model:
-        Anthropic model identifier used for the LLM path.
+        Optional model identifier (back-compat). Ignored — the active
+        LLMProvider owns backend + model selection.
     """
 
     def __init__(
         self,
         use_llm: bool = False,
-        model: str = "claude-sonnet-4-20250514",
+        model: str | None = None,
     ) -> None:
         self.use_llm = use_llm
         self.model = model

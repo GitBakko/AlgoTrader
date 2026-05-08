@@ -41,11 +41,14 @@ class MantisAgentOrchestrator:
     Parameters
     ----------
     llm_model:
-        Anthropic model identifier passed to LLM-backed agents.
+        Optional model identifier (back-compat). The active LLMProvider
+        owns backend + model selection (see ``src/llm_provider/factory.py``);
+        this value is forwarded to subclass constructors but is not
+        authoritative.
     temperature:
-        Sampling temperature for Claude calls.
+        Sampling temperature for LLM calls.
     max_tokens:
-        Max tokens per Claude response.
+        Max tokens per LLM response.
     technical_weight:
         Weight for technical analysis in the TraderAgent scoring.
     sentiment_weight:
@@ -64,7 +67,7 @@ class MantisAgentOrchestrator:
 
     def __init__(
         self,
-        llm_model: str = "claude-sonnet-4-20250514",
+        llm_model: str | None = None,
         temperature: float = 0.2,
         max_tokens: int = 2000,
         technical_weight: float = 0.4,
@@ -94,7 +97,7 @@ class MantisAgentOrchestrator:
         self.fund_manager = FundManagerAgent()
         self.debate_enabled = debate_enabled
         self.vision_enabled = vision_enabled
-        self.vision_agent = VisionAgent(vision_model=llm_model) if vision_enabled else None
+        self.vision_agent = VisionAgent() if vision_enabled else None
         self.drl_enabled = drl_enabled
         # DRL ensemble agent: start with an empty ensemble (agents are loaded/trained separately)
         self.drl_agent = (

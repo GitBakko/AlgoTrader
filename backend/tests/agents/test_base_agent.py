@@ -1,29 +1,56 @@
-"""
-Tests for MantisBaseAgent — the abstract base class for all MANTIS AI agents.
+"""Tests for MantisBaseAgent — Phase 14b provider-based.
 
-Uses unittest.mock to avoid real Anthropic API calls.
-All async tests run automatically via asyncio_mode = auto in pytest.ini.
+Phase 14b (2026-05-08): the base class delegates to ``LLMProvider``
+instead of the anthropic client. Tests inject a FakeProvider via the
+constructor — no monkey-patching, no anthropic dep.
 """
 
-import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from __future__ import annotations
 
 import pytest
 
 from src.agents.schemas import AgentRole, MarketContext, TechnicalReport
+from src.llm_provider.base import LLMProvider, LLMProviderError
 
 
-# ---------------------------------------------------------------------------
-# Concrete mock agent for testing (not abstract)
-# ---------------------------------------------------------------------------
+class FakeProvider(LLMProvider):
+    """Records the last generate() call and returns scripted output."""
+
+    def __init__(self, response: str | Exception):
+        self._response = response
+        self.last_prompt: str | None = None
+        self.last_system: str | None = None
+        self.last_max_tokens: int | None = None
+        self.last_temperature: float | None = None
+        self.last_json_mode: bool | None = None
+
+    async def generate(self, prompt, *, system=None, max_tokens=1500,
+                       temperature=0.0, json_mode=False, keep_alive=None):
+        self.last_prompt = prompt
+        self.last_system = system
+        self.last_max_tokens = max_tokens
+        self.last_temperature = temperature
+        self.last_json_mode = json_mode
+        if isinstance(self._response, Exception):
+            raise self._response
+        return self._response
+
+    async def analyze_image(self, prompt, image_bytes, *, system=None, max_tokens=1500,
+                            temperature=0.0, json_mode=False, keep_alive=None):
+        return self._response if not isinstance(self._response, Exception) else ""
+
+    async def embed(self, texts):
+        return [[0.0] * self.embedding_dim for _ in texts]
+
+    async def health_check(self):
+        return True
+
+    @property
+    def embedding_dim(self) -> int:
+        return 1024
 
 
-def _make_mock_agent(**kwargs):
-    """
-    Import MantisBaseAgent and return a concrete MockAgent instance.
-    Deferred import so that if the module doesn't exist yet, only the
-    test that calls this helper fails (not collection-time).
-    """
+def _make_mock_agent(provider: LLMProvider | None = None, **kwargs):
     from src.agents.base_agent import MantisBaseAgent  # noqa: PLC0415
 
     class MockAgent(MantisBaseAgent):
@@ -36,7 +63,7 @@ def _make_mock_agent(**kwargs):
         def _build_user_message(self, context: MarketContext) -> str:
             return f"Analyse {context.epic} at {context.current_price}"
 
-    return MockAgent(**kwargs)
+    return MockAgent(provider=provider, **kwargs)
 
 
 def _make_valid_technical_report(symbol: str = "GOLD") -> TechnicalReport:
@@ -57,259 +84,162 @@ def _make_context(epic: str = "GOLD") -> MarketContext:
 
 
 # ---------------------------------------------------------------------------
-# Test: Initialisation
+# Init
 # ---------------------------------------------------------------------------
 
 
 class TestInit:
     def test_init_defaults(self):
-        """Default constructor should use the canonical MANTIS model settings."""
         agent = _make_mock_agent()
-        assert agent.model == "claude-sonnet-4-20250514"
+        assert agent.model is None
         assert agent.max_tokens == 2000
         assert agent.temperature == 0.2
-        assert agent._client is None  # lazy-init — not created until first call
+        assert agent._provider is None  # lazy resolution
 
-    def test_init_custom_model(self):
-        """Custom constructor values should override defaults."""
-        agent = _make_mock_agent(
-            model="claude-opus-4-5",
-            max_tokens=4096,
-            temperature=0.0,
-        )
-        assert agent.model == "claude-opus-4-5"
+    def test_init_custom_values(self):
+        fake = FakeProvider("{}")
+        agent = _make_mock_agent(provider=fake, model="custom-model",
+                                 max_tokens=4096, temperature=0.0)
+        assert agent.model == "custom-model"
         assert agent.max_tokens == 4096
         assert agent.temperature == 0.0
-
-    def test_token_budget_default(self):
-        """Default max_tokens must be at least 1000 to allow reasonable JSON output."""
-        agent = _make_mock_agent()
-        assert agent.max_tokens >= 1000
+        assert agent._provider is fake
 
     def test_class_variables_set(self):
-        """Concrete subclass must expose role and output_schema class variables."""
         agent = _make_mock_agent()
         assert agent.role == AgentRole.TECHNICAL
         assert agent.output_schema is TechnicalReport
 
 
 # ---------------------------------------------------------------------------
-# Test: analyze() public interface
+# analyze() — error swallowing
 # ---------------------------------------------------------------------------
 
 
 class TestAnalyze:
-    async def test_analyze_calls_llm_and_parses(self):
-        """analyze() should delegate to _call_llm and return its result."""
-        agent = _make_mock_agent()
-        expected = _make_valid_technical_report()
-        context = _make_context()
+    @pytest.mark.asyncio
+    async def test_analyze_returns_parsed_report(self):
+        report = _make_valid_technical_report()
+        fake = FakeProvider(report.model_dump_json())
+        agent = _make_mock_agent(provider=fake)
 
-        with patch.object(agent, "_call_llm", new=AsyncMock(return_value=expected)) as mock_llm:
-            result = await agent.analyze(context)
-
-        assert result is expected
-        mock_llm.assert_awaited_once_with(context)
-
-    async def test_analyze_returns_none_on_llm_failure(self):
-        """analyze() must swallow exceptions from _call_llm and return None."""
-        agent = _make_mock_agent()
-        context = _make_context()
-
-        with patch.object(agent, "_call_llm", new=AsyncMock(side_effect=RuntimeError("API down"))):
-            result = await agent.analyze(context)
-
-        assert result is None
-
-    async def test_analyze_returns_none_on_json_parse_failure(self):
-        """analyze() must also swallow JSON/Pydantic validation errors."""
-        agent = _make_mock_agent()
-        context = _make_context()
-
-        with patch.object(agent, "_call_llm", new=AsyncMock(side_effect=ValueError("bad json"))):
-            result = await agent.analyze(context)
-
-        assert result is None
-
-    async def test_analyze_returns_none_on_unexpected_exception(self):
-        """Any exception type should be caught — pipeline must never crash."""
-        agent = _make_mock_agent()
-        context = _make_context()
-
-        with patch.object(agent, "_call_llm", new=AsyncMock(side_effect=KeyError("missing_key"))):
-            result = await agent.analyze(context)
-
-        assert result is None
-
-
-# ---------------------------------------------------------------------------
-# Test: _call_llm internal method
-# ---------------------------------------------------------------------------
-
-
-class TestCallLlm:
-    def _make_llm_response(self, text: str) -> MagicMock:
-        """Build a minimal mock of an Anthropic message response."""
-        content_block = MagicMock()
-        content_block.text = text
-        response = MagicMock()
-        response.content = [content_block]
-        return response
-
-    async def test_call_llm_parses_clean_json(self):
-        """_call_llm should parse a clean JSON response into output_schema."""
-        agent = _make_mock_agent()
-        report = _make_valid_technical_report("GOLD")
-        json_text = report.model_dump_json()
-
-        mock_create = AsyncMock(return_value=self._make_llm_response(json_text))
-        mock_client = MagicMock()
-        mock_client.messages.create = mock_create
-        agent._client = mock_client
-
-        context = _make_context("GOLD")
-        result = await agent._call_llm(context)
+        result = await agent.analyze(_make_context())
 
         assert isinstance(result, TechnicalReport)
         assert result.symbol == "GOLD"
         assert result.trend_direction == "BULLISH"
-        mock_create.assert_awaited_once()
 
-    async def test_call_llm_strips_markdown_fences(self):
-        """_call_llm must strip ```json ... ``` fences before parsing."""
-        agent = _make_mock_agent()
-        report = _make_valid_technical_report("GOLD")
-        raw_json = report.model_dump_json()
-        fenced_text = f"```json\n{raw_json}\n```"
+    @pytest.mark.asyncio
+    async def test_analyze_returns_none_on_provider_error(self):
+        fake = FakeProvider(LLMProviderError("network down"))
+        agent = _make_mock_agent(provider=fake)
 
-        mock_create = AsyncMock(return_value=self._make_llm_response(fenced_text))
-        mock_client = MagicMock()
-        mock_client.messages.create = mock_create
-        agent._client = mock_client
+        assert await agent.analyze(_make_context()) is None
 
-        context = _make_context("GOLD")
-        result = await agent._call_llm(context)
+    @pytest.mark.asyncio
+    async def test_analyze_returns_none_on_invalid_json(self):
+        fake = FakeProvider("This is not JSON at all.")
+        agent = _make_mock_agent(provider=fake)
+
+        assert await agent.analyze(_make_context()) is None
+
+    @pytest.mark.asyncio
+    async def test_analyze_returns_none_on_unexpected_exception(self):
+        fake = FakeProvider(KeyError("missing"))
+        agent = _make_mock_agent(provider=fake)
+
+        assert await agent.analyze(_make_context()) is None
+
+
+# ---------------------------------------------------------------------------
+# _call_llm internals
+# ---------------------------------------------------------------------------
+
+
+class TestCallLlm:
+    @pytest.mark.asyncio
+    async def test_strips_markdown_fences(self):
+        report = _make_valid_technical_report()
+        fenced = f"```json\n{report.model_dump_json()}\n```"
+        fake = FakeProvider(fenced)
+        agent = _make_mock_agent(provider=fake)
+
+        result = await agent._call_llm(_make_context())
 
         assert isinstance(result, TechnicalReport)
         assert result.symbol == "GOLD"
 
-    async def test_call_llm_passes_correct_params(self):
-        """_call_llm must forward model, max_tokens, temperature, system, messages."""
-        agent = _make_mock_agent(model="claude-haiku-3-5", max_tokens=1500, temperature=0.1)
+    @pytest.mark.asyncio
+    async def test_passes_correct_params(self):
         report = _make_valid_technical_report()
-        json_text = report.model_dump_json()
-
-        mock_create = AsyncMock(return_value=self._make_llm_response(json_text))
-        mock_client = MagicMock()
-        mock_client.messages.create = mock_create
-        agent._client = mock_client
-
-        context = _make_context()
-        await agent._call_llm(context)
-
-        call_kwargs = mock_create.call_args.kwargs
-        assert call_kwargs["model"] == "claude-haiku-3-5"
-        assert call_kwargs["max_tokens"] == 1500
-        assert call_kwargs["temperature"] == 0.1
-        assert "system" in call_kwargs
-        assert "messages" in call_kwargs
-
-    async def test_call_llm_includes_schema_hint_in_system(self):
-        """System prompt must include the output_schema JSON schema."""
-        agent = _make_mock_agent()
-        report = _make_valid_technical_report()
-
-        mock_create = AsyncMock(return_value=self._make_llm_response(report.model_dump_json()))
-        mock_client = MagicMock()
-        mock_client.messages.create = mock_create
-        agent._client = mock_client
+        fake = FakeProvider(report.model_dump_json())
+        agent = _make_mock_agent(provider=fake, max_tokens=1500, temperature=0.1)
 
         await agent._call_llm(_make_context())
 
-        system_arg = mock_create.call_args.kwargs["system"]
-        # Schema hint should be embedded in the system prompt
-        assert "json" in system_arg.lower()
-        assert "symbol" in system_arg  # TechnicalReport has a 'symbol' field
+        assert fake.last_max_tokens == 1500
+        assert fake.last_temperature == 0.1
+        assert fake.last_json_mode is True
 
-    async def test_call_llm_user_message_uses_context(self):
-        """User message must be built from context by _build_user_message."""
-        agent = _make_mock_agent()
+    @pytest.mark.asyncio
+    async def test_includes_schema_hint_in_system(self):
         report = _make_valid_technical_report()
+        fake = FakeProvider(report.model_dump_json())
+        agent = _make_mock_agent(provider=fake)
 
-        mock_create = AsyncMock(return_value=self._make_llm_response(report.model_dump_json()))
-        mock_client = MagicMock()
-        mock_client.messages.create = mock_create
-        agent._client = mock_client
+        await agent._call_llm(_make_context())
 
-        context = _make_context("GOLD")
-        await agent._call_llm(context)
+        assert fake.last_system is not None
+        assert "json" in fake.last_system.lower()
+        assert "symbol" in fake.last_system
 
-        messages_arg = mock_create.call_args.kwargs["messages"]
-        assert len(messages_arg) == 1
-        assert messages_arg[0]["role"] == "user"
-        assert "GOLD" in messages_arg[0]["content"]
+    @pytest.mark.asyncio
+    async def test_user_message_uses_context(self):
+        report = _make_valid_technical_report()
+        fake = FakeProvider(report.model_dump_json())
+        agent = _make_mock_agent(provider=fake)
 
+        await agent._call_llm(_make_context("GOLD"))
 
-# ---------------------------------------------------------------------------
-# Test: _get_client lazy initialisation
-# ---------------------------------------------------------------------------
-
-
-class TestGetClient:
-    def test_get_client_lazy_init(self):
-        """_get_client should create the Anthropic client on first call."""
-        agent = _make_mock_agent()
-        assert agent._client is None
-
-        mock_anthropic_module = MagicMock()
-        mock_async_client = MagicMock()
-        mock_anthropic_module.AsyncAnthropic.return_value = mock_async_client
-
-        with patch.dict("sys.modules", {"anthropic": mock_anthropic_module}):
-            client = agent._get_client()
-
-        assert client is mock_async_client
-        mock_anthropic_module.AsyncAnthropic.assert_called_once()
-
-    def test_get_client_reuses_instance(self):
-        """_get_client should return the same client on subsequent calls."""
-        agent = _make_mock_agent()
-        mock_client = MagicMock()
-        agent._client = mock_client
-
-        result = agent._get_client()
-        assert result is mock_client
-
-    def test_get_client_import_error_propagates(self):
-        """If anthropic is not installed, ImportError should propagate clearly."""
-        import sys
-        agent = _make_mock_agent()
-
-        # Temporarily hide the anthropic module
-        original = sys.modules.pop("anthropic", None)
-        try:
-            with pytest.raises((ImportError, ModuleNotFoundError)):
-                agent._get_client()
-        finally:
-            if original is not None:
-                sys.modules["anthropic"] = original
+        assert fake.last_prompt is not None
+        assert "GOLD" in fake.last_prompt
 
 
 # ---------------------------------------------------------------------------
-# Test: Abstract interface enforcement
+# Provider lazy resolution
+# ---------------------------------------------------------------------------
+
+
+class TestGetProvider:
+    def test_returns_injected_provider(self):
+        fake = FakeProvider("{}")
+        agent = _make_mock_agent(provider=fake)
+        assert agent._get_provider() is fake
+
+    def test_falls_back_to_factory_singleton(self, monkeypatch):
+        from src.llm_provider import factory as factory_mod
+
+        sentinel = FakeProvider("{}")
+        monkeypatch.setattr(factory_mod, "get_llm_provider", lambda: sentinel)
+
+        agent = _make_mock_agent()  # no injected provider
+        assert agent._get_provider() is sentinel
+        assert agent._provider is sentinel  # cached after first resolve
+
+
+# ---------------------------------------------------------------------------
+# Abstract enforcement
 # ---------------------------------------------------------------------------
 
 
 class TestAbstractInterface:
     def test_cannot_instantiate_directly(self):
-        """MantisBaseAgent must be abstract — direct instantiation must fail."""
         from src.agents.base_agent import MantisBaseAgent  # noqa: PLC0415
 
         with pytest.raises(TypeError):
             MantisBaseAgent()  # type: ignore[abstract]
 
     def test_subclass_without_get_system_prompt_fails(self):
-        """Subclass missing get_system_prompt() must raise TypeError on instantiation."""
         from src.agents.base_agent import MantisBaseAgent  # noqa: PLC0415
 
         class IncompleteAgent(MantisBaseAgent):
@@ -323,7 +253,6 @@ class TestAbstractInterface:
             IncompleteAgent()
 
     def test_subclass_without_build_user_message_fails(self):
-        """Subclass missing _build_user_message() must raise TypeError on instantiation."""
         from src.agents.base_agent import MantisBaseAgent  # noqa: PLC0415
 
         class IncompleteAgent(MantisBaseAgent):
