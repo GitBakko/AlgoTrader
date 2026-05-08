@@ -651,6 +651,55 @@ USDCAD_CONFIG = AssetFeatureConfig(
     ],
 )
 
+# Phase 14 forex candidates (2026-05-09)
+AUDUSD_CONFIG = AssetFeatureConfig(
+    epic="AUDUSD",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={**DEFAULT_TECHNICAL_PARAMS},
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="commodity_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with copper / gold"},
+        ),
+    ],
+)
+
+NZDUSD_CONFIG = AssetFeatureConfig(
+    epic="NZDUSD",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={**DEFAULT_TECHNICAL_PARAMS},
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="aud_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with AUDUSD"},
+        ),
+    ],
+)
+
+EURJPY_CONFIG = AssetFeatureConfig(
+    epic="EURJPY",
+    primary_timeframe="1h",
+    additional_timeframes=["4h", "1d"],
+    technical_params={**DEFAULT_TECHNICAL_PARAMS},
+    features=[
+        FeatureConfig(name="technical_all", feature_type=FeatureType.TECHNICAL),
+        FeatureConfig(
+            name="cross_correlation",
+            feature_type=FeatureType.CROSS_ASSET,
+            enabled=False,
+            params={"description": "Rolling correlation with EURUSD / USDJPY"},
+        ),
+    ],
+)
+
 
 # Master config dict
 ASSET_FEATURE_CONFIGS: dict[str, AssetFeatureConfig] = {
@@ -686,6 +735,10 @@ ASSET_FEATURE_CONFIGS: dict[str, AssetFeatureConfig] = {
     "AMD": AMD_CONFIG,
     "USDCHF": USDCHF_CONFIG,
     "USDCAD": USDCAD_CONFIG,
+    # Phase 14 forex candidates (2026-05-09)
+    "AUDUSD": AUDUSD_CONFIG,
+    "NZDUSD": NZDUSD_CONFIG,
+    "EURJPY": EURJPY_CONFIG,
 }
 
 

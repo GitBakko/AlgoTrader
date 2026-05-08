@@ -9,7 +9,7 @@ class TestStrategyConfig:
         assert resp.status_code == 200
         data = resp.json()["data"]
         assert isinstance(data, list)
-        assert len(data) == 29  # Phase 12 (21) + Phase 14 (8 candidates)
+        assert len(data) == 32  # Phase 12 (21) + Phase 14 stocks/forex Wave 1 (8) + Wave 2 (3)
         epics = {c["epic"] for c in data}
         assert epics == {
             # Crypto
@@ -22,6 +22,7 @@ class TestStrategyConfig:
             "WTIUSD", "NATGAS",
             # Forex
             "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD",
+            "AUDUSD", "NZDUSD", "EURJPY",
             # Stocks
             "NVDA", "TSLA", "AAPL", "MSFT", "GOOGL", "AMZN", "META", "AMD",
         }

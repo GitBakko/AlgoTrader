@@ -36,6 +36,9 @@ EPIC_TO_FINNHUB: dict[str, str | None] = {
     "USDJPY": None,
     "USDCHF": None,
     "USDCAD": None,
+    "AUDUSD": None,
+    "NZDUSD": None,
+    "EURJPY": None,
     # Commodities
     "XAUUSD": None,
     "XAGUSD": None,
@@ -75,6 +78,9 @@ EPIC_TO_NEWS_QUERY: dict[str, str] = {
     "USDJPY": "USD JPY dollar yen forex",
     "USDCHF": "USD CHF dollar swiss franc forex",
     "USDCAD": "USD CAD dollar canadian forex",
+    "AUDUSD": "AUD USD aussie dollar forex",
+    "NZDUSD": "NZD USD kiwi dollar forex",
+    "EURJPY": "EUR JPY euro yen forex cross",
     # Commodities
     "XAUUSD": "gold XAUUSD commodity",
     "XAGUSD": "silver XAGUSD commodity",

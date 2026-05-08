@@ -41,6 +41,19 @@ SUPPORTED_MARKETS = [
     MarketInfo(epic="GBPUSD", name="British Pound / US Dollar (GBP/USD)", change_pct=0.0),
     MarketInfo(epic="USDJPY", name="US Dollar / Japanese Yen (USD/JPY)", change_pct=0.0),
     MarketInfo(epic="NAS100", name="Nasdaq 100 (US TECH 100)", change_pct=0.0),
+    # Phase 14 stock candidates (2026-05-08 promoted)
+    MarketInfo(epic="AAPL", name="Apple Inc (AAPL)", change_pct=0.0),
+    MarketInfo(epic="MSFT", name="Microsoft Corp (MSFT)", change_pct=0.0),
+    MarketInfo(epic="GOOGL", name="Alphabet Inc Class A (GOOGL)", change_pct=0.0),
+    MarketInfo(epic="AMZN", name="Amazon.com Inc (AMZN)", change_pct=0.0),
+    MarketInfo(epic="META", name="Meta Platforms (META)", change_pct=0.0),
+    MarketInfo(epic="AMD", name="Advanced Micro Devices (AMD)", change_pct=0.0),
+    # Phase 14 forex (2026-05-08/09)
+    MarketInfo(epic="USDCHF", name="US Dollar / Swiss Franc (USD/CHF)", change_pct=0.0),
+    MarketInfo(epic="USDCAD", name="US Dollar / Canadian Dollar (USD/CAD)", change_pct=0.0),
+    MarketInfo(epic="AUDUSD", name="Australian Dollar / US Dollar (AUD/USD)", change_pct=0.0),
+    MarketInfo(epic="NZDUSD", name="New Zealand Dollar / US Dollar (NZD/USD)", change_pct=0.0),
+    MarketInfo(epic="EURJPY", name="Euro / Japanese Yen (EUR/JPY)", change_pct=0.0),
 ]
 
 _MARKET_MAP = {m.epic: m for m in SUPPORTED_MARKETS}

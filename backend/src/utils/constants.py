@@ -40,6 +40,13 @@ ALL_ASSETS: list[str] = [
     "AMD",
     "USDCHF",
     "USDCAD",
+    # Phase 14 forex expansion (2026-05-09)
+    # Diversifies away from existing USD-quote majors. Initially gated
+    # in _EXCLUDED_ASSETS until 730d Capital.com backfill + retrain
+    # produces f1 > 0.55 baseline.
+    "AUDUSD",
+    "NZDUSD",
+    "EURJPY",
 ]
 
 # Assets excluded from trading.
@@ -88,6 +95,16 @@ _EXCLUDED_ASSETS = {
     # produced f1 0.5945 / 0.6134 (above BTC baseline 0.57). Risk multi-
     # plier left at default 1.0 until live PnL evidence justifies a
     # boost à la USDJPY (1.5x). See backend/.env EPIC_RISK_MULTIPLIERS.
+    #
+    # AUDUSD + EURJPY PROMOTED on 2026-05-09 — Phase 14 forex retrain
+    # produced f1 0.5307 / 0.5418 (between stock baseline AMD 0.5149
+    # and META 0.5401). 19 folds × 199 features. Risk multiplier
+    # default 1.0; revisit after live PnL evidence.
+    #
+    # NZDUSD KEPT EXCLUDED — f1 0.5060 below stock floor 0.51,
+    # marginal vs random. Re-evaluate after AUDUSD shows live edge
+    # (sister-pair correlation should lift NZDUSD signal quality).
+    "NZDUSD",
 }
 TRADABLE_ASSETS: list[str] = [a for a in ALL_ASSETS if a not in _EXCLUDED_ASSETS]
 
@@ -113,7 +130,10 @@ COMMODITY_ASSETS: set[str] = {
 }
 
 # Forex assets
-FOREX_ASSETS: set[str] = {"EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD"}
+FOREX_ASSETS: set[str] = {
+    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD",
+    "AUDUSD", "NZDUSD", "EURJPY",
+}
 
 # Index assets
 INDEX_ASSETS: set[str] = {"US500", "DE40", "NAS100"}
@@ -162,4 +182,8 @@ ASSET_CLUSTERS: dict[str, list[str]] = {
     # Forex: USD index dynamics
     "USDCHF": ["EURUSD", "USDJPY"],
     "USDCAD": ["WTIUSD", "US500"],
+    # Forex Phase 14: commodity-linked + cross
+    "AUDUSD": ["XAUUSD", "COPPER"],
+    "NZDUSD": ["AUDUSD", "WTIUSD"],
+    "EURJPY": ["EURUSD", "USDJPY"],
 }
