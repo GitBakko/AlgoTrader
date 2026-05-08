@@ -16,6 +16,12 @@ EPIC_TO_FINNHUB: dict[str, str | None] = {
     # Stocks
     "NVDA": "NVDA",
     "TSLA": "TSLA",
+    "AAPL": "AAPL",
+    "MSFT": "MSFT",
+    "GOOGL": "GOOGL",
+    "AMZN": "AMZN",
+    "META": "META",
+    "AMD": "AMD",
     # Crypto (Finnhub has crypto endpoints but not equity features)
     "BTCUSD": None,
     "ETHUSD": None,
@@ -28,6 +34,8 @@ EPIC_TO_FINNHUB: dict[str, str | None] = {
     "EURUSD": None,
     "GBPUSD": None,
     "USDJPY": None,
+    "USDCHF": None,
+    "USDCAD": None,
     # Commodities
     "XAUUSD": None,
     "XAGUSD": None,
@@ -47,6 +55,12 @@ EPIC_TO_NEWS_QUERY: dict[str, str] = {
     # Stocks
     "NVDA": "NVIDIA NVDA",
     "TSLA": "Tesla TSLA",
+    "AAPL": "Apple AAPL stock",
+    "MSFT": "Microsoft MSFT stock",
+    "GOOGL": "Alphabet Google GOOGL stock",
+    "AMZN": "Amazon AMZN stock",
+    "META": "Meta Platforms META stock",
+    "AMD": "Advanced Micro Devices AMD stock",
     # Crypto
     "BTCUSD": "Bitcoin BTC crypto",
     "ETHUSD": "Ethereum ETH crypto",
@@ -59,6 +73,8 @@ EPIC_TO_NEWS_QUERY: dict[str, str] = {
     "EURUSD": "EUR USD euro dollar forex",
     "GBPUSD": "GBP USD pound sterling forex",
     "USDJPY": "USD JPY dollar yen forex",
+    "USDCHF": "USD CHF dollar swiss franc forex",
+    "USDCAD": "USD CAD dollar canadian forex",
     # Commodities
     "XAUUSD": "gold XAUUSD commodity",
     "XAGUSD": "silver XAGUSD commodity",

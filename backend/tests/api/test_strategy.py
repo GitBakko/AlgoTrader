@@ -9,7 +9,7 @@ class TestStrategyConfig:
         assert resp.status_code == 200
         data = resp.json()["data"]
         assert isinstance(data, list)
-        assert len(data) == 21  # Expanded asset coverage (21 total assets)
+        assert len(data) == 29  # Phase 12 (21) + Phase 14 (8 candidates)
         epics = {c["epic"] for c in data}
         assert epics == {
             # Crypto
@@ -21,9 +21,9 @@ class TestStrategyConfig:
             # Commodities/Energy
             "WTIUSD", "NATGAS",
             # Forex
-            "EURUSD", "GBPUSD", "USDJPY",
+            "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD",
             # Stocks
-            "NVDA", "TSLA",
+            "NVDA", "TSLA", "AAPL", "MSFT", "GOOGL", "AMZN", "META", "AMD",
         }
 
     def test_config_has_expected_fields(self, client):

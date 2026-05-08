@@ -48,8 +48,8 @@ class TestPortfolioExpansion:
             assert epic in market_epics, f"New EPIC {epic} missing from SUPPORTED_MARKETS"
 
     def test_strategy_epics_count(self):
-        """Strategy router should have 21 EPICs."""
-        assert len(SUPPORTED_EPICS) == 21, f"Expected 21 strategy EPICs, got {len(SUPPORTED_EPICS)}"
+        """Strategy router should have 29 EPICs (Phase 12 + Phase 14 stocks/forex)."""
+        assert len(SUPPORTED_EPICS) == 29, f"Expected 29 strategy EPICs, got {len(SUPPORTED_EPICS)}"
 
     def test_new_strategy_epics_present(self):
         """All 12 new EPICs should be in SUPPORTED_EPICS."""
@@ -67,10 +67,10 @@ class TestPortfolioExpansion:
             assert epic in model_epics, f"New EPIC {epic} missing from _MODEL_REGISTRY"
 
     def test_feature_configs_count(self):
-        """Asset feature configs should have 21 entries."""
+        """Asset feature configs should have 29 entries (Phase 12 + Phase 14 candidates)."""
         assert (
-            len(ASSET_FEATURE_CONFIGS) == 21
-        ), f"Expected 21 feature configs, got {len(ASSET_FEATURE_CONFIGS)}"
+            len(ASSET_FEATURE_CONFIGS) == 29
+        ), f"Expected 29 feature configs, got {len(ASSET_FEATURE_CONFIGS)}"
 
     def test_new_feature_configs_present(self):
         """All 12 new EPICs should have feature configs."""
@@ -89,12 +89,17 @@ class TestPortfolioExpansion:
             assert len(config.features) > 0
 
     def test_active_epics_count(self):
-        """PredictionService.ACTIVE_EPICS should have 13 (21 total minus 8
-        EXCLUDED by Phase 0 + pre-Phase-0 cuts: NAS100, XAGUSD, DASHUSD,
-        ICPUSD, NATGAS, EURUSD, DOGUSD, GBPUSD)."""
+        """PredictionService.ACTIVE_EPICS should have 15.
+
+        Composition: 13 surviving Phase 0/Phase 12 (XAUUSD, BTCUSD, US500,
+        WTIUSD, NVDA, TSLA, DE40, SOLUSD, ETHUSD, BNBUSD, COPPER, PLATINUM,
+        USDJPY) + 2 Phase 14 forex (USDCHF, USDCAD).
+        Phase 14 stocks (AAPL/MSFT/GOOGL/AMZN/META/AMD) excluded pending
+        Capital.com history backfill.
+        """
         assert (
-            len(PredictionService.ACTIVE_EPICS) == 13
-        ), f"Expected 13 active EPICs, got {len(PredictionService.ACTIVE_EPICS)}"
+            len(PredictionService.ACTIVE_EPICS) == 15
+        ), f"Expected 15 active EPICs, got {len(PredictionService.ACTIVE_EPICS)}"
 
     def test_new_active_epics_present(self):
         """Surviving new EPICs should be in PredictionService.ACTIVE_EPICS."""
@@ -184,4 +189,4 @@ def test_all_imports_valid():
 
     # If we reach here, all imports succeeded
     assert app is not None
-    assert len(ASSET_FEATURE_CONFIGS) == 21
+    assert len(ASSET_FEATURE_CONFIGS) == 29
