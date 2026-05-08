@@ -12,6 +12,10 @@ from loguru import logger
 from src.data.data_access import DataAccessLayer
 from src.data.storage import ParquetStorageManager
 from src.features.builder import FeatureBuilder
+from src.models.asset_metadata import (
+    compute_walk_forward_windows,
+    get_window_spec,
+)
 from src.models.target_builder import TargetBuilder
 from src.models.trainer import ModelTrainer
 from src.models.versioning import ModelVersioning
@@ -19,30 +23,30 @@ from src.models.walk_forward import WalkForwardSplitter
 from src.models.xgboost_model import XGBoostClassifier
 from src.utils.constants import TRADABLE_ASSETS
 
-# Stock epics with fewer trading hours per day
-STOCK_EPICS = {"NVDA", "TSLA"}
-LIMITED_HOURS_EPICS = {"NAS100"}
-
-BARS_PER_DAY = {"1h": 24, "4h": 6, "1d": 1}
-STOCK_BARS_PER_DAY = {"1h": 10, "4h": 3, "1d": 1}
-LIMITED_HOURS_BARS_PER_DAY = {"1h": 5, "4h": 2, "1d": 1}
-
 
 def _get_splitter(timeframe: str, epic: str, horizon_bars: int = 12) -> WalkForwardSplitter:
-    """Create walk-forward splitter scaled to timeframe and asset type."""
-    if epic in STOCK_EPICS:
-        scale = STOCK_BARS_PER_DAY.get(timeframe, 1)
-    elif epic in LIMITED_HOURS_EPICS:
-        scale = LIMITED_HOURS_BARS_PER_DAY.get(timeframe, 1)
-    else:
-        scale = BARS_PER_DAY.get(timeframe, 1)
+    """Create walk-forward splitter from asset_metadata.
+
+    Window sizes anchored to calendar days × `bars_per_calendar_day`
+    so 24/7 crypto, 24/5 forex/indices/commodities, and ~6.5h CFD
+    stocks all stay at a comparable fold count. Purge/embargo scaled
+    on the same per-asset bars-per-day to bound leakage at the bar
+    horizon, with a hard floor on `horizon_bars` for short-horizon
+    label leakage.
+    """
+    windows = compute_walk_forward_windows(epic, timeframe)
+    spec = get_window_spec(epic)
+    # bars-per-day at this timeframe — derived from the train window
+    # so it stays consistent with what compute_walk_forward_windows
+    # actually produced (single source of truth).
+    bpd_at_tf = max(1, int(round(windows["train_window"] / spec.train_calendar_days)))
     return WalkForwardSplitter(
-        train_window=252 * scale,
-        val_window=63 * scale,
-        test_window=21 * scale,
-        step_size=21 * scale,
-        purge_gap=max(5 * scale, 2 * horizon_bars),
-        embargo=max(2 * scale, horizon_bars),
+        train_window=windows["train_window"],
+        val_window=windows["val_window"],
+        test_window=windows["test_window"],
+        step_size=windows["step_size"],
+        purge_gap=max(5 * bpd_at_tf, 2 * horizon_bars),
+        embargo=max(2 * bpd_at_tf, horizon_bars),
     )
 
 

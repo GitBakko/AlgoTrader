@@ -272,16 +272,21 @@ class TrainingOrchestrator:
 
         loop = asyncio.get_event_loop()
 
+        from src.models.asset_metadata import compute_walk_forward_windows
+
         def _do_train() -> dict:
-            # Walk-forward windows sized for 1h bars:
-            # train=6048 (~252 trading days), val=1512 (~63d), test=504 (~21d),
-            # step=504 (~21d) → ~10 folds. Matches the config that produced
-            # F1 0.51-0.59 on the Apr 5 models.
+            # Walk-forward windows sized from asset-class metadata so the
+            # calendar coverage of train/val/test stays consistent across
+            # markets that trade at different rates (24/7 crypto vs ~6.5h
+            # stocks). Calibration anchored on `bars_per_calendar_day` —
+            # see src/models/asset_metadata.py and the 2026-05-08 fold-
+            # collapse incident that motivated this fix.
+            asset_windows = compute_walk_forward_windows(epic, timeframe)
             splitter = WalkForwardSplitter(
-                train_window=config.get("train_window", 6048),
-                val_window=config.get("val_window", 1512),
-                test_window=config.get("test_window", 504),
-                step_size=config.get("step_size", 504),
+                train_window=config.get("train_window", asset_windows["train_window"]),
+                val_window=config.get("val_window", asset_windows["val_window"]),
+                test_window=config.get("test_window", asset_windows["test_window"]),
+                step_size=config.get("step_size", asset_windows["step_size"]),
                 purge_gap=config.get("purge_gap", 5),
                 embargo=config.get("embargo", 2),
             )
