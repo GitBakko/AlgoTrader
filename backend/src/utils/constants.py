@@ -73,19 +73,17 @@ _EXCLUDED_ASSETS = {
     "EURUSD",
     "DOGUSD",
     "GBPUSD",
-    # Phase 12 stock candidates — STILL EXCLUDED.
-    # Even with 199-feature parity (multi-timeframe + cross-asset + SIL),
-    # validation training produced f1 0.30–0.38 vs baseline 0.51+. Root
-    # cause is data, not features: yfinance hourly is cash-equity only
-    # (~4.8 bars/cal-day) whereas NVDA/TSLA use Capital.com extended-
-    # hours feed (~10.6 bars/cal-day, ~2x density). Promotion requires
-    # Capital.com history backfill — Phase 14.
-    "AAPL",
-    "MSFT",
-    "GOOGL",
-    "AMZN",
-    "META",
-    "AMD",
+    # AAPL/MSFT/GOOGL/AMZN/META/AMD PROMOTED on 2026-05-08 — Phase 14
+    # Capital.com history backfill complete (commit e0d26cd unblocked
+    # tz-mismatch in storage.append_candles). Each stock now has
+    # ~12,750 bars at ~17.5 bars/cal-day density (yfinance + Capital
+    # combined), well above Phase 0 stocks=10.5 spec. Walk-forward
+    # windows compute cleanly (train=2646, val=662, test=220, step=220
+    # → 42 folds available). Per-epic risk multiplier defaults to 1.0
+    # until live PnL justifies adjustment (track via EPIC_RISK_MULTIPLIERS
+    # in backend/.env). XGBoost models will be trained on first
+    # /api/models/retrain-all run.
+    #
     # USDCHF + USDCAD PROMOTED on 2026-05-08 — multi-timeframe retrain
     # produced f1 0.5945 / 0.6134 (above BTC baseline 0.57). Risk multi-
     # plier left at default 1.0 until live PnL evidence justifies a

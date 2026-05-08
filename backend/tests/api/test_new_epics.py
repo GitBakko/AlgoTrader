@@ -89,17 +89,17 @@ class TestPortfolioExpansion:
             assert len(config.features) > 0
 
     def test_active_epics_count(self):
-        """PredictionService.ACTIVE_EPICS should have 15.
+        """PredictionService.ACTIVE_EPICS should have 21.
 
         Composition: 13 surviving Phase 0/Phase 12 (XAUUSD, BTCUSD, US500,
         WTIUSD, NVDA, TSLA, DE40, SOLUSD, ETHUSD, BNBUSD, COPPER, PLATINUM,
-        USDJPY) + 2 Phase 14 forex (USDCHF, USDCAD).
-        Phase 14 stocks (AAPL/MSFT/GOOGL/AMZN/META/AMD) excluded pending
-        Capital.com history backfill.
+        USDJPY) + 2 Phase 14 forex (USDCHF, USDCAD) + 6 Phase 14 stocks
+        (AAPL/MSFT/GOOGL/AMZN/META/AMD) — promoted 2026-05-08 after
+        Capital.com history backfill (~17.5 bars/cal-day density).
         """
         assert (
-            len(PredictionService.ACTIVE_EPICS) == 15
-        ), f"Expected 15 active EPICs, got {len(PredictionService.ACTIVE_EPICS)}"
+            len(PredictionService.ACTIVE_EPICS) == 21
+        ), f"Expected 21 active EPICs, got {len(PredictionService.ACTIVE_EPICS)}"
 
     def test_new_active_epics_present(self):
         """Surviving new EPICs should be in PredictionService.ACTIVE_EPICS."""
