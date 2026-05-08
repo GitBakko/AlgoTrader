@@ -14,6 +14,7 @@ from src.strategy.schemas import TradingSignal
 def _non_scalp_settings():
     s = MagicMock()
     s.scalp_mode_enabled = False
+    s.epic_risk_multipliers = {}
     return s
 
 

@@ -424,6 +424,26 @@ class RiskManager:
                 ),
             )
 
+        # 6-bis. Per-epic risk multiplier (Phase 12 universe-tuning,
+        # 2026-05-08). Composes with correlation/confidence/equity-curve
+        # below. Multiplier 0.0 short-circuits as REJECT — chronic-loser
+        # disable path. >1.0 boosts proven winners. Missing epics default
+        # to 1.0 (no change). Audit trail always populated.
+        epic_mult = _risk_settings.epic_risk_multipliers.get(signal.epic, 1.0)
+        audit["epic_risk_multiplier"] = round(epic_mult, 4)
+        if epic_mult <= 0.0:
+            return RiskCheckResult(
+                approved=False,
+                rejection_reason=(
+                    f"Epic {signal.epic} disabled "
+                    f"(epic_risk_multiplier={epic_mult})"
+                ),
+                audit=audit,
+            )
+        if epic_mult != 1.0:
+            position_size *= epic_mult
+            adjustments.append(f"Epic risk multiplier: {epic_mult:.2f}x")
+
         # Apply correlation multiplier
         if corr_multiplier < 1.0:
             position_size *= corr_multiplier

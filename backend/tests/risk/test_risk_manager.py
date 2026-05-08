@@ -27,6 +27,10 @@ def _non_scalp_settings(
     s.min_notional_usd = min_notional_usd
     s.forex_usd_base_size_multiplier = forex_usd_base_size_multiplier
     s.forex_max_leverage_multiplier = forex_max_leverage_multiplier
+    # Default no per-epic risk multipliers — RiskManager treats every epic
+    # at baseline 1.0. Tests that need to exercise the disable/boost path
+    # set this explicitly via `_non_scalp_settings(...).epic_risk_multipliers`.
+    s.epic_risk_multipliers = {}
     return s
 
 
@@ -56,6 +60,56 @@ class TestRiskManager:
         assert result.position_size > 0
         assert result.stop_loss > 0
         assert result.take_profit > 0
+
+    def test_epic_risk_multiplier_zero_rejects_trade(self):
+        # multiplier 0.0 acts as a per-epic disable: signal generates +
+        # audits but RiskManager refuses to size it.
+        s = _non_scalp_settings()
+        s.epic_risk_multipliers = {"DE40": 0.0}
+        with patch("src.risk.risk_manager.get_settings", return_value=s):
+            rm = RiskManager(initial_equity=10000.0)
+            signal = _make_signal(epic="DE40")
+            result = rm.check_trade(signal, equity=10000.0, atr=20.0)
+            assert result.approved is False
+            assert "DE40" in (result.rejection_reason or "")
+            assert "epic_risk_multiplier" in (result.rejection_reason or "")
+            assert result.audit.get("epic_risk_multiplier") == 0.0
+
+    def test_epic_risk_multiplier_boost_scales_position(self):
+        # 1.5x boost on TSLA must yield ~50% larger position vs baseline,
+        # everything else equal. Using a separate epic with mult=1.0 as
+        # the control isolates the multiplier effect from confidence,
+        # correlation, and equity-curve mechanics (all baseline here).
+        s_baseline = _non_scalp_settings()
+        s_baseline.epic_risk_multipliers = {}
+        with patch("src.risk.risk_manager.get_settings", return_value=s_baseline):
+            rm = RiskManager(initial_equity=10000.0)
+            r0 = rm.check_trade(_make_signal(epic="TSLA"), equity=10000.0, atr=20.0)
+            assert r0.approved is True
+            base_size = r0.position_size
+
+        s_boost = _non_scalp_settings()
+        s_boost.epic_risk_multipliers = {"TSLA": 1.5}
+        with patch("src.risk.risk_manager.get_settings", return_value=s_boost):
+            rm = RiskManager(initial_equity=10000.0)
+            r1 = rm.check_trade(_make_signal(epic="TSLA"), equity=10000.0, atr=20.0)
+            assert r1.approved is True
+            assert r1.audit.get("epic_risk_multiplier") == 1.5
+            # Boost must be reflected in the final size (modulo equity-curve
+            # filter and other compounded multipliers, which are identical
+            # across the two runs because the equity / signal / atr inputs
+            # are identical). Tolerate tiny rounding noise.
+            assert r1.position_size > base_size * 1.4
+
+    def test_epic_risk_multiplier_missing_epic_baseline(self):
+        # Epic not present in the multiplier dict ⇒ baseline 1.0.
+        s = _non_scalp_settings()
+        s.epic_risk_multipliers = {"TSLA": 1.5}  # no XAUUSD entry
+        with patch("src.risk.risk_manager.get_settings", return_value=s):
+            rm = RiskManager(initial_equity=10000.0)
+            result = rm.check_trade(_make_signal(epic="XAUUSD"), equity=10000.0, atr=20.0)
+            assert result.approved is True
+            assert result.audit.get("epic_risk_multiplier") == 1.0
 
     def test_rejects_when_circuit_breaker_active(self):
         rm = RiskManager(initial_equity=10000.0)

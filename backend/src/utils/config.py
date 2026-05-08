@@ -251,6 +251,44 @@ class Settings(BaseSettings):
     signal_loop_post_bar_offset_seconds: int = Field(
         default=10, alias="SIGNAL_LOOP_POST_BAR_OFFSET_SECONDS"
     )
+    # Per-epic risk multiplier applied immediately after position-sizing in
+    # RiskManager.check_trade. Composes with correlation, confidence, and
+    # equity-curve multipliers. Use to reduce exposure on chronic losers
+    # without removing them from TRADABLE_ASSETS (signals still generate +
+    # audit), or to boost proven winners.
+    #
+    # Format: "EPIC=mult,EPIC=mult" — parsed by `epic_risk_multipliers`
+    # property. 0.0 ⇒ RiskManager rejects every signal for that epic
+    # (full disable, audit visible). 1.0 ⇒ baseline. >1.0 ⇒ boost.
+    # Missing epics default to 1.0.
+    #
+    # Calibration source: 2026-05-08 production P&L analysis.
+    #   - Chronic losers (cumulative > -$3k): ETHUSD/DE40/US500 → 0.0
+    #   - Mid-range losers (-$1k to -$3k):
+    #     BTCUSD/SOLUSD/NVDA/COPPER → 0.5
+    #   - Proven winners: TSLA (+$2.2k) / USDJPY (+$1.1k, 75% WR) → 1.5
+    epic_risk_multipliers_str: str = Field(
+        default="", alias="EPIC_RISK_MULTIPLIERS"
+    )
+
+    @property
+    def epic_risk_multipliers(self) -> dict[str, float]:
+        """Parse `EPIC_RISK_MULTIPLIERS` env into a dict.
+
+        Tokens malformed/non-float are silently skipped so a typo in
+        config never accidentally disables every epic.
+        """
+        out: dict[str, float] = {}
+        for token in (self.epic_risk_multipliers_str or "").split(","):
+            token = token.strip()
+            if not token or "=" not in token:
+                continue
+            epic, mult = token.split("=", 1)
+            try:
+                out[epic.strip().upper()] = float(mult.strip())
+            except ValueError:
+                continue
+        return out
     # Forex with USD as the base currency (USDJPY, USDCHF, USDCAD) has a
     # pip value much smaller than $1 per micro-unit, so the standard
     # max_position_pct (~20% notional) caps the size at a level where
