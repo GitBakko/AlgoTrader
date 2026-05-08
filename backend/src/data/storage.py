@@ -50,6 +50,20 @@ EMPTY_DF_SCHEMA = {
 }
 
 
+def _strip_timestamp_tz(df: pl.DataFrame) -> pl.DataFrame:
+    """Drop tz info on the ``timestamp`` column when present.
+
+    Mixing tz-aware + tz-naive frames raises in pl.concat, even when
+    both represent the same wall-clock instant. We canonicalise to
+    tz-naive at the storage boundary so concat always succeeds.
+    """
+    if "timestamp" not in df.columns:
+        return df
+    if df.schema["timestamp"].time_zone is None:
+        return df
+    return df.with_columns(pl.col("timestamp").dt.replace_time_zone(None))
+
+
 class ParquetStorageManager:
     """
     Manages Parquet file storage for OHLC data.
@@ -168,8 +182,16 @@ class ParquetStorageManager:
                 # Load existing data
                 df_existing = pl.read_parquet(file_path)
 
+                # Normalize timestamp tz to naive UTC on both sides before
+                # concat. Polars rejects mixing tz-aware + tz-naive even
+                # when both represent the same wall-clock UTC moment.
+                # Existing yfinance-sourced files were written tz-aware;
+                # broker-sourced new candles are tz-naive.
+                df_existing = _strip_timestamp_tz(df_existing)
+                df_new_norm = _strip_timestamp_tz(df_new)
+
                 # Combine with new data
-                df_combined = pl.concat([df_existing, df_new])
+                df_combined = pl.concat([df_existing, df_new_norm])
 
                 # Deduplicate by timestamp (keep 'historical' source over 'realtime')
                 # Sort by timestamp DESC, then by source (alphabetical: 'historical' < 'realtime')
@@ -177,6 +199,7 @@ class ParquetStorageManager:
                     subset=["timestamp"], keep="first"
                 )
 
+                # Pre-normalisation count for accurate added-vs-duplicate diff
                 added = len(df_deduplicated) - len(df_existing)
                 logger.info(
                     f"Appended {added} new candles to {file_path} "
