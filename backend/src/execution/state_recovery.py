@@ -21,6 +21,43 @@ from src.risk.trailing_stop_manager import TrailingStopManager
 from src.utils.config import get_settings
 
 
+def _position_to_dict(p) -> dict:
+    """Normalize a broker `Position` (or dict mock) into the broker-shaped
+    dict consumed by `_reconcile_positions` and `_check_stop_losses`.
+
+    Live broker calls return Pydantic `Position` objects; tests sometimes
+    feed dicts directly. Accept both. Always emit broker-schema keys
+    (`stop_level`/`profit_level`) so downstream SL/TP enforcement works.
+    """
+    if isinstance(p, dict):
+        # Test path or already-normalized input — fill missing keys.
+        out = dict(p)
+        out.setdefault("stop_level", out.get("stop_loss"))
+        out.setdefault("profit_level", out.get("take_profit"))
+        return out
+    direction = getattr(p, "direction", None)
+    direction_val = direction.value if hasattr(direction, "value") else str(direction)
+    created_date = getattr(p, "created_date", None)
+    return {
+        "deal_id": getattr(p, "deal_id", None),
+        "epic": getattr(p, "epic", None),
+        "direction": direction_val,
+        "size": float(getattr(p, "size", 0) or 0),
+        "level": float(getattr(p, "level", 0) or 0),
+        "stop_level": (
+            float(p.stop_level) if getattr(p, "stop_level", None) is not None else None
+        ),
+        "profit_level": (
+            float(p.profit_level)
+            if getattr(p, "profit_level", None) is not None
+            else None
+        ),
+        "upl": float(p.upl) if getattr(p, "upl", None) is not None else 0.0,
+        "deal_reference": getattr(p, "deal_reference", None),
+        "created_date": created_date.isoformat() if created_date is not None else None,
+    }
+
+
 @dataclass
 class RecoveryReport:
     """Report of state recovery operation."""
@@ -219,7 +256,12 @@ class StateRecoveryService:
                 if attempt > 0:
                     logger.info(f"Broker position recovery succeeded on attempt {attempt + 1}/3")
                 logger.debug(f"Loaded {len(positions)} positions from broker")
-                return positions
+                # Convert Pydantic Position objects to broker-shaped dicts so
+                # downstream consumers (`_reconcile_positions`,
+                # `_check_stop_losses`) can subscript safely. Direction is an
+                # Enum; emit its `.value` string to match broker JSON shape.
+                # Tests sometimes feed dicts directly — accept either shape.
+                return [_position_to_dict(p) for p in positions]
 
             except (TimeoutError, aiohttp.ClientError) as e:
                 # Retryable errors (connection, timeout)
@@ -253,7 +295,12 @@ class StateRecoveryService:
                 repo = PositionRepository(session)
                 db_positions = await repo.get_open_positions()
 
-                # Convert ORM models to dicts matching broker format
+                # Convert ORM models to dicts matching broker format. Use
+                # broker-schema keys (`stop_level`/`profit_level`) because
+                # paper_loop._check_stop_losses reads those — using the legacy
+                # `stop_loss`/`take_profit` names left DB-recovered positions
+                # without SL/TP enforcement until the next successful broker
+                # fetch.
                 positions = []
                 for pos in db_positions:
                     positions.append(
@@ -263,10 +310,15 @@ class StateRecoveryService:
                             "direction": pos.direction,
                             "size": float(pos.size),
                             "level": float(pos.entry_price),
-                            "stop_loss": float(pos.stop_loss) if pos.stop_loss else None,
-                            "take_profit": float(pos.take_profit) if pos.take_profit else None,
-                            "unrealized_pnl": float(pos.profit_loss) if pos.profit_loss else 0.0,
-                            "created_at": pos.opened_at.isoformat(),
+                            "stop_level": (
+                                float(pos.stop_loss) if pos.stop_loss else None
+                            ),
+                            "profit_level": (
+                                float(pos.take_profit) if pos.take_profit else None
+                            ),
+                            "upl": float(pos.profit_loss) if pos.profit_loss else 0.0,
+                            "deal_reference": getattr(pos, "deal_reference", None),
+                            "created_date": pos.opened_at.isoformat(),
                         }
                     )
 
@@ -298,25 +350,19 @@ class StateRecoveryService:
         broker_ids = {p["deal_id"] for p in broker_positions}
         db_ids = {p["deal_id"] for p in db_positions}
 
-        # Positions in DB but not in broker (closed externally)
+        # Positions in DB but not in broker (closed while backend was down).
+        # Do NOT auto-mark them CLOSED with reason=EXTERNAL and pnl=NULL —
+        # that bypasses Invariant #3 (3-tier close detection) and silently
+        # discards real broker P&L. Instead, log a warning and let
+        # `reinject_orphans()` enqueue them into `_pending_close_detections`
+        # so the standard reconciliation pulls real Transaction-history P&L.
         stale_ids = db_ids - broker_ids
-        if stale_ids and self.db_session_factory:
+        if stale_ids:
             logger.warning(
-                f"Found {len(stale_ids)} stale positions in DB (not in broker): {stale_ids}"
+                f"Found {len(stale_ids)} stale positions in DB (not in "
+                f"broker): {stale_ids} — will be picked up by "
+                f"reinject_orphans() for 3-tier close detection"
             )
-
-            # Auto-close stale positions
-            try:
-                from src.database.repositories import PositionRepository
-
-                async with self.db_session_factory() as session:
-                    repo = PositionRepository(session)
-                    for deal_id in stale_ids:
-                        await repo.mark_as_closed(deal_id, close_reason="EXTERNAL")
-                        logger.info(f"Auto-closed stale position {deal_id} in DB")
-                    await session.commit()
-            except Exception as e:
-                logger.error(f"Failed to auto-close stale positions: {e}")
 
         # Positions in broker but not in DB (opened externally or recovery gap)
         new_ids = broker_ids - db_ids
@@ -362,14 +408,24 @@ class StateRecoveryService:
             positions: List of position dicts to inject
         """
         for pos in positions:
+            # Read broker keys with legacy fallback. DB-loaded dicts now ship
+            # `stop_level`/`profit_level`; older callers still pass the legacy
+            # names — keep both readable to avoid behavior regressions on the
+            # ExecutionEngine side, whose API uses `stop_loss`/`take_profit`.
+            stop_level = pos.get("stop_level")
+            if stop_level is None:
+                stop_level = pos.get("stop_loss")
+            profit_level = pos.get("profit_level")
+            if profit_level is None:
+                profit_level = pos.get("take_profit")
             self.execution_engine._position_tracker.inject_paper_position(
                 deal_id=pos["deal_id"],
                 epic=pos["epic"],
                 direction=pos["direction"],
                 size=pos["size"],
                 entry_price=pos["level"],
-                stop_loss=pos.get("stop_loss"),
-                take_profit=pos.get("take_profit"),
+                stop_loss=stop_level,
+                take_profit=profit_level,
             )
         logger.info(f"Injected {len(positions)} positions into ExecutionEngine")
 
@@ -403,9 +459,13 @@ class StateRecoveryService:
                 # legacy risk_multiple ladder.
                 position_tp_by_id: dict[str, float | None] = {
                     p["deal_id"]: (
-                        float(p["take_profit"])
-                        if p.get("take_profit") is not None
-                        else None
+                        float(p["profit_level"])
+                        if p.get("profit_level") is not None
+                        else (
+                            float(p["take_profit"])
+                            if p.get("take_profit") is not None
+                            else None
+                        )
                     )
                     for p in positions
                 }
