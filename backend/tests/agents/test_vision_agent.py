@@ -232,7 +232,10 @@ class TestOrchestratorVisionIntegration:
 
     @pytest.mark.asyncio
     async def test_vision_injects_context_data(self, market_context, bullish_vision_report):
-        """Vision agent injects vision_data and rag_context into MarketContext."""
+        """Vision agent injects vision_data and rag_context into the
+        orchestrator's pipeline copy (NOT the caller's MarketContext —
+        post-C3 fix the orchestrator works on context.model_copy() so
+        vision/DRL state never leaks back across tick boundaries)."""
         from src.agents.orchestrator import MantisAgentOrchestrator
 
         orch = MantisAgentOrchestrator(vision_enabled=True, debate_enabled=False)
@@ -243,16 +246,31 @@ class TestOrchestratorVisionIntegration:
             chart_confidence=0.8,
         )
 
+        # Spy on the trader's propose() to inspect the enriched context the
+        # orchestrator actually passed downstream. We assert on that copy.
+        captured: dict = {}
+        original_propose = orch.trader.propose
+
+        def _capturing_propose(technical, sentiment, risk, ctx):
+            captured["context"] = ctx
+            return original_propose(technical, sentiment, risk, ctx)
+
         with (
             patch.object(orch.technical, "analyze", new_callable=AsyncMock, return_value=None),
             patch.object(orch.sentiment, "analyze", new_callable=AsyncMock, return_value=None),
             patch.object(orch.risk, "analyze", new_callable=AsyncMock, return_value=None),
             patch.object(orch.vision_agent, "analyze", new_callable=AsyncMock, return_value=vision_signal),
+            patch.object(orch.trader, "propose", side_effect=_capturing_propose),
         ):
             decision = await orch.run(market_context)
 
-        # Context should have been enriched
-        assert market_context.vision_data is not None
-        assert market_context.vision_data["trend"] == "BULLISH"
-        assert market_context.vision_data["confidence"] == 0.8
-        assert market_context.rag_context == "Gold is rallying due to Fed"
+        # Caller's context MUST remain pristine (hub-schema immutability).
+        assert market_context.vision_data is None
+        assert market_context.rag_context is None
+        # Orchestrator's pipeline copy received the vision enrichment.
+        assert decision is not None
+        enriched = captured["context"]
+        assert enriched.vision_data is not None
+        assert enriched.vision_data["trend"] == "BULLISH"
+        assert enriched.vision_data["confidence"] == 0.8
+        assert enriched.rag_context == "Gold is rallying due to Fed"

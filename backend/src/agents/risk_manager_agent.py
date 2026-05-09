@@ -46,8 +46,29 @@ class RiskManagerAgent(MantisBaseAgent):
     role = AgentRole.RISK
     output_schema = RiskReport
 
-    # Blocking threshold: risk_score strictly greater than this → veto
+    # Class-level fallback so legacy callers reading
+    # ``RiskManagerAgent.RISK_BLOCK_THRESHOLD`` still see a sane default.
+    # The instance attribute set in ``__init__`` shadows this when the
+    # orchestrator wires a custom threshold (M7 fix — class assignment
+    # via ``orch.risk.RISK_BLOCK_THRESHOLD = X`` only set an instance
+    # attribute and left the class default visible to direct callers).
     RISK_BLOCK_THRESHOLD: float = 0.8
+
+    def __init__(
+        self,
+        model: str | None = None,
+        max_tokens: int = 2000,
+        temperature: float = 0.2,
+        provider=None,
+        risk_block_threshold: float = 0.8,
+    ) -> None:
+        super().__init__(
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            provider=provider,
+        )
+        self.RISK_BLOCK_THRESHOLD = float(risk_block_threshold)
 
     # ------------------------------------------------------------------
     # Abstract interface implementation

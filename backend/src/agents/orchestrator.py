@@ -85,9 +85,11 @@ class MantisAgentOrchestrator:
             model=llm_model, temperature=temperature, max_tokens=max_tokens
         )
         self.risk = RiskManagerAgent(
-            model=llm_model, temperature=temperature, max_tokens=max_tokens
+            model=llm_model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            risk_block_threshold=risk_block_threshold,
         )
-        self.risk.RISK_BLOCK_THRESHOLD = risk_block_threshold
         self.trader = TraderAgent(
             technical_weight=technical_weight,
             sentiment_weight=sentiment_weight,
@@ -122,6 +124,12 @@ class MantisAgentOrchestrator:
         """
         audit_trail: list[dict] = []
 
+        # Work on a private copy so vision/DRL writes never leak back into
+        # the caller's MarketContext (CLAUDE.md: hub schema, agents must not
+        # mutate). paper_loop reuses the same instance across ticks; without
+        # this copy, vision_data from tick N would persist into tick N+1.
+        context = context.model_copy()
+
         # Step 1: Technical Analysis
         technical = await self._safe_analyze(self.technical, context, audit_trail, "technical")
 
@@ -135,7 +143,7 @@ class MantisAgentOrchestrator:
         if self.vision_enabled and self.vision_agent is not None:
             try:
                 vision_signal = await self.vision_agent.analyze(context)
-                # Inject vision data into context for downstream agents
+                # Inject vision data into the local copy for downstream agents
                 context.vision_data = {
                     "trend": (
                         vision_signal.vision_report.trend_direction
@@ -192,15 +200,10 @@ class MantisAgentOrchestrator:
                 logger.warning(f"DRL ensemble agent failed: {e!r}")
                 audit_trail.append({"agent": "drl", "status": "error", "error": str(e)})
 
-        # Step 4: Trade Proposal
+        # Step 4: Trade Proposal — FundManager owns the "trader" audit row
+        # (H6: previously both layers appended one, producing duplicates
+        # after the merge at line ~end of run()).
         proposal = self.trader.propose(technical, sentiment, risk_report, context)
-        audit_trail.append(
-            {
-                "agent": "trader",
-                "action": proposal.action,
-                "confidence": proposal.confidence,
-            }
-        )
 
         # Step 5: Debate (optional)
         debate_summary = None

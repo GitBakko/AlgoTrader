@@ -155,4 +155,4 @@ class FinalDecision(TradeProposal):
     approved: bool = False
     override_reason: str | None = None
     debate_summary: str | None = None
-    agent_audit_trail: list[dict[str, Any]]
+    agent_audit_trail: list[dict[str, Any]] = Field(default_factory=list)

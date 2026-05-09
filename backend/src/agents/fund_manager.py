@@ -41,7 +41,10 @@ class FundManagerAgent:
         """Make final trade decision."""
         audit_trail: list[dict] = []
 
-        # Record proposal entry from trader
+        # Record proposal entry from trader. FundManager owns this row —
+        # the orchestrator-level "trader" entry was removed (H6 fix:
+        # previously every FinalDecision shipped two "trader" rows
+        # because both layers appended one and merged trails at the end).
         audit_trail.append(
             {
                 "agent": "trader",
