@@ -96,6 +96,22 @@ class LLMProvider(ABC):
             LLMProviderError: irrecoverable backend failure.
         """
 
+    async def rerank(
+        self,
+        query: str,
+        passages: list[str],
+    ) -> list[float]:
+        """Score query↔passage relevance via a cross-encoder reranker.
+
+        Returns a list of scalar scores (one per passage), higher = more
+        relevant. Default implementation raises NotImplementedError; concrete
+        backends opt in by overriding (the OllamaProvider lazy-loads
+        ``BAAI/bge-reranker-v2-m3`` locally via transformers when first called).
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement rerank()"
+        )
+
     @abstractmethod
     async def health_check(self) -> bool:
         """Return True if the backend is reachable + responsive.

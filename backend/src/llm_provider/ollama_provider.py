@@ -21,12 +21,75 @@ Design notes:
 
 from __future__ import annotations
 
+import asyncio
 import base64
 
 import httpx
 from loguru import logger
 
 from src.llm_provider.base import LLMProvider, LLMProviderError
+
+
+class _LocalCrossEncoder:
+    """Lazy-loaded bge-reranker-v2-m3 wrapper.
+
+    Loads the cross-encoder once on first ``__call__`` and reuses it
+    across calls. Pure CPU (uses the existing ``torch+cpu`` install in
+    the backend venv); first call pays the ~568 MB HF download +
+    ~2-4 s model load. Subsequent calls run in ~50-200 ms per query
+    against ≤20 passages.
+
+    Thread-safety: the model itself is read-only after load. We hold
+    a single ``torch.no_grad()`` context per call. Multiple concurrent
+    callers serialize on the GIL but the bottleneck is the matmul,
+    not Python — so concurrency-via-asyncio is fine.
+    """
+
+    def __init__(self, model_id: str, max_length: int = 512):
+        self.model_id = model_id
+        self.max_length = max_length
+        self._tokenizer = None
+        self._model = None
+
+    def _ensure_loaded(self):
+        if self._model is not None:
+            return
+        # Local imports — keep heavy deps out of module-load time.
+        from transformers import (  # noqa: PLC0415
+            AutoModelForSequenceClassification,
+            AutoTokenizer,
+        )
+
+        logger.info(f"[rerank] loading {self.model_id} on CPU (first call)...")
+        self._tokenizer = AutoTokenizer.from_pretrained(self.model_id)
+        self._model = AutoModelForSequenceClassification.from_pretrained(self.model_id)
+        self._model.eval()
+        logger.info(f"[rerank] {self.model_id} loaded.")
+
+    def __call__(self, query: str, passages: list[str]) -> list[float]:
+        if not passages:
+            return []
+        self._ensure_loaded()
+        import torch  # noqa: PLC0415
+
+        pairs = [(query, p) for p in passages]
+        with torch.no_grad():
+            inputs = self._tokenizer(
+                pairs,
+                padding=True,
+                truncation=True,
+                max_length=self.max_length,
+                return_tensors="pt",
+            )
+            logits = self._model(**inputs).logits.view(-1).float()
+            scores = torch.sigmoid(logits).tolist()
+        return [float(s) for s in scores]
+
+
+async def _run_in_thread(scorer: _LocalCrossEncoder, query: str, passages: list[str]) -> list[float]:
+    """Off-load the (CPU-bound) reranker call to a default executor."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, scorer, query, passages)
 
 
 class OllamaProvider(LLMProvider):
@@ -147,6 +210,35 @@ class OllamaProvider(LLMProvider):
                 f"vectors for {len(texts)} inputs"
             )
         return embeddings
+
+    async def rerank(self, query: str, passages: list[str]) -> list[float]:
+        """Score query↔passage relevance via local bge-reranker-v2-m3.
+
+        Ollama's ``/api/embed`` for ``qllama/bge-reranker-v2-m3`` returns
+        bi-encoder vectors, not the cross-encoder relevance scores the
+        model was trained for. We bypass Ollama for reranking and load
+        ``BAAI/bge-reranker-v2-m3`` locally via ``transformers`` —
+        cached in HF home on first call (~568 MB), then reused. Runs on
+        CPU; the reranker is small enough that batched 20-pair scoring
+        completes in ~1-2s on modern desktops, fast enough for the
+        non-blocking RAG enrichment path.
+
+        Returns one scalar per passage (sigmoid-applied logit, range
+        [0, 1] after sigmoid). Returns an empty list when ``passages``
+        is empty.
+        """
+        if not passages:
+            return []
+        scorer = self._get_reranker()
+        return await _run_in_thread(scorer, query, passages)
+
+    def _get_reranker(self):
+        if getattr(self, "_reranker", None) is None:
+            self._reranker = _LocalCrossEncoder(
+                model_id="BAAI/bge-reranker-v2-m3",
+                max_length=512,
+            )
+        return self._reranker
 
     async def health_check(self) -> bool:
         try:

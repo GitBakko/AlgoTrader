@@ -473,3 +473,134 @@ async def test_build_with_summary_falls_back_on_unexpected_error():
 
     assert ctx.executive_summary == ""
     assert ctx.news_section != ""
+
+
+# ---------------------------------------------------------------------------
+# Phase 14c/d: docs corpus retrieval + reranker
+# ---------------------------------------------------------------------------
+
+
+import numpy as np  # noqa: E402
+
+from src.rag.vector_store import MantisVectorStore  # noqa: E402
+
+
+class _RetrievalFakeProvider(_FakeProvider):
+    """FakeProvider with embed/rerank wired for retrieve_docs tests."""
+
+    def __init__(self, embed_response=None, rerank_response=None):
+        super().__init__("ok")
+        self._embed = embed_response
+        self._rerank = rerank_response
+        self.rerank_calls = 0
+
+    async def embed(self, texts):
+        if self._embed is not None:
+            return self._embed
+        return [[0.0] * self.embedding_dim for _ in texts]
+
+    async def rerank(self, query, passages):
+        self.rerank_calls += 1
+        if isinstance(self._rerank, Exception):
+            raise self._rerank
+        if self._rerank is not None:
+            return self._rerank
+        return [0.5 for _ in passages]
+
+
+def _make_corpus(tmp_path):
+    store = MantisVectorStore(dimension=4, store_path=str(tmp_path))
+    store.add("alpha doc text", np.array([1.0, 0.0, 0.0, 0.0]),
+              metadata={"source": "a.md", "header": "alpha"})
+    store.add("beta doc text", np.array([0.9, 0.4, 0.0, 0.0]),
+              metadata={"source": "b.md", "header": "beta"})
+    store.add("gamma doc text", np.array([0.5, 0.8, 0.0, 0.0]),
+              metadata={"source": "c.md", "header": "gamma"})
+    store.add("delta doc text", np.array([0.1, 0.99, 0.0, 0.0]),
+              metadata={"source": "d.md", "header": "delta"})
+    store.save()
+
+
+@pytest.mark.asyncio
+async def test_retrieve_docs_returns_top_k_cosine_only(tmp_path):
+    _make_corpus(tmp_path)
+    fake = _RetrievalFakeProvider(embed_response=[[1.0, 0.0, 0.0, 0.0]])
+    builder = MantisRAGContextBuilder(provider=fake, corpus_dir=str(tmp_path))
+
+    results = await builder.retrieve_docs("alpha?", top_k=2, rerank=False)
+
+    assert len(results) == 2
+    assert results[0]["source"] == "a.md"  # most similar
+    assert "rerank_score" not in results[0]
+    assert fake.rerank_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_retrieve_docs_applies_rerank(tmp_path):
+    _make_corpus(tmp_path)
+    # All 4 corpus docs above the default min_similarity floor when the
+    # query embedding is [1, 0, 0, 0]: cosine(a)=1.0, b≈0.91, c≈0.53,
+    # d≈0.10. Lower min_similarity to 0.0 so the candidate pool keeps
+    # all four — gives the reranker meaningful work to do.
+    fake = _RetrievalFakeProvider(
+        embed_response=[[1.0, 0.0, 0.0, 0.0]],
+        rerank_response=[0.1, 0.2, 0.9, 0.3],  # gamma should win
+    )
+    builder = MantisRAGContextBuilder(provider=fake, corpus_dir=str(tmp_path))
+
+    results = await builder.retrieve_docs(
+        "alpha?", top_k=2, rerank=True, candidate_pool=4, min_similarity=0.0
+    )
+
+    assert fake.rerank_calls == 1
+    assert results[0]["source"] == "c.md"  # promoted by reranker
+    assert results[0]["rerank_score"] == pytest.approx(0.9)
+
+
+@pytest.mark.asyncio
+async def test_retrieve_docs_rerank_failure_falls_back_to_cosine(tmp_path):
+    _make_corpus(tmp_path)
+    fake = _RetrievalFakeProvider(
+        embed_response=[[1.0, 0.0, 0.0, 0.0]],
+        rerank_response=RuntimeError("reranker offline"),
+    )
+    builder = MantisRAGContextBuilder(provider=fake, corpus_dir=str(tmp_path))
+
+    results = await builder.retrieve_docs("alpha?", top_k=2, rerank=True)
+
+    assert fake.rerank_calls == 1
+    assert results[0]["source"] == "a.md"  # cosine ordering preserved
+    assert "rerank_score" not in results[0]
+
+
+@pytest.mark.asyncio
+async def test_retrieve_docs_handles_missing_corpus(tmp_path):
+    fake = _RetrievalFakeProvider()
+    builder = MantisRAGContextBuilder(
+        provider=fake, corpus_dir=str(tmp_path / "does-not-exist")
+    )
+
+    assert await builder.retrieve_docs("anything") == []
+    assert fake.rerank_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_build_with_summary_includes_docs_when_query_passed(tmp_path):
+    _make_corpus(tmp_path)
+    fake = _RetrievalFakeProvider(
+        embed_response=[[1.0, 0.0, 0.0, 0.0]],
+        rerank_response=[0.9, 0.5, 0.4, 0.3],
+    )
+    fake._response = "Concise summary."
+    builder = MantisRAGContextBuilder(provider=fake, corpus_dir=str(tmp_path))
+
+    ctx = await builder.build_with_summary(
+        news=[make_news_item()],
+        symbol="XAUUSD",
+        retrieval_query="alpha?",
+    )
+
+    assert ctx.executive_summary == "Concise summary."
+    # The synthesized prompt fed to generate() should reference the docs
+    # block — assert via the FakeProvider's last_prompt capture.
+    assert "Relevant MANTIS Knowledge" in (fake.last_prompt or "")

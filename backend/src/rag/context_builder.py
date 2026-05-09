@@ -316,13 +316,22 @@ class MantisRAGContextBuilder:
         query: str,
         top_k: int = 5,
         min_similarity: float = 0.35,
+        rerank: bool = True,
+        candidate_pool: int = 10,
     ) -> list[dict]:
         """Retrieve top-k MANTIS doc chunks semantically similar to ``query``.
 
-        The corpus is built by ``scripts/index_mantis_docs.py`` and lives
-        at ``data/rag_corpus/`` by default. Returns a list of dicts shaped
-        ``{"text": str, "source": str, "header": str, "similarity": float}``;
-        empty list on any failure (no corpus, no provider, etc.) so the
+        Pipeline:
+        1. bge-m3 query embed via the LLMProvider.
+        2. Cosine search on the disk-persisted vector store; pulls top
+           ``candidate_pool`` (default 20) above ``min_similarity``.
+        3. When ``rerank=True``, score the candidates with a local
+           bge-reranker-v2-m3 cross-encoder and keep the top-``top_k``
+           by ``rerank_score``. Falls back to pure cosine ordering on
+           any reranker failure (model not installed, OOM, etc).
+
+        Returns ``[{"text", "source", "header", "similarity",
+        "rerank_score"?}]``; empty on any pipeline failure so the
         trading loop never crashes on RAG misses.
         """
         store = self._load_corpus()
@@ -342,16 +351,40 @@ class MantisRAGContextBuilder:
         if not vectors:
             return []
 
-        results = store.search(vectors[0], top_k=top_k, min_similarity=min_similarity)
-        return [
-            {
-                "text": r.text,
-                "source": r.metadata.get("source", ""),
-                "header": r.metadata.get("header", ""),
-                "similarity": r.similarity,
-            }
-            for r in results
-        ]
+        # Stage 1: pull a wider candidate pool than we will ultimately
+        # return so the reranker has something to rearrange.
+        pool_k = max(top_k, candidate_pool) if rerank else top_k
+        candidates = store.search(vectors[0], top_k=pool_k, min_similarity=min_similarity)
+        if not candidates:
+            return []
+
+        out: list[dict] = []
+        for c in candidates:
+            out.append({
+                "text": c.text,
+                "source": c.metadata.get("source", ""),
+                "header": c.metadata.get("header", ""),
+                "similarity": c.similarity,
+            })
+
+        # Stage 2: cross-encoder rerank — the surprising-result lever.
+        if rerank and len(out) > 1:
+            try:
+                rerank_scores = await provider.rerank(
+                    query, [c["text"] for c in out]
+                )
+            except NotImplementedError:
+                rerank_scores = None
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"[RAG] rerank failed, falling back to cosine: {exc!r}")
+                rerank_scores = None
+
+            if rerank_scores is not None and len(rerank_scores) == len(out):
+                for c, s in zip(out, rerank_scores):
+                    c["rerank_score"] = float(s)
+                out.sort(key=lambda x: x.get("rerank_score", 0.0), reverse=True)
+
+        return out[:top_k]
 
     def _load_corpus(self):
         """Lazy-load the MantisVectorStore from disk on first use."""
