@@ -106,7 +106,19 @@ def chunk_by_section(text: str, source: str) -> list[tuple[str, str]]:
     current_buf: list[str] = []
 
     header_re = re.compile(r"^#{1,3}\s+(.+)$")
+    fence_re = re.compile(r"^\s*```")
+    in_fence = False  # M9 fix: don't treat lines inside fenced code blocks
+    # as section headers — Python comments like '# MANTIS-EVOLUTION' inside
+    # ``` ``` blocks were misidentified as ###-level headers and split
+    # chunks mid-block.
     for line in lines:
+        if fence_re.match(line):
+            in_fence = not in_fence
+            current_buf.append(line)
+            continue
+        if in_fence:
+            current_buf.append(line)
+            continue
         m = header_re.match(line.strip())
         if m:
             if current_buf:
@@ -165,12 +177,26 @@ async def build_corpus(repo_root: Path, corpus_dir: Path) -> None:
         if not chunks:
             continue
 
-        # Batch embed all chunks for this file in a single Ollama call.
+        # H11 fix: batch embed in chunks of <=20 to avoid the 60 s Ollama
+        # timeout silently skipping large files (CLAUDE.md, STYLE_BIBLE.md
+        # produce 30+ chunks of 1500 char each — single-batch could exceed
+        # the timeout and the entire file is dropped from the corpus).
         chunk_texts = [body for _, body in chunks]
-        try:
-            vectors = await provider.embed(chunk_texts)
-        except Exception as exc:
-            logger.warning(f"Embedding failed for {rel}: {exc!r}")
+        EMBED_BATCH = 20
+        vectors: list[list[float]] = []
+        embed_failed = False
+        for i in range(0, len(chunk_texts), EMBED_BATCH):
+            batch = chunk_texts[i : i + EMBED_BATCH]
+            try:
+                batch_vecs = await provider.embed(batch)
+            except Exception as exc:
+                logger.warning(
+                    f"Embedding failed for {rel} batch {i}-{i + len(batch)}: {exc!r}"
+                )
+                embed_failed = True
+                break
+            vectors.extend(batch_vecs)
+        if embed_failed:
             skipped_files += 1
             continue
 

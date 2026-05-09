@@ -27,6 +27,12 @@ def _non_scalp_settings(
     s.min_notional_usd = min_notional_usd
     s.forex_usd_base_size_multiplier = forex_usd_base_size_multiplier
     s.forex_max_leverage_multiplier = forex_max_leverage_multiplier
+    # H13 fix: explicitly disable the §4-ter R:R floor for legacy tests.
+    # Without this, `float(MagicMock())` returns 1.0 (Python default
+    # `__float__`) which means every existing test silently ran the
+    # check at threshold=1.0 instead of production 0.40 — a regression
+    # in the strategy-paired R:R range (0.40–1.0) was invisible.
+    s.min_signal_rr_threshold = 0.0
     # Default no per-epic risk multipliers — RiskManager treats every epic
     # at baseline 1.0. Tests that need to exercise the disable/boost path
     # set this explicitly via `_non_scalp_settings(...).epic_risk_multipliers`.
@@ -468,3 +474,47 @@ class TestRiskManager:
         # but not for "Total exposure")
         if not result.approved:
             assert "Total exposure" not in (result.rejection_reason or "")
+
+
+class TestRRFloor:
+    """§4-ter R:R floor — coverage gap surfaced by H13 audit."""
+
+    def _signal_with_paired_sl_tp(self, *, sl: float, tp: float) -> TradingSignal:
+        return TradingSignal(
+            epic="XAUUSD",
+            direction=SignalDirection.BUY,
+            confidence=0.80,
+            signal_class=2,
+            entry_price=2000.0,
+            suggested_stop=sl,
+            suggested_tp=tp,
+        )
+
+    def test_rr_floor_rejects_below_threshold(self):
+        """Strategy-paired signal with R:R 0.30 must be rejected at 0.40."""
+        rm = RiskManager(initial_equity=10000.0, limits=RiskLimits())
+        # entry=2000, SL=1980 -> stop=20, TP=2006 -> reward=6 -> R:R=0.30
+        signal = self._signal_with_paired_sl_tp(sl=1980.0, tp=2006.0)
+        settings = _non_scalp_settings()
+        settings.min_signal_rr_threshold = 0.40
+        with patch("src.risk.risk_manager.get_settings", return_value=settings):
+            result = rm.check_trade(
+                signal=signal, equity=10000.0, atr=20.0, open_positions=[],
+            )
+        assert result.approved is False
+        assert "R:R" in (result.rejection_reason or "")
+
+    def test_rr_floor_passes_strategy_calibrated_pair(self):
+        """Strategy-paired signal with R:R 0.75 must be approved at 0.40."""
+        rm = RiskManager(initial_equity=10000.0, limits=RiskLimits())
+        # entry=2000, SL=1980 -> stop=20, TP=2015 -> reward=15 -> R:R=0.75
+        signal = self._signal_with_paired_sl_tp(sl=1980.0, tp=2015.0)
+        settings = _non_scalp_settings()
+        settings.min_signal_rr_threshold = 0.40
+        with patch("src.risk.risk_manager.get_settings", return_value=settings):
+            result = rm.check_trade(
+                signal=signal, equity=10000.0, atr=20.0, open_positions=[],
+            )
+        # If rejected, must NOT be for R:R reason
+        if not result.approved:
+            assert "R:R" not in (result.rejection_reason or "")

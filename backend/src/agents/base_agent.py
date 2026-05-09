@@ -106,9 +106,13 @@ class MantisBaseAgent(ABC):
             json_mode=True,
         )
 
-        if text.startswith("```"):
-            text = text.split("\n", 1)[1]
-            text = text.rsplit("```", 1)[0]
+        # M6 + M12 fix: share the more robust fence stripper used by the
+        # vision analyser. The previous inline strip mishandled
+        # space-padded fences (` \`\`\` json `) and could truncate JSON
+        # bodies whose content legitimately included triple-backticks.
+        from src.vision.vision_analyzer import _strip_fences  # noqa: PLC0415
+
+        text = _strip_fences(text).strip()
 
         data = json.loads(text)
         return self.output_schema.model_validate(data)

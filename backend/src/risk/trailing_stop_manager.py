@@ -287,6 +287,22 @@ class TrailingStopManager:
         """Get current stop state for a position."""
         return self._positions.get(deal_id)
 
+    def remap_deal_id(self, old_deal_id: str, new_deal_id: str) -> bool:
+        """Atomically re-key a tracked position from ``old_deal_id`` to
+        ``new_deal_id`` (M4 fix: callers previously did pop+setitem
+        through ``_positions`` directly, which is fragile under any future
+        await insertion in the call site).
+
+        Returns True if the remap happened, False if the old key was
+        absent.
+        """
+        state = self._positions.pop(old_deal_id, None)
+        if state is None:
+            return False
+        state.deal_id = new_deal_id
+        self._positions[new_deal_id] = state
+        return True
+
     def _derive_tp_levels(
         self,
         direction: str,
@@ -303,8 +319,25 @@ class TrailingStopManager:
         """
         if take_profit is not None and take_profit > 0:
             tp2 = float(take_profit)
-            tp1 = entry_price + (tp2 - entry_price) * 0.5
-            return tp1, tp2
+            # M13 fix: enforce direction-aware TP. A wrong-side TP (e.g.
+            # SELL with TP > entry) silently produced an immediate-trip
+            # ladder under the previous formula because the SELL TP1
+            # check (`price <= state.tp1_level`) is always True when
+            # `tp1_level` is above entry. Fall back to legacy ladder
+            # rather than propagate the inverted state.
+            if direction == "BUY" and tp2 <= entry_price:
+                logger.warning(
+                    f"[trailing] BUY take_profit {tp2} <= entry {entry_price}; "
+                    f"falling back to legacy risk-multiple ladder"
+                )
+            elif direction != "BUY" and tp2 >= entry_price:
+                logger.warning(
+                    f"[trailing] SELL take_profit {tp2} >= entry {entry_price}; "
+                    f"falling back to legacy risk-multiple ladder"
+                )
+            else:
+                tp1 = entry_price + (tp2 - entry_price) * 0.5
+                return tp1, tp2
 
         if direction == "BUY":
             tp1 = entry_price + risk_distance * self.config.tp1_risk_multiple
@@ -382,8 +415,14 @@ class TrailingStopManager:
             tp2_level=tp2_level,
             risk_distance=risk_distance,
             phase=phase,
-            highest_price=highest_price or entry_price,
-            lowest_price=lowest_price or entry_price,
+            # M15 fix: explicit None-check rather than truthiness. A
+            # legitimately-persisted lowest_price=0.0 (rare but possible
+            # for partially-written rows or test inputs) was previously
+            # treated as missing and replaced with entry_price, which
+            # for a SELL position means trailing ratchet starts from the
+            # wrong baseline.
+            highest_price=highest_price if highest_price is not None else entry_price,
+            lowest_price=lowest_price if lowest_price is not None else entry_price,
         )
 
         self._positions[deal_id] = state

@@ -19,7 +19,13 @@ class MantisVectorStore:
     Supports persist/load for disk caching.
     """
 
-    def __init__(self, dimension: int = 384, store_path: str | None = None):
+    def __init__(self, dimension: int = 1024, store_path: str | None = None):
+        # H12 fix: default dimension realigned with bge-m3 (1024) which is
+        # the active embedder. The legacy 384 default was a leftover from
+        # the pre-bge-m3 MiniLM era — it caused fallback embedders to
+        # raise ValueError on `add()` against a corpus loaded at 1024.
+        # `load()` still corrects `self.dimension` from the persisted
+        # matrix shape, so existing on-disk corpora keep working.
         self.dimension = dimension
         self.store_path = store_path
         self._vectors: list[np.ndarray] = []

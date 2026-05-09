@@ -453,12 +453,11 @@ class PaperTradingLoop:
                         best_dp = dp
                 if best is not None:
                     state = best
-                    # Re-key the manager so subsequent lookups hit on the
-                    # current dealId without scanning. Avoids a stale entry
-                    # surviving forever as a phantom "?" in the UI.
-                    self.trailing_stop_manager._positions.pop(state.deal_id, None)
-                    state.deal_id = deal_id
-                    self.trailing_stop_manager._positions[deal_id] = state
+                    # M4 fix: atomic remap via dedicated helper instead of
+                    # poking _positions directly. Keeps the rotation safe
+                    # if any future hook adds an await between the pop and
+                    # the setitem.
+                    self.trailing_stop_manager.remap_deal_id(state.deal_id, deal_id)
             if state:
                 from src.risk.trailing_stop_manager import TrailingPhase
 
@@ -998,12 +997,22 @@ class PaperTradingLoop:
         Uses a cache to avoid hammering the API on every loop iteration.
         """
         now = datetime.now(UTC)
-        # Cache transactions for 30 seconds to avoid excessive API calls
+        # H3 fix: align cache TTL to the reconciler tick interval (15 s
+        # default). Hardcoded 60 s meant ticks 2-4 within a 60 s window
+        # reused stale data — broker-initiated TP/SL closes settling
+        # between ticks were missed by v1 Strategy 1+2 (dealId/reference
+        # match) and unnecessarily deferred to Tier 2. We keep a small
+        # floor (10 s) to avoid hammering the API on rapid manual ticks.
         cache_attr = "_txn_cache"
         cache_ts_attr = "_txn_cache_ts"
         cached = getattr(self, cache_attr, None)
         cached_ts = getattr(self, cache_ts_attr, None)
-        if cached is not None and cached_ts and (now - cached_ts).total_seconds() < 60:
+        cache_ttl = max(10, int(getattr(self, "_reconciler_interval", 15)))
+        if (
+            cached is not None
+            and cached_ts
+            and (now - cached_ts).total_seconds() < cache_ttl
+        ):
             return cached
 
         try:
@@ -1179,6 +1188,12 @@ class PaperTradingLoop:
         # cannot resolve — in those cases v1's own deferral + 10-min
         # timeout path still owns the decision.
         v2_outcomes_by_deal: dict[str, object] = {}
+        # H2 fix: cache activities once for both the authoritative v2 detect
+        # and the shadow v2 detect below. Without this cache the detector
+        # internally re-fetched /history/activity twice per tick — combined
+        # with the also-double /history/transactions fetch on the shadow
+        # path, a 3-position tick could push 13 calls to a 10 req/sec API.
+        _v2_activities = None
         if v2_enabled:
             detector = self._get_close_detector()
             if detector is not None:
@@ -1187,9 +1202,35 @@ class PaperTradingLoop:
                     for _did, _pending in retry_pending:
                         if _did not in v2_previous:
                             v2_previous[_did] = _pending.prev_pos
+                    # Pre-fetch activity window once. Pass `transactions=`
+                    # which is already loaded above (line ~1152).
+                    if self.broker is not None:
+                        try:
+                            disappeared_for_window = [
+                                (did, ppos)
+                                for did, ppos in v2_previous.items()
+                                if did and did not in {
+                                    p.get("deal_id") for p in current_positions
+                                }
+                            ]
+                            if disappeared_for_window:
+                                from_dt, to_dt = detector._compute_window(
+                                    disappeared_for_window, now
+                                )
+                                _v2_activities = (
+                                    await self.broker.get_activity_history(
+                                        from_dt, to_dt
+                                    )
+                                )
+                        except Exception as _ae:
+                            logger.debug(
+                                f"[close-v2] activity prefetch skipped: {_ae!r}"
+                            )
                     v2_outcomes = await detector.detect(
                         previous=v2_previous,
                         current=current_positions,
+                        activities=_v2_activities,
+                        transactions=transactions,
                     )
                     for _o in v2_outcomes:
                         v2_outcomes_by_deal[_o.deal_id] = _o
@@ -1426,6 +1467,7 @@ class PaperTradingLoop:
                 current_positions=current_positions,
                 transactions=transactions,
                 v1_outcomes=v1_outcomes,
+                activities=_v2_activities,
             )
 
         self._previous_positions = {
@@ -1468,6 +1510,7 @@ class PaperTradingLoop:
         current_positions: list[dict],
         transactions: list,
         v1_outcomes: dict[str, str],
+        activities: list | None = None,
     ) -> None:
         """Invoke v2 CloseDetector in shadow mode and record disagreements.
 
@@ -1490,6 +1533,7 @@ class PaperTradingLoop:
             outcomes = await detector.detect(
                 previous=previous_snapshot,
                 current=current_positions,
+                activities=activities,
                 transactions=transactions,
             )
         except Exception as e:
@@ -3659,7 +3703,16 @@ class PaperTradingLoop:
                                     f"[{epic}] Time stop close submitted — awaiting "
                                     f"broker reconciliation (held {age_hours:.1f}h)"
                                 )
-                            continue  # Skip SL/TP checks for this position
+                                continue  # Skip SL/TP — close in flight
+                            # H4 fix: when result.success=False (e.g., market
+                            # closed for index over weekend), DO NOT skip the
+                            # SL/TP checks below. The position is still open
+                            # and a Monday gap-open could trip SL/TP — we
+                            # need the local check to fire.
+                            logger.warning(
+                                f"[{epic}] Time stop close failed "
+                                f"(success=False), continuing with SL/TP check"
+                            )
                         except Exception as e:
                             logger.warning(f"[{epic}] Time stop close failed: {e}")
                 except (ValueError, TypeError) as e:

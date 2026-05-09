@@ -13,6 +13,10 @@ from src.rag.schemas import NewsItem, RAGContext
 if TYPE_CHECKING:
     from src.llm_provider.base import LLMProvider
 
+# Sentinel marker for `_load_corpus` so missing/empty corpus state is
+# cached and not re-stat()'d per call (M10 fix).
+_CORPUS_MISSING = object()
+
 
 class MantisRAGContextBuilder:
     """
@@ -387,9 +391,17 @@ class MantisRAGContextBuilder:
         return out[:top_k]
 
     def _load_corpus(self):
-        """Lazy-load the MantisVectorStore from disk on first use."""
-        if self._vector_store is not None:
+        """Lazy-load the MantisVectorStore from disk on first use.
+
+        M10 fix: cache the missing/empty result with the sentinel
+        ``_CORPUS_MISSING`` so we don't re-stat the directory on every
+        epic on every strategy tick when no corpus has been built yet
+        (fresh deploy, CI environment).
+        """
+        if self._vector_store is not None and self._vector_store is not _CORPUS_MISSING:
             return self._vector_store
+        if self._vector_store is _CORPUS_MISSING:
+            return None
         try:
             from pathlib import Path  # noqa: PLC0415
 
@@ -398,16 +410,26 @@ class MantisRAGContextBuilder:
             path = Path(self._corpus_dir)
             if not path.exists():
                 logger.debug(f"[RAG] corpus dir not found: {path}")
+                self._vector_store = _CORPUS_MISSING
                 return None
-            store = MantisVectorStore(store_path=str(path))
+            # H12 alignment: build the store with the live provider's
+            # embedding dim so a fresh (unsaved) corpus accepts add()
+            # vectors at the correct width even before load() rewrites it.
+            try:
+                provider_dim = int(self._get_provider().embedding_dim)
+            except Exception:
+                provider_dim = 1024
+            store = MantisVectorStore(dimension=provider_dim, store_path=str(path))
             store.load()
             if store.size() == 0:
                 logger.debug(f"[RAG] corpus empty at {path}")
+                self._vector_store = _CORPUS_MISSING
                 return None
             self._vector_store = store
             return store
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"[RAG] corpus load failed: {exc!r}")
+            self._vector_store = _CORPUS_MISSING
             return None
 
     def _get_provider(self) -> "LLMProvider":

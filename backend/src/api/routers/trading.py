@@ -670,20 +670,28 @@ async def emergency_stop(request: Request):
     errors = len(result["errors"])
     logger.warning(f"[EMERGENCY STOP] Complete: {closed} closed, {errors} errors")
 
-    # 4. Fire alert (non-critical)
+    # 4. Fire CRITICAL alert (M2 fix: Invariant #4 says CRITICAL, and the
+    # alert must NOT be gated on `alerts_enabled` — operator visibility
+    # of an emergency stop is non-negotiable).
     try:
         from src.monitoring.alerting.alert_manager import get_alert_manager
-        from src.utils.config import get_settings
+        from src.monitoring.alerting.schemas import (
+            Alert,
+            AlertSeverity,
+            AlertType,
+        )
 
-        if getattr(get_settings(), "alerts_enabled", False):
-            am = get_alert_manager()
-            await am.alert_circuit_breaker(
-                epic="ALL",
-                reason=f"EMERGENCY STOP: {closed} positions closed, {errors} errors",
-                consecutive_losses=0,
-            )
-    except Exception:
-        pass
+        am = get_alert_manager()
+        alert = Alert(
+            alert_type=AlertType.SYSTEM_ERROR,
+            severity=AlertSeverity.CRITICAL,
+            title="EMERGENCY STOP EXECUTED",
+            message=f"{closed} positions closed, {errors} errors",
+            details={"positions_closed": closed, "errors": errors},
+        )
+        await am.send_alert(alert)
+    except Exception as alert_err:
+        logger.error(f"Emergency stop alert failed: {alert_err}")
 
     return success_response(
         {

@@ -307,11 +307,20 @@ async def test_market_context_enriched(
     debate_summary,
 ):
     """
-    After running with vision + DRL enabled, verify:
-    - context.vision_data is populated with trend, confidence, patterns, insight
-    - context.drl_signal is populated with action, confidence, voting_mode, contributing_agents
+    After running with vision + DRL enabled, verify the orchestrator's
+    pipeline copy of MarketContext (NOT the caller's instance — post-C3
+    fix, MarketContext mutations stay confined to a model_copy() so
+    paper_loop's reused-across-ticks instance never leaks state) is
+    populated with vision_data and drl_signal.
     """
     orch = _make_orchestrator(vision_enabled=True, drl_enabled=True, debate_enabled=False)
+
+    captured: dict = {}
+    original_propose = orch.trader.propose
+
+    def _capturing_propose(technical, sentiment, risk, ctx):
+        captured["context"] = ctx
+        return original_propose(technical, sentiment, risk, ctx)
 
     with (
         patch.object(orch.technical, "analyze", new_callable=AsyncMock, return_value=tech_report),
@@ -319,28 +328,34 @@ async def test_market_context_enriched(
         patch.object(orch.risk, "analyze", new_callable=AsyncMock, return_value=risk_report),
         patch.object(orch.vision_agent, "analyze", new_callable=AsyncMock, return_value=vision_signal),
         patch.object(orch.drl_agent, "analyze", new_callable=AsyncMock, return_value=drl_signal),
+        patch.object(orch.trader, "propose", side_effect=_capturing_propose),
     ):
         decision = await orch.run(market_context)
 
     assert isinstance(decision, FinalDecision)
+    # Caller's MarketContext stays pristine.
+    assert market_context.vision_data is None
+    assert market_context.drl_signal is None
 
-    # Vision data injected into context
-    assert market_context.vision_data is not None
-    assert "trend" in market_context.vision_data
-    assert "confidence" in market_context.vision_data
-    assert "patterns" in market_context.vision_data
-    assert "insight" in market_context.vision_data
-    assert market_context.vision_data["trend"] == "BULLISH"
-    assert market_context.vision_data["confidence"] == pytest.approx(0.72)
+    enriched = captured["context"]
 
-    # DRL signal injected into context
-    assert market_context.drl_signal is not None
-    assert "action" in market_context.drl_signal
-    assert "confidence" in market_context.drl_signal
-    assert "voting_mode" in market_context.drl_signal
-    assert "contributing_agents" in market_context.drl_signal
-    assert market_context.drl_signal["action"] == 1  # BUY
-    assert market_context.drl_signal["voting_mode"] == "REGIME_ROUTING"
+    # Vision data injected into the pipeline copy
+    assert enriched.vision_data is not None
+    assert "trend" in enriched.vision_data
+    assert "confidence" in enriched.vision_data
+    assert "patterns" in enriched.vision_data
+    assert "insight" in enriched.vision_data
+    assert enriched.vision_data["trend"] == "BULLISH"
+    assert enriched.vision_data["confidence"] == pytest.approx(0.72)
+
+    # DRL signal injected into the pipeline copy
+    assert enriched.drl_signal is not None
+    assert "action" in enriched.drl_signal
+    assert "confidence" in enriched.drl_signal
+    assert "voting_mode" in enriched.drl_signal
+    assert "contributing_agents" in enriched.drl_signal
+    assert enriched.drl_signal["action"] == 1  # BUY
+    assert enriched.drl_signal["voting_mode"] == "REGIME_ROUTING"
 
 
 # ---------------------------------------------------------------------------

@@ -31,6 +31,20 @@ def _error(msg: str, status: int = 400):
 async def agents_status():
     """Get multi-agent pipeline status and configuration."""
     settings = get_settings()
+    # M11 fix: report the active LLM provider + model. Previously this
+    # always returned the stale "claude-sonnet-4-20250514" default of
+    # `agents_llm_model` even after Phase 14b migrated the agent layer
+    # to the LLMProvider abstraction (Ollama / qwen3.6:35b).
+    llm_label = "unknown"
+    try:
+        from src.llm_provider.factory import get_llm_provider  # noqa: PLC0415
+
+        provider = get_llm_provider()
+        provider_name = type(provider).__name__
+        gen_model = getattr(provider, "generation_model", None)
+        llm_label = f"{provider_name}/{gen_model}" if gen_model else provider_name
+    except Exception:
+        pass
     return _success(
         {
             "agents_enabled": settings.agents_enabled,
@@ -38,11 +52,7 @@ async def agents_status():
             "drl_enabled": settings.drl_enabled,
             "debate_enabled": settings.agents_debate_enabled,
             "orchestrator_active": settings.agents_enabled,
-            "llm_model": (
-                settings.agents_llm_model
-                if hasattr(settings, "agents_llm_model")
-                else "claude-sonnet-4-20250514"
-            ),
+            "llm_model": llm_label,
         }
     )
 

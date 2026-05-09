@@ -121,7 +121,13 @@ class CorrelationGuard:
             if corr is not None:
                 handled_epics.add(pos_epic)
                 abs_corr = abs(corr)
-                new_mult = 1.0 - abs_corr
+                # M14 fix: clamp to [0, 1]. numpy float drift can yield
+                # |corr| > 1.0 (1.0000000001 after matrix ops on highly
+                # correlated pairs); without the clamp, new_mult goes
+                # negative and propagates to a negative position size
+                # that downstream rejects with a misleading "size zero"
+                # message instead of surfacing the matrix anomaly.
+                new_mult = max(0.0, 1.0 - abs_corr)
                 if new_mult < size_multiplier:
                     size_multiplier = new_mult
                     warnings.append(
