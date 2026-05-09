@@ -54,9 +54,12 @@ class MantisDRLEnsembleAgent:
             regime = self._detect_regime(context)
             signal = self.ensemble.predict(observation, current_regime=regime)
 
-            # Apply confidence threshold — low-confidence signals become HOLD
+            # Apply confidence threshold — low-confidence signals become HOLD.
+            # H7 fix: copy with override instead of mutating the model
+            # returned by ensemble.predict(). Mutation bypassed Pydantic
+            # validation and risked corrupting any cached/shared singleton.
             if signal.confidence < self.confidence_threshold:
-                signal.action = 0  # HOLD
+                return signal.model_copy(update={"action": 0})
 
             return signal
         except Exception as e:

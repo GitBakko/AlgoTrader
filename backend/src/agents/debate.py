@@ -184,21 +184,30 @@ class BullBearDebate:
                     )
                 )
 
-            # Resistance proximity: only relevant for BUY proposals
+            # Resistance proximity: only relevant for BUY proposals.
+            # H5 fix: pick the nearest resistance ABOVE entry, not the
+            # globally lowest. Otherwise resistances below entry (e.g.,
+            # previous swing-low support that the LLM also added to the
+            # resistance list) trigger a spurious BEAR with `min()` <
+            # entry * 1.01 always True.
             if technical.key_resistance_levels and proposal.action == "BUY":
-                nearest_resistance = min(technical.key_resistance_levels)
-                if nearest_resistance < proposal.entry_price * 1.01:
-                    bear_args.append(
-                        DebateArgument(
-                            side="BEAR",
-                            argument=(
-                                f"Resistance at {nearest_resistance:.2f} is very close "
-                                f"to entry ({proposal.entry_price:.2f})"
-                            ),
-                            confidence=0.6,
-                            evidence=[],
+                resistances_above = [
+                    r for r in technical.key_resistance_levels if r > proposal.entry_price
+                ]
+                if resistances_above:
+                    nearest_resistance = min(resistances_above)
+                    if nearest_resistance < proposal.entry_price * 1.01:
+                        bear_args.append(
+                            DebateArgument(
+                                side="BEAR",
+                                argument=(
+                                    f"Resistance at {nearest_resistance:.2f} is very close "
+                                    f"to entry ({proposal.entry_price:.2f})"
+                                ),
+                                confidence=0.6,
+                                evidence=[],
+                            )
                         )
-                    )
 
         # ----------------------------------------------------------------
         # Sentiment arguments

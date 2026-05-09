@@ -429,6 +429,23 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"reinject_orphans failed (non-fatal): {e}")
 
+    # H1 fix: rehydrate Tier-2 retry queue from `pending_close_detections`
+    # so the 10-minute reconciliation timeout survives backend restarts.
+    # Without this, a pending close queued before the previous shutdown
+    # gets `first_seen=now / retry_count=0` on the next run — the timeout
+    # clock restarts and it can defer indefinitely (DE40 / NATGAS class).
+    try:
+        rehydrated = await recovery_service.rehydrate_pending_closes()
+        if rehydrated:
+            logger.warning(
+                f"⚠️  {rehydrated} pending close(s) rehydrated from DB "
+                f"(reconciliation timeout continues from previous run)"
+            )
+        else:
+            logger.info("Pending-close rehydration: none persisted")
+    except Exception as e:
+        logger.error(f"rehydrate_pending_closes failed (non-fatal): {e}")
+
     # ══════════════════════════════════════════════════════════
     # 📦 PRE-FETCH MARKET SPECS (minDealSize cache)
     # ══════════════════════════════════════════════════════════

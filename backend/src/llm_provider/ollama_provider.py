@@ -87,8 +87,13 @@ class _LocalCrossEncoder:
 
 
 async def _run_in_thread(scorer: _LocalCrossEncoder, query: str, passages: list[str]) -> list[float]:
-    """Off-load the (CPU-bound) reranker call to a default executor."""
-    loop = asyncio.get_event_loop()
+    """Off-load the (CPU-bound) reranker call to a default executor.
+
+    Uses ``asyncio.get_running_loop`` (H10 fix) — ``get_event_loop`` is
+    deprecated inside coroutines on Python 3.12 and raises ``RuntimeError``
+    on 3.14 when no current loop is set.
+    """
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, scorer, query, passages)
 
 
@@ -229,10 +234,40 @@ class OllamaProvider(LLMProvider):
         """
         if not passages:
             return []
-        scorer = self._get_reranker()
+        scorer = await self._get_reranker_async()
         return await _run_in_thread(scorer, query, passages)
 
-    def _get_reranker(self):
+    async def _get_reranker_async(self) -> _LocalCrossEncoder:
+        """Lazy-construct + lazy-load the reranker behind an asyncio.Lock.
+
+        H9 fix: a fleet of concurrent ``rerank()`` calls (e.g., 15 epics
+        firing on the same strategy tick) used to all pass the
+        ``_reranker is None`` check simultaneously, each constructing a
+        fresh ``_LocalCrossEncoder`` and each driving the 568 MB HF
+        download. The lock serialises construction + first-load while
+        keeping the actual scoring path lock-free.
+        """
+        # Lazy lock init — `asyncio.Lock` must be created inside a running
+        # loop so we cannot put it in __init__ (the provider is built at
+        # import time before the loop exists).
+        if getattr(self, "_reranker_lock", None) is None:
+            self._reranker_lock = asyncio.Lock()
+        async with self._reranker_lock:
+            if getattr(self, "_reranker", None) is None:
+                self._reranker = _LocalCrossEncoder(
+                    model_id="BAAI/bge-reranker-v2-m3",
+                    max_length=512,
+                )
+                # Warm the model inside the lock so two concurrent first
+                # callers don't both pay the disk-I/O hit.
+                await asyncio.get_running_loop().run_in_executor(
+                    None, self._reranker._ensure_loaded
+                )
+        return self._reranker
+
+    def _get_reranker(self) -> _LocalCrossEncoder:
+        """Sync accessor retained for tests that reach in directly. The
+        async path goes through ``_get_reranker_async`` (H9)."""
         if getattr(self, "_reranker", None) is None:
             self._reranker = _LocalCrossEncoder(
                 model_id="BAAI/bge-reranker-v2-m3",

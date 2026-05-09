@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from loguru import logger
 
-from src.llm_provider.base import LLMProvider
+from src.llm_provider.base import LLMProvider, LLMProviderError
 from src.llm_provider.ollama_provider import OllamaProvider
 
 _provider_singleton: LLMProvider | None = None
@@ -50,7 +50,12 @@ def get_llm_provider() -> LLMProvider:
             f"embed={settings.ollama_embedding_model}"
         )
     else:
-        raise ValueError(
+        # H8 fix: raise the typed provider error, not a bare ValueError.
+        # Bare ValueError gets caught by the BLE001 handler in
+        # MantisBaseAgent.analyze() and turned into a silent permanent
+        # HOLD across every agent — invisible to operator dashboards
+        # that only watch trade activity.
+        raise LLMProviderError(
             f"Unknown LLM_BACKEND={backend!r}. Supported: 'ollama'."
         )
 
