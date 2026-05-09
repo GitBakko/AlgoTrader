@@ -96,14 +96,18 @@ _EXCLUDED_ASSETS = {
     # plier left at default 1.0 until live PnL evidence justifies a
     # boost à la USDJPY (1.5x). See backend/.env EPIC_RISK_MULTIPLIERS.
     #
-    # AUDUSD + EURJPY PROMOTED on 2026-05-09 — Phase 14 forex retrain
-    # produced f1 0.5307 / 0.5418 (between stock baseline AMD 0.5149
-    # and META 0.5401). 19 folds × 199 features. Risk multiplier
-    # default 1.0; revisit after live PnL evidence.
-    #
-    # NZDUSD KEPT EXCLUDED — f1 0.5060 below stock floor 0.51,
-    # marginal vs random. Re-evaluate after AUDUSD shows live edge
-    # (sister-pair correlation should lift NZDUSD signal quality).
+    # Phase 14 forex Wave 2 — ALL EXCLUDED on 2026-05-09 after walk-
+    # forward backtest exposed catastrophic OOS performance despite
+    # decent f1:
+    #   AUDUSD: WR 0.0% (414 trades all losing), Sharpe -19.75, DD -100%
+    #   EURJPY: WR 22.6%, Sharpe -11.91, PF 0.08
+    #   NZDUSD: f1 0.5060 marginal — never exited gate
+    # f1 0.53/0.54 was misleading — model picks direction OK but
+    # strategy R:R + execution path turn it into systematic loss.
+    # Root cause investigation pending: spread/slippage modeling,
+    # MR strategy mismatch on trending pairs, or TP/SL config.
+    "AUDUSD",
+    "EURJPY",
     "NZDUSD",
 }
 TRADABLE_ASSETS: list[str] = [a for a in ALL_ASSETS if a not in _EXCLUDED_ASSETS]

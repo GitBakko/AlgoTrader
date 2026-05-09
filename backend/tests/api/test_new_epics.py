@@ -89,17 +89,18 @@ class TestPortfolioExpansion:
             assert len(config.features) > 0
 
     def test_active_epics_count(self):
-        """PredictionService.ACTIVE_EPICS should have 23.
+        """PredictionService.ACTIVE_EPICS should have 21.
 
         Composition: 13 surviving Phase 0/Phase 12 + 2 Phase 14 forex
-        (USDCHF/USDCAD) + 6 Phase 14 stocks (AAPL/MSFT/GOOGL/AMZN/META/
-        AMD) + 2 Phase 14 forex Wave 2 (AUDUSD/EURJPY, promoted
-        2026-05-09 at f1 0.5307/0.5418).
-        NZDUSD remains excluded (f1 0.5060 marginal).
+        Wave 1 (USDCHF/USDCAD) + 6 Phase 14 stocks (AAPL/MSFT/GOOGL/
+        AMZN/META/AMD).
+        Phase 14 forex Wave 2 (AUDUSD/NZDUSD/EURJPY) all EXCLUDED on
+        2026-05-09 — walk-forward exposed AUDUSD WR 0.0% / EURJPY
+        Sharpe -11.91 despite decent f1.
         """
         assert (
-            len(PredictionService.ACTIVE_EPICS) == 23
-        ), f"Expected 23 active EPICs, got {len(PredictionService.ACTIVE_EPICS)}"
+            len(PredictionService.ACTIVE_EPICS) == 21
+        ), f"Expected 21 active EPICs, got {len(PredictionService.ACTIVE_EPICS)}"
 
     def test_new_active_epics_present(self):
         """Surviving new EPICs should be in PredictionService.ACTIVE_EPICS."""
