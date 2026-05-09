@@ -1118,7 +1118,15 @@ class PaperTradingLoop:
         if self.execution_engine.mode == ExecutionMode.PAPER:
             return
 
-        self._broker_closed_deals = set()
+        # Cross-tick race guard: seed the per-tick close set with any
+        # close currently being finalized in another coroutine. Without
+        # this seeding the per-call reset would void the
+        # `_check_stop_losses` skip-set whenever `_finalize_close` is
+        # suspended at an await across the 15s reconciler boundary,
+        # opening a window for a redundant broker `close_position` call.
+        if not hasattr(self, "_inflight_close_deals"):
+            self._inflight_close_deals: set[str] = set()
+        self._broker_closed_deals = set(self._inflight_close_deals)
         now = datetime.now(UTC)
         _settings = get_settings()
         timeout_sec = _settings.close_reconciliation_timeout_seconds
@@ -1560,6 +1568,11 @@ class PaperTradingLoop:
         except Exception:
             pass
 
+        # Mark deal as in-flight so concurrent reconciler ticks don't
+        # re-issue close calls while this finalize is suspended at await.
+        if not hasattr(self, "_inflight_close_deals"):
+            self._inflight_close_deals = set()
+        self._inflight_close_deals.add(deal_id)
         self._broker_closed_deals.add(deal_id)
         self._on_position_closed(deal_id, pnl, epic=epic, close_reason=close_reason)
 
@@ -1621,6 +1634,9 @@ class PaperTradingLoop:
             except Exception as alert_err:
                 logger.warning(f"Trade close alert failed: {alert_err}")
 
+        # Release the cross-tick guard now that finalize is fully done.
+        self._inflight_close_deals.discard(deal_id)
+
     async def _emit_unreconciled_close(self, pending: "PendingClose") -> None:
         """Tier 3: persist a close we could not reconcile with broker data.
 
@@ -1640,6 +1656,9 @@ class PaperTradingLoop:
         except Exception:
             pass
 
+        if not hasattr(self, "_inflight_close_deals"):
+            self._inflight_close_deals = set()
+        self._inflight_close_deals.add(pending.deal_id)
         self._broker_closed_deals.add(pending.deal_id)
         exit_price = float(pending.prev_pos.get("level") or pending.entry_price)
 
@@ -1705,6 +1724,9 @@ class PaperTradingLoop:
                     await am.send_alert(alert)
             except Exception as alert_err:
                 logger.warning(f"Unreconciled close alert failed: {alert_err}")
+
+        # Release the cross-tick guard now that finalize is fully done.
+        self._inflight_close_deals.discard(pending.deal_id)
 
     async def _persist_trailing_event(
         self,
