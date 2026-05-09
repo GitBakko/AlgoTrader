@@ -389,32 +389,40 @@ async def get_swap_accum(
     # rate+notional computed above — same approximation as the MINIMAL
     # Phase 4 behaviour, so a fresh epic that has no history yet still
     # renders something reasonable while the scheduler fills rows over time.
+    #
+    # Gate: only pull snapshots when an open position currently exists.
+    # Without a live position, accumulated swap on the response must be
+    # 0 — historical rows belong to a closed position whose P&L was
+    # already realised at close time and re-summing them here would
+    # double-count and surprise the caller. The test
+    # ``test_no_position_zero_notional`` codifies this contract.
     snapshot_by_date: dict[str, dict] = {}
-    try:
-        from src.database.repositories.swap_snapshot_repository import (
-            SwapSnapshotRepository,
-        )
-        from src.database.session import DatabaseManager
+    if position_size > 0:
+        try:
+            from src.database.repositories.swap_snapshot_repository import (
+                SwapSnapshotRepository,
+            )
+            from src.database.session import DatabaseManager
 
-        session_factory = DatabaseManager.get_session_factory()
-        async with session_factory() as session:
-            snap_repo = SwapSnapshotRepository(session)
-            rows = await snap_repo.get_recent(epic_upper, days)
-            for r in rows:
-                r_dir = (r.direction or "").upper()
-                snap_rate = (
-                    r.short_rate_pct if r_dir in ("SHORT", "SELL")
-                    else r.long_rate_pct
-                )
-                if snap_rate is None:
-                    snap_rate = rate_pct
-                snapshot_by_date[r.snapshot_date.isoformat()] = {
-                    "rate_pct": float(snap_rate),
-                    "notional": float(r.notional or 0),
-                    "source": r.source,
-                }
-    except Exception as e:
-        logger.debug(f"swap-accum snapshot DB lookup failed for {epic_upper}: {e}")
+            session_factory = DatabaseManager.get_session_factory()
+            async with session_factory() as session:
+                snap_repo = SwapSnapshotRepository(session)
+                rows = await snap_repo.get_recent(epic_upper, days)
+                for r in rows:
+                    r_dir = (r.direction or "").upper()
+                    snap_rate = (
+                        r.short_rate_pct if r_dir in ("SHORT", "SELL")
+                        else r.long_rate_pct
+                    )
+                    if snap_rate is None:
+                        snap_rate = rate_pct
+                    snapshot_by_date[r.snapshot_date.isoformat()] = {
+                        "rate_pct": float(snap_rate),
+                        "notional": float(r.notional or 0),
+                        "source": r.source,
+                    }
+        except Exception as e:
+            logger.debug(f"swap-accum snapshot DB lookup failed for {epic_upper}: {e}")
 
     # Build per-day series looking back (today-(days-1) .. today).
     today = _dt.now(_UTC).replace(hour=0, minute=0, second=0, microsecond=0)

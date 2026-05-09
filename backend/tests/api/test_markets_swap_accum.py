@@ -104,12 +104,6 @@ class TestSwapAccum:
         finally:
             app.dependency_overrides.pop(get_position_repo, None)
 
-    @pytest.mark.xfail(
-        reason="Pre-existing baseline failure — endpoint sums swap_daily_snapshots "
-        "rows even when no position exists; endpoint logic needs gating on "
-        "position presence. Tracked in project_test_baseline_2026-04-20.md.",
-        strict=False,
-    )
     def test_no_position_zero_notional(self, client, broker_stub):
         repo = AsyncMock()
         repo.get_by_epic = AsyncMock(return_value=[])
