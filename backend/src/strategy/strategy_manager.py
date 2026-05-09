@@ -495,8 +495,10 @@ class StrategyManager:
         market_data: dict,
     ) -> TradingSignal:
         """Scalp mode: technical score first, ML as boost layer."""
-        from datetime import datetime
-
+        # Use module-level `datetime` import (line 6) so test fixtures that
+        # patch `src.strategy.strategy_manager.datetime` actually apply
+        # here. The inline `from datetime import datetime` previously
+        # shadowed the patch with the real stdlib class.
         import polars as pl
 
         from src.models.schemas import SignalClass
@@ -604,8 +606,10 @@ class StrategyManager:
         market_data: dict,
     ) -> TradingSignal:
         """ML-Primary mode: ML decides direction, ScalpScore confirms quality."""
-        from datetime import datetime
-
+        # Use module-level `datetime` import (line 6) so test fixtures that
+        # patch `src.strategy.strategy_manager.datetime` actually apply
+        # here. The inline `from datetime import datetime` previously
+        # shadowed the patch with the real stdlib class.
         import polars as pl
 
         from src.models.schemas import SignalClass

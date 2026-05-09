@@ -18,11 +18,39 @@ their own ``get_settings`` patch).
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from datetime import UTC, datetime
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.utils.config import get_settings
+
+
+@pytest.fixture(autouse=True)
+def _freeze_session_friendly_clock():
+    """Pin ``datetime.now(UTC)`` to 14:00 UTC for every strategy test.
+
+    Without this, tests that exercise ``StrategyManager._process_scalp`` /
+    ``_process_ml_primary`` (or anywhere ``SessionFilter`` is consulted)
+    fail outside London/NY/Asia kill zones — the wall-clock-dependent
+    ``datetime.now(UTC).hour`` reads UTC 22-23 (= 00-01 CEST) and the
+    session filter blocks XAUUSD/forex_major/index trades.
+
+    14:00 UTC sits inside the NY kill zone for every asset class the
+    test fixtures use, so ``session_blocked`` is False and the rest of
+    the strategy chain runs as intended.
+    """
+    fixed_dt = datetime(2026, 5, 9, 14, 0, 0, tzinfo=UTC)
+
+    class _FrozenDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            if tz is not None:
+                return fixed_dt.astimezone(tz)
+            return fixed_dt.replace(tzinfo=None)
+
+    with patch("src.strategy.strategy_manager.datetime", _FrozenDateTime):
+        yield
 
 
 @pytest.fixture(autouse=True)
