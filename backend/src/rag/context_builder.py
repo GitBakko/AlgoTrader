@@ -32,14 +32,19 @@ class MantisRAGContextBuilder:
         "markdown headers."
     )
 
+    DEFAULT_CORPUS_DIR = "data/rag_corpus"
+
     def __init__(
         self,
         max_tokens: int | None = None,
         provider: "LLMProvider | None" = None,
+        corpus_dir: str | None = None,
     ):
         if max_tokens is not None:
             self.MAX_CONTEXT_TOKENS = max_tokens
         self._provider = provider
+        self._corpus_dir = corpus_dir or self.DEFAULT_CORPUS_DIR
+        self._vector_store = None  # lazy-loaded on first retrieve_docs call
 
     def build(
         self,
@@ -226,21 +231,38 @@ class MantisRAGContextBuilder:
         sil_data: dict | None = None,
         memory_context: MemoryContext | None = None,
         symbol: str = "",
+        retrieval_query: str | None = None,
     ) -> RAGContext:
         """Build context + add an LLM-driven executive summary.
 
-        Falls back to ``build()`` output (empty summary) on any provider
-        error — the trading loop must never crash on RAG failures.
+        When ``retrieval_query`` is provided, also retrieves the top-3
+        most-similar chunks from the indexed MANTIS docs corpus and
+        appends them as a ``docs_section`` payload in the executive
+        summary input. Falls back to ``build()`` output (empty summary)
+        on any provider error — the trading loop must never crash on
+        RAG failures.
         """
         ctx = self.build(news=news, sil_data=sil_data, memory_context=memory_context)
-        summary = await self._summarize(ctx, symbol)
+
+        docs_snippets: list[dict] = []
+        if retrieval_query:
+            docs_snippets = await self.retrieve_docs(retrieval_query, top_k=3)
+
+        summary = await self._summarize(ctx, symbol, docs_snippets=docs_snippets)
         if summary:
             ctx.executive_summary = summary
         return ctx
 
-    async def _summarize(self, ctx: RAGContext, symbol: str) -> str:
+    async def _summarize(
+        self,
+        ctx: RAGContext,
+        symbol: str,
+        docs_snippets: list[dict] | None = None,
+    ) -> str:
         """Call the LLMProvider to produce the executive summary."""
-        if not (ctx.news_section or ctx.macro_section or ctx.memory_section):
+        has_section = bool(ctx.news_section or ctx.macro_section or ctx.memory_section)
+        has_docs = bool(docs_snippets)
+        if not (has_section or has_docs):
             return ""
         try:
             provider = self._get_provider()
@@ -257,6 +279,14 @@ class MantisRAGContextBuilder:
             prompt_parts.append(ctx.macro_section)
         if ctx.memory_section:
             prompt_parts.append(ctx.memory_section)
+        if docs_snippets:
+            doc_lines = ["## Relevant MANTIS Knowledge"]
+            for snip in docs_snippets:
+                src = snip.get("source", "")
+                hdr = snip.get("header", "")
+                txt = snip.get("text", "")[:400]
+                doc_lines.append(f"- [{src} § {hdr}] {txt}")
+            prompt_parts.append("\n".join(doc_lines))
         prompt = "\n\n".join(prompt_parts)
 
         from src.llm_provider.base import LLMProviderError  # noqa: PLC0415
@@ -276,6 +306,76 @@ class MantisRAGContextBuilder:
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"[RAG] unexpected error during summary: {exc!r}")
             return ""
+
+    # ------------------------------------------------------------------
+    # Phase 14c: docs corpus retrieval (bge-m3 vector search)
+    # ------------------------------------------------------------------
+
+    async def retrieve_docs(
+        self,
+        query: str,
+        top_k: int = 5,
+        min_similarity: float = 0.35,
+    ) -> list[dict]:
+        """Retrieve top-k MANTIS doc chunks semantically similar to ``query``.
+
+        The corpus is built by ``scripts/index_mantis_docs.py`` and lives
+        at ``data/rag_corpus/`` by default. Returns a list of dicts shaped
+        ``{"text": str, "source": str, "header": str, "similarity": float}``;
+        empty list on any failure (no corpus, no provider, etc.) so the
+        trading loop never crashes on RAG misses.
+        """
+        store = self._load_corpus()
+        if store is None or store.size() == 0:
+            return []
+        try:
+            provider = self._get_provider()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(f"[RAG] provider unavailable for docs retrieval: {exc!r}")
+            return []
+
+        try:
+            vectors = await provider.embed([query])
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"[RAG] embed failed for docs retrieval: {exc!r}")
+            return []
+        if not vectors:
+            return []
+
+        results = store.search(vectors[0], top_k=top_k, min_similarity=min_similarity)
+        return [
+            {
+                "text": r.text,
+                "source": r.metadata.get("source", ""),
+                "header": r.metadata.get("header", ""),
+                "similarity": r.similarity,
+            }
+            for r in results
+        ]
+
+    def _load_corpus(self):
+        """Lazy-load the MantisVectorStore from disk on first use."""
+        if self._vector_store is not None:
+            return self._vector_store
+        try:
+            from pathlib import Path  # noqa: PLC0415
+
+            from src.rag.vector_store import MantisVectorStore  # noqa: PLC0415
+
+            path = Path(self._corpus_dir)
+            if not path.exists():
+                logger.debug(f"[RAG] corpus dir not found: {path}")
+                return None
+            store = MantisVectorStore(store_path=str(path))
+            store.load()
+            if store.size() == 0:
+                logger.debug(f"[RAG] corpus empty at {path}")
+                return None
+            self._vector_store = store
+            return store
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"[RAG] corpus load failed: {exc!r}")
+            return None
 
     def _get_provider(self) -> "LLMProvider":
         if self._provider is None:
