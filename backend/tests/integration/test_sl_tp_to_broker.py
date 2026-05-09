@@ -20,8 +20,21 @@ from src.strategy.schemas import TradingSignal
 
 
 def _non_scalp_settings():
+    """Match the canonical mock in tests/risk/test_risk_manager.py.
+
+    The bare MagicMock left `epic_risk_multipliers`, `min_risk_amount_usd`,
+    and `min_signal_rr_threshold` un-stubbed, which broke the §6-bis
+    `epic_mult <= 0.0` comparison and §4-ter R:R floor with TypeError
+    against MagicMock auto-attributes.
+    """
     s = MagicMock()
     s.scalp_mode_enabled = False
+    s.min_risk_amount_usd = 0.0
+    s.min_notional_usd = 0.0
+    s.forex_usd_base_size_multiplier = 1.0
+    s.forex_max_leverage_multiplier = 1.0
+    s.min_signal_rr_threshold = 0.0
+    s.epic_risk_multipliers = {}
     return s
 
 

@@ -5,25 +5,18 @@ import pytest
 
 class TestSearchMarkets:
     def test_search_all_markets(self, client):
+        """Endpoint returns the searchable asset universe. Aligned with
+        `ALL_ASSETS` (Phase 14 promotion) instead of the legacy 21-asset
+        snapshot."""
+        from src.utils.constants import ALL_ASSETS
+
         resp = client.get("/api/markets/search")
         assert resp.status_code == 200
         data = resp.json()["data"]
-        assert len(data) == 21  # Expanded asset coverage (21 total assets)
         epics = {m["epic"] for m in data}
-        assert epics == {
-            # Crypto
-            "BTCUSD", "ETHUSD", "SOLUSD", "DOGUSD", "DASHUSD", "ICPUSD", "BNBUSD",
-            # Metals
-            "XAUUSD", "XAGUSD", "COPPER", "PLATINUM",
-            # Indices
-            "US500", "DE40", "NAS100",
-            # Commodities/Energy
-            "WTIUSD", "NATGAS",
-            # Forex
-            "EURUSD", "GBPUSD", "USDJPY",
-            # Stocks
-            "NVDA", "TSLA",
-        }
+        assert epics >= set(ALL_ASSETS), (
+            f"Missing assets: {set(ALL_ASSETS) - epics}"
+        )
 
     def test_search_by_keyword(self, client):
         resp = client.get("/api/markets/search?q=gold")
