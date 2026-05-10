@@ -64,13 +64,16 @@ class TestVisionAnalyze:
 
     @pytest.mark.asyncio
     async def test_analyze_disabled_returns_error(self, client):
-        """When VISION_ENABLED=false, returns error."""
+        """When VISION_ENABLED=false, returns 403 with success=False.
+
+        H1-API fix: `_error(msg, status)` now returns the requested
+        status code (was always 200 prior to the audit fix)."""
         with patch("src.api.routers.vision.get_settings") as mock_settings:
             s = MagicMock()
             s.vision_enabled = False
             mock_settings.return_value = s
             resp = await client.post("/api/vision/analyze?epic=XAUUSD")
-            assert resp.status_code == 200
+            assert resp.status_code == 403
             data = resp.json()
             assert data["success"] is False
             assert "disabled" in data["error"].lower()
@@ -81,13 +84,16 @@ class TestRAGContext:
 
     @pytest.mark.asyncio
     async def test_rag_disabled_returns_error(self, client):
-        """When RAG_ENABLED=false, returns error."""
+        """When RAG_ENABLED=false, returns 403 with success=False.
+
+        H1-API fix: `_error(msg, status)` now returns the requested
+        status code."""
         with patch("src.api.routers.vision.get_settings") as mock_settings:
             s = MagicMock()
             s.rag_enabled = False
             mock_settings.return_value = s
             resp = await client.get("/api/vision/rag?epic=XAUUSD")
-            assert resp.status_code == 200
+            assert resp.status_code == 403
             data = resp.json()
             assert data["success"] is False
             assert "disabled" in data["error"].lower()

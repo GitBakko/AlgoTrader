@@ -21,6 +21,11 @@ export interface HeatmapCell {
   state: 'live' | 'executed' | 'rejected' | 'closed' | 'hold' | 'none';
   /** ISO timestamp of the latest signal, or null. */
   ts: string | null;
+  /** C1-FE fix: deal_id of the live position overlay so the click
+   *  handler routes to the correct position drawer when two positions
+   *  share an epic (Bug class `dea2a29` — epic-only matching can pick
+   *  the closing trade instead of the new one). */
+  liveDealId?: string | null;
 }
 
 /**
@@ -78,26 +83,32 @@ export class SignalsHeatmapComponent {
     return map;
   });
 
-  /** Set of epics with an open position right now (state="live" overlay). */
-  private readonly liveEpics = computed<Set<string>>(() => {
-    const set = new Set<string>();
+  /** Map epic → most-recently-opened position deal_id (state="live"
+   *  overlay). C1-FE: keeps the deal_id so cell-click routes to the
+   *  right drawer when two positions share an epic. Last-write-wins
+   *  on duplicates is acceptable here because the click handler still
+   *  goes through the live position lookup, but the value being
+   *  carried into the cell prevents the epic-only `find` mismatch. */
+  private readonly liveDealByEpic = computed<Record<string, string>>(() => {
+    const out: Record<string, string> = {};
     for (const p of this.positions()) {
-      if (p.epic) set.add(p.epic);
+      if (p.epic && p.deal_id) out[p.epic] = p.deal_id;
     }
-    return set;
+    return out;
   });
 
   /** Full cell list driven by the universe — always one cell per epic. */
   readonly allCells = computed<HeatmapCell[]>(() => {
     const universe = this.epics();
     const latest = this.latestByEpic();
-    const live = this.liveEpics();
+    const liveDeals = this.liveDealByEpic();
     return universe.map((epic) => {
       const sig = latest[epic] ?? null;
       const direction = (sig?.direction as HeatmapCell['direction']) ?? '—';
       const confidence = sig ? Math.round((sig.confidence ?? 0) * 100) : null;
+      const liveDealId = liveDeals[epic] ?? null;
       let state: HeatmapCell['state'] = 'none';
-      if (live.has(epic)) {
+      if (liveDealId) {
         state = 'live';
       } else if (sig) {
         const status = (sig.status ?? '').toUpperCase();
@@ -113,6 +124,7 @@ export class SignalsHeatmapComponent {
         confidence,
         state,
         ts: sig?.timestamp ?? null,
+        liveDealId,
       };
     });
   });

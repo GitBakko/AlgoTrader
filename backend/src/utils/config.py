@@ -80,6 +80,14 @@ class Settings(BaseSettings):
     capital_live_email: str = Field(default="", alias="CAPITAL_LIVE_EMAIL")
     capital_live_password: str = Field(default="", alias="CAPITAL_LIVE_PASSWORD")
 
+    # ===== Auth Gate =====
+    # When True, every state-changing API endpoint requires a valid JWT.
+    # Default False so the existing test fixtures (which don't ship
+    # Authorization headers) keep passing under DEMO/PAPER. LIVE deploy
+    # MUST set this True — main.py refuses to start a non-DEMO backend
+    # otherwise (see C1-API audit fix).
+    auth_required: bool = Field(default=False, alias="AUTH_REQUIRED")
+
     # ===== Broker Configuration =====
     use_demo: bool = Field(default=True, alias="USE_DEMO")
     session_timeout_minutes: int = Field(default=10, alias="SESSION_TIMEOUT_MINUTES")

@@ -205,6 +205,11 @@ class SessionManager:
                 break
             except Exception as e:
                 logger.error(f"Error in keep-alive ping loop: {e}")
+                # H2-BROKER fix: back off so a sustained network outage
+                # doesn't spin this coroutine as fast as the scheduler
+                # can run it, saturating the event loop and starving the
+                # trading tick.
+                await asyncio.sleep(min(ping_interval, 30))
 
     async def _start_ping_task(self) -> None:
         """Start background keep-alive ping task."""

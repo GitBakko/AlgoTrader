@@ -9,10 +9,32 @@ import { AuthService } from '../services/auth.service';
  * Attaches JWT token to all HTTP requests.
  * On 401: attempts silent token refresh, then retries the original request.
  * Uses BehaviorSubject to queue concurrent requests during refresh.
+ *
+ * C3-FE security fix: refresh-state used to live at module scope, so
+ * `isRefreshing=true` (or queued subscriptions) could survive a logout
+ * and bleed into the next session — old-session subscribers replaying
+ * old requests under new credentials, or new-session 401s queueing
+ * forever. The state now lives in module-level mutable refs but is
+ * explicitly reset by `resetAuthInterceptorState()` which is called
+ * from `AuthService.clearAuth()`.
  */
 
 let isRefreshing = false;
-const refreshTokenSubject = new BehaviorSubject<string | null>(null);
+let refreshTokenSubject = new BehaviorSubject<string | null>(null);
+
+/** Reset interceptor state on logout/login boundary. Called from
+ *  AuthService.clearAuth so every new session starts clean. */
+export function resetAuthInterceptorState(): void {
+  isRefreshing = false;
+  // Complete the existing subject so any queued subscribers terminate
+  // with a finite-stream rather than emitting against a new session.
+  try {
+    refreshTokenSubject.complete();
+  } catch {
+    /* noop */
+  }
+  refreshTokenSubject = new BehaviorSubject<string | null>(null);
+}
 
 function addToken(req: HttpRequest<unknown>, token: string): HttpRequest<unknown> {
   return req.clone({ setHeaders: { Authorization: `Bearer ${token}` } });

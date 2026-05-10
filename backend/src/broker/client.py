@@ -202,6 +202,23 @@ class CapitalComClient:
                             f"Broker 5xx error (after {self._retry_attempts} retries): {error_msg}"
                         )
 
+                # H1-BROKER fix: 429 IS retryable. Treat it inside the
+                # retry loop with extra +1s buffer so a transient burst-
+                # window hit doesn't immediately drop the order.
+                if response.status_code == 429:
+                    if attempt < self._retry_attempts - 1:
+                        retry_delay = self._retry_base_delay * (2 ** attempt) + 1.0
+                        logger.warning(
+                            f"429 rate-limit on {method} {endpoint} — "
+                            f"retry {attempt + 1}/{self._retry_attempts} "
+                            f"in {retry_delay:.2f}s"
+                        )
+                        await asyncio.sleep(retry_delay)
+                        continue
+                    raise CapitalComError(
+                        f"Broker 429 rate-limit (after {self._retry_attempts} retries)"
+                    )
+
                 # Handle 4xx errors (client errors - don't retry)
                 if response.status_code >= 400:
                     error_data = response.json() if response.text else {}
@@ -407,8 +424,15 @@ class CapitalComClient:
         Returns:
             Deal confirmation
         """
+        # H3-BROKER fix: exclude None fields so a single-leg modify
+        # (only SL or only TP) doesn't PUT `null` to the broker — Capital
+        # interprets `null stopLevel` as "remove SL" and silently strips
+        # the existing stop. The model_config "exclude_none" key was a
+        # no-op (not a Pydantic v2 ConfigDict field).
         response = await self._request(
-            "PUT", f"/api/v1/positions/{deal_id}", json=request.model_dump(by_alias=True)
+            "PUT",
+            f"/api/v1/positions/{deal_id}",
+            json=request.model_dump(by_alias=True, exclude_none=True),
         )
         return DealConfirmation(**response)
 

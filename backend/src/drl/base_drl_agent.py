@@ -96,6 +96,12 @@ class MantisDRLAgent(ABC):
         """
         Predict an action from the given observation.
 
+        C1-DRL fix: SB3 models trained on MantisRLEnvironment use the
+        5-action RLAction space (0=LONG_ENTRY, 1=LONG_EXIT, 2=SHORT_ENTRY,
+        3=SHORT_EXIT, 4=NEUTRAL). The ensemble voter expects the 3-action
+        DRLEnsembleSignal space (0=HOLD, 1=BUY, 2=SELL). Map here so a
+        NEUTRAL/EXIT plurality doesn't propagate as undefined action=4.
+
         Returns:
             (action, info_dict) where action is 0=HOLD, 1=BUY, 2=SELL.
             If the model is untrained, returns (0, {"confidence": 0.0}).
@@ -106,8 +112,19 @@ class MantisDRLAgent(ABC):
         action, _states = self._model.predict(observation, deterministic=deterministic)
         # For continuous (Box) action spaces, action is a numpy array.
         # Flatten to scalar: take first element and convert to int.
-        action_scalar = np.asarray(action).flat[0]
-        return int(action_scalar), {"confidence": 0.7 if deterministic else 0.5}
+        action_scalar = int(np.asarray(action).flat[0])
+
+        # 5-action RL → 3-action DRL ensemble remap. Anything not LONG/
+        # SHORT_ENTRY collapses to HOLD — this matches the existing
+        # MantisRLAgent._map_action contract used by the non-ensemble
+        # path and prevents silent action=4 leaks into the voter.
+        _RL_TO_DRL = {0: 1, 2: 2}  # LONG_ENTRY→BUY, SHORT_ENTRY→SELL
+        if action_scalar in (0, 1, 2, 3, 4):
+            mapped = _RL_TO_DRL.get(action_scalar, 0)
+        else:
+            # Unknown action space size — pass through clamped to [0, 2].
+            mapped = max(0, min(2, action_scalar))
+        return mapped, {"confidence": 0.7 if deterministic else 0.5}
 
     # ------------------------------------------------------------------
     # Persistence

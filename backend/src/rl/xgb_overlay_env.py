@@ -61,7 +61,15 @@ class XGBOverlayEnv:
         inner: MantisRLEnvironment,
         xgb_signals: np.ndarray,
         config: RLConfig | None = None,
+        signal_encoding: str = "signalclass",
     ) -> None:
+        """C2-DRL fix: explicit ``signal_encoding`` param. ``"signalclass"``
+        (default, XGBoost legacy: 0=SELL, 1=HOLD, 2=BUY) keeps existing
+        callers working. ``"drl"`` (DRLEnsembleSignal: 0=HOLD, 1=BUY,
+        2=SELL) is auto-remapped to the SignalClass shape internally so
+        the baseline P&L math stays consistent. Phase 5 PoC ran with
+        encoding mismatch — adding the explicit param makes future Phase
+        5-bis attempts immune to silent inversion."""
         self._inner = inner
         self._config = config or inner.config
         self._reward_calc = MantisRewardCalculator(self._config)
@@ -70,7 +78,18 @@ class XGBOverlayEnv:
             raise ValueError(
                 f"xgb_signals length {len(xgb_signals)} != n_candles {inner.n_candles}"
             )
-        self._xgb_signals = np.asarray(xgb_signals, dtype=np.int32)
+        sigs = np.asarray(xgb_signals, dtype=np.int32)
+        encoding = signal_encoding.lower()
+        if encoding not in {"signalclass", "drl"}:
+            raise ValueError(
+                f"signal_encoding={signal_encoding!r} must be "
+                f"'signalclass' or 'drl'"
+            )
+        if encoding == "drl":
+            # 0=HOLD, 1=BUY, 2=SELL → SignalClass 1=HOLD, 2=BUY, 0=SELL
+            _DRL_TO_SC = np.array([1, 2, 0], dtype=np.int32)
+            sigs = _DRL_TO_SC[np.clip(sigs, 0, 2)]
+        self._xgb_signals = sigs
 
         # Pre-compute per-bar baseline step / cumulative P&L (fraction).
         self._xgb_step_pnl, self._xgb_cum_pnl = self._compute_baseline_pnl(

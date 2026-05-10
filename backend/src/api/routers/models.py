@@ -517,9 +517,10 @@ async def retrain_all(
 
     orch = getattr(request.app.state, "training_orchestrator", None)
     if orch is None:
-        return success_response(
-            {"message": "Training orchestrator non disponibile"}, status_code=503
-        )
+        # H2-API fix: success_response only accepts (data) — passing
+        # status_code= raises TypeError → 500. Use error_response for
+        # actual 503 semantics.
+        return error_response("Training orchestrator non disponibile", 503)
 
     if orch._running:
         return success_response({"message": "Training gia in corso"})

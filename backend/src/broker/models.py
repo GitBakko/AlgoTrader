@@ -120,7 +120,9 @@ class SessionTokens(BaseModel):
 
     cst: str
     security_token: str = Field(alias="x_security_token")
-    created_at: datetime = Field(default_factory=datetime.now)
+    # M3-BROKER fix: tz-aware default so expiry comparisons against
+    # tz-aware datetime.now(UTC) don't TypeError silently in tests.
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 # ===== Market Data Models =====

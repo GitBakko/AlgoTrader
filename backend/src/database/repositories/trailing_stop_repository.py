@@ -6,7 +6,7 @@ Enables persistence and recovery of trailing stop manager state.
 from decimal import Decimal
 
 from loguru import logger
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.broker.models import Direction
@@ -130,7 +130,10 @@ class TrailingStopRepository:
 
     async def bulk_delete(self, deal_ids: list[str]) -> int:
         """
-        Delete multiple trailing stop states.
+        Delete multiple trailing stop states in a single statement.
+
+        M1-DB fix: was a per-id SELECT+DELETE loop (N+1 query). Now a
+        single ``DELETE WHERE deal_id IN (...)`` round-trip.
 
         Args:
             deal_ids: List of position deal identifiers
@@ -138,8 +141,12 @@ class TrailingStopRepository:
         Returns:
             Number of states deleted
         """
-        count = 0
-        for deal_id in deal_ids:
-            if await self.delete_by_deal_id(deal_id):
-                count += 1
-        return count
+        if not deal_ids:
+            return 0
+        stmt = (
+            delete(TrailingStopState)
+            .where(TrailingStopState.deal_id.in_(deal_ids))
+        )
+        result = await self.session.execute(stmt)
+        await self.session.flush()
+        return int(result.rowcount or 0)

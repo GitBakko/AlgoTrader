@@ -4,6 +4,7 @@ Handles user login, registration, and profile retrieval.
 """
 
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
@@ -159,8 +160,13 @@ async def register(
     """
     Register a new user.
 
+    C2-API security fix: any non-VIEWER role_name supplied by an
+    unauthenticated request is silently downgraded to VIEWER.
+    Privilege escalation via self-registration is now impossible —
+    higher roles must be granted by an ADMIN through a separate flow.
+
     Args:
-        request: FastAPI request (for rate limiting)
+        request: FastAPI request (for rate limiting + auth probe)
         body: Registration data (username, email, password, role)
         session: Database session
 
@@ -168,8 +174,31 @@ async def register(
         Created user information
 
     Raises:
-        HTTPException: 400 if username/email already exists or role invalid
+        HTTPException: 400 if username/email already exists
     """
+    # Probe for an authenticated ADMIN caller. Any other case (no token,
+    # invalid token, non-ADMIN role) silently forces VIEWER.
+    requested_role = (body.role_name or "VIEWER").upper()
+    effective_role = "VIEWER"
+    if requested_role != "VIEWER":
+        try:
+            from src.auth.dependencies import get_current_user as _get_user  # noqa: PLC0415
+
+            current = await _get_user(request, session)
+            current_role = await RBACManager(session).get_role_by_id(current.role_id)
+            if current_role and current_role.name == "ADMIN":
+                effective_role = requested_role
+            else:
+                logger.warning(
+                    f"Register: role downgrade {requested_role}→VIEWER "
+                    f"(caller user_id={current.id} role={getattr(current_role,'name',None)})"
+                )
+        except Exception:
+            logger.warning(
+                f"Register: role downgrade {requested_role}→VIEWER "
+                f"(unauthenticated request)"
+            )
+
     # Check if username already exists
     stmt = select(User).where(User.username == body.username)
     result = await session.execute(stmt)
@@ -190,11 +219,11 @@ async def register(
 
     # Get role
     rbac = RBACManager(session)
-    role = await rbac.get_role_by_name(body.role_name)
+    role = await rbac.get_role_by_name(effective_role)
     if not role:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid role: {body.role_name}. Must be one of: VIEWER, TRADER, ADMIN",
+            detail=f"Invalid role: {effective_role}. Must be one of: VIEWER, TRADER, ADMIN",
         )
 
     # Create user
@@ -211,7 +240,7 @@ async def register(
     await session.commit()
     await session.refresh(user)
 
-    logger.info(f"New user registered: {user.username} with role {body.role_name}")
+    logger.info(f"New user registered: {user.username} with role {effective_role}")
 
     # Get role name for response
     return success_response(
@@ -487,15 +516,20 @@ async def upload_avatar(
 @router.get("/avatar/{user_id}")
 async def get_avatar(
     user_id: int,
+    current_user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ):
     """
     Retrieve user avatar image.
 
-    Returns the avatar image file with appropriate caching headers.
+    C3-API security fix: now requires auth + verifies the resolved file
+    path stays inside ``AVATAR_STORAGE_DIR`` (path-traversal containment).
+    MIME type detected via stdlib ``mimetypes`` instead of hard-coded
+    ``image/jpeg`` (M5-API).
 
     Args:
         user_id: User ID
+        current_user: Authenticated caller (any role)
         session: Database session
 
     Returns:
@@ -514,11 +548,36 @@ async def get_avatar(
     if not file_path:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File avatar non trovato")
 
+    # Path-traversal containment: resolve symlinks + verify the file is
+    # under AVATAR_STORAGE_DIR. Refuse to serve anything outside.
+    import mimetypes  # noqa: PLC0415
+    from src.utils.avatar_handler import AVATAR_STORAGE_DIR  # noqa: PLC0415
+
+    try:
+        resolved = Path(file_path).resolve()
+        avatar_root = AVATAR_STORAGE_DIR.resolve()
+        if not resolved.is_relative_to(avatar_root):
+            logger.warning(
+                f"avatar serve refused — path {resolved} outside {avatar_root}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="File avatar non trovato",
+            )
+    except (RuntimeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="File avatar non trovato"
+        )
+
+    media_type, _ = mimetypes.guess_type(str(resolved))
+    if media_type is None:
+        media_type = "application/octet-stream"
+
     # Return file with caching headers (24h cache)
     return FileResponse(
-        file_path,
-        media_type="image/jpeg",
-        headers={"Cache-Control": "public, max-age=86400"},  # 24 hours
+        resolved,
+        media_type=media_type,
+        headers={"Cache-Control": "private, max-age=86400"},  # 24 hours
     )
 
 

@@ -10,7 +10,7 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
@@ -124,6 +124,15 @@ async def lifespan(app: FastAPI):
     logger.info(f"Using {'DEMO' if settings.use_demo else 'LIVE'} Capital.com account")
     logger.info(f"Trading Enabled: {settings.trading_enabled}")
     logger.info(f"Paper Trading: {settings.paper_trading}")
+
+    # C1-API LIVE-mode start guard: refuse to boot a non-DEMO backend
+    # without auth required. Prevents an accidental LIVE deploy from
+    # exposing emergency-stop and order-modify endpoints anonymously.
+    if not settings.use_demo and not getattr(settings, "auth_required", False):
+        raise RuntimeError(
+            "LIVE mode requires AUTH_REQUIRED=true. Refusing to start "
+            "with anonymous access to trading control surface."
+        )
 
     # Initialize shutdown flag
     app.state.is_shutting_down = False
@@ -605,22 +614,21 @@ async def lifespan(app: FastAPI):
 
 
 async def shutdown_handler(signum, frame, app_instance):
-    """Handle graceful shutdown on SIGTERM/SIGINT."""
+    """Handle graceful shutdown on SIGTERM/SIGINT.
+
+    H3-API fix: only set the shutdown flag and close paper positions
+    (which the lifespan handler doesn't touch). Broker WS disconnect,
+    broker session close, and DB close are all owned by the lifespan
+    yield path — running them here too produced double-close races
+    that left background tasks dangling on RuntimeError.
+    """
     logger.warning(f"Received signal {signum}, initiating graceful shutdown...")
 
-    # 1. Stop accepting new requests
+    # 1. Stop accepting new requests — lifespan checks this flag
     app_instance.state.is_shutting_down = True
     logger.info("Stopped accepting new requests")
 
-    # 2. Close WebSocket connections
-    if hasattr(app_instance.state, "broker_ws_client") and app_instance.state.broker_ws_client:
-        try:
-            await app_instance.state.broker_ws_client.disconnect()
-            logger.info("WebSocket connections closed")
-        except Exception as e:
-            logger.error(f"WebSocket disconnect failed: {e}")
-
-    # 3. Stop paper trading loop
+    # 2. Stop paper trading loop (lifespan does NOT do this in time)
     if hasattr(app_instance.state, "paper_loop") and app_instance.state.paper_loop.is_running:
         try:
             app_instance.state.paper_loop.stop()
@@ -628,7 +636,8 @@ async def shutdown_handler(signum, frame, app_instance):
         except Exception as e:
             logger.error(f"Paper loop stop failed: {e}")
 
-    # 4. Close open positions (paper mode only)
+    # 3. Close open paper positions (PAPER only — lifespan never closes
+    # paper positions, this is the right home for it)
     if settings.execution_mode == "PAPER":
         try:
             open_positions = []
@@ -651,22 +660,9 @@ async def shutdown_handler(signum, frame, app_instance):
         except Exception as e:
             logger.error(f"Position closure failed: {e}")
 
-    # 5. Disconnect broker
-    if hasattr(app_instance.state, "broker_client") and app_instance.state.broker_client:
-        try:
-            await app_instance.state.broker_client.close()
-            logger.info("Broker disconnected")
-        except Exception as e:
-            logger.error(f"Broker disconnect failed: {e}")
-
-    # 6. Close database connections
-    try:
-        await DatabaseManager.close()
-        logger.info("Database connections closed")
-    except Exception as e:
-        logger.error(f"Database close failed: {e}")
-
-    logger.success("Graceful shutdown complete")
+    # NOTE: WS disconnect, broker.close(), DatabaseManager.close() are
+    # owned by the lifespan yield path — DO NOT duplicate them here.
+    logger.success("Signal-handler pre-shutdown done; lifespan will finalise")
     sys.exit(0)
 
 
@@ -853,25 +849,46 @@ async def root():
 
 
 # ===== API Routers =====
+# C1-API audit fix: when `AUTH_REQUIRED=true`, every router below the
+# auth router itself gets a global `Depends(get_current_user)` so all
+# state-changing endpoints reject anonymous requests. LIVE-mode start
+# guard (lifespan) refuses to boot in non-DEMO mode without auth.
+from src.auth.dependencies import get_current_user as _gcu
+
+_auth_deps = (
+    [Depends(_gcu)]
+    if getattr(settings, "auth_required", False)
+    else None
+)
+if _auth_deps:
+    logger.warning(
+        "🔒 AUTH_REQUIRED=true — all non-/auth endpoints require Bearer token"
+    )
+else:
+    logger.warning(
+        "⚠️  AUTH_REQUIRED=false — API endpoints accept anonymous requests "
+        "(only safe for DEMO/dev). Flip AUTH_REQUIRED=true before LIVE."
+    )
+
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
-app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
-app.include_router(positions.router, prefix="/api/positions", tags=["Positions"])
-app.include_router(signals.router, prefix="/api/signals", tags=["Signals"])
-app.include_router(markets.router, prefix="/api/markets", tags=["Markets"])
-app.include_router(news.router, prefix="/api/news", tags=["News"])
-app.include_router(backtest.router, prefix="/api/backtest", tags=["Backtest"])
-app.include_router(strategy.router, prefix="/api/strategy", tags=["Strategy"])
-app.include_router(models.router, prefix="/api/models", tags=["Models"])
-app.include_router(system.router, prefix="/api/system", tags=["System"])
-app.include_router(trading.router, prefix="/api/trading", tags=["Trading"])
-app.include_router(export.router, prefix="/api/export", tags=["Export"])
-app.include_router(monitoring.router, prefix="/api", tags=["Monitoring"])
-app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
-app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
-app.include_router(sil.router, prefix="/api/sil", tags=["SIL"])
-app.include_router(vision.router, prefix="/api/vision", tags=["Vision AI"])
-app.include_router(drl.router, prefix="/api/drl", tags=["DRL Ensemble"])
-app.include_router(agents.router, prefix="/api/agents", tags=["Agents"])
+app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"], dependencies=_auth_deps)
+app.include_router(positions.router, prefix="/api/positions", tags=["Positions"], dependencies=_auth_deps)
+app.include_router(signals.router, prefix="/api/signals", tags=["Signals"], dependencies=_auth_deps)
+app.include_router(markets.router, prefix="/api/markets", tags=["Markets"], dependencies=_auth_deps)
+app.include_router(news.router, prefix="/api/news", tags=["News"], dependencies=_auth_deps)
+app.include_router(backtest.router, prefix="/api/backtest", tags=["Backtest"], dependencies=_auth_deps)
+app.include_router(strategy.router, prefix="/api/strategy", tags=["Strategy"], dependencies=_auth_deps)
+app.include_router(models.router, prefix="/api/models", tags=["Models"], dependencies=_auth_deps)
+app.include_router(system.router, prefix="/api/system", tags=["System"], dependencies=_auth_deps)
+app.include_router(trading.router, prefix="/api/trading", tags=["Trading"], dependencies=_auth_deps)
+app.include_router(export.router, prefix="/api/export", tags=["Export"], dependencies=_auth_deps)
+app.include_router(monitoring.router, prefix="/api", tags=["Monitoring"], dependencies=_auth_deps)
+app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"], dependencies=_auth_deps)
+app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"], dependencies=_auth_deps)
+app.include_router(sil.router, prefix="/api/sil", tags=["SIL"], dependencies=_auth_deps)
+app.include_router(vision.router, prefix="/api/vision", tags=["Vision AI"], dependencies=_auth_deps)
+app.include_router(drl.router, prefix="/api/drl", tags=["DRL Ensemble"], dependencies=_auth_deps)
+app.include_router(agents.router, prefix="/api/agents", tags=["Agents"], dependencies=_auth_deps)
 
 # ===== WebSocket Endpoints =====
 app.websocket("/ws/prices")(prices_endpoint)

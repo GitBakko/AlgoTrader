@@ -17,6 +17,12 @@ export class WebSocketService {
   private readonly MAX_RECONNECT_DELAY = 60000;
   private readonly BASE_DELAY = 1000;
 
+  /** H1-FE fix: when true, every onclose handler skips its reconnect
+   *  scheduler. Set during `disconnect()` (e.g., on logout) so the
+   *  resulting close events don't immediately re-open all 4 channels
+   *  under the logged-out session. Each `connectX()` resets to false. */
+  private intentionalDisconnect = false;
+
   readonly prices = signal<Record<string, PriceTick>>({});
   readonly lastTrade = signal<TradeEvent | null>(null);
   readonly connected = signal(false);
@@ -58,6 +64,7 @@ export class WebSocketService {
 
   connectPrices(): void {
     if (this.priceWs) return;
+    this.intentionalDisconnect = false;
     const url = `${environment.wsUrl}/ws/prices`;
     this.priceWs = new WebSocket(url);
 
@@ -119,6 +126,7 @@ export class WebSocketService {
     this.priceWs.onclose = () => {
       this.connected.set(false);
       this.priceWs = null;
+      if (this.intentionalDisconnect) return;
       const delay = this.getReconnectDelay(this.priceReconnectAttempts);
       this.priceReconnectAttempts++;
       setTimeout(() => this.connectPrices(), delay);
@@ -131,6 +139,7 @@ export class WebSocketService {
 
   connectTrades(): void {
     if (this.tradeWs) return;
+    this.intentionalDisconnect = false;
     const url = `${environment.wsUrl}/ws/trades`;
     this.tradeWs = new WebSocket(url);
 
@@ -154,6 +163,7 @@ export class WebSocketService {
 
     this.tradeWs.onclose = () => {
       this.tradeWs = null;
+      if (this.intentionalDisconnect) return;
       const delay = this.getReconnectDelay(this.tradeReconnectAttempts);
       this.tradeReconnectAttempts++;
       setTimeout(() => this.connectTrades(), delay);
@@ -166,6 +176,7 @@ export class WebSocketService {
 
   connectTraining(): void {
     if (this.trainingWs) return;
+    this.intentionalDisconnect = false;
     const url = `${environment.wsUrl}/ws/training`;
     this.trainingWs = new WebSocket(url);
 
@@ -184,6 +195,7 @@ export class WebSocketService {
 
     this.trainingWs.onclose = () => {
       this.trainingWs = null;
+      if (this.intentionalDisconnect) return;
       const delay = this.getReconnectDelay(this.trainingReconnectAttempts);
       this.trainingReconnectAttempts++;
       setTimeout(() => this.connectTraining(), delay);
@@ -202,6 +214,7 @@ export class WebSocketService {
    */
   connectMarkets(): void {
     if (this.marketsWs) return;
+    this.intentionalDisconnect = false;
     const url = `${environment.wsUrl}/ws/markets`;
     this.marketsWs = new WebSocket(url);
 
@@ -223,6 +236,7 @@ export class WebSocketService {
 
     this.marketsWs.onclose = () => {
       this.marketsWs = null;
+      if (this.intentionalDisconnect) return;
       const delay = this.getReconnectDelay(this.marketsReconnectAttempts);
       this.marketsReconnectAttempts++;
       setTimeout(() => this.connectMarkets(), delay);
@@ -234,6 +248,11 @@ export class WebSocketService {
   }
 
   disconnect(): void {
+    // H1-FE fix: flag the disconnect as intentional BEFORE calling
+    // .close() so the synchronous onclose callbacks bail out without
+    // scheduling a reconnect under the logged-out session. Each
+    // connectX() resets the flag back to false on entry.
+    this.intentionalDisconnect = true;
     this.priceWs?.close();
     this.tradeWs?.close();
     this.trainingWs?.close();
@@ -249,5 +268,6 @@ export class WebSocketService {
     this.priceReconnectAttempts = 0;
     this.tradeReconnectAttempts = 0;
     this.trainingReconnectAttempts = 0;
+    this.marketsReconnectAttempts = 0;
   }
 }

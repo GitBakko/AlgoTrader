@@ -104,6 +104,12 @@ class RBACManager:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_role_by_id(self, role_id: int) -> Role | None:
+        """Get role by primary-key id."""
+        stmt = select(Role).where(Role.id == role_id)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def get_permission(self, resource: str, action: str) -> Permission | None:
         """
         Get permission by resource and action.

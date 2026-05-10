@@ -24,7 +24,14 @@ def _success(data):
 
 
 def _error(msg: str, status: int = 400):
-    return {"success": False, "error": msg}
+    """H1-API fix: return JSONResponse with the requested status code so
+    the prior plain-dict return (HTTP 200 regardless of `status`) stops
+    masking 403/503 as success."""
+    from fastapi.responses import JSONResponse  # noqa: PLC0415
+    return JSONResponse(
+        status_code=status,
+        content={"success": False, "error": msg},
+    )
 
 
 @router.get("/status")

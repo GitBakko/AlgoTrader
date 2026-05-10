@@ -50,16 +50,23 @@ class ConnectionManager:
         logger.info(f"WebSocket disconnected from channel: {channel}")
 
     async def broadcast(self, channel: str, data: dict) -> None:
-        """Send data to all connections on a channel."""
+        """Send data to all connections on a channel.
+
+        H5-API fix: snapshot the connection list at the start so a
+        cooperative-async ``connect()`` interleaved between iteration
+        and the dead-cleanup rebuild can't drop the new client.
+        """
         if channel not in self._connections:
             return
+        # Snapshot — keep iteration immune to concurrent connect/disconnect.
+        connections = list(self._connections.get(channel, []))
         dead = []
-        for ws in self._connections[channel]:
+        for ws in connections:
             try:
                 await ws.send_json(data)
             except Exception:
                 dead.append(ws)
-        # Clean up dead connections in a single pass
+        # Clean up dead connections in a single pass against the live list.
         if dead:
             dead_set = {id(ws) for ws in dead}
             self._connections[channel] = [

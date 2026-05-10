@@ -107,22 +107,49 @@ async def list_closed_positions(
         epic=epic,
     )
 
-    # Compute aggregates from ALL matching positions (not just current page)
-    all_positions, _ = await position_repo.get_closed_positions(
-        limit=10000,
-        offset=0,
-        date_from=from_dt,
-        date_to=to_dt,
-        close_reason=close_reason,
-        epic=epic,
+    # H4-API fix: aggregate via SQL (single SUM/COUNT round-trip) instead
+    # of pulling up to 10000 rows per page-load. Old path was a DoS vector
+    # against Postgres on every dashboard refresh.
+    from sqlalchemy import case, func, select  # noqa: PLC0415
+    from src.database.models import Position  # noqa: PLC0415
+
+    agg_stmt = (
+        select(
+            func.coalesce(func.sum(Position.profit_loss), 0).label("total_pnl"),
+            func.coalesce(
+                func.sum(case((Position.profit_loss > 0, 1), else_=0)), 0
+            ).label("win_count"),
+            func.coalesce(
+                func.sum(case((Position.profit_loss <= 0, 1), else_=0)), 0
+            ).label("loss_count"),
+            func.coalesce(
+                func.avg(case((Position.profit_loss > 0, Position.profit_loss))), 0
+            ).label("avg_win"),
+            func.coalesce(
+                func.avg(case((Position.profit_loss <= 0, Position.profit_loss))), 0
+            ).label("avg_loss"),
+            func.count(Position.id).label("counted"),
+        )
+        .where(Position.status == "CLOSED")
+        .where(Position.close_reason != "UNRECONCILED")
+        .where(Position.profit_loss.is_not(None))
     )
-    pnl_values = [
-        float(p.profit_loss)
-        for p in all_positions
-        if p.profit_loss is not None and p.close_reason != "UNRECONCILED"
-    ]
-    wins = [v for v in pnl_values if v > 0]
-    losses = [v for v in pnl_values if v <= 0]
+    if from_dt:
+        naive_from = from_dt.replace(tzinfo=None) if from_dt.tzinfo else from_dt
+        agg_stmt = agg_stmt.where(Position.closed_at >= naive_from)
+    if to_dt:
+        naive_to = to_dt.replace(tzinfo=None) if to_dt.tzinfo else to_dt
+        agg_stmt = agg_stmt.where(Position.closed_at <= naive_to)
+    if close_reason:
+        agg_stmt = agg_stmt.where(Position.close_reason == close_reason)
+    if epic:
+        agg_stmt = agg_stmt.where(Position.epic == epic)
+
+    agg_row = (await position_repo.session.execute(agg_stmt)).one()
+    counted = int(agg_row.counted or 0)
+    win_count = int(agg_row.win_count or 0)
+    loss_count = int(agg_row.loss_count or 0)
+    win_rate = round(win_count / counted, 4) if counted else 0
 
     return success_response(
         {
@@ -131,12 +158,12 @@ async def list_closed_positions(
             "page": page,
             "page_size": page_size,
             "aggregates": {
-                "total_pnl": round(sum(pnl_values), 2) if pnl_values else 0,
-                "win_count": len(wins),
-                "loss_count": len(losses),
-                "win_rate": round(len(wins) / len(pnl_values), 4) if pnl_values else 0,
-                "avg_win": round(sum(wins) / len(wins), 2) if wins else 0,
-                "avg_loss": round(sum(losses) / len(losses), 2) if losses else 0,
+                "total_pnl": round(float(agg_row.total_pnl or 0), 2),
+                "win_count": win_count,
+                "loss_count": loss_count,
+                "win_rate": win_rate,
+                "avg_win": round(float(agg_row.avg_win or 0), 2),
+                "avg_loss": round(float(agg_row.avg_loss or 0), 2),
             },
         }
     )

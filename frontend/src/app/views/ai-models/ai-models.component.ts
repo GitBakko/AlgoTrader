@@ -496,7 +496,13 @@ export class AiModelsComponent implements OnInit {
         this.trading.trainingStatus.set(update);
       }
     });
-    this.destroyRef.onDestroy(() => this.stopPolling());
+    this.destroyRef.onDestroy(() => {
+      this.stopPolling();
+      // L1-FE: clear any in-flight setTimeout fires so we don't write
+      // signals after component destroy.
+      for (const t of this._pendingTimers) clearTimeout(t);
+      this._pendingTimers.clear();
+    });
   }
 
   readonly activeTab = signal<'models' | 'training'>('models');
@@ -613,19 +619,28 @@ export class AiModelsComponent implements OnInit {
       this.trading.startTraining();
     }
     this.startPolling();
-    // Refresh status quickly after start, then clear loading flag
-    setTimeout(() => {
+    // L1-FE fix: track timer so destroy clears it before signal write.
+    const tid = setTimeout(() => {
       this.trading.loadTrainingStatus();
       this.retrainStarting.set(false);
+      this._pendingTimers.delete(tid);
     }, 1500);
+    this._pendingTimers.add(tid);
   }
 
   retrainSingle(epic: string): void {
     this.trading.startTrainingSingle(epic);
     this.startPolling();
-    // Refresh models list after a delay to pick up hot-reloaded model
-    setTimeout(() => this.trading.loadModels(), 5000);
+    // L1-FE fix: track timer so destroy clears it.
+    const tid = setTimeout(() => {
+      this.trading.loadModels();
+      this._pendingTimers.delete(tid);
+    }, 5000);
+    this._pendingTimers.add(tid);
   }
+
+  /** L1-FE: timers awaiting fire — cleared in destroyRef.onDestroy. */
+  private readonly _pendingTimers = new Set<ReturnType<typeof setTimeout>>();
 
   startRetrainWithConfig(): void {
     const epics = this.configSelectedEpics().length > 0 ? this.configSelectedEpics() : undefined;

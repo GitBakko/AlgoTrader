@@ -36,10 +36,15 @@ class TradeJournalNoteRepository(BaseRepository[TradeJournalNote]):
         return await self.create(note)
 
     async def delete_note(self, epic: str, signal_timestamp: str) -> bool:
-        """Delete a note for a signal."""
+        """Delete a note for a signal.
+
+        M3-DB fix: flush after delete so a same-session re-query doesn't
+        see the stale row.
+        """
         existing = await self.get_by_signal(epic, signal_timestamp)
         if existing:
             await self.session.delete(existing)
+            await self.session.flush()
             return True
         return False
 

@@ -138,7 +138,13 @@ export class AuthService {
   }
 
   /**
-   * Clear all authentication data
+   * Clear all authentication data.
+   * C3-FE: also resets the auth-interceptor module-level refresh state so
+   * a stale `isRefreshing=true` or queued subscribers from the prior
+   * session don't poison the next login.
+   * H1-FE / H2-FE: tear down WS reconnect loops on logout. Lazy
+   * `inject` so DI sees Auth-clear is the only entry point (no
+   * circular import via top-level `import`).
    */
   clearAuth(): void {
     this.authState.set({
@@ -149,6 +155,38 @@ export class AuthService {
     localStorage.removeItem(this.TOKEN_KEY);
     localStorage.removeItem(this.USER_KEY);
     localStorage.removeItem(this.REFRESH_TOKEN_KEY);
+    // C3-FE interceptor reset
+    import('../interceptors/auth.interceptor').then((m) => {
+      try {
+        m.resetAuthInterceptorState();
+      } catch {
+        /* noop */
+      }
+    });
+    // H1-FE WS disconnect
+    try {
+      this._wsLazy?.disconnect();
+    } catch {
+      /* noop */
+    }
+    // H2-FE notification WS disconnect
+    try {
+      this._notifLazy?.disconnectWs();
+    } catch {
+      /* noop */
+    }
+  }
+
+  /** Lazily-resolved peers. AuthService can't `inject(WebSocketService)`
+   *  at construction time because that would form a DI cycle through
+   *  the auth interceptor, but we can fetch them on first call after
+   *  the app has fully bootstrapped. */
+  private _wsLazy: { disconnect(): void } | null = null;
+  private _notifLazy: { disconnectWs(): void } | null = null;
+  /** Wired by AppComponent during bootstrap. */
+  registerLogoutTeardown(args: { ws?: { disconnect(): void }; notif?: { disconnectWs(): void } }): void {
+    if (args.ws) this._wsLazy = args.ws;
+    if (args.notif) this._notifLazy = args.notif;
   }
 
   /**

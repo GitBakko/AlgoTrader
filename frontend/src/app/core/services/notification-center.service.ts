@@ -1,10 +1,16 @@
-import { Injectable, inject, signal, computed, OnDestroy } from '@angular/core';
+import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { ApiResponse, AppNotification, NotificationListResponse } from '../models';
 
+/**
+ * H2-FE fix: removed `OnDestroy` — Angular never calls `ngOnDestroy` on
+ * root-scoped services so the previous handler was unreachable. The WS
+ * is now torn down explicitly via `disconnectWs()` called from
+ * `AuthService.clearAuth()` so the reconnect-loop stops on logout.
+ */
 @Injectable({ providedIn: 'root' })
-export class NotificationCenterService implements OnDestroy {
+export class NotificationCenterService {
   private readonly http = inject(HttpClient);
   private readonly apiUrl = `${environment.apiUrl}/api/notifications`;
   private readonly wsUrl = `${environment.wsUrl}/ws/notifications`;
@@ -38,6 +44,9 @@ export class NotificationCenterService implements OnDestroy {
   private reconnectAttempts = 0;
   private readonly MAX_RECONNECT_DELAY = 60000;
   private readonly BASE_DELAY = 2000;
+  /** H2-FE: when true, the onclose handler skips its reconnect timer
+   *  so logout closes the WS cleanly. Reset on each `connectWs()`. */
+  private intentionalDisconnect = false;
 
   /** Initialize: load from REST + connect WS */
   init(): void {
@@ -134,6 +143,7 @@ export class NotificationCenterService implements OnDestroy {
   /** Connect to /ws/notifications for real-time push */
   private connectWs(): void {
     if (this.ws) return;
+    this.intentionalDisconnect = false;
     this.ws = new WebSocket(this.wsUrl);
 
     this.ws.onopen = () => {
@@ -157,6 +167,7 @@ export class NotificationCenterService implements OnDestroy {
 
     this.ws.onclose = () => {
       this.ws = null;
+      if (this.intentionalDisconnect) return;
       const delay = Math.min(
         this.BASE_DELAY * Math.pow(2, this.reconnectAttempts),
         this.MAX_RECONNECT_DELAY
@@ -170,8 +181,11 @@ export class NotificationCenterService implements OnDestroy {
     };
   }
 
-  ngOnDestroy(): void {
+  /** H2-FE public teardown — call from AuthService.clearAuth(). */
+  disconnectWs(): void {
+    this.intentionalDisconnect = true;
     this.ws?.close();
     this.ws = null;
+    this.reconnectAttempts = 0;
   }
 }

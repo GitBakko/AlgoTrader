@@ -513,25 +513,20 @@ export class PositionsComponent implements OnInit {
     Math.max(1, Math.ceil(this.trading.closedTotal() / this.pageSize))
   );
 
-  // Calculate live P&L + current price using WebSocket prices
+  // Calculate live P&L + current price using WebSocket prices.
+  // M1-FE fix: Trading Invariant #2 — no `(price - level) * size` fallback
+  // when UPL is null. Display 0 P&L until broker UPL becomes available.
   readonly livePositions = computed(() => {
     const positions = this.trading.paperPositions();
     const prices = this.ws.prices();
     return positions.map(pos => {
-      if (pos.upl != null) {
-        const tick = prices[pos.epic];
-        const currentPrice = tick ? (pos.direction === 'BUY' ? tick.bid : tick.offer) : null;
-        return { ...pos, live_pnl: pos.upl, current_price: currentPrice };
-      }
       const tick = prices[pos.epic];
-      if (!tick) return { ...pos, live_pnl: 0, current_price: null as number | null };
-      const currentPrice = pos.direction === 'BUY' ? tick.bid : tick.offer;
-      const diff = pos.direction === 'BUY' ? currentPrice - pos.level : pos.level - currentPrice;
-      return {
-        ...pos,
-        live_pnl: Math.round(diff * pos.size * 100) / 100,
-        current_price: currentPrice,
-      };
+      const currentPrice = tick
+        ? pos.direction === 'BUY' ? tick.bid : tick.offer
+        : null;
+      // Broker-authoritative UPL only — anything else is fabricated.
+      const live_pnl = pos.upl != null ? pos.upl : 0;
+      return { ...pos, live_pnl, current_price: currentPrice };
     });
   });
 

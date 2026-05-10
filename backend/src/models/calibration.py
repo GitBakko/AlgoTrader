@@ -105,7 +105,7 @@ class ConfidenceCalibrator:
         if not self._fitted:
             raise RuntimeError("Calibrator not fitted. Call fit() first.")
 
-        y_proba.shape[0]
+        # M4-MODELS fix: removed dead `y_proba.shape[0]` expression.
         calibrated = np.zeros_like(y_proba)
 
         for cls in range(self.n_classes):

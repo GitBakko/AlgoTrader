@@ -477,12 +477,21 @@ export class PaperTradingComponent implements OnInit {
    *  rather than introducing a parallel drawer just for the heatmap. */
   onHeatmapCellClick(cell: HeatmapCell): void {
     if (cell.state === 'live') {
-      // If the epic has an open position, surface the position drawer instead
-      // so the user lands on the live trade context, not the signal that opened it.
-      const live = this.trading.paperPositions().find((p) => p.epic === cell.epic);
-      if (live) {
-        this.selectedPositionId.set(live.deal_id);
-        return;
+      // C1-FE fix: route by `cell.liveDealId` (carried from heatmap's
+      // liveDealByEpic) instead of `find(p.epic === cell.epic)`. When
+      // two rapid-fire positions exist on the same epic (close not yet
+      // reconciled + new signal executing), epic-only match returns the
+      // first match — which may be the closing trade — and the drawer
+      // opens on the wrong position (Bug class `dea2a29`).
+      const targetDealId = cell.liveDealId;
+      if (targetDealId) {
+        const live = this.trading
+          .paperPositions()
+          .find((p) => p.deal_id === targetDealId);
+        if (live) {
+          this.selectedPositionId.set(live.deal_id);
+          return;
+        }
       }
     }
     // Fall back to the global signal-audit drawer (latest by epic).
@@ -575,11 +584,15 @@ function adaptPosition(
   const stopLoss = p.stop_level ?? p.level;
   const takeProfit = p.profit_level ?? p.level;
   const upl = p.upl;
-  const livePnl = upl != null
-    ? upl
-    : (direction === 'BUY' ? (current - p.level) : (p.level - current)) * p.size;
+  // C2-FE fix: Trading Invariant #2 — no `(current - level) * size`
+  // arithmetic P&L fallback. UPL must come from the broker. When null
+  // (first poll cycle, broker hiccup) display 0/dash rather than
+  // fabricate a number that ignores spreads / multipliers / FX.
+  const livePnl = upl != null ? upl : 0;
   const denom = p.level || 1;
-  const pnlPct = ((current - p.level) / denom) * 100 * (direction === 'BUY' ? 1 : -1);
+  const pnlPct = upl != null
+    ? ((current - p.level) / denom) * 100 * (direction === 'BUY' ? 1 : -1)
+    : 0;
   const openedMs = p.opened_at ? Date.parse(p.opened_at) : nowMs;
   const ageSec = Math.max(0, Math.floor((nowMs - openedMs) / 1000));
   const risk = Math.abs(p.level - stopLoss) || 1;
