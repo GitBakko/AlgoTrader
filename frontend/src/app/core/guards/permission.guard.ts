@@ -24,8 +24,13 @@ export const permissionGuard: CanActivateFn = (route, state) => {
   const action = route.data['action'] as string | undefined;
 
   if (!resource || !action) {
-    console.error('[PermissionGuard] No permission specified in route data');
-    return true; // Allow if no permission specified (fallback)
+    // L1-FE-AUDIT: was fail-open (return true) — a developer adding
+    // `canActivate: [permissionGuard]` without route data silently
+    // gained unrestricted access. Now fail-closed: deny + redirect to
+    // /403 so the misconfiguration is visible.
+    console.error('[PermissionGuard] Route missing resource/action — denying access');
+    router.navigate(['/403']);
+    return false;
   }
 
   // Check if user has the required permission

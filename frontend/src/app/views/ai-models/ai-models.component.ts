@@ -490,10 +490,12 @@ export class AiModelsComponent implements OnInit {
 
   constructor() {
     this.ws.connectTraining();
+    // H6-FE-AUDIT: defer signal write via queueMicrotask to avoid the
+    // documented infinite-loop pattern (history-tab bug 1cdd48f).
     effect(() => {
       const update = this.ws.trainingUpdate();
       if (update) {
-        this.trading.trainingStatus.set(update);
+        queueMicrotask(() => this.trading.trainingStatus.set(update));
       }
     });
     this.destroyRef.onDestroy(() => {

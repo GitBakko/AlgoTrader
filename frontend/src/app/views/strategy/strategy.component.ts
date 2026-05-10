@@ -8,6 +8,7 @@ import {
   FormControlDirective, BadgeComponent
 } from '@coreui/angular';
 import { TradingService } from '../../core/services/trading.service';
+import { ToastService } from '../../shared/services/toast.service';
 import { StrategyConfig } from '../../core/models';
 
 @Component({
@@ -110,6 +111,7 @@ import { StrategyConfig } from '../../core/models';
 export class StrategyComponent implements OnInit {
   private readonly trading = inject(TradingService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
   readonly configs = this.trading.strategyConfigs;
   readonly limits = this.trading.riskLimitsData;
   readonly allocation = this.trading.allocationData;
@@ -125,13 +127,22 @@ export class StrategyComponent implements OnInit {
   }
 
   saveConfig(cfg: StrategyConfig): void {
-    this.trading.updateStrategyConfig(cfg).pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
+    // H7-FE-AUDIT: was a silent .subscribe(); failures left the form
+    // showing the new values without persisting them. ToastService
+    // surfaces success / error.
+    this.trading.updateStrategyConfig(cfg).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => this.toast.success(`${cfg.epic} config salvata`),
+      error: () => this.toast.error('Errore nel salvataggio config'),
+    });
   }
 
   saveLimits(): void {
     const l = this.limits();
     if (l) {
-      this.trading.updateRiskLimits(l).pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
+      this.trading.updateRiskLimits(l).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: () => this.toast.success('Risk limits salvati'),
+        error: () => this.toast.error('Errore nel salvataggio risk limits'),
+      });
     }
   }
 }

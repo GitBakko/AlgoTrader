@@ -179,7 +179,7 @@
           </c-card-header>
           <c-card-body class="p-3">
             @if (pnlAssetChartData(); as data) {
-              <div [style.height.px]="Math.max(280, pnlByAsset().length * 28)">
+              <div [style.height.px]="assetChartHeight()">
                 <c-chart type="bar" [data]="data" [options]="pnlAssetChartOptions"></c-chart>
               </div>
             } @else {

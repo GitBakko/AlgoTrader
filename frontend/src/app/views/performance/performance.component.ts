@@ -216,5 +216,9 @@ export class PerformanceComponent implements OnInit {
     },
   };
 
-  readonly Math = Math;
+  // H10-FE-AUDIT: was `readonly Math = Math` plus inline
+  // `[style.height.px]="Math.max(280, pnlByAsset().length * 28)"` in
+  // the template — exposure of a global to the template + style
+  // binding. Computed signal owns the height now.
+  readonly assetChartHeight = computed(() => Math.max(280, this.pnlByAsset().length * 28));
 }

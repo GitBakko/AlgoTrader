@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import {
@@ -210,15 +210,10 @@ export class MarketsComponent implements OnInit {
   /** 8-slot skeleton placeholder grid — stable reference. */
   readonly skeletonSlots = Array.from({ length: 8 });
 
-  constructor() {
-    // Fetch news when asset selected
-    effect(() => {
-      const epic = this.selectedEpic();
-      if (epic) {
-        this.newsService.getNews(epic, 5, 7);
-      }
-    });
-  }
+  // H5-FE-AUDIT: news fetch was triggered from a constructor `effect()`
+  // that wrote no signals but still violated CLAUDE.md "fetch from
+  // explicit user action" guidance. Move into selectAsset() below; the
+  // effect block is removed entirely.
   readonly chartLoading = signal(false);
   readonly rawCandles = signal<{ timestamp: string; open: number; high: number; low: number; close: number; volume: number }[]>([]);
   readonly currentMarketStatus = signal<MarketStatusResponse | null>(null);
@@ -310,6 +305,7 @@ export class MarketsComponent implements OnInit {
 
   selectAsset(epic: string): void {
     this.selectedEpic.set(epic);
+    this.newsService.getNews(epic, 5, 7);
     this.loadChart();
   }
 

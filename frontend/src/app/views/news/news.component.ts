@@ -2,13 +2,17 @@ import { Component, inject, signal, ChangeDetectionStrategy, DestroyRef } from '
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { CardComponent, CardBodyComponent, CardHeaderComponent, BadgeComponent, RowComponent, ColComponent } from '@coreui/angular';
+import { IconDirective } from '@coreui/icons-angular';
 import { NewsService } from '../../core/services/news.service';
+
+/** L2-VIEWS-OTHER: extracted polling interval to a named constant. */
+const NEWS_POLL_INTERVAL_MS = 30_000;
 
 @Component({
   selector: 'app-news',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, CardComponent, CardBodyComponent, CardHeaderComponent, BadgeComponent, RowComponent, ColComponent],
+  imports: [CommonModule, CardComponent, CardBodyComponent, CardHeaderComponent, BadgeComponent, RowComponent, ColComponent, IconDirective],
   templateUrl: './news.component.html',
   styleUrls: ['./news.component.scss']
 })
@@ -30,7 +34,7 @@ export class NewsComponent {
 
   constructor() {
     this.loadNews();
-    const pollTimer = setInterval(() => this.loadNews(), 30_000);
+    const pollTimer = setInterval(() => this.loadNews(), NEWS_POLL_INTERVAL_MS);
     this.destroyRef.onDestroy(() => clearInterval(pollTimer));
   }
 
