@@ -1,0 +1,31 @@
+- generic [ref=e5]:
+  - generic [ref=e6]:
+    - img [ref=e7]
+    - heading "MANTIS AI" [level=1] [ref=e13]
+    - paragraph [ref=e14]: Trading Algoritmico Intelligente
+    - generic [ref=e15]:
+      - generic [ref=e16]: 21 Asset
+      - generic [ref=e17]: AI Models
+      - generic [ref=e18]: Risk Control
+  - generic [ref=e20]:
+    - heading "Benvenuto" [level=1] [ref=e21]
+    - paragraph [ref=e22]: Accedi alla piattaforma di trading
+    - generic [ref=e24]:
+      - generic [ref=e25]:
+        - img
+      - textbox "Username" [ref=e26]
+    - generic [ref=e28]:
+      - generic [ref=e29]:
+        - img
+      - textbox "Password" [ref=e30]
+    - generic [ref=e31]:
+      - generic [ref=e32]:
+        - checkbox "Ricordami" [ref=e33]
+        - generic [ref=e34]: Ricordami
+      - link "Password dimenticata?" [ref=e35] [cursor=pointer]:
+        - /url: "#"
+    - button "Accedi" [ref=e36] [cursor=pointer]
+    - generic [ref=e37]:
+      - text: Non hai un account?
+      - link "Registrati" [ref=e38] [cursor=pointer]:
+        - /url: "#/register"

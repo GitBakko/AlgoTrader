@@ -1,0 +1,272 @@
+- generic [ref=e41]:
+  - generic [ref=e42]:
+    - img [ref=e46]
+    - navigation [ref=e53]:
+      - link [ref=e55] [cursor=pointer]:
+        - /url: "#/dashboard"
+        - img
+      - link [ref=e57] [cursor=pointer]:
+        - /url: "#/positions"
+        - img
+      - link [ref=e59] [cursor=pointer]:
+        - /url: "#/signals"
+        - img
+      - link [ref=e61] [cursor=pointer]:
+        - /url: "#/markets"
+        - img
+      - link [ref=e63] [cursor=pointer]:
+        - /url: "#/news"
+        - img
+      - link [ref=e65] [cursor=pointer]:
+        - /url: "#/paper-trading"
+        - img
+      - link [ref=e67] [cursor=pointer]:
+        - /url: "#/trade-journal"
+        - img
+      - link [ref=e69] [cursor=pointer]:
+        - /url: "#/backtest"
+        - img
+      - link [ref=e71] [cursor=pointer]:
+        - /url: "#/performance"
+        - img
+      - link [ref=e73] [cursor=pointer]:
+        - /url: "#/strategy"
+        - img
+      - link [ref=e75] [cursor=pointer]:
+        - /url: "#/models"
+        - img
+      - link [ref=e77] [cursor=pointer]:
+        - /url: "#/notifications"
+        - img
+      - link [ref=e79] [cursor=pointer]:
+        - /url: "#/settings"
+        - img
+      - link [ref=e81] [cursor=pointer]:
+        - /url: "#/system-logs"
+        - img
+    - button "Toggle sidebar fold" [ref=e83] [cursor=pointer]
+  - generic [ref=e84]:
+    - banner [ref=e85]:
+      - generic [ref=e86]:
+        - button "Toggle navigation" [ref=e87] [cursor=pointer]:
+          - img
+        - navigation [ref=e88]:
+          - link "Dashboard" [ref=e90] [cursor=pointer]:
+            - /url: "#/dashboard"
+          - link "Paper Trading" [ref=e674] [cursor=pointer]:
+            - /url: "#/paper-trading"
+          - link "Posizioni" [ref=e92] [cursor=pointer]:
+            - /url: "#/positions"
+          - link "Trade Journal" [ref=e1982] [cursor=pointer]:
+            - /url: "#/trade-journal"
+        - navigation [ref=e97]:
+          - generic [ref=e99]:
+            - generic [ref=e100]:
+              - generic [ref=e101]: Oggi
+              - generic [ref=e102]: +0,00
+            - generic [ref=e103]:
+              - generic [ref=e104]: Live
+              - generic [ref=e105]: +5,00
+          - generic [ref=e111]: Live
+          - button "Notifiche" [ref=e116] [cursor=pointer]:
+            - img
+          - button "Open theme picker" [ref=e120] [cursor=pointer]:
+            - img
+          - button "User menu" [ref=e125] [cursor=pointer]:
+            - img "Bakko^ avatar" [ref=e128]
+            - generic [ref=e129]: Bakko^
+            - img
+    - generic [ref=e29281]:
+      - generic [ref=e29282]:
+        - generic [ref=e29283]:
+          - heading "Mercati" [level=5] [ref=e29284]
+          - generic [ref=e29285]: WS Live
+        - generic [ref=e29286]: 20 asset live
+      - generic [ref=e29287]:
+        - generic [ref=e29291] [cursor=pointer]:
+          - generic [ref=e29292]:
+            - img "XAUUSD logo" [ref=e29295]
+            - generic [ref=e29296]:
+              - generic [ref=e29297]: XAUUSD
+              - generic [ref=e29298]: "Spread: 0.50"
+          - generic [ref=e29299]:
+            - generic [ref=e29300]: 4,716.00
+            - generic [ref=e29301]: 4,715.75 / 4,716.25
+        - generic [ref=e29305] [cursor=pointer]:
+          - generic [ref=e29306]:
+            - img "BTCUSD logo" [ref=e29309]
+            - generic [ref=e29310]:
+              - generic [ref=e29311]: BTCUSD
+              - generic [ref=e29312]: "Spread: 50"
+          - generic [ref=e29313]:
+            - generic [ref=e29314]: 80,824
+            - generic [ref=e29315]: 80,799 / 80,849
+        - generic [ref=e29319] [cursor=pointer]:
+          - generic [ref=e29320]:
+            - img "US500 logo" [ref=e29323]
+            - generic [ref=e29324]:
+              - generic [ref=e29325]: US500
+              - generic [ref=e29326]: "Spread: 0.6"
+          - generic [ref=e29327]:
+            - generic [ref=e29328]: 7,396.3
+            - generic [ref=e29329]: 7,396.0 / 7,396.6
+        - generic [ref=e29333] [cursor=pointer]:
+          - generic [ref=e29334]:
+            - img "WTIUSD logo" [ref=e29337]
+            - generic [ref=e29338]:
+              - generic [ref=e29339]: WTIUSD
+              - generic [ref=e29340]: "Spread: 0.08"
+          - generic [ref=e29341]:
+            - generic [ref=e29342]: "92.41"
+            - generic [ref=e29343]: 92.38 / 92.46
+        - generic [ref=e29347] [cursor=pointer]:
+          - generic [ref=e29348]:
+            - img "NVDA logo" [ref=e29351]
+            - generic [ref=e29352]:
+              - generic [ref=e29353]: NVDA
+              - generic [ref=e29354]: "Spread: 0.11"
+          - generic [ref=e29355]:
+            - generic [ref=e29356]: "214.99"
+            - generic [ref=e29357]: 214.93 / 215.04
+        - generic [ref=e29361] [cursor=pointer]:
+          - generic [ref=e29362]:
+            - img "TSLA logo" [ref=e29365]
+            - generic [ref=e29366]:
+              - generic [ref=e29367]: TSLA
+              - generic [ref=e29368]: "Spread: 0.20"
+          - generic [ref=e29369]:
+            - generic [ref=e29370]: "428.10"
+            - generic [ref=e29371]: 428.00 / 428.20
+        - generic [ref=e29375] [cursor=pointer]:
+          - generic [ref=e29376]:
+            - img "XAGUSD logo" [ref=e29379]
+            - generic [ref=e29380]:
+              - generic [ref=e29381]: XAGUSD
+              - generic [ref=e29382]: "Spread: 0.080"
+          - generic [ref=e29383]:
+            - generic [ref=e29384]: "80.352"
+            - generic [ref=e29385]: 80.312 / 80.392
+        - generic [ref=e29389] [cursor=pointer]:
+          - generic [ref=e29390]:
+            - img "DE40 logo" [ref=e29393]
+            - generic [ref=e29394]:
+              - generic [ref=e29395]: DE40
+              - generic [ref=e29396]: "Spread: 8.0"
+          - generic [ref=e29397]:
+            - generic [ref=e29398]: 24,399.1
+            - generic [ref=e29399]: 24,395.1 / 24,403.1
+        - generic [ref=e29403] [cursor=pointer]:
+          - generic [ref=e29404]:
+            - img "SOLUSD logo" [ref=e29407]
+            - generic [ref=e29408]:
+              - generic [ref=e29409]: SOLUSD
+              - generic [ref=e29410]: "Spread: 0.47"
+          - generic [ref=e29411]:
+            - generic [ref=e29412]: "93.43"
+            - generic [ref=e29413]: 93.19 / 93.66
+        - generic [ref=e29417] [cursor=pointer]:
+          - generic [ref=e29418]:
+            - img "ETHUSD logo" [ref=e29421]
+            - generic [ref=e29422]:
+              - generic [ref=e29423]: ETHUSD
+              - generic [ref=e29424]: "Spread: 1.8"
+          - generic [ref=e29425]:
+            - generic [ref=e29426]: 2,321.9
+            - generic [ref=e29427]: 2,321.0 / 2,322.7
+        - generic [ref=e29431] [cursor=pointer]:
+          - generic [ref=e29432]:
+            - img "BNBUSD logo" [ref=e29435]
+            - generic [ref=e29436]:
+              - generic [ref=e29437]: BNBUSD
+              - generic [ref=e29438]: "Spread: 3.3"
+          - generic [ref=e29439]:
+            - generic [ref=e29440]: "649.3"
+            - generic [ref=e29441]: 647.7 / 650.9
+        - generic [ref=e29445] [cursor=pointer]:
+          - generic [ref=e29446]:
+            - img "DOGUSD logo" [ref=e29449]
+            - generic [ref=e29450]:
+              - generic [ref=e29451]: DOGUSD
+              - generic [ref=e29452]: "Spread: 0.000541"
+          - generic [ref=e29453]:
+            - generic [ref=e29454]: "0.108240"
+            - generic [ref=e29455]: 0.107969 / 0.108510
+        - generic [ref=e29459] [cursor=pointer]:
+          - generic [ref=e29460]:
+            - img "DASHUSD logo" [ref=e29463]
+            - generic [ref=e29464]:
+              - generic [ref=e29465]: DASHUSD
+              - generic [ref=e29466]: "Spread: 0.49"
+          - generic [ref=e29467]:
+            - generic [ref=e29468]: "48.92"
+            - generic [ref=e29469]: 48.67 / 49.16
+        - generic [ref=e29473] [cursor=pointer]:
+          - generic [ref=e29474]:
+            - img "ICPUSD logo" [ref=e29477]
+            - generic [ref=e29478]:
+              - generic [ref=e29479]: ICPUSD
+              - generic [ref=e29480]: "Spread: 0.0342"
+          - generic [ref=e29481]:
+            - generic [ref=e29482]: "3.4160"
+            - generic [ref=e29483]: 3.3989 / 3.4331
+        - generic [ref=e29487] [cursor=pointer]:
+          - generic [ref=e29488]:
+            - img "NATGAS logo" [ref=e29491]
+            - generic [ref=e29492]:
+              - generic [ref=e29493]: NATGAS
+              - generic [ref=e29494]: "Spread: 0.005"
+          - generic [ref=e29495]:
+            - generic [ref=e29496]: "2.914"
+            - generic [ref=e29497]: 2.912 / 2.917
+        - generic [ref=e29501] [cursor=pointer]:
+          - generic [ref=e29502]:
+            - img "COPPER logo" [ref=e29505]
+            - generic [ref=e29506]:
+              - generic [ref=e29507]: COPPER
+              - generic [ref=e29508]: "Spread: 0.00272"
+          - generic [ref=e29509]:
+            - generic [ref=e29510]: "6.29501"
+            - generic [ref=e29511]: 6.29365 / 6.29637
+        - generic [ref=e29515] [cursor=pointer]:
+          - generic [ref=e29516]:
+            - img "PLATINUM logo" [ref=e29519]
+            - generic [ref=e29520]:
+              - generic [ref=e29521]: PLATINUM
+              - generic [ref=e29522]: "Spread: 20.00"
+          - generic [ref=e29523]:
+            - generic [ref=e29524]: 2,058.05
+            - generic [ref=e29525]: 2,048.05 / 2,068.05
+        - generic [ref=e29529] [cursor=pointer]:
+          - generic [ref=e29530]:
+            - img "GBPUSD logo" [ref=e29533]
+            - generic [ref=e29534]:
+              - generic [ref=e29535]: GBPUSD
+              - generic [ref=e29536]: "Spread: 0.00110"
+          - generic [ref=e29537]:
+            - generic [ref=e29538]: "1.36332"
+            - generic [ref=e29539]: 1.36277 / 1.36387
+        - generic [ref=e29543] [cursor=pointer]:
+          - generic [ref=e29544]:
+            - img "USDJPY logo" [ref=e29547]
+            - generic [ref=e29548]:
+              - generic [ref=e29549]: USDJPY
+              - generic [ref=e29550]: "Spread: 0.050"
+          - generic [ref=e29551]:
+            - generic [ref=e29552]: "156.666"
+            - generic [ref=e29553]: 156.641 / 156.691
+        - generic [ref=e29557] [cursor=pointer]:
+          - generic [ref=e29558]:
+            - img "NAS100 logo" [ref=e29561]
+            - generic [ref=e29562]:
+              - generic [ref=e29563]: NAS100
+              - generic [ref=e29564]: "Spread: 0.22"
+          - generic [ref=e29565]:
+            - generic [ref=e29566]: "294.95"
+            - generic [ref=e29567]: 294.84 / 295.06
+    - contentinfo [ref=e666]:
+      - generic [ref=e667]: MANTIS AI
+      - generic [ref=e668]: •
+      - generic [ref=e669]: v1.0
+      - generic [ref=e670]: •
+      - generic [ref=e671]: Demo Mode
+  - complementary "Signal audit" [ref=e672]

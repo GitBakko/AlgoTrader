@@ -1,0 +1,143 @@
+- generic [ref=e41]:
+  - generic [ref=e42]:
+    - img [ref=e46]
+    - navigation [ref=e53]:
+      - link [ref=e55] [cursor=pointer]:
+        - /url: "#/dashboard"
+        - img
+      - link [ref=e57] [cursor=pointer]:
+        - /url: "#/positions"
+        - img
+      - link [ref=e59] [cursor=pointer]:
+        - /url: "#/signals"
+        - img
+      - link [ref=e61] [cursor=pointer]:
+        - /url: "#/markets"
+        - img
+      - link [ref=e63] [cursor=pointer]:
+        - /url: "#/news"
+        - img
+      - link [ref=e65] [cursor=pointer]:
+        - /url: "#/paper-trading"
+        - img
+      - link [ref=e67] [cursor=pointer]:
+        - /url: "#/trade-journal"
+        - img
+      - link [ref=e69] [cursor=pointer]:
+        - /url: "#/backtest"
+        - img
+      - link [ref=e71] [cursor=pointer]:
+        - /url: "#/performance"
+        - img
+      - link [ref=e73] [cursor=pointer]:
+        - /url: "#/strategy"
+        - img
+      - link [ref=e75] [cursor=pointer]:
+        - /url: "#/models"
+        - img
+      - link [ref=e77] [cursor=pointer]:
+        - /url: "#/notifications"
+        - img
+      - link [ref=e79] [cursor=pointer]:
+        - /url: "#/settings"
+        - img
+      - link [ref=e81] [cursor=pointer]:
+        - /url: "#/system-logs"
+        - img
+    - button "Toggle sidebar fold" [ref=e83] [cursor=pointer]
+  - generic [ref=e84]:
+    - banner [ref=e85]:
+      - generic [ref=e86]:
+        - button "Toggle navigation" [ref=e87] [cursor=pointer]:
+          - img
+        - navigation [ref=e88]:
+          - link "Dashboard" [ref=e90] [cursor=pointer]:
+            - /url: "#/dashboard"
+          - link "Paper Trading" [ref=e674] [cursor=pointer]:
+            - /url: "#/paper-trading"
+          - link "Posizioni" [ref=e92] [cursor=pointer]:
+            - /url: "#/positions"
+          - link "Trade Journal" [ref=e1982] [cursor=pointer]:
+            - /url: "#/trade-journal"
+        - navigation [ref=e97]:
+          - generic [ref=e99]:
+            - generic [ref=e100]:
+              - generic [ref=e101]: Oggi
+              - generic [ref=e102]: +0,00
+            - generic [ref=e103]:
+              - generic [ref=e104]: Live
+              - generic [ref=e105]: +5,00
+          - generic [ref=e111]: Live
+          - button "Notifiche" [ref=e116] [cursor=pointer]:
+            - img
+          - button "Open theme picker" [ref=e120] [cursor=pointer]:
+            - img
+          - button "User menu" [ref=e125] [cursor=pointer]:
+            - img "Bakko^ avatar" [ref=e128]
+            - generic [ref=e129]: Bakko^
+            - img
+    - generic [ref=e4363]:
+      - banner [ref=e4364]:
+        - generic [ref=e4365]:
+          - generic [ref=e4366]: Analisi · Backtest
+          - heading "Backtest Engine" [level=1] [ref=e4367]
+          - generic [ref=e4368]: Nessun run ancora · configura e avvia
+      - generic [ref=e4369]:
+        - generic [ref=e4371]:
+          - generic [ref=e4372]: Configurazione
+          - generic [ref=e4373]:
+            - generic [ref=e4374]:
+              - generic [ref=e4375]: Asset
+              - combobox [ref=e4376]:
+                - option "Gold (XAUUSD)" [selected]
+                - option "Bitcoin (BTCUSD)"
+                - option "S&P 500 (US500)"
+                - option "Oil (WTIUSD)"
+                - option "NVIDIA (NVDA)"
+                - option "Tesla (TSLA)"
+                - option "Silver (XAGUSD)"
+                - option "DAX (DE40)"
+                - option "Solana (SOLUSD)"
+                - option "Ethereum (ETHUSD)"
+                - option "Binance Coin (BNBUSD)"
+                - option "Dogecoin (DOGUSD)"
+                - option "Dash (DASHUSD)"
+                - option "Internet Computer (ICPUSD)"
+                - option "Natural Gas (NATGAS)"
+                - option "Copper (COPPER)"
+                - option "Platinum (PLATINUM)"
+                - option "GBP/USD (GBPUSD)"
+                - option "USD/JPY (USDJPY)"
+                - option "Nasdaq 100 (NAS100)"
+            - generic [ref=e4377]:
+              - generic [ref=e4378]: Timeframe
+              - combobox [ref=e4379]:
+                - option "1 Hour" [selected]
+                - option "4 Hours"
+                - option "1 Day"
+            - generic [ref=e4380]:
+              - generic [ref=e4381]: Capitale ($)
+              - spinbutton [ref=e4382]: "10000"
+            - generic [ref=e4383]:
+              - generic [ref=e4384]: Rischio/Trade (%)
+              - spinbutton [ref=e4385]: "0.02"
+            - generic [ref=e4386]:
+              - generic [ref=e4387]: Strategia
+              - combobox [ref=e4388]:
+                - option "ML Ensemble" [selected]
+                - option "Squeeze Breakout"
+                - option "VWAP Reversion"
+                - option "Auto (Router)"
+            - button "Avvia Backtest" [ref=e4389] [cursor=pointer]
+        - generic [ref=e4391]:
+          - generic [ref=e4392]: Risultati
+          - generic [ref=e4394]:
+            - generic [ref=e4395]: Nessun backtest eseguito
+            - generic [ref=e4396]: Configura i parametri e avvia un backtest.
+    - contentinfo [ref=e666]:
+      - generic [ref=e667]: MANTIS AI
+      - generic [ref=e668]: •
+      - generic [ref=e669]: v1.0
+      - generic [ref=e670]: •
+      - generic [ref=e671]: Demo Mode
+  - complementary "Signal audit" [ref=e672]

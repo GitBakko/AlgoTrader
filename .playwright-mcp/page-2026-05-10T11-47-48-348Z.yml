@@ -1,0 +1,147 @@
+- generic [ref=e41]:
+  - generic [ref=e42]:
+    - img [ref=e46]
+    - navigation [ref=e53]:
+      - link [ref=e55] [cursor=pointer]:
+        - /url: "#/dashboard"
+        - img
+      - link [ref=e57] [cursor=pointer]:
+        - /url: "#/positions"
+        - img
+      - link [ref=e59] [cursor=pointer]:
+        - /url: "#/signals"
+        - img
+      - link [ref=e61] [cursor=pointer]:
+        - /url: "#/markets"
+        - img
+      - link [ref=e63] [cursor=pointer]:
+        - /url: "#/news"
+        - img
+      - link [ref=e65] [cursor=pointer]:
+        - /url: "#/paper-trading"
+        - img
+      - link [ref=e67] [cursor=pointer]:
+        - /url: "#/trade-journal"
+        - img
+      - link [ref=e69] [cursor=pointer]:
+        - /url: "#/backtest"
+        - img
+      - link [ref=e71] [cursor=pointer]:
+        - /url: "#/performance"
+        - img
+      - link [ref=e73] [cursor=pointer]:
+        - /url: "#/strategy"
+        - img
+      - link [ref=e75] [cursor=pointer]:
+        - /url: "#/models"
+        - img
+      - link [ref=e77] [cursor=pointer]:
+        - /url: "#/notifications"
+        - img
+      - link [ref=e79] [cursor=pointer]:
+        - /url: "#/settings"
+        - img
+      - link [ref=e81] [cursor=pointer]:
+        - /url: "#/system-logs"
+        - img
+    - button "Toggle sidebar fold" [ref=e83] [cursor=pointer]
+  - generic [ref=e84]:
+    - banner [ref=e85]:
+      - generic [ref=e86]:
+        - button "Toggle navigation" [ref=e87] [cursor=pointer]:
+          - img
+        - navigation [ref=e88]:
+          - link "Dashboard" [ref=e90] [cursor=pointer]:
+            - /url: "#/dashboard"
+          - link "Paper Trading" [ref=e674] [cursor=pointer]:
+            - /url: "#/paper-trading"
+          - link "Posizioni" [ref=e92] [cursor=pointer]:
+            - /url: "#/positions"
+          - link "Trade Journal" [ref=e1982] [cursor=pointer]:
+            - /url: "#/trade-journal"
+        - navigation [ref=e97]:
+          - generic [ref=e99]:
+            - generic [ref=e100]:
+              - generic [ref=e101]: Oggi
+              - generic [ref=e102]: +0,00
+            - generic [ref=e103]:
+              - generic [ref=e104]: Live
+              - generic [ref=e105]: +5,00
+          - generic [ref=e111]: Live
+          - button "Notifiche" [ref=e116] [cursor=pointer]:
+            - img
+          - button "Open theme picker" [ref=e120] [cursor=pointer]:
+            - img
+          - button "User menu" [ref=e125] [cursor=pointer]:
+            - img "Bakko^ avatar" [ref=e128]
+            - generic [ref=e129]: Bakko^
+            - img
+    - generic [ref=e29839]:
+      - generic [ref=e29840]:
+        - heading "Performance Analytics" [level=5] [ref=e29841]
+        - generic [ref=e29842]:
+          - button "7g" [ref=e29843] [cursor=pointer]
+          - button "30g" [ref=e29844] [cursor=pointer]
+          - button "90g" [ref=e29845] [cursor=pointer]
+          - button "1A" [ref=e29846] [cursor=pointer]
+          - button "Tutto" [ref=e29847] [cursor=pointer]
+      - generic [ref=e29848]:
+        - generic [ref=e29851]:
+          - generic [ref=e29852]: Trades
+          - generic [ref=e29853]: "179"
+          - generic [ref=e29854]: 96W / 83L
+        - generic [ref=e29857]:
+          - generic [ref=e29858]: Win Rate
+          - generic [ref=e29859]: 53,6%
+          - generic [ref=e29860]: "PF: 1,18"
+        - generic [ref=e29863]:
+          - generic [ref=e29864]: Total P&L
+          - generic [ref=e29865]: $ +318,08
+          - generic [ref=e29866]: "Best: +246,86 Worst: -152,53"
+        - generic [ref=e29869]:
+          - generic [ref=e29870]: Max Drawdown
+          - generic [ref=e29871]: 2,54%
+          - generic [ref=e29872]: "Cons. W: 7 | L: 12"
+      - generic [ref=e29873]:
+        - generic [ref=e29876]:
+          - generic [ref=e29877]: Sharpe Ratio
+          - generic [ref=e29878]: 2,193
+          - generic [ref=e29879]: Risk-adjusted return (ann.)
+        - generic [ref=e29882]:
+          - generic [ref=e29883]: Sortino Ratio
+          - generic [ref=e29884]: 3,941
+          - generic [ref=e29885]: Downside risk-adjusted (ann.)
+        - generic [ref=e29888]:
+          - generic [ref=e29889]: Calmar Ratio
+          - generic [ref=e29890]: 22,495
+          - generic [ref=e29891]: Return / Max Drawdown (ann.)
+      - generic [ref=e29892]:
+        - generic [ref=e29893]:
+          - generic [ref=e29894]: Equity Curve (P&L cumulativo)
+          - generic [ref=e29895]: $ +318,08
+        - table [ref=e29901]:
+          - row "Charting by TradingView" [ref=e29902]:
+            - cell
+            - cell "Charting by TradingView" [ref=e29903]:
+              - link "Charting by TradingView" [ref=e29907] [cursor=pointer]:
+                - /url: https://www.tradingview.com/?utm_medium=lwc-link&utm_campaign=lwc-chart&utm_source=localhost/
+                - img [ref=e29908]
+            - cell
+          - row [ref=e29912]:
+            - cell
+            - cell [ref=e29913]
+            - cell
+      - generic [ref=e29917]:
+        - generic [ref=e29919]:
+          - generic [ref=e29920]: Distribuzione P&L per Trade
+          - img [ref=e29924]
+        - generic [ref=e29926]:
+          - generic [ref=e29927]: P&L per Asset
+          - img [ref=e29931]
+    - contentinfo [ref=e666]:
+      - generic [ref=e667]: MANTIS AI
+      - generic [ref=e668]: •
+      - generic [ref=e669]: v1.0
+      - generic [ref=e670]: •
+      - generic [ref=e671]: Demo Mode
+  - complementary "Signal audit" [ref=e672]

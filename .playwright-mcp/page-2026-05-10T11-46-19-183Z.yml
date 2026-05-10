@@ -1,0 +1,489 @@
+- generic [ref=e41]:
+  - generic [ref=e42]:
+    - img [ref=e46]
+    - navigation [ref=e53]:
+      - link [ref=e55] [cursor=pointer]:
+        - /url: "#/dashboard"
+        - img
+      - link [ref=e57] [cursor=pointer]:
+        - /url: "#/positions"
+        - img
+      - link [ref=e59] [cursor=pointer]:
+        - /url: "#/signals"
+        - img
+      - link [ref=e61] [cursor=pointer]:
+        - /url: "#/markets"
+        - img
+      - link [ref=e63] [cursor=pointer]:
+        - /url: "#/news"
+        - img
+      - link [ref=e65] [cursor=pointer]:
+        - /url: "#/paper-trading"
+        - img
+      - link [ref=e67] [cursor=pointer]:
+        - /url: "#/trade-journal"
+        - img
+      - link [ref=e69] [cursor=pointer]:
+        - /url: "#/backtest"
+        - img
+      - link [ref=e71] [cursor=pointer]:
+        - /url: "#/performance"
+        - img
+      - link [ref=e73] [cursor=pointer]:
+        - /url: "#/strategy"
+        - img
+      - link [ref=e75] [cursor=pointer]:
+        - /url: "#/models"
+        - img
+      - link [ref=e77] [cursor=pointer]:
+        - /url: "#/notifications"
+        - img
+      - link [ref=e79] [cursor=pointer]:
+        - /url: "#/settings"
+        - img
+      - link [ref=e81] [cursor=pointer]:
+        - /url: "#/system-logs"
+        - img
+    - button "Toggle sidebar fold" [ref=e83] [cursor=pointer]
+  - generic [ref=e84]:
+    - banner [ref=e85]:
+      - generic [ref=e86]:
+        - button "Toggle navigation" [ref=e87] [cursor=pointer]:
+          - img
+        - navigation [ref=e88]:
+          - link "Dashboard" [ref=e90] [cursor=pointer]:
+            - /url: "#/dashboard"
+          - link "Paper Trading" [ref=e674] [cursor=pointer]:
+            - /url: "#/paper-trading"
+          - link "Posizioni" [ref=e92] [cursor=pointer]:
+            - /url: "#/positions"
+          - link "Trade Journal" [ref=e1982] [cursor=pointer]:
+            - /url: "#/trade-journal"
+        - navigation [ref=e97]:
+          - generic [ref=e99]:
+            - generic [ref=e100]:
+              - generic [ref=e101]: Oggi
+              - generic [ref=e102]: +0,00
+            - generic [ref=e103]:
+              - generic [ref=e104]: Live
+              - generic [ref=e105]: +5,00
+          - generic [ref=e111]: Live
+          - button "Notifiche" [ref=e116] [cursor=pointer]:
+            - img
+          - button "Open theme picker" [ref=e120] [cursor=pointer]:
+            - img
+          - button "User menu" [ref=e125] [cursor=pointer]:
+            - img "Bakko^ avatar" [ref=e128]
+            - generic [ref=e129]: Bakko^
+            - img
+    - generic [ref=e28067]:
+      - banner [ref=e28068]:
+        - generic [ref=e28069]: Sistema · Configurazione
+        - heading "Impostazioni" [level=1] [ref=e28070]
+        - generic [ref=e28071]: 21 asset · 20 attivi
+      - generic [ref=e28072]:
+        - generic [ref=e28074]:
+          - generic [ref=e28075]: Configurazione
+          - generic [ref=e28077]: Caricamento...
+        - generic [ref=e28078]:
+          - generic [ref=e28080]: Parametri Rischio
+          - generic [ref=e28081]:
+            - generic [ref=e28082]: Notifiche
+            - generic [ref=e28083]:
+              - generic [ref=e28084]:
+                - checkbox "Notifiche browser (trade, circuit breaker)" [checked] [ref=e28085]
+                - generic [ref=e28086]: Notifiche browser (trade, circuit breaker)
+              - generic [ref=e28087]:
+                - checkbox "Suoni alert (chime su trade)" [checked] [ref=e28088]
+                - generic [ref=e28089]: Suoni alert (chime su trade)
+              - generic [ref=e28090]: Filtra Notifiche In-App
+              - generic [ref=e28091]:
+                - button "📈 Trade Aperte" [ref=e28092] [cursor=pointer]
+                - button "📉 Trade Chiuse" [ref=e28093] [cursor=pointer]
+                - button "🎯 Segnali" [ref=e28094] [cursor=pointer]
+                - button "🔴 Circuit Breaker" [ref=e28095] [cursor=pointer]
+                - button "⚠️ Drawdown" [ref=e28096] [cursor=pointer]
+                - button "❌ Errori Broker" [ref=e28097] [cursor=pointer]
+                - button "🛑 Errori Sistema" [ref=e28098] [cursor=pointer]
+              - generic [ref=e28099]: Click per silenziare/attivare. Le notifiche silenziate non appaiono nella campanella.
+        - generic [ref=e28101]:
+          - generic [ref=e28102]: Risk Status Live
+          - generic [ref=e28104]: Caricamento...
+      - generic [ref=e28105]:
+        - generic [ref=e28106]:
+          - text: Asset Universe
+          - generic [ref=e28107]: 21 asset
+        - table [ref=e28110]:
+          - rowgroup [ref=e28111]:
+            - row "Epic Nome Tipo Exchange Posizioni Status Azioni" [ref=e28112]:
+              - columnheader "Epic" [ref=e28113]
+              - columnheader "Nome" [ref=e28114]
+              - columnheader "Tipo" [ref=e28115]
+              - columnheader "Exchange" [ref=e28116]
+              - columnheader "Posizioni" [ref=e28117]
+              - columnheader "Status" [ref=e28118]
+              - columnheader "Azioni" [ref=e28119]
+          - rowgroup [ref=e28120]:
+            - row "XAUUSD logo XAUUSD Gold Commodity COMEX 0 Attivo Escludi Train" [ref=e28121]:
+              - cell "XAUUSD logo XAUUSD" [ref=e28122]:
+                - generic [ref=e28123]:
+                  - img "XAUUSD logo" [ref=e28126]
+                  - generic [ref=e28127]: XAUUSD
+              - cell "Gold" [ref=e28128]
+              - cell "Commodity" [ref=e28129]:
+                - generic [ref=e28130]: Commodity
+              - cell "COMEX" [ref=e28131]
+              - cell "0" [ref=e28132]
+              - cell "Attivo" [ref=e28133]:
+                - generic [ref=e28134]: Attivo
+              - cell "Escludi Train" [ref=e28135]:
+                - generic [ref=e28136]:
+                  - button "Escludi" [ref=e28137] [cursor=pointer]
+                  - button "Train" [ref=e28138] [cursor=pointer]:
+                    - generic [ref=e28139]: Train
+            - row "XAGUSD logo XAGUSD Silver Commodity COMEX 0 Attivo Escludi Train" [ref=e28140]:
+              - cell "XAGUSD logo XAGUSD" [ref=e28141]:
+                - generic [ref=e28142]:
+                  - img "XAGUSD logo" [ref=e28145]
+                  - generic [ref=e28146]: XAGUSD
+              - cell "Silver" [ref=e28147]
+              - cell "Commodity" [ref=e28148]:
+                - generic [ref=e28149]: Commodity
+              - cell "COMEX" [ref=e28150]
+              - cell "0" [ref=e28151]
+              - cell "Attivo" [ref=e28152]:
+                - generic [ref=e28153]: Attivo
+              - cell "Escludi Train" [ref=e28154]:
+                - generic [ref=e28155]:
+                  - button "Escludi" [ref=e28156] [cursor=pointer]
+                  - button "Train" [ref=e28157] [cursor=pointer]:
+                    - generic [ref=e28158]: Train
+            - row "WTIUSD logo WTIUSD Crude Oil WTI Commodity NYMEX 0 Attivo Escludi Train" [ref=e28159]:
+              - cell "WTIUSD logo WTIUSD" [ref=e28160]:
+                - generic [ref=e28161]:
+                  - img "WTIUSD logo" [ref=e28164]
+                  - generic [ref=e28165]: WTIUSD
+              - cell "Crude Oil WTI" [ref=e28166]
+              - cell "Commodity" [ref=e28167]:
+                - generic [ref=e28168]: Commodity
+              - cell "NYMEX" [ref=e28169]
+              - cell "0" [ref=e28170]
+              - cell "Attivo" [ref=e28171]:
+                - generic [ref=e28172]: Attivo
+              - cell "Escludi Train" [ref=e28173]:
+                - generic [ref=e28174]:
+                  - button "Escludi" [ref=e28175] [cursor=pointer]
+                  - button "Train" [ref=e28176] [cursor=pointer]:
+                    - generic [ref=e28177]: Train
+            - row "BTCUSD logo BTCUSD Bitcoin Crypto 24/7 0 Attivo Escludi Train" [ref=e28178]:
+              - cell "BTCUSD logo BTCUSD" [ref=e28179]:
+                - generic [ref=e28180]:
+                  - img "BTCUSD logo" [ref=e28183]
+                  - generic [ref=e28184]: BTCUSD
+              - cell "Bitcoin" [ref=e28185]
+              - cell "Crypto" [ref=e28186]:
+                - generic [ref=e28187]: Crypto
+              - cell "24/7" [ref=e28188]
+              - cell "0" [ref=e28189]
+              - cell "Attivo" [ref=e28190]:
+                - generic [ref=e28191]: Attivo
+              - cell "Escludi Train" [ref=e28192]:
+                - generic [ref=e28193]:
+                  - button "Escludi" [ref=e28194] [cursor=pointer]
+                  - button "Train" [ref=e28195] [cursor=pointer]:
+                    - generic [ref=e28196]: Train
+            - row "EURUSD logo EURUSD EUR/USD Forex 24/5 0 Escluso Attiva Train" [ref=e28197]:
+              - cell "EURUSD logo EURUSD" [ref=e28198]:
+                - generic [ref=e28199]:
+                  - img "EURUSD logo" [ref=e28202]
+                  - generic [ref=e28203]: EURUSD
+              - cell "EUR/USD" [ref=e28204]
+              - cell "Forex" [ref=e28205]:
+                - generic [ref=e28206]: Forex
+              - cell "24/5" [ref=e28207]
+              - cell "0" [ref=e28208]
+              - cell "Escluso" [ref=e28209]:
+                - generic [ref=e28210]: Escluso
+              - cell "Attiva Train" [ref=e28211]:
+                - generic [ref=e28212]:
+                  - button "Attiva" [ref=e28213] [cursor=pointer]
+                  - button "Train" [ref=e28214] [cursor=pointer]:
+                    - generic [ref=e28215]: Train
+            - row "US500 logo US500 S&P 500 Index CME 0 Attivo Escludi Train" [ref=e28216]:
+              - cell "US500 logo US500" [ref=e28217]:
+                - generic [ref=e28218]:
+                  - img "US500 logo" [ref=e28221]
+                  - generic [ref=e28222]: US500
+              - cell "S&P 500" [ref=e28223]
+              - cell "Index" [ref=e28224]:
+                - generic [ref=e28225]: Index
+              - cell "CME" [ref=e28226]
+              - cell "0" [ref=e28227]
+              - cell "Attivo" [ref=e28228]:
+                - generic [ref=e28229]: Attivo
+              - cell "Escludi Train" [ref=e28230]:
+                - generic [ref=e28231]:
+                  - button "Escludi" [ref=e28232] [cursor=pointer]
+                  - button "Train" [ref=e28233] [cursor=pointer]:
+                    - generic [ref=e28234]: Train
+            - row "DE40 logo DE40 DAX 40 Index EUREX 0 Attivo Escludi Train" [ref=e28235]:
+              - cell "DE40 logo DE40" [ref=e28236]:
+                - generic [ref=e28237]:
+                  - img "DE40 logo" [ref=e28240]
+                  - generic [ref=e28241]: DE40
+              - cell "DAX 40" [ref=e28242]
+              - cell "Index" [ref=e28243]:
+                - generic [ref=e28244]: Index
+              - cell "EUREX" [ref=e28245]
+              - cell "0" [ref=e28246]
+              - cell "Attivo" [ref=e28247]:
+                - generic [ref=e28248]: Attivo
+              - cell "Escludi Train" [ref=e28249]:
+                - generic [ref=e28250]:
+                  - button "Escludi" [ref=e28251] [cursor=pointer]
+                  - button "Train" [ref=e28252] [cursor=pointer]:
+                    - generic [ref=e28253]: Train
+            - row "NVDA logo NVDA NVIDIA Stock CFD NASDAQ 0 Attivo Escludi Train" [ref=e28254]:
+              - cell "NVDA logo NVDA" [ref=e28255]:
+                - generic [ref=e28256]:
+                  - img "NVDA logo" [ref=e28259]
+                  - generic [ref=e28260]: NVDA
+              - cell "NVIDIA" [ref=e28261]
+              - cell "Stock CFD" [ref=e28262]:
+                - generic [ref=e28263]: Stock CFD
+              - cell "NASDAQ" [ref=e28264]
+              - cell "0" [ref=e28265]
+              - cell "Attivo" [ref=e28266]:
+                - generic [ref=e28267]: Attivo
+              - cell "Escludi Train" [ref=e28268]:
+                - generic [ref=e28269]:
+                  - button "Escludi" [ref=e28270] [cursor=pointer]
+                  - button "Train" [ref=e28271] [cursor=pointer]:
+                    - generic [ref=e28272]: Train
+            - row "TSLA logo TSLA Tesla Stock CFD NASDAQ 0 Attivo Escludi Train" [ref=e28273]:
+              - cell "TSLA logo TSLA" [ref=e28274]:
+                - generic [ref=e28275]:
+                  - img "TSLA logo" [ref=e28278]
+                  - generic [ref=e28279]: TSLA
+              - cell "Tesla" [ref=e28280]
+              - cell "Stock CFD" [ref=e28281]:
+                - generic [ref=e28282]: Stock CFD
+              - cell "NASDAQ" [ref=e28283]
+              - cell "0" [ref=e28284]
+              - cell "Attivo" [ref=e28285]:
+                - generic [ref=e28286]: Attivo
+              - cell "Escludi Train" [ref=e28287]:
+                - generic [ref=e28288]:
+                  - button "Escludi" [ref=e28289] [cursor=pointer]
+                  - button "Train" [ref=e28290] [cursor=pointer]:
+                    - generic [ref=e28291]: Train
+            - row "SOLUSD logo SOLUSD Solana Crypto 24/7 0 Attivo Escludi Train" [ref=e28292]:
+              - cell "SOLUSD logo SOLUSD" [ref=e28293]:
+                - generic [ref=e28294]:
+                  - img "SOLUSD logo" [ref=e28297]
+                  - generic [ref=e28298]: SOLUSD
+              - cell "Solana" [ref=e28299]
+              - cell "Crypto" [ref=e28300]:
+                - generic [ref=e28301]: Crypto
+              - cell "24/7" [ref=e28302]
+              - cell "0" [ref=e28303]
+              - cell "Attivo" [ref=e28304]:
+                - generic [ref=e28305]: Attivo
+              - cell "Escludi Train" [ref=e28306]:
+                - generic [ref=e28307]:
+                  - button "Escludi" [ref=e28308] [cursor=pointer]
+                  - button "Train" [ref=e28309] [cursor=pointer]:
+                    - generic [ref=e28310]: Train
+            - row "ETHUSD logo ETHUSD Ethereum Crypto 24/7 0 Attivo Escludi Train" [ref=e28311]:
+              - cell "ETHUSD logo ETHUSD" [ref=e28312]:
+                - generic [ref=e28313]:
+                  - img "ETHUSD logo" [ref=e28316]
+                  - generic [ref=e28317]: ETHUSD
+              - cell "Ethereum" [ref=e28318]
+              - cell "Crypto" [ref=e28319]:
+                - generic [ref=e28320]: Crypto
+              - cell "24/7" [ref=e28321]
+              - cell "0" [ref=e28322]
+              - cell "Attivo" [ref=e28323]:
+                - generic [ref=e28324]: Attivo
+              - cell "Escludi Train" [ref=e28325]:
+                - generic [ref=e28326]:
+                  - button "Escludi" [ref=e28327] [cursor=pointer]
+                  - button "Train" [ref=e28328] [cursor=pointer]:
+                    - generic [ref=e28329]: Train
+            - row "BNBUSD logo BNBUSD Binance Coin Crypto 24/7 0 Attivo Escludi Train" [ref=e28330]:
+              - cell "BNBUSD logo BNBUSD" [ref=e28331]:
+                - generic [ref=e28332]:
+                  - img "BNBUSD logo" [ref=e28335]
+                  - generic [ref=e28336]: BNBUSD
+              - cell "Binance Coin" [ref=e28337]
+              - cell "Crypto" [ref=e28338]:
+                - generic [ref=e28339]: Crypto
+              - cell "24/7" [ref=e28340]
+              - cell "0" [ref=e28341]
+              - cell "Attivo" [ref=e28342]:
+                - generic [ref=e28343]: Attivo
+              - cell "Escludi Train" [ref=e28344]:
+                - generic [ref=e28345]:
+                  - button "Escludi" [ref=e28346] [cursor=pointer]
+                  - button "Train" [ref=e28347] [cursor=pointer]:
+                    - generic [ref=e28348]: Train
+            - row "DOGUSD logo DOGUSD Dogecoin Crypto 24/7 0 Attivo Escludi Train" [ref=e28349]:
+              - cell "DOGUSD logo DOGUSD" [ref=e28350]:
+                - generic [ref=e28351]:
+                  - img "DOGUSD logo" [ref=e28354]
+                  - generic [ref=e28355]: DOGUSD
+              - cell "Dogecoin" [ref=e28356]
+              - cell "Crypto" [ref=e28357]:
+                - generic [ref=e28358]: Crypto
+              - cell "24/7" [ref=e28359]
+              - cell "0" [ref=e28360]
+              - cell "Attivo" [ref=e28361]:
+                - generic [ref=e28362]: Attivo
+              - cell "Escludi Train" [ref=e28363]:
+                - generic [ref=e28364]:
+                  - button "Escludi" [ref=e28365] [cursor=pointer]
+                  - button "Train" [ref=e28366] [cursor=pointer]:
+                    - generic [ref=e28367]: Train
+            - row "DASHUSD logo DASHUSD Dash Crypto 24/7 0 Attivo Escludi Train" [ref=e28368]:
+              - cell "DASHUSD logo DASHUSD" [ref=e28369]:
+                - generic [ref=e28370]:
+                  - img "DASHUSD logo" [ref=e28373]
+                  - generic [ref=e28374]: DASHUSD
+              - cell "Dash" [ref=e28375]
+              - cell "Crypto" [ref=e28376]:
+                - generic [ref=e28377]: Crypto
+              - cell "24/7" [ref=e28378]
+              - cell "0" [ref=e28379]
+              - cell "Attivo" [ref=e28380]:
+                - generic [ref=e28381]: Attivo
+              - cell "Escludi Train" [ref=e28382]:
+                - generic [ref=e28383]:
+                  - button "Escludi" [ref=e28384] [cursor=pointer]
+                  - button "Train" [ref=e28385] [cursor=pointer]:
+                    - generic [ref=e28386]: Train
+            - row "ICPUSD logo ICPUSD Internet Computer Crypto 24/7 0 Attivo Escludi Train" [ref=e28387]:
+              - cell "ICPUSD logo ICPUSD" [ref=e28388]:
+                - generic [ref=e28389]:
+                  - img "ICPUSD logo" [ref=e28392]
+                  - generic [ref=e28393]: ICPUSD
+              - cell "Internet Computer" [ref=e28394]
+              - cell "Crypto" [ref=e28395]:
+                - generic [ref=e28396]: Crypto
+              - cell "24/7" [ref=e28397]
+              - cell "0" [ref=e28398]
+              - cell "Attivo" [ref=e28399]:
+                - generic [ref=e28400]: Attivo
+              - cell "Escludi Train" [ref=e28401]:
+                - generic [ref=e28402]:
+                  - button "Escludi" [ref=e28403] [cursor=pointer]
+                  - button "Train" [ref=e28404] [cursor=pointer]:
+                    - generic [ref=e28405]: Train
+            - row "NATGAS logo NATGAS Natural Gas Commodity NYMEX 0 Attivo Escludi Train" [ref=e28406]:
+              - cell "NATGAS logo NATGAS" [ref=e28407]:
+                - generic [ref=e28408]:
+                  - img "NATGAS logo" [ref=e28411]
+                  - generic [ref=e28412]: NATGAS
+              - cell "Natural Gas" [ref=e28413]
+              - cell "Commodity" [ref=e28414]:
+                - generic [ref=e28415]: Commodity
+              - cell "NYMEX" [ref=e28416]
+              - cell "0" [ref=e28417]
+              - cell "Attivo" [ref=e28418]:
+                - generic [ref=e28419]: Attivo
+              - cell "Escludi Train" [ref=e28420]:
+                - generic [ref=e28421]:
+                  - button "Escludi" [ref=e28422] [cursor=pointer]
+                  - button "Train" [ref=e28423] [cursor=pointer]:
+                    - generic [ref=e28424]: Train
+            - row "COPPER logo COPPER Copper Commodity COMEX 1 Attivo Train" [ref=e28425]:
+              - cell "COPPER logo COPPER" [ref=e28426]:
+                - generic [ref=e28427]:
+                  - img "COPPER logo" [ref=e28430]
+                  - generic [ref=e28431]: COPPER
+              - cell "Copper" [ref=e28432]
+              - cell "Commodity" [ref=e28433]:
+                - generic [ref=e28434]: Commodity
+              - cell "COMEX" [ref=e28435]
+              - cell "1" [ref=e28436]:
+                - generic [ref=e28437]: "1"
+              - cell "Attivo" [ref=e28438]:
+                - generic [ref=e28439]: Attivo
+              - cell "Train" [ref=e28440]:
+                - button "Train" [ref=e28442] [cursor=pointer]:
+                  - generic [ref=e28443]: Train
+            - row "PLATINUM logo PLATINUM Platinum Commodity NYMEX 0 Attivo Escludi Train" [ref=e28444]:
+              - cell "PLATINUM logo PLATINUM" [ref=e28445]:
+                - generic [ref=e28446]:
+                  - img "PLATINUM logo" [ref=e28449]
+                  - generic [ref=e28450]: PLATINUM
+              - cell "Platinum" [ref=e28451]
+              - cell "Commodity" [ref=e28452]:
+                - generic [ref=e28453]: Commodity
+              - cell "NYMEX" [ref=e28454]
+              - cell "0" [ref=e28455]
+              - cell "Attivo" [ref=e28456]:
+                - generic [ref=e28457]: Attivo
+              - cell "Escludi Train" [ref=e28458]:
+                - generic [ref=e28459]:
+                  - button "Escludi" [ref=e28460] [cursor=pointer]
+                  - button "Train" [ref=e28461] [cursor=pointer]:
+                    - generic [ref=e28462]: Train
+            - row "GBPUSD logo GBPUSD GBP/USD Forex 24/5 0 Attivo Escludi Train" [ref=e28463]:
+              - cell "GBPUSD logo GBPUSD" [ref=e28464]:
+                - generic [ref=e28465]:
+                  - img "GBPUSD logo" [ref=e28468]
+                  - generic [ref=e28469]: GBPUSD
+              - cell "GBP/USD" [ref=e28470]
+              - cell "Forex" [ref=e28471]:
+                - generic [ref=e28472]: Forex
+              - cell "24/5" [ref=e28473]
+              - cell "0" [ref=e28474]
+              - cell "Attivo" [ref=e28475]:
+                - generic [ref=e28476]: Attivo
+              - cell "Escludi Train" [ref=e28477]:
+                - generic [ref=e28478]:
+                  - button "Escludi" [ref=e28479] [cursor=pointer]
+                  - button "Train" [ref=e28480] [cursor=pointer]:
+                    - generic [ref=e28481]: Train
+            - row "USDJPY logo USDJPY USD/JPY Forex 24/5 0 Attivo Escludi Train" [ref=e28482]:
+              - cell "USDJPY logo USDJPY" [ref=e28483]:
+                - generic [ref=e28484]:
+                  - img "USDJPY logo" [ref=e28487]
+                  - generic [ref=e28488]: USDJPY
+              - cell "USD/JPY" [ref=e28489]
+              - cell "Forex" [ref=e28490]:
+                - generic [ref=e28491]: Forex
+              - cell "24/5" [ref=e28492]
+              - cell "0" [ref=e28493]
+              - cell "Attivo" [ref=e28494]:
+                - generic [ref=e28495]: Attivo
+              - cell "Escludi Train" [ref=e28496]:
+                - generic [ref=e28497]:
+                  - button "Escludi" [ref=e28498] [cursor=pointer]
+                  - button "Train" [ref=e28499] [cursor=pointer]:
+                    - generic [ref=e28500]: Train
+            - row "NAS100 logo NAS100 Nasdaq 100 Index CME 0 Attivo Escludi Train" [ref=e28501]:
+              - cell "NAS100 logo NAS100" [ref=e28502]:
+                - generic [ref=e28503]:
+                  - img "NAS100 logo" [ref=e28506]
+                  - generic [ref=e28507]: NAS100
+              - cell "Nasdaq 100" [ref=e28508]
+              - cell "Index" [ref=e28509]:
+                - generic [ref=e28510]: Index
+              - cell "CME" [ref=e28511]
+              - cell "0" [ref=e28512]
+              - cell "Attivo" [ref=e28513]:
+                - generic [ref=e28514]: Attivo
+              - cell "Escludi Train" [ref=e28515]:
+                - generic [ref=e28516]:
+                  - button "Escludi" [ref=e28517] [cursor=pointer]
+                  - button "Train" [ref=e28518] [cursor=pointer]:
+                    - generic [ref=e28519]: Train
+    - contentinfo [ref=e666]:
+      - generic [ref=e667]: MANTIS AI
+      - generic [ref=e668]: •
+      - generic [ref=e669]: v1.0
+      - generic [ref=e670]: •
+      - generic [ref=e671]: Demo Mode
+  - complementary "Signal audit" [ref=e672]

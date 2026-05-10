@@ -1,0 +1,417 @@
+- generic [ref=e41]:
+  - generic [ref=e42]:
+    - img [ref=e46]
+    - navigation [ref=e53]:
+      - link [ref=e55] [cursor=pointer]:
+        - /url: "#/dashboard"
+        - img
+      - link [ref=e57] [cursor=pointer]:
+        - /url: "#/positions"
+        - img
+      - link [ref=e59] [cursor=pointer]:
+        - /url: "#/signals"
+        - img
+      - link [ref=e61] [cursor=pointer]:
+        - /url: "#/markets"
+        - img
+      - link [ref=e63] [cursor=pointer]:
+        - /url: "#/news"
+        - img
+      - link [ref=e65] [cursor=pointer]:
+        - /url: "#/paper-trading"
+        - img
+      - link [ref=e67] [cursor=pointer]:
+        - /url: "#/trade-journal"
+        - img
+      - link [ref=e69] [cursor=pointer]:
+        - /url: "#/backtest"
+        - img
+      - link [ref=e71] [cursor=pointer]:
+        - /url: "#/performance"
+        - img
+      - link [ref=e73] [cursor=pointer]:
+        - /url: "#/strategy"
+        - img
+      - link [ref=e75] [cursor=pointer]:
+        - /url: "#/models"
+        - img
+      - link [ref=e77] [cursor=pointer]:
+        - /url: "#/notifications"
+        - img
+      - link [ref=e79] [cursor=pointer]:
+        - /url: "#/settings"
+        - img
+      - link [ref=e81] [cursor=pointer]:
+        - /url: "#/system-logs"
+        - img
+    - button "Toggle sidebar fold" [ref=e83] [cursor=pointer]
+  - generic [ref=e84]:
+    - banner [ref=e85]:
+      - generic [ref=e86]:
+        - button "Toggle navigation" [ref=e87] [cursor=pointer]:
+          - img
+        - navigation [ref=e88]:
+          - link "Dashboard" [ref=e90] [cursor=pointer]:
+            - /url: "#/dashboard"
+          - link "Posizioni" [ref=e92] [cursor=pointer]:
+            - /url: "#/positions"
+          - link "Segnali" [ref=e94] [cursor=pointer]:
+            - /url: "#/signals"
+          - link "News Feed" [ref=e96] [cursor=pointer]:
+            - /url: "#/news"
+        - navigation [ref=e97]:
+          - generic [ref=e99]:
+            - generic [ref=e100]:
+              - generic [ref=e101]: Oggi
+              - generic [ref=e102]: +0,00
+            - generic [ref=e103]:
+              - generic [ref=e104]: Live
+              - generic [ref=e105]: +5,00
+          - generic [ref=e111]: Live
+          - button "Notifiche" [ref=e116] [cursor=pointer]:
+            - img
+          - button "Open theme picker" [ref=e120] [cursor=pointer]:
+            - img
+          - button "User menu" [ref=e125] [cursor=pointer]:
+            - img "Bakko^ avatar" [ref=e128]
+            - generic [ref=e129]: Bakko^
+            - img
+    - main "Dashboard v2 cockpit" [ref=e133]:
+      - group "Operational status" [ref=e135]:
+        - region "Live P&L" [ref=e136]:
+          - generic [ref=e137]:
+            - generic [ref=e138]: SESSION · Live P&L
+            - generic [ref=e140]: LONDON
+          - generic [ref=e141]:
+            - text: +$5,00
+            - generic [ref=e142]: ▲ 0,06%
+          - generic [ref=e143]:
+            - generic [ref=e144]: Realized
+            - generic [ref=e145]: $0,00
+            - generic [ref=e146]: ·
+            - generic [ref=e147]: Unrealized
+            - generic [ref=e148]: +$5,00
+          - generic [ref=e149]:
+            - generic [ref=e150]:
+              - generic [ref=e151]: Equity
+              - generic [ref=e152]: $8.978,13
+            - generic [ref=e153]:
+              - generic [ref=e154]: Trades
+              - generic [ref=e155]: "179"
+            - generic [ref=e156]:
+              - generic [ref=e157]: Peak
+              - generic [ref=e158]: +$317,27
+        - region "Open positions" [ref=e159]:
+          - generic [ref=e160]:
+            - generic [ref=e161]: Open Positions · 1/8
+            - generic [ref=e162]:
+              - generic [ref=e163]: Kelly ½ · 0%
+              - generic [ref=e164]: ·
+              - generic [ref=e165]: 7 slots free
+              - button "Emergency kill switch" [ref=e166] [cursor=pointer]: KILL SWITCH
+          - button "Select COPPER for swap card" [pressed] [ref=e168] [cursor=pointer]:
+            - generic [ref=e169]:
+              - generic [ref=e170]: COPPER
+              - generic [ref=e171]: ▼SELL
+            - generic [ref=e172]:
+              - generic [ref=e173]: +$5,00
+              - generic [ref=e174]: +0,34%
+        - region "System status" [ref=e175]:
+          - generic [ref=e177]: System
+          - generic [ref=e178]:
+            - generic [ref=e179]:
+              - generic [ref=e180]: Breakers
+              - generic [ref=e181]: 6/6 OK
+            - generic [ref=e182]:
+              - generic [ref=e183]: WS
+              - generic [ref=e184]: Live
+            - generic [ref=e185]:
+              - generic [ref=e186]: Broker
+              - generic [ref=e187]: Capital
+            - generic [ref=e188]:
+              - generic [ref=e189]: Mode
+              - generic [ref=e190]: DEMO
+            - generic [ref=e191]:
+              - generic [ref=e192]: Swap
+              - generic [ref=e193]: "-0.015%"
+            - generic [ref=e194]:
+              - generic [ref=e195]: Regime
+              - generic [ref=e196]: —
+      - generic "Performance Cockpit" [ref=e197]:
+        - generic [ref=e198]:
+          - heading "Performance Cockpit" [level=1] [ref=e199]
+          - generic [ref=e200]: since 2026-04-10 · 179 closed trades · regime-gated
+        - tablist "Timeframe" [ref=e201]:
+          - tab "1D" [ref=e202] [cursor=pointer]
+          - tab "7D" [ref=e203] [cursor=pointer]
+          - tab "30D" [selected] [ref=e204] [cursor=pointer]
+          - tab "90D" [ref=e205] [cursor=pointer]
+          - tab "YTD" [ref=e206] [cursor=pointer]
+          - tab "ALL" [ref=e207] [cursor=pointer]
+          - tab "CUSTOM" [ref=e208] [cursor=pointer]
+      - region "Equity cockpit" [ref=e209]:
+        - group "Performance metrics" [ref=e211]:
+          - generic [ref=e212]:
+            - generic [ref=e213]: Profit Factor
+            - generic [ref=e214]: "1.18"
+            - generic [ref=e215]: gross +$2.1k / −$1.8k · soglia 1.3 ✗
+          - generic [ref=e216]:
+            - generic [ref=e217]: Calmar
+            - generic [ref=e218]: "22.50"
+            - generic [ref=e219]: Sharpe 2.19 · Sortino 3.94
+          - generic [ref=e220]:
+            - generic [ref=e221]: Expectancy
+            - generic [ref=e222]: +$1,77
+            - generic [ref=e223]: per trade · 179 closed
+        - generic [ref=e224]:
+          - generic [ref=e225]:
+            - generic [ref=e226]:
+              - generic [ref=e227]: Equity spine · 30D
+              - generic [ref=e228]:
+                - generic [ref=e229]: equity
+                - generic [ref=e231]: peak
+                - generic [ref=e233]: drawdown
+            - generic [ref=e236]:
+              - generic [ref=e237]: curr $8.973
+              - generic [ref=e238]: ·
+              - generic [ref=e239]: ROI +4,6%
+              - generic [ref=e240]: ·
+              - generic [ref=e241]: ann. +87,5%
+          - generic [ref=e242]:
+            - table [ref=e247]:
+              - row "Charting by TradingView" [ref=e248]:
+                - cell
+                - cell "Charting by TradingView" [ref=e249]:
+                  - link "Charting by TradingView" [ref=e253] [cursor=pointer]:
+                    - /url: https://www.tradingview.com/?utm_medium=lwc-link&utm_campaign=lwc-chart&utm_source=localhost/
+                    - img [ref=e254]
+                - cell [ref=e258]
+              - row [ref=e262]:
+                - cell
+                - cell [ref=e263]
+                - cell [ref=e267]
+            - img
+            - generic: PEAK $9.094
+            - generic: MAX DD -2,5%
+            - generic: BREAKEVEN
+        - group "Drawdown metrics" [ref=e271]:
+          - generic [ref=e272]:
+            - generic [ref=e273]: Max Drawdown
+            - generic [ref=e274]: −2,54%
+            - generic [ref=e275]: 13d dal peak · rec. in corso
+          - generic [ref=e276]:
+            - generic [ref=e277]: Current DD
+            - generic [ref=e278]: −14,92%
+            - generic [ref=e279]: $8.973,13 vs peak $10.546,30
+          - generic [ref=e280]:
+            - generic [ref=e281]: Win Rate
+            - generic [ref=e282]: 53,6%
+            - generic [ref=e283]: 96W · 83L · ▲ +18,0pp
+      - region "Secondary metrics" [ref=e284]:
+        - region "Duration vs PnL scatter" [ref=e286]:
+          - generic [ref=e287]:
+            - generic [ref=e288]: Duration × PnL
+            - generic [ref=e289]: 127 trade · €/h axis
+          - generic [ref=e290]:
+            - img [ref=e291]
+            - generic: +$
+            - generic: −$
+            - generic: dur →
+          - generic [ref=e420]:
+            - generic [ref=e421]:
+              - text: win
+              - generic [ref=e423]: 6h 7m · +$3.62/h
+            - generic [ref=e424]:
+              - text: loss
+              - generic [ref=e426]: 5h 39m · −$3.87/h
+        - region "Commissioni overnight" [ref=e428]:
+          - generic [ref=e429]:
+            - generic [ref=e430]: Commissioni overnight
+            - generic [ref=e431]: CAPITAL · COPPER
+          - generic [ref=e432]:
+            - generic [ref=e433]:
+              - img [ref=e434]
+              - generic [ref=e437]:
+                - generic [ref=e438]: +0,0111%
+                - generic [ref=e439]: per giorno
+            - generic [ref=e440]:
+              - generic [ref=e441]: +$0,17
+              - generic [ref=e442]: / giorno
+              - generic [ref=e443]:
+                - generic [ref=e444]: 7d accum
+                - generic [ref=e445]: +$0,95
+              - generic [ref=e446]:
+                - generic [ref=e447]: COPPER sell
+                - generic [ref=e448]: 236,00
+              - generic [ref=e450]: $1.490,94 notional
+              - generic [ref=e451]:
+                - generic [ref=e452]: prossima
+                - generic [ref=e453]: 9h 18m
+          - generic [ref=e454]:
+            - generic [ref=e455]: long -0,0193%
+            - generic [ref=e456]: ·
+            - generic [ref=e457]: short 0,0111%
+            - generic [ref=e458]: ·
+            - generic [ref=e459]: 3× weekend
+        - region "Daily P&L heatmap" [ref=e461]:
+          - generic [ref=e462]:
+            - generic [ref=e463]: Daily Heatmap · 30d
+            - generic [ref=e464]:
+              - generic [ref=e465]: best +$317,27
+              - generic [ref=e466]: worst −$185,25
+          - generic [ref=e467]:
+            - generic [ref=e468]:
+              - generic [ref=e469]:
+                - generic [ref=e470]: L
+                - generic [ref=e471]: M
+                - generic [ref=e472]: M
+                - generic [ref=e473]: G
+                - generic [ref=e474]: V
+                - generic [ref=e475]: S
+                - generic [ref=e476]: D
+              - generic [ref=e477]:
+                - generic [ref=e478]:
+                  - button "2026-04-10 −$74,97" [ref=e483] [cursor=pointer]:
+                    - generic: −75
+                  - button "2026-04-12 +$53,72" [ref=e485] [cursor=pointer]:
+                    - generic: "+54"
+                - generic [ref=e486]:
+                  - button "2026-04-13 −$120,44" [ref=e487] [cursor=pointer]:
+                    - generic: −120
+                  - button "2026-04-14 −$43,46" [ref=e488] [cursor=pointer]:
+                    - generic: −43
+                  - button "2026-04-15 +$42,79" [ref=e489] [cursor=pointer]:
+                    - generic: "+43"
+                  - button "2026-04-16 −$35,19" [ref=e490] [cursor=pointer]:
+                    - generic: −35
+                  - button "2026-04-17 +$80,31" [ref=e491] [cursor=pointer]:
+                    - generic: "+80"
+                  - button "2026-04-18 +$34,41" [ref=e492] [cursor=pointer]:
+                    - generic: "+34"
+                  - button "2026-04-19 +$317,27" [ref=e493] [cursor=pointer]:
+                    - generic: "+317"
+                - generic [ref=e494]:
+                  - button "2026-05-04 −$26,91" [ref=e495] [cursor=pointer]:
+                    - generic: −27
+                  - button "2026-05-05 −$8,98" [ref=e496] [cursor=pointer]:
+                    - generic: −9
+                  - button "2026-05-06 −$12,36" [ref=e497] [cursor=pointer]:
+                    - generic: −12
+                  - button "2026-05-07 −$3,89" [ref=e498] [cursor=pointer]:
+                    - generic: −4
+                  - button "2026-05-08 −$5,81" [ref=e499] [cursor=pointer]:
+                    - generic: −6
+                  - button "2026-05-09 $0,00" [ref=e500] [cursor=pointer]
+                  - button "2026-05-10 $0,00" [ref=e501] [cursor=pointer]
+            - status [ref=e502]:
+              - generic [ref=e503]: Focus
+              - generic [ref=e504]: dom 10 mag
+              - generic [ref=e505]: — flat
+              - generic [ref=e506]: no trades
+      - region "Trade breakdown per day" [ref=e508]:
+        - generic [ref=e509]:
+          - generic [ref=e510]: Trade Breakdown · per day · BUY ▲ / SELL ▼
+          - generic [ref=e511]:
+            - generic [ref=e512]: 30D · 24 days · Σ 164 trade
+            - generic [ref=e513]: scale p90 · max 19
+            - generic [ref=e514]: TP
+            - generic [ref=e516]: Going
+            - generic [ref=e518]: SL
+        - generic [ref=e520]:
+          - generic [ref=e521]:
+            - generic:
+              - generic: "10"
+              - generic: "8"
+              - generic: "5"
+              - generic: "3"
+            - generic [ref=e522]:
+              - generic "BUY 1 on 2026-04-10" [ref=e523] [cursor=pointer]
+              - generic "BUY 0 on 2026-04-11" [ref=e525] [cursor=pointer]
+              - generic "BUY 0 on 2026-04-12" [ref=e526] [cursor=pointer]
+              - generic "BUY 4 on 2026-04-13" [ref=e527] [cursor=pointer]
+              - generic "BUY 1 on 2026-04-14" [ref=e530] [cursor=pointer]
+              - generic "BUY 2 on 2026-04-15" [ref=e532] [cursor=pointer]
+              - generic "BUY 1 on 2026-04-16" [ref=e534] [cursor=pointer]
+              - generic "BUY 2 on 2026-04-17" [ref=e536] [cursor=pointer]
+              - generic "BUY 0 on 2026-04-18" [ref=e538] [cursor=pointer]
+              - generic "BUY 2 on 2026-04-19" [ref=e539] [cursor=pointer]
+              - generic "BUY 1 on 2026-04-20" [ref=e541] [cursor=pointer]
+              - generic "BUY 1 on 2026-04-21" [ref=e543] [cursor=pointer]
+              - generic "BUY 0 on 2026-04-22" [ref=e545] [cursor=pointer]
+              - generic "BUY 0 on 2026-04-23" [ref=e546] [cursor=pointer]
+              - generic "BUY 1 on 2026-04-24" [ref=e547] [cursor=pointer]
+              - generic "BUY 0 on 2026-04-25" [ref=e549] [cursor=pointer]
+              - generic "BUY 0 on 2026-04-26" [ref=e550] [cursor=pointer]
+              - generic "BUY 0 on 2026-04-27" [ref=e551] [cursor=pointer]
+              - generic "BUY 2 on 2026-04-28" [ref=e552] [cursor=pointer]
+              - generic "BUY 0 on 2026-04-29" [ref=e555] [cursor=pointer]
+              - generic "BUY 7 on 2026-04-30" [ref=e556] [cursor=pointer]
+              - generic "BUY 4 on 2026-05-01" [ref=e559] [cursor=pointer]
+              - generic "BUY 0 on 2026-05-02" [ref=e562] [cursor=pointer]
+              - generic "BUY 0 on 2026-05-03" [ref=e563] [cursor=pointer]
+              - generic "BUY 1 on 2026-05-04" [ref=e564] [cursor=pointer]
+              - generic "BUY 9 on 2026-05-05" [ref=e566] [cursor=pointer]
+              - generic "BUY 1 on 2026-05-06" [ref=e569] [cursor=pointer]
+              - generic "BUY 5 on 2026-05-07" [ref=e571] [cursor=pointer]
+              - generic "BUY 2 on 2026-05-08" [ref=e574] [cursor=pointer]
+              - generic "BUY 0 on 2026-05-09" [ref=e577] [cursor=pointer]
+              - generic "BUY 0 on 2026-05-10" [ref=e578] [cursor=pointer]
+            - generic [ref=e580]: "0"
+            - generic [ref=e581]:
+              - generic "SELL 2 on 2026-04-10" [ref=e582] [cursor=pointer]
+              - generic "SELL 0 on 2026-04-11" [ref=e584] [cursor=pointer]
+              - generic "SELL 1 on 2026-04-12" [ref=e585] [cursor=pointer]
+              - generic "SELL 1 on 2026-04-13" [ref=e587] [cursor=pointer]
+              - generic "SELL 1 on 2026-04-14" [ref=e589] [cursor=pointer]
+              - generic "SELL 3 on 2026-04-15" [ref=e591] [cursor=pointer]
+              - generic "SELL 3 on 2026-04-16" [ref=e594] [cursor=pointer]
+              - generic "SELL 2 on 2026-04-17" [ref=e597] [cursor=pointer]
+              - generic "SELL 1 on 2026-04-18" [ref=e600] [cursor=pointer]
+              - generic "SELL 1 on 2026-04-19" [ref=e602] [cursor=pointer]
+              - generic "SELL 0 on 2026-04-20" [ref=e604] [cursor=pointer]
+              - generic "SELL 1 on 2026-04-21" [ref=e605] [cursor=pointer]
+              - generic "SELL 6 on 2026-04-22" [ref=e607] [cursor=pointer]
+              - generic "SELL 8 on 2026-04-23" [ref=e610] [cursor=pointer]
+              - generic "SELL 8 on 2026-04-24" [ref=e612] [cursor=pointer]
+              - generic "SELL 0 on 2026-04-25" [ref=e615] [cursor=pointer]
+              - generic "SELL 0 on 2026-04-26" [ref=e616] [cursor=pointer]
+              - generic "SELL 7 on 2026-04-27" [ref=e617] [cursor=pointer]
+              - generic "SELL 12 on 2026-04-28" [ref=e620] [cursor=pointer]:
+                - generic: "+12"
+              - generic "SELL 12 on 2026-04-29" [ref=e623] [cursor=pointer]:
+                - generic: "+12"
+              - generic "SELL 3 on 2026-04-30" [ref=e626] [cursor=pointer]
+              - generic "SELL 6 on 2026-05-01" [ref=e629] [cursor=pointer]
+              - generic "SELL 0 on 2026-05-02" [ref=e632] [cursor=pointer]
+              - generic "SELL 0 on 2026-05-03" [ref=e633] [cursor=pointer]
+              - generic "SELL 19 on 2026-05-04" [ref=e634] [cursor=pointer]:
+                - generic: "+19"
+              - generic "SELL 2 on 2026-05-05" [ref=e637] [cursor=pointer]
+              - generic "SELL 1 on 2026-05-06" [ref=e639] [cursor=pointer]
+              - generic "SELL 7 on 2026-05-07" [ref=e641] [cursor=pointer]
+              - generic "SELL 10 on 2026-05-08" [ref=e644] [cursor=pointer]
+              - generic "SELL 0 on 2026-05-09" [ref=e648] [cursor=pointer]
+              - generic "SELL 0 on 2026-05-10" [ref=e649] [cursor=pointer]
+            - generic [ref=e650]:
+              - generic [ref=e651]: 10 apr
+              - generic [ref=e652]: 25 apr
+              - generic [ref=e653]: 10 mag · today
+          - status [ref=e654]:
+            - generic [ref=e655]: Focus day
+            - generic [ref=e656]: dom 10 mag
+            - generic [ref=e657]:
+              - generic [ref=e658]: ▲ BUY 0
+              - generic [ref=e659]: TP 0 · Go 0 · SL 0
+            - generic [ref=e660]:
+              - generic [ref=e661]: ▼ SELL 0
+              - generic [ref=e662]: TP 0 · Go 0 · SL 0
+            - generic [ref=e663]:
+              - generic [ref=e664]: Day P&L
+              - generic [ref=e665]: $0,00
+    - contentinfo [ref=e666]:
+      - generic [ref=e667]: MANTIS AI
+      - generic [ref=e668]: •
+      - generic [ref=e669]: v1.0
+      - generic [ref=e670]: •
+      - generic [ref=e671]: Demo Mode
+  - complementary "Signal audit" [ref=e672]

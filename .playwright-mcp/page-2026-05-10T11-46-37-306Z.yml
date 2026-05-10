@@ -1,0 +1,145 @@
+- generic [ref=e41]:
+  - generic [ref=e42]:
+    - img [ref=e46]
+    - navigation [ref=e53]:
+      - link [ref=e55] [cursor=pointer]:
+        - /url: "#/dashboard"
+        - img
+      - link [ref=e57] [cursor=pointer]:
+        - /url: "#/positions"
+        - img
+      - link [ref=e59] [cursor=pointer]:
+        - /url: "#/signals"
+        - img
+      - link [ref=e61] [cursor=pointer]:
+        - /url: "#/markets"
+        - img
+      - link [ref=e63] [cursor=pointer]:
+        - /url: "#/news"
+        - img
+      - link [ref=e65] [cursor=pointer]:
+        - /url: "#/paper-trading"
+        - img
+      - link [ref=e67] [cursor=pointer]:
+        - /url: "#/trade-journal"
+        - img
+      - link [ref=e69] [cursor=pointer]:
+        - /url: "#/backtest"
+        - img
+      - link [ref=e71] [cursor=pointer]:
+        - /url: "#/performance"
+        - img
+      - link [ref=e73] [cursor=pointer]:
+        - /url: "#/strategy"
+        - img
+      - link [ref=e75] [cursor=pointer]:
+        - /url: "#/models"
+        - img
+      - link [ref=e77] [cursor=pointer]:
+        - /url: "#/notifications"
+        - img
+      - link [ref=e79] [cursor=pointer]:
+        - /url: "#/settings"
+        - img
+      - link [ref=e81] [cursor=pointer]:
+        - /url: "#/system-logs"
+        - img
+    - button "Toggle sidebar fold" [ref=e83] [cursor=pointer]
+  - generic [ref=e84]:
+    - banner [ref=e85]:
+      - generic [ref=e86]:
+        - button "Toggle navigation" [ref=e87] [cursor=pointer]:
+          - img
+        - navigation [ref=e88]:
+          - link "Dashboard" [ref=e90] [cursor=pointer]:
+            - /url: "#/dashboard"
+          - link "Paper Trading" [ref=e674] [cursor=pointer]:
+            - /url: "#/paper-trading"
+          - link "Posizioni" [ref=e92] [cursor=pointer]:
+            - /url: "#/positions"
+          - link "Trade Journal" [ref=e1982] [cursor=pointer]:
+            - /url: "#/trade-journal"
+        - navigation [ref=e97]:
+          - generic [ref=e99]:
+            - generic [ref=e100]:
+              - generic [ref=e101]: Oggi
+              - generic [ref=e102]: +0,00
+            - generic [ref=e103]:
+              - generic [ref=e104]: Live
+              - generic [ref=e105]: +5,00
+          - generic [ref=e111]: Live
+          - button "Notifiche" [ref=e116] [cursor=pointer]:
+            - img
+          - button "Open theme picker" [ref=e120] [cursor=pointer]:
+            - img
+          - button "User menu" [ref=e125] [cursor=pointer]:
+            - img "Bakko^ avatar" [ref=e128]
+            - generic [ref=e129]: Bakko^
+            - img
+    - generic [ref=e28570]:
+      - banner [ref=e28571]:
+        - generic [ref=e28572]:
+          - generic [ref=e28573]: Sistema · Eventi
+          - heading "Notifiche" [level=1] [ref=e28574]
+          - generic [ref=e28575]: 0 totali
+        - generic [ref=e28576]:
+          - button "Reset filtri" [ref=e28577] [cursor=pointer]
+          - button "Segna tutte lette" [ref=e28578] [cursor=pointer]
+      - generic [ref=e28583]:
+        - generic [ref=e28584]:
+          - generic [ref=e28585]: Tipo
+          - combobox [ref=e28586]:
+            - option "Tutti" [selected]
+            - option "TRADE_OPENED"
+            - option "TRADE_CLOSED"
+            - option "SIGNAL_GENERATED"
+            - option "CIRCUIT_BREAKER"
+            - option "DRAWDOWN_EXCEEDED"
+            - option "CONSECUTIVE_LOSSES"
+            - option "RISK_LIMIT_BREACH"
+            - option "POSITION_STUCK"
+            - option "DATABASE_FAILURE"
+            - option "BROKER_DISCONNECTED"
+            - option "BROKER_ERROR"
+            - option "SYSTEM_ERROR"
+            - option "BACKUP_START"
+            - option "BACKUP_COMPLETE"
+        - generic [ref=e28587]:
+          - generic [ref=e28588]: Severità
+          - combobox [ref=e28589]:
+            - option "Tutte" [selected]
+            - option "CRITICAL"
+            - option "WARNING"
+            - option "INFO"
+        - generic [ref=e28590]:
+          - generic [ref=e28591]: Asset
+          - textbox "es. XAUUSD" [ref=e28592]
+        - generic [ref=e28593]:
+          - switch "Solo non lette" [ref=e28594]
+          - generic [ref=e28595]: Solo non lette
+      - generic [ref=e28598]:
+        - generic [ref=e28599]: 0 notifiche totali
+        - table [ref=e28602]:
+          - rowgroup [ref=e28603]:
+            - row "Titolo Messaggio Asset Severità Tempo Azioni" [ref=e28604]:
+              - columnheader [ref=e28605]
+              - columnheader "Titolo" [ref=e28606]
+              - columnheader "Messaggio" [ref=e28607]
+              - columnheader "Asset" [ref=e28608]
+              - columnheader "Severità" [ref=e28609]
+              - columnheader "Tempo" [ref=e28610]
+              - columnheader "Azioni" [ref=e28611]
+          - rowgroup [ref=e28612]:
+            - row "🔔 Nessuna notifica Le notifiche appariranno qui quando il sistema genererà eventi" [ref=e28613]:
+              - cell "🔔 Nessuna notifica Le notifiche appariranno qui quando il sistema genererà eventi" [ref=e28614]:
+                - generic [ref=e28615]:
+                  - generic [ref=e28616]: 🔔
+                  - generic [ref=e28617]: Nessuna notifica
+                  - generic [ref=e28618]: Le notifiche appariranno qui quando il sistema genererà eventi
+    - contentinfo [ref=e666]:
+      - generic [ref=e667]: MANTIS AI
+      - generic [ref=e668]: •
+      - generic [ref=e669]: v1.0
+      - generic [ref=e670]: •
+      - generic [ref=e671]: Demo Mode
+  - complementary "Signal audit" [ref=e672]

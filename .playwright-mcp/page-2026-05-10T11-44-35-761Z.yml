@@ -1,0 +1,1171 @@
+- generic [ref=e41]:
+  - generic [ref=e42]:
+    - img [ref=e46]
+    - navigation [ref=e53]:
+      - link [ref=e55] [cursor=pointer]:
+        - /url: "#/dashboard"
+        - img
+      - link [ref=e57] [cursor=pointer]:
+        - /url: "#/positions"
+        - img
+      - link [ref=e59] [cursor=pointer]:
+        - /url: "#/signals"
+        - img
+      - link [ref=e61] [cursor=pointer]:
+        - /url: "#/markets"
+        - img
+      - link [ref=e63] [cursor=pointer]:
+        - /url: "#/news"
+        - img
+      - link [ref=e65] [cursor=pointer]:
+        - /url: "#/paper-trading"
+        - img
+      - link [ref=e67] [cursor=pointer]:
+        - /url: "#/trade-journal"
+        - img
+      - link [ref=e69] [cursor=pointer]:
+        - /url: "#/backtest"
+        - img
+      - link [ref=e71] [cursor=pointer]:
+        - /url: "#/performance"
+        - img
+      - link [ref=e73] [cursor=pointer]:
+        - /url: "#/strategy"
+        - img
+      - link [ref=e75] [cursor=pointer]:
+        - /url: "#/models"
+        - img
+      - link [ref=e77] [cursor=pointer]:
+        - /url: "#/notifications"
+        - img
+      - link [ref=e79] [cursor=pointer]:
+        - /url: "#/settings"
+        - img
+      - link [ref=e81] [cursor=pointer]:
+        - /url: "#/system-logs"
+        - img
+    - button "Toggle sidebar fold" [ref=e83] [cursor=pointer]
+  - generic [ref=e84]:
+    - banner [ref=e85]:
+      - generic [ref=e86]:
+        - button "Toggle navigation" [ref=e87] [cursor=pointer]:
+          - img
+        - navigation [ref=e88]:
+          - link "Dashboard" [ref=e90] [cursor=pointer]:
+            - /url: "#/dashboard"
+          - link "Paper Trading" [ref=e674] [cursor=pointer]:
+            - /url: "#/paper-trading"
+          - link "Posizioni" [ref=e92] [cursor=pointer]:
+            - /url: "#/positions"
+          - link "Trade Journal" [ref=e1982] [cursor=pointer]:
+            - /url: "#/trade-journal"
+        - navigation [ref=e97]:
+          - generic [ref=e99]:
+            - generic [ref=e100]:
+              - generic [ref=e101]: Oggi
+              - generic [ref=e102]: +0,00
+            - generic [ref=e103]:
+              - generic [ref=e104]: Live
+              - generic [ref=e105]: +5,00
+          - generic [ref=e111]: Live
+          - button "Notifiche" [ref=e116] [cursor=pointer]:
+            - img
+          - button "Open theme picker" [ref=e120] [cursor=pointer]:
+            - img
+          - button "User menu" [ref=e125] [cursor=pointer]:
+            - img "Bakko^ avatar" [ref=e128]
+            - generic [ref=e129]: Bakko^
+            - img
+    - generic [ref=e3027]:
+      - banner [ref=e3028]:
+        - generic [ref=e3029]:
+          - generic [ref=e3030]: Trading · Intelligenza
+          - heading "Segnali AI" [level=1] [ref=e3031]
+          - generic [ref=e3032]: 64 totali · 0% eseguiti · conf. media 42%
+        - button "Test Signal" [ref=e3034] [cursor=pointer]
+      - generic [ref=e3035]:
+        - generic [ref=e3036]: Segnali di Trading (64)
+        - generic [ref=e3037]:
+          - generic [ref=e3040]:
+            - generic [ref=e3041]: Segnali Totali
+            - generic [ref=e3042]: "64"
+          - generic [ref=e3045]:
+            - generic [ref=e3046]: Eseguiti
+            - generic [ref=e3047]: 0%
+          - generic [ref=e3050]:
+            - generic [ref=e3051]: Confidenza Media
+            - generic [ref=e3052]: 42%
+          - generic [ref=e3055]:
+            - generic [ref=e3056]: Top Strategia
+            - generic [ref=e3057]: mean_reversion
+        - table [ref=e3061]:
+          - rowgroup [ref=e3062]:
+            - row "Asset Dir Confidenza Entry SL TP Regime Status Data" [ref=e3063]:
+              - columnheader "Asset" [ref=e3064]
+              - columnheader "Dir" [ref=e3065]
+              - columnheader "Confidenza" [ref=e3066]
+              - columnheader "Entry" [ref=e3067]
+              - columnheader "SL" [ref=e3068]
+              - columnheader "TP" [ref=e3069]
+              - columnheader "Regime" [ref=e3070]
+              - columnheader "Status" [ref=e3071]
+              - columnheader "Data" [ref=e3072]
+          - rowgroup [ref=e3073]:
+            - row "BNBUSD logo BNBUSD HOLD 39.27870690822601 39% 648.0 — — - hold 10/05, 10:00" [ref=e3074]:
+              - cell "BNBUSD logo BNBUSD" [ref=e3075]:
+                - generic [ref=e3076]:
+                  - img "BNBUSD logo" [ref=e3079]
+                  - text: BNBUSD
+              - cell "HOLD" [ref=e3080]:
+                - generic [ref=e3081]: HOLD
+              - cell "39.27870690822601 39%" [ref=e3082]:
+                - generic [ref=e3083]:
+                  - progressbar [ref=e3084]:
+                    - progressbar [ref=e3085]
+                  - generic [ref=e3086]: 39%
+              - cell "648.0" [ref=e3087]
+              - cell "—" [ref=e3088]
+              - cell "—" [ref=e3089]
+              - cell "-" [ref=e3090]
+              - cell "hold" [ref=e3091]:
+                - generic [ref=e3092]: hold
+              - cell "10/05, 10:00" [ref=e3094]
+            - row "ETHUSD logo ETHUSD HOLD 0% 2,327.4 — — - hold 10/05, 10:00" [ref=e3095]:
+              - cell "ETHUSD logo ETHUSD" [ref=e3096]:
+                - generic [ref=e3097]:
+                  - img "ETHUSD logo" [ref=e3100]
+                  - text: ETHUSD
+              - cell "HOLD" [ref=e3101]:
+                - generic [ref=e3102]: HOLD
+              - cell "0%" [ref=e3103]:
+                - generic [ref=e3106]: 0%
+              - cell "2,327.4" [ref=e3107]
+              - cell "—" [ref=e3108]
+              - cell "—" [ref=e3109]
+              - cell "-" [ref=e3110]
+              - cell "hold" [ref=e3111]:
+                - generic [ref=e3112]: hold
+              - cell "10/05, 10:00" [ref=e3114]
+            - row "SOLUSD logo SOLUSD HOLD 0% 93.35 — — - hold 10/05, 10:00" [ref=e3115]:
+              - cell "SOLUSD logo SOLUSD" [ref=e3116]:
+                - generic [ref=e3117]:
+                  - img "SOLUSD logo" [ref=e3120]
+                  - text: SOLUSD
+              - cell "HOLD" [ref=e3121]:
+                - generic [ref=e3122]: HOLD
+              - cell "0%" [ref=e3123]:
+                - generic [ref=e3126]: 0%
+              - cell "93.35" [ref=e3127]
+              - cell "—" [ref=e3128]
+              - cell "—" [ref=e3129]
+              - cell "-" [ref=e3130]
+              - cell "hold" [ref=e3131]:
+                - generic [ref=e3132]: hold
+              - cell "10/05, 10:00" [ref=e3134]
+            - row "BTCUSD logo BTCUSD HOLD 37.86977231502533 38% 80,744 — — - hold 10/05, 10:00" [ref=e3135]:
+              - cell "BTCUSD logo BTCUSD" [ref=e3136]:
+                - generic [ref=e3137]:
+                  - img "BTCUSD logo" [ref=e3140]
+                  - text: BTCUSD
+              - cell "HOLD" [ref=e3141]:
+                - generic [ref=e3142]: HOLD
+              - cell "37.86977231502533 38%" [ref=e3143]:
+                - generic [ref=e3144]:
+                  - progressbar [ref=e3145]:
+                    - progressbar [ref=e3146]
+                  - generic [ref=e3147]: 38%
+              - cell "80,744" [ref=e3148]
+              - cell "—" [ref=e3149]
+              - cell "—" [ref=e3150]
+              - cell "-" [ref=e3151]
+              - cell "hold" [ref=e3152]:
+                - generic [ref=e3153]: hold
+              - cell "10/05, 10:00" [ref=e3155]
+            - row "BNBUSD logo BNBUSD HOLD 39.53906297683716 40% 648.9 — — - hold 10/05, 06:00" [ref=e3156]:
+              - cell "BNBUSD logo BNBUSD" [ref=e3157]:
+                - generic [ref=e3158]:
+                  - img "BNBUSD logo" [ref=e3161]
+                  - text: BNBUSD
+              - cell "HOLD" [ref=e3162]:
+                - generic [ref=e3163]: HOLD
+              - cell "39.53906297683716 40%" [ref=e3164]:
+                - generic [ref=e3165]:
+                  - progressbar [ref=e3166]:
+                    - progressbar [ref=e3167]
+                  - generic [ref=e3168]: 40%
+              - cell "648.9" [ref=e3169]
+              - cell "—" [ref=e3170]
+              - cell "—" [ref=e3171]
+              - cell "-" [ref=e3172]
+              - cell "hold" [ref=e3173]:
+                - generic [ref=e3174]: hold
+              - cell "10/05, 06:00" [ref=e3176]
+            - row "ETHUSD logo ETHUSD HOLD 0% 2,325.3 — — - hold 10/05, 06:00" [ref=e3177]:
+              - cell "ETHUSD logo ETHUSD" [ref=e3178]:
+                - generic [ref=e3179]:
+                  - img "ETHUSD logo" [ref=e3182]
+                  - text: ETHUSD
+              - cell "HOLD" [ref=e3183]:
+                - generic [ref=e3184]: HOLD
+              - cell "0%" [ref=e3185]:
+                - generic [ref=e3188]: 0%
+              - cell "2,325.3" [ref=e3189]
+              - cell "—" [ref=e3190]
+              - cell "—" [ref=e3191]
+              - cell "-" [ref=e3192]
+              - cell "hold" [ref=e3193]:
+                - generic [ref=e3194]: hold
+              - cell "10/05, 06:00" [ref=e3196]
+            - row "SOLUSD logo SOLUSD HOLD 0% 92.99 — — - hold 10/05, 06:00" [ref=e3197]:
+              - cell "SOLUSD logo SOLUSD" [ref=e3198]:
+                - generic [ref=e3199]:
+                  - img "SOLUSD logo" [ref=e3202]
+                  - text: SOLUSD
+              - cell "HOLD" [ref=e3203]:
+                - generic [ref=e3204]: HOLD
+              - cell "0%" [ref=e3205]:
+                - generic [ref=e3208]: 0%
+              - cell "92.99" [ref=e3209]
+              - cell "—" [ref=e3210]
+              - cell "—" [ref=e3211]
+              - cell "-" [ref=e3212]
+              - cell "hold" [ref=e3213]:
+                - generic [ref=e3214]: hold
+              - cell "10/05, 06:00" [ref=e3216]
+            - row "BTCUSD logo BTCUSD HOLD 0% 80,639 — — - hold 10/05, 06:00" [ref=e3217]:
+              - cell "BTCUSD logo BTCUSD" [ref=e3218]:
+                - generic [ref=e3219]:
+                  - img "BTCUSD logo" [ref=e3222]
+                  - text: BTCUSD
+              - cell "HOLD" [ref=e3223]:
+                - generic [ref=e3224]: HOLD
+              - cell "0%" [ref=e3225]:
+                - generic [ref=e3228]: 0%
+              - cell "80,639" [ref=e3229]
+              - cell "—" [ref=e3230]
+              - cell "—" [ref=e3231]
+              - cell "-" [ref=e3232]
+              - cell "hold" [ref=e3233]:
+                - generic [ref=e3234]: hold
+              - cell "10/05, 06:00" [ref=e3236]
+            - row "BNBUSD logo BNBUSD HOLD 39.53906297683716 40% 650.6 — — - hold 10/05, 02:00" [ref=e3237]:
+              - cell "BNBUSD logo BNBUSD" [ref=e3238]:
+                - generic [ref=e3239]:
+                  - img "BNBUSD logo" [ref=e3242]
+                  - text: BNBUSD
+              - cell "HOLD" [ref=e3243]:
+                - generic [ref=e3244]: HOLD
+              - cell "39.53906297683716 40%" [ref=e3245]:
+                - generic [ref=e3246]:
+                  - progressbar [ref=e3247]:
+                    - progressbar [ref=e3248]
+                  - generic [ref=e3249]: 40%
+              - cell "650.6" [ref=e3250]
+              - cell "—" [ref=e3251]
+              - cell "—" [ref=e3252]
+              - cell "-" [ref=e3253]
+              - cell "hold" [ref=e3254]:
+                - generic [ref=e3255]: hold
+              - cell "10/05, 02:00" [ref=e3257]
+            - row "ETHUSD logo ETHUSD HOLD 0% 2,329.7 — — - hold 10/05, 02:00" [ref=e3258]:
+              - cell "ETHUSD logo ETHUSD" [ref=e3259]:
+                - generic [ref=e3260]:
+                  - img "ETHUSD logo" [ref=e3263]
+                  - text: ETHUSD
+              - cell "HOLD" [ref=e3264]:
+                - generic [ref=e3265]: HOLD
+              - cell "0%" [ref=e3266]:
+                - generic [ref=e3269]: 0%
+              - cell "2,329.7" [ref=e3270]
+              - cell "—" [ref=e3271]
+              - cell "—" [ref=e3272]
+              - cell "-" [ref=e3273]
+              - cell "hold" [ref=e3274]:
+                - generic [ref=e3275]: hold
+              - cell "10/05, 02:00" [ref=e3277]
+            - row "SOLUSD logo SOLUSD HOLD 0% 93.37 — — - hold 10/05, 02:00" [ref=e3278]:
+              - cell "SOLUSD logo SOLUSD" [ref=e3279]:
+                - generic [ref=e3280]:
+                  - img "SOLUSD logo" [ref=e3283]
+                  - text: SOLUSD
+              - cell "HOLD" [ref=e3284]:
+                - generic [ref=e3285]: HOLD
+              - cell "0%" [ref=e3286]:
+                - generic [ref=e3289]: 0%
+              - cell "93.37" [ref=e3290]
+              - cell "—" [ref=e3291]
+              - cell "—" [ref=e3292]
+              - cell "-" [ref=e3293]
+              - cell "hold" [ref=e3294]:
+                - generic [ref=e3295]: hold
+              - cell "10/05, 02:00" [ref=e3297]
+            - row "BTCUSD logo BTCUSD HOLD 0% 80,882 — — - hold 10/05, 02:00" [ref=e3298]:
+              - cell "BTCUSD logo BTCUSD" [ref=e3299]:
+                - generic [ref=e3300]:
+                  - img "BTCUSD logo" [ref=e3303]
+                  - text: BTCUSD
+              - cell "HOLD" [ref=e3304]:
+                - generic [ref=e3305]: HOLD
+              - cell "0%" [ref=e3306]:
+                - generic [ref=e3309]: 0%
+              - cell "80,882" [ref=e3310]
+              - cell "—" [ref=e3311]
+              - cell "—" [ref=e3312]
+              - cell "-" [ref=e3313]
+              - cell "hold" [ref=e3314]:
+                - generic [ref=e3315]: hold
+              - cell "10/05, 02:00" [ref=e3317]
+            - row "BNBUSD logo BNBUSD HOLD 39.27870690822601 39% 648.1 — — - hold 09/05, 22:00" [ref=e3318]:
+              - cell "BNBUSD logo BNBUSD" [ref=e3319]:
+                - generic [ref=e3320]:
+                  - img "BNBUSD logo" [ref=e3323]
+                  - text: BNBUSD
+              - cell "HOLD" [ref=e3324]:
+                - generic [ref=e3325]: HOLD
+              - cell "39.27870690822601 39%" [ref=e3326]:
+                - generic [ref=e3327]:
+                  - progressbar [ref=e3328]:
+                    - progressbar [ref=e3329]
+                  - generic [ref=e3330]: 39%
+              - cell "648.1" [ref=e3331]
+              - cell "—" [ref=e3332]
+              - cell "—" [ref=e3333]
+              - cell "-" [ref=e3334]
+              - cell "hold" [ref=e3335]:
+                - generic [ref=e3336]: hold
+              - cell "09/05, 22:00" [ref=e3338]
+            - row "ETHUSD logo ETHUSD HOLD 0% 2,321.1 — — - hold 09/05, 22:00" [ref=e3339]:
+              - cell "ETHUSD logo ETHUSD" [ref=e3340]:
+                - generic [ref=e3341]:
+                  - img "ETHUSD logo" [ref=e3344]
+                  - text: ETHUSD
+              - cell "HOLD" [ref=e3345]:
+                - generic [ref=e3346]: HOLD
+              - cell "0%" [ref=e3347]:
+                - generic [ref=e3350]: 0%
+              - cell "2,321.1" [ref=e3351]
+              - cell "—" [ref=e3352]
+              - cell "—" [ref=e3353]
+              - cell "-" [ref=e3354]
+              - cell "hold" [ref=e3355]:
+                - generic [ref=e3356]: hold
+              - cell "09/05, 22:00" [ref=e3358]
+            - row "SOLUSD logo SOLUSD HOLD 0% 92.96 — — - hold 09/05, 22:00" [ref=e3359]:
+              - cell "SOLUSD logo SOLUSD" [ref=e3360]:
+                - generic [ref=e3361]:
+                  - img "SOLUSD logo" [ref=e3364]
+                  - text: SOLUSD
+              - cell "HOLD" [ref=e3365]:
+                - generic [ref=e3366]: HOLD
+              - cell "0%" [ref=e3367]:
+                - generic [ref=e3370]: 0%
+              - cell "92.96" [ref=e3371]
+              - cell "—" [ref=e3372]
+              - cell "—" [ref=e3373]
+              - cell "-" [ref=e3374]
+              - cell "hold" [ref=e3375]:
+                - generic [ref=e3376]: hold
+              - cell "09/05, 22:00" [ref=e3378]
+            - row "BTCUSD logo BTCUSD HOLD 0% 80,498 — — - hold 09/05, 22:00" [ref=e3379]:
+              - cell "BTCUSD logo BTCUSD" [ref=e3380]:
+                - generic [ref=e3381]:
+                  - img "BTCUSD logo" [ref=e3384]
+                  - text: BTCUSD
+              - cell "HOLD" [ref=e3385]:
+                - generic [ref=e3386]: HOLD
+              - cell "0%" [ref=e3387]:
+                - generic [ref=e3390]: 0%
+              - cell "80,498" [ref=e3391]
+              - cell "—" [ref=e3392]
+              - cell "—" [ref=e3393]
+              - cell "-" [ref=e3394]
+              - cell "hold" [ref=e3395]:
+                - generic [ref=e3396]: hold
+              - cell "09/05, 22:00" [ref=e3398]
+            - row "BNBUSD logo BNBUSD HOLD 36.36409938335419 36% 649.7 — — - hold 09/05, 18:00" [ref=e3399]:
+              - cell "BNBUSD logo BNBUSD" [ref=e3400]:
+                - generic [ref=e3401]:
+                  - img "BNBUSD logo" [ref=e3404]
+                  - text: BNBUSD
+              - cell "HOLD" [ref=e3405]:
+                - generic [ref=e3406]: HOLD
+              - cell "36.36409938335419 36%" [ref=e3407]:
+                - generic [ref=e3408]:
+                  - progressbar [ref=e3409]:
+                    - progressbar [ref=e3410]
+                  - generic [ref=e3411]: 36%
+              - cell "649.7" [ref=e3412]
+              - cell "—" [ref=e3413]
+              - cell "—" [ref=e3414]
+              - cell "-" [ref=e3415]
+              - cell "hold" [ref=e3416]:
+                - generic [ref=e3417]: hold
+              - cell "09/05, 18:00" [ref=e3419]
+            - row "ETHUSD logo ETHUSD HOLD 0% 2,314.5 — — - hold 09/05, 18:00" [ref=e3420]:
+              - cell "ETHUSD logo ETHUSD" [ref=e3421]:
+                - generic [ref=e3422]:
+                  - img "ETHUSD logo" [ref=e3425]
+                  - text: ETHUSD
+              - cell "HOLD" [ref=e3426]:
+                - generic [ref=e3427]: HOLD
+              - cell "0%" [ref=e3428]:
+                - generic [ref=e3431]: 0%
+              - cell "2,314.5" [ref=e3432]
+              - cell "—" [ref=e3433]
+              - cell "—" [ref=e3434]
+              - cell "-" [ref=e3435]
+              - cell "hold" [ref=e3436]:
+                - generic [ref=e3437]: hold
+              - cell "09/05, 18:00" [ref=e3439]
+            - row "SOLUSD logo SOLUSD HOLD 0% 93.50 — — - hold 09/05, 18:00" [ref=e3440]:
+              - cell "SOLUSD logo SOLUSD" [ref=e3441]:
+                - generic [ref=e3442]:
+                  - img "SOLUSD logo" [ref=e3445]
+                  - text: SOLUSD
+              - cell "HOLD" [ref=e3446]:
+                - generic [ref=e3447]: HOLD
+              - cell "0%" [ref=e3448]:
+                - generic [ref=e3451]: 0%
+              - cell "93.50" [ref=e3452]
+              - cell "—" [ref=e3453]
+              - cell "—" [ref=e3454]
+              - cell "-" [ref=e3455]
+              - cell "hold" [ref=e3456]:
+                - generic [ref=e3457]: hold
+              - cell "09/05, 18:00" [ref=e3459]
+            - row "BTCUSD logo BTCUSD HOLD 0% 80,351 — — - hold 09/05, 18:00" [ref=e3460]:
+              - cell "BTCUSD logo BTCUSD" [ref=e3461]:
+                - generic [ref=e3462]:
+                  - img "BTCUSD logo" [ref=e3465]
+                  - text: BTCUSD
+              - cell "HOLD" [ref=e3466]:
+                - generic [ref=e3467]: HOLD
+              - cell "0%" [ref=e3468]:
+                - generic [ref=e3471]: 0%
+              - cell "80,351" [ref=e3472]
+              - cell "—" [ref=e3473]
+              - cell "—" [ref=e3474]
+              - cell "-" [ref=e3475]
+              - cell "hold" [ref=e3476]:
+                - generic [ref=e3477]: hold
+              - cell "09/05, 18:00" [ref=e3479]
+            - row "BNBUSD logo BNBUSD HOLD 49.53906297683716 50% 650.2 — — - hold 09/05, 14:00" [ref=e3480]:
+              - cell "BNBUSD logo BNBUSD" [ref=e3481]:
+                - generic [ref=e3482]:
+                  - img "BNBUSD logo" [ref=e3485]
+                  - text: BNBUSD
+              - cell "HOLD" [ref=e3486]:
+                - generic [ref=e3487]: HOLD
+              - cell "49.53906297683716 50%" [ref=e3488]:
+                - generic [ref=e3489]:
+                  - progressbar [ref=e3490]:
+                    - progressbar [ref=e3491]
+                  - generic [ref=e3492]: 50%
+              - cell "650.2" [ref=e3493]
+              - cell "—" [ref=e3494]
+              - cell "—" [ref=e3495]
+              - cell "-" [ref=e3496]
+              - cell "hold" [ref=e3497]:
+                - generic [ref=e3498]: hold
+              - cell "09/05, 14:00" [ref=e3500]
+            - row "ETHUSD logo ETHUSD HOLD 0% 2,317.6 — — - hold 09/05, 14:00" [ref=e3501]:
+              - cell "ETHUSD logo ETHUSD" [ref=e3502]:
+                - generic [ref=e3503]:
+                  - img "ETHUSD logo" [ref=e3506]
+                  - text: ETHUSD
+              - cell "HOLD" [ref=e3507]:
+                - generic [ref=e3508]: HOLD
+              - cell "0%" [ref=e3509]:
+                - generic [ref=e3512]: 0%
+              - cell "2,317.6" [ref=e3513]
+              - cell "—" [ref=e3514]
+              - cell "—" [ref=e3515]
+              - cell "-" [ref=e3516]
+              - cell "hold" [ref=e3517]:
+                - generic [ref=e3518]: hold
+              - cell "09/05, 14:00" [ref=e3520]
+            - row "SOLUSD logo SOLUSD HOLD 0% 93.69 — — - hold 09/05, 14:00" [ref=e3521]:
+              - cell "SOLUSD logo SOLUSD" [ref=e3522]:
+                - generic [ref=e3523]:
+                  - img "SOLUSD logo" [ref=e3526]
+                  - text: SOLUSD
+              - cell "HOLD" [ref=e3527]:
+                - generic [ref=e3528]: HOLD
+              - cell "0%" [ref=e3529]:
+                - generic [ref=e3532]: 0%
+              - cell "93.69" [ref=e3533]
+              - cell "—" [ref=e3534]
+              - cell "—" [ref=e3535]
+              - cell "-" [ref=e3536]
+              - cell "hold" [ref=e3537]:
+                - generic [ref=e3538]: hold
+              - cell "09/05, 14:00" [ref=e3540]
+            - row "BTCUSD logo BTCUSD HOLD 0% 80,358 — — - hold 09/05, 14:00" [ref=e3541]:
+              - cell "BTCUSD logo BTCUSD" [ref=e3542]:
+                - generic [ref=e3543]:
+                  - img "BTCUSD logo" [ref=e3546]
+                  - text: BTCUSD
+              - cell "HOLD" [ref=e3547]:
+                - generic [ref=e3548]: HOLD
+              - cell "0%" [ref=e3549]:
+                - generic [ref=e3552]: 0%
+              - cell "80,358" [ref=e3553]
+              - cell "—" [ref=e3554]
+              - cell "—" [ref=e3555]
+              - cell "-" [ref=e3556]
+              - cell "hold" [ref=e3557]:
+                - generic [ref=e3558]: hold
+              - cell "09/05, 14:00" [ref=e3560]
+            - row "USDCAD logo USDCAD HOLD 0% 0.00 — — - market_closed 09/05, 10:00" [ref=e3561]:
+              - cell "USDCAD logo USDCAD" [ref=e3562]:
+                - generic [ref=e3563]:
+                  - img "USDCAD logo" [ref=e3566]
+                  - text: USDCAD
+              - cell "HOLD" [ref=e3567]:
+                - generic [ref=e3568]: HOLD
+              - cell "0%" [ref=e3569]:
+                - generic [ref=e3572]: 0%
+              - cell "0.00" [ref=e3573]
+              - cell "—" [ref=e3574]
+              - cell "—" [ref=e3575]
+              - cell "-" [ref=e3576]
+              - cell "market_closed" [ref=e3577]:
+                - generic [ref=e3578]: market_closed
+              - cell "09/05, 10:00" [ref=e3580]
+            - row "USDCHF logo USDCHF HOLD 0% 0.00 — — - market_closed 09/05, 10:00" [ref=e3581]:
+              - cell "USDCHF logo USDCHF" [ref=e3582]:
+                - generic [ref=e3583]:
+                  - img "USDCHF logo" [ref=e3586]
+                  - text: USDCHF
+              - cell "HOLD" [ref=e3587]:
+                - generic [ref=e3588]: HOLD
+              - cell "0%" [ref=e3589]:
+                - generic [ref=e3592]: 0%
+              - cell "0.00" [ref=e3593]
+              - cell "—" [ref=e3594]
+              - cell "—" [ref=e3595]
+              - cell "-" [ref=e3596]
+              - cell "market_closed" [ref=e3597]:
+                - generic [ref=e3598]: market_closed
+              - cell "09/05, 10:00" [ref=e3600]
+            - row "AMD logo AMD HOLD 0% 0.00 — — - market_closed 09/05, 10:00" [ref=e3601]:
+              - cell "AMD logo AMD" [ref=e3602]:
+                - generic [ref=e3603]:
+                  - img "AMD logo" [ref=e3606]
+                  - text: AMD
+              - cell "HOLD" [ref=e3607]:
+                - generic [ref=e3608]: HOLD
+              - cell "0%" [ref=e3609]:
+                - generic [ref=e3612]: 0%
+              - cell "0.00" [ref=e3613]
+              - cell "—" [ref=e3614]
+              - cell "—" [ref=e3615]
+              - cell "-" [ref=e3616]
+              - cell "market_closed" [ref=e3617]:
+                - generic [ref=e3618]: market_closed
+              - cell "09/05, 10:00" [ref=e3620]
+            - row "META logo META HOLD 0% 0.00 — — - market_closed 09/05, 10:00" [ref=e3621]:
+              - cell "META logo META" [ref=e3622]:
+                - generic [ref=e3623]:
+                  - img "META logo" [ref=e3626]
+                  - text: META
+              - cell "HOLD" [ref=e3627]:
+                - generic [ref=e3628]: HOLD
+              - cell "0%" [ref=e3629]:
+                - generic [ref=e3632]: 0%
+              - cell "0.00" [ref=e3633]
+              - cell "—" [ref=e3634]
+              - cell "—" [ref=e3635]
+              - cell "-" [ref=e3636]
+              - cell "market_closed" [ref=e3637]:
+                - generic [ref=e3638]: market_closed
+              - cell "09/05, 10:00" [ref=e3640]
+            - row "AMZN logo AMZN HOLD 0% 0.00 — — - market_closed 09/05, 10:00" [ref=e3641]:
+              - cell "AMZN logo AMZN" [ref=e3642]:
+                - generic [ref=e3643]:
+                  - img "AMZN logo" [ref=e3646]
+                  - text: AMZN
+              - cell "HOLD" [ref=e3647]:
+                - generic [ref=e3648]: HOLD
+              - cell "0%" [ref=e3649]:
+                - generic [ref=e3652]: 0%
+              - cell "0.00" [ref=e3653]
+              - cell "—" [ref=e3654]
+              - cell "—" [ref=e3655]
+              - cell "-" [ref=e3656]
+              - cell "market_closed" [ref=e3657]:
+                - generic [ref=e3658]: market_closed
+              - cell "09/05, 10:00" [ref=e3660]
+            - row "GOOGL logo GOOGL HOLD 0% 0.00 — — - market_closed 09/05, 10:00" [ref=e3661]:
+              - cell "GOOGL logo GOOGL" [ref=e3662]:
+                - generic [ref=e3663]:
+                  - img "GOOGL logo" [ref=e3666]
+                  - text: GOOGL
+              - cell "HOLD" [ref=e3667]:
+                - generic [ref=e3668]: HOLD
+              - cell "0%" [ref=e3669]:
+                - generic [ref=e3672]: 0%
+              - cell "0.00" [ref=e3673]
+              - cell "—" [ref=e3674]
+              - cell "—" [ref=e3675]
+              - cell "-" [ref=e3676]
+              - cell "market_closed" [ref=e3677]:
+                - generic [ref=e3678]: market_closed
+              - cell "09/05, 10:00" [ref=e3680]
+            - row "MSFT logo MSFT HOLD 0% 0.00 — — - market_closed 09/05, 10:00" [ref=e3681]:
+              - cell "MSFT logo MSFT" [ref=e3682]:
+                - generic [ref=e3683]:
+                  - img "MSFT logo" [ref=e3686]
+                  - text: MSFT
+              - cell "HOLD" [ref=e3687]:
+                - generic [ref=e3688]: HOLD
+              - cell "0%" [ref=e3689]:
+                - generic [ref=e3692]: 0%
+              - cell "0.00" [ref=e3693]
+              - cell "—" [ref=e3694]
+              - cell "—" [ref=e3695]
+              - cell "-" [ref=e3696]
+              - cell "market_closed" [ref=e3697]:
+                - generic [ref=e3698]: market_closed
+              - cell "09/05, 10:00" [ref=e3700]
+            - row "AAPL logo AAPL HOLD 0% 0.00 — — - market_closed 09/05, 10:00" [ref=e3701]:
+              - cell "AAPL logo AAPL" [ref=e3702]:
+                - generic [ref=e3703]:
+                  - img "AAPL logo" [ref=e3706]
+                  - text: AAPL
+              - cell "HOLD" [ref=e3707]:
+                - generic [ref=e3708]: HOLD
+              - cell "0%" [ref=e3709]:
+                - generic [ref=e3712]: 0%
+              - cell "0.00" [ref=e3713]
+              - cell "—" [ref=e3714]
+              - cell "—" [ref=e3715]
+              - cell "-" [ref=e3716]
+              - cell "market_closed" [ref=e3717]:
+                - generic [ref=e3718]: market_closed
+              - cell "09/05, 10:00" [ref=e3720]
+            - row "USDJPY logo USDJPY HOLD 0% 0.000 — — - market_closed 09/05, 10:00" [ref=e3721]:
+              - cell "USDJPY logo USDJPY" [ref=e3722]:
+                - generic [ref=e3723]:
+                  - img "USDJPY logo" [ref=e3726]
+                  - text: USDJPY
+              - cell "HOLD" [ref=e3727]:
+                - generic [ref=e3728]: HOLD
+              - cell "0%" [ref=e3729]:
+                - generic [ref=e3732]: 0%
+              - cell "0.000" [ref=e3733]
+              - cell "—" [ref=e3734]
+              - cell "—" [ref=e3735]
+              - cell "-" [ref=e3736]
+              - cell "market_closed" [ref=e3737]:
+                - generic [ref=e3738]: market_closed
+              - cell "09/05, 10:00" [ref=e3740]
+            - row "PLATINUM logo PLATINUM HOLD 0% 0.00 — — - market_closed 09/05, 10:00" [ref=e3741]:
+              - cell "PLATINUM logo PLATINUM" [ref=e3742]:
+                - generic [ref=e3743]:
+                  - img "PLATINUM logo" [ref=e3746]
+                  - text: PLATINUM
+              - cell "HOLD" [ref=e3747]:
+                - generic [ref=e3748]: HOLD
+              - cell "0%" [ref=e3749]:
+                - generic [ref=e3752]: 0%
+              - cell "0.00" [ref=e3753]
+              - cell "—" [ref=e3754]
+              - cell "—" [ref=e3755]
+              - cell "-" [ref=e3756]
+              - cell "market_closed" [ref=e3757]:
+                - generic [ref=e3758]: market_closed
+              - cell "09/05, 10:00" [ref=e3760]
+            - row "BNBUSD logo BNBUSD HOLD 52.61593818664551 53% 655.5 — — - hold 09/05, 10:00" [ref=e3761]:
+              - cell "BNBUSD logo BNBUSD" [ref=e3762]:
+                - generic [ref=e3763]:
+                  - img "BNBUSD logo" [ref=e3766]
+                  - text: BNBUSD
+              - cell "HOLD" [ref=e3767]:
+                - generic [ref=e3768]: HOLD
+              - cell "52.61593818664551 53%" [ref=e3769]:
+                - generic [ref=e3770]:
+                  - progressbar [ref=e3771]:
+                    - progressbar [ref=e3772]
+                  - generic [ref=e3773]: 53%
+              - cell "655.5" [ref=e3774]
+              - cell "—" [ref=e3775]
+              - cell "—" [ref=e3776]
+              - cell "-" [ref=e3777]
+              - cell "hold" [ref=e3778]:
+                - generic [ref=e3779]: hold
+              - cell "09/05, 10:00" [ref=e3781]
+            - row "ETHUSD logo ETHUSD HOLD 0% 2,323.6 — — - hold 09/05, 10:00" [ref=e3782]:
+              - cell "ETHUSD logo ETHUSD" [ref=e3783]:
+                - generic [ref=e3784]:
+                  - img "ETHUSD logo" [ref=e3787]
+                  - text: ETHUSD
+              - cell "HOLD" [ref=e3788]:
+                - generic [ref=e3789]: HOLD
+              - cell "0%" [ref=e3790]:
+                - generic [ref=e3793]: 0%
+              - cell "2,323.6" [ref=e3794]
+              - cell "—" [ref=e3795]
+              - cell "—" [ref=e3796]
+              - cell "-" [ref=e3797]
+              - cell "hold" [ref=e3798]:
+                - generic [ref=e3799]: hold
+              - cell "09/05, 10:00" [ref=e3801]
+            - row "SOLUSD logo SOLUSD HOLD 0% 94.02 — — - hold 09/05, 10:00" [ref=e3802]:
+              - cell "SOLUSD logo SOLUSD" [ref=e3803]:
+                - generic [ref=e3804]:
+                  - img "SOLUSD logo" [ref=e3807]
+                  - text: SOLUSD
+              - cell "HOLD" [ref=e3808]:
+                - generic [ref=e3809]: HOLD
+              - cell "0%" [ref=e3810]:
+                - generic [ref=e3813]: 0%
+              - cell "94.02" [ref=e3814]
+              - cell "—" [ref=e3815]
+              - cell "—" [ref=e3816]
+              - cell "-" [ref=e3817]
+              - cell "hold" [ref=e3818]:
+                - generic [ref=e3819]: hold
+              - cell "09/05, 10:00" [ref=e3821]
+            - row "DE40 logo DE40 HOLD 0% 0.0 — — - market_closed 09/05, 10:00" [ref=e3822]:
+              - cell "DE40 logo DE40" [ref=e3823]:
+                - generic [ref=e3824]:
+                  - img "DE40 logo" [ref=e3827]
+                  - text: DE40
+              - cell "HOLD" [ref=e3828]:
+                - generic [ref=e3829]: HOLD
+              - cell "0%" [ref=e3830]:
+                - generic [ref=e3833]: 0%
+              - cell "0.0" [ref=e3834]
+              - cell "—" [ref=e3835]
+              - cell "—" [ref=e3836]
+              - cell "-" [ref=e3837]
+              - cell "market_closed" [ref=e3838]:
+                - generic [ref=e3839]: market_closed
+              - cell "09/05, 10:00" [ref=e3841]
+            - row "TSLA logo TSLA HOLD 0% 0.00 — — - market_closed 09/05, 10:00" [ref=e3842]:
+              - cell "TSLA logo TSLA" [ref=e3843]:
+                - generic [ref=e3844]:
+                  - img "TSLA logo" [ref=e3847]
+                  - text: TSLA
+              - cell "HOLD" [ref=e3848]:
+                - generic [ref=e3849]: HOLD
+              - cell "0%" [ref=e3850]:
+                - generic [ref=e3853]: 0%
+              - cell "0.00" [ref=e3854]
+              - cell "—" [ref=e3855]
+              - cell "—" [ref=e3856]
+              - cell "-" [ref=e3857]
+              - cell "market_closed" [ref=e3858]:
+                - generic [ref=e3859]: market_closed
+              - cell "09/05, 10:00" [ref=e3861]
+            - row "NVDA logo NVDA HOLD 0% 0.00 — — - market_closed 09/05, 10:00" [ref=e3862]:
+              - cell "NVDA logo NVDA" [ref=e3863]:
+                - generic [ref=e3864]:
+                  - img "NVDA logo" [ref=e3867]
+                  - text: NVDA
+              - cell "HOLD" [ref=e3868]:
+                - generic [ref=e3869]: HOLD
+              - cell "0%" [ref=e3870]:
+                - generic [ref=e3873]: 0%
+              - cell "0.00" [ref=e3874]
+              - cell "—" [ref=e3875]
+              - cell "—" [ref=e3876]
+              - cell "-" [ref=e3877]
+              - cell "market_closed" [ref=e3878]:
+                - generic [ref=e3879]: market_closed
+              - cell "09/05, 10:00" [ref=e3881]
+            - row "WTIUSD logo WTIUSD HOLD 0% 0.00 — — - market_closed 09/05, 10:00" [ref=e3882]:
+              - cell "WTIUSD logo WTIUSD" [ref=e3883]:
+                - generic [ref=e3884]:
+                  - img "WTIUSD logo" [ref=e3887]
+                  - text: WTIUSD
+              - cell "HOLD" [ref=e3888]:
+                - generic [ref=e3889]: HOLD
+              - cell "0%" [ref=e3890]:
+                - generic [ref=e3893]: 0%
+              - cell "0.00" [ref=e3894]
+              - cell "—" [ref=e3895]
+              - cell "—" [ref=e3896]
+              - cell "-" [ref=e3897]
+              - cell "market_closed" [ref=e3898]:
+                - generic [ref=e3899]: market_closed
+              - cell "09/05, 10:00" [ref=e3901]
+            - row "US500 logo US500 HOLD 0% 0.0 — — - market_closed 09/05, 10:00" [ref=e3902]:
+              - cell "US500 logo US500" [ref=e3903]:
+                - generic [ref=e3904]:
+                  - img "US500 logo" [ref=e3907]
+                  - text: US500
+              - cell "HOLD" [ref=e3908]:
+                - generic [ref=e3909]: HOLD
+              - cell "0%" [ref=e3910]:
+                - generic [ref=e3913]: 0%
+              - cell "0.0" [ref=e3914]
+              - cell "—" [ref=e3915]
+              - cell "—" [ref=e3916]
+              - cell "-" [ref=e3917]
+              - cell "market_closed" [ref=e3918]:
+                - generic [ref=e3919]: market_closed
+              - cell "09/05, 10:00" [ref=e3921]
+            - row "BTCUSD logo BTCUSD HOLD 0% 80,459 — — - hold 09/05, 10:00" [ref=e3922]:
+              - cell "BTCUSD logo BTCUSD" [ref=e3923]:
+                - generic [ref=e3924]:
+                  - img "BTCUSD logo" [ref=e3927]
+                  - text: BTCUSD
+              - cell "HOLD" [ref=e3928]:
+                - generic [ref=e3929]: HOLD
+              - cell "0%" [ref=e3930]:
+                - generic [ref=e3933]: 0%
+              - cell "80,459" [ref=e3934]
+              - cell "—" [ref=e3935]
+              - cell "—" [ref=e3936]
+              - cell "-" [ref=e3937]
+              - cell "hold" [ref=e3938]:
+                - generic [ref=e3939]: hold
+              - cell "09/05, 10:00" [ref=e3941]
+            - row "XAUUSD logo XAUUSD HOLD 0% 0.00 — — - market_closed 09/05, 10:00" [ref=e3942]:
+              - cell "XAUUSD logo XAUUSD" [ref=e3943]:
+                - generic [ref=e3944]:
+                  - img "XAUUSD logo" [ref=e3947]
+                  - text: XAUUSD
+              - cell "HOLD" [ref=e3948]:
+                - generic [ref=e3949]: HOLD
+              - cell "0%" [ref=e3950]:
+                - generic [ref=e3953]: 0%
+              - cell "0.00" [ref=e3954]
+              - cell "—" [ref=e3955]
+              - cell "—" [ref=e3956]
+              - cell "-" [ref=e3957]
+              - cell "market_closed" [ref=e3958]:
+                - generic [ref=e3959]: market_closed
+              - cell "09/05, 10:00" [ref=e3961]
+            - row "USDCAD logo USDCAD HOLD 0% 0.00 — — - market_closed 09/05, 09:35" [ref=e3962]:
+              - cell "USDCAD logo USDCAD" [ref=e3963]:
+                - generic [ref=e3964]:
+                  - img "USDCAD logo" [ref=e3967]
+                  - text: USDCAD
+              - cell "HOLD" [ref=e3968]:
+                - generic [ref=e3969]: HOLD
+              - cell "0%" [ref=e3970]:
+                - generic [ref=e3973]: 0%
+              - cell "0.00" [ref=e3974]
+              - cell "—" [ref=e3975]
+              - cell "—" [ref=e3976]
+              - cell "-" [ref=e3977]
+              - cell "market_closed" [ref=e3978]:
+                - generic [ref=e3979]: market_closed
+              - cell "09/05, 09:35" [ref=e3981]
+            - row "USDCHF logo USDCHF HOLD 0% 0.00 — — - market_closed 09/05, 09:35" [ref=e3982]:
+              - cell "USDCHF logo USDCHF" [ref=e3983]:
+                - generic [ref=e3984]:
+                  - img "USDCHF logo" [ref=e3987]
+                  - text: USDCHF
+              - cell "HOLD" [ref=e3988]:
+                - generic [ref=e3989]: HOLD
+              - cell "0%" [ref=e3990]:
+                - generic [ref=e3993]: 0%
+              - cell "0.00" [ref=e3994]
+              - cell "—" [ref=e3995]
+              - cell "—" [ref=e3996]
+              - cell "-" [ref=e3997]
+              - cell "market_closed" [ref=e3998]:
+                - generic [ref=e3999]: market_closed
+              - cell "09/05, 09:35" [ref=e4001]
+            - row "AMD logo AMD HOLD 0% 0.00 — — - market_closed 09/05, 09:35" [ref=e4002]:
+              - cell "AMD logo AMD" [ref=e4003]:
+                - generic [ref=e4004]:
+                  - img "AMD logo" [ref=e4007]
+                  - text: AMD
+              - cell "HOLD" [ref=e4008]:
+                - generic [ref=e4009]: HOLD
+              - cell "0%" [ref=e4010]:
+                - generic [ref=e4013]: 0%
+              - cell "0.00" [ref=e4014]
+              - cell "—" [ref=e4015]
+              - cell "—" [ref=e4016]
+              - cell "-" [ref=e4017]
+              - cell "market_closed" [ref=e4018]:
+                - generic [ref=e4019]: market_closed
+              - cell "09/05, 09:35" [ref=e4021]
+            - row "META logo META HOLD 0% 0.00 — — - market_closed 09/05, 09:35" [ref=e4022]:
+              - cell "META logo META" [ref=e4023]:
+                - generic [ref=e4024]:
+                  - img "META logo" [ref=e4027]
+                  - text: META
+              - cell "HOLD" [ref=e4028]:
+                - generic [ref=e4029]: HOLD
+              - cell "0%" [ref=e4030]:
+                - generic [ref=e4033]: 0%
+              - cell "0.00" [ref=e4034]
+              - cell "—" [ref=e4035]
+              - cell "—" [ref=e4036]
+              - cell "-" [ref=e4037]
+              - cell "market_closed" [ref=e4038]:
+                - generic [ref=e4039]: market_closed
+              - cell "09/05, 09:35" [ref=e4041]
+            - row "AMZN logo AMZN HOLD 0% 0.00 — — - market_closed 09/05, 09:35" [ref=e4042]:
+              - cell "AMZN logo AMZN" [ref=e4043]:
+                - generic [ref=e4044]:
+                  - img "AMZN logo" [ref=e4047]
+                  - text: AMZN
+              - cell "HOLD" [ref=e4048]:
+                - generic [ref=e4049]: HOLD
+              - cell "0%" [ref=e4050]:
+                - generic [ref=e4053]: 0%
+              - cell "0.00" [ref=e4054]
+              - cell "—" [ref=e4055]
+              - cell "—" [ref=e4056]
+              - cell "-" [ref=e4057]
+              - cell "market_closed" [ref=e4058]:
+                - generic [ref=e4059]: market_closed
+              - cell "09/05, 09:35" [ref=e4061]
+            - row "GOOGL logo GOOGL HOLD 0% 0.00 — — - market_closed 09/05, 09:35" [ref=e4062]:
+              - cell "GOOGL logo GOOGL" [ref=e4063]:
+                - generic [ref=e4064]:
+                  - img "GOOGL logo" [ref=e4067]
+                  - text: GOOGL
+              - cell "HOLD" [ref=e4068]:
+                - generic [ref=e4069]: HOLD
+              - cell "0%" [ref=e4070]:
+                - generic [ref=e4073]: 0%
+              - cell "0.00" [ref=e4074]
+              - cell "—" [ref=e4075]
+              - cell "—" [ref=e4076]
+              - cell "-" [ref=e4077]
+              - cell "market_closed" [ref=e4078]:
+                - generic [ref=e4079]: market_closed
+              - cell "09/05, 09:35" [ref=e4081]
+            - row "MSFT logo MSFT HOLD 0% 0.00 — — - market_closed 09/05, 09:35" [ref=e4082]:
+              - cell "MSFT logo MSFT" [ref=e4083]:
+                - generic [ref=e4084]:
+                  - img "MSFT logo" [ref=e4087]
+                  - text: MSFT
+              - cell "HOLD" [ref=e4088]:
+                - generic [ref=e4089]: HOLD
+              - cell "0%" [ref=e4090]:
+                - generic [ref=e4093]: 0%
+              - cell "0.00" [ref=e4094]
+              - cell "—" [ref=e4095]
+              - cell "—" [ref=e4096]
+              - cell "-" [ref=e4097]
+              - cell "market_closed" [ref=e4098]:
+                - generic [ref=e4099]: market_closed
+              - cell "09/05, 09:35" [ref=e4101]
+            - row "AAPL logo AAPL HOLD 0% 0.00 — — - market_closed 09/05, 09:35" [ref=e4102]:
+              - cell "AAPL logo AAPL" [ref=e4103]:
+                - generic [ref=e4104]:
+                  - img "AAPL logo" [ref=e4107]
+                  - text: AAPL
+              - cell "HOLD" [ref=e4108]:
+                - generic [ref=e4109]: HOLD
+              - cell "0%" [ref=e4110]:
+                - generic [ref=e4113]: 0%
+              - cell "0.00" [ref=e4114]
+              - cell "—" [ref=e4115]
+              - cell "—" [ref=e4116]
+              - cell "-" [ref=e4117]
+              - cell "market_closed" [ref=e4118]:
+                - generic [ref=e4119]: market_closed
+              - cell "09/05, 09:35" [ref=e4121]
+            - row "USDJPY logo USDJPY HOLD 0% 0.000 — — - market_closed 09/05, 09:35" [ref=e4122]:
+              - cell "USDJPY logo USDJPY" [ref=e4123]:
+                - generic [ref=e4124]:
+                  - img "USDJPY logo" [ref=e4127]
+                  - text: USDJPY
+              - cell "HOLD" [ref=e4128]:
+                - generic [ref=e4129]: HOLD
+              - cell "0%" [ref=e4130]:
+                - generic [ref=e4133]: 0%
+              - cell "0.000" [ref=e4134]
+              - cell "—" [ref=e4135]
+              - cell "—" [ref=e4136]
+              - cell "-" [ref=e4137]
+              - cell "market_closed" [ref=e4138]:
+                - generic [ref=e4139]: market_closed
+              - cell "09/05, 09:35" [ref=e4141]
+            - row "PLATINUM logo PLATINUM HOLD 0% 0.00 — — - market_closed 09/05, 09:35" [ref=e4142]:
+              - cell "PLATINUM logo PLATINUM" [ref=e4143]:
+                - generic [ref=e4144]:
+                  - img "PLATINUM logo" [ref=e4147]
+                  - text: PLATINUM
+              - cell "HOLD" [ref=e4148]:
+                - generic [ref=e4149]: HOLD
+              - cell "0%" [ref=e4150]:
+                - generic [ref=e4153]: 0%
+              - cell "0.00" [ref=e4154]
+              - cell "—" [ref=e4155]
+              - cell "—" [ref=e4156]
+              - cell "-" [ref=e4157]
+              - cell "market_closed" [ref=e4158]:
+                - generic [ref=e4159]: market_closed
+              - cell "09/05, 09:35" [ref=e4161]
+            - row "BNBUSD logo BNBUSD HOLD 42.61593818664551 43% 655.5 — — - hold 09/05, 09:35" [ref=e4162]:
+              - cell "BNBUSD logo BNBUSD" [ref=e4163]:
+                - generic [ref=e4164]:
+                  - img "BNBUSD logo" [ref=e4167]
+                  - text: BNBUSD
+              - cell "HOLD" [ref=e4168]:
+                - generic [ref=e4169]: HOLD
+              - cell "42.61593818664551 43%" [ref=e4170]:
+                - generic [ref=e4171]:
+                  - progressbar [ref=e4172]:
+                    - progressbar [ref=e4173]
+                  - generic [ref=e4174]: 43%
+              - cell "655.5" [ref=e4175]
+              - cell "—" [ref=e4176]
+              - cell "—" [ref=e4177]
+              - cell "-" [ref=e4178]
+              - cell "hold" [ref=e4179]:
+                - generic [ref=e4180]: hold
+              - cell "09/05, 09:35" [ref=e4182]
+            - row "ETHUSD logo ETHUSD HOLD 0% 2,323.6 — — - hold 09/05, 09:35" [ref=e4183]:
+              - cell "ETHUSD logo ETHUSD" [ref=e4184]:
+                - generic [ref=e4185]:
+                  - img "ETHUSD logo" [ref=e4188]
+                  - text: ETHUSD
+              - cell "HOLD" [ref=e4189]:
+                - generic [ref=e4190]: HOLD
+              - cell "0%" [ref=e4191]:
+                - generic [ref=e4194]: 0%
+              - cell "2,323.6" [ref=e4195]
+              - cell "—" [ref=e4196]
+              - cell "—" [ref=e4197]
+              - cell "-" [ref=e4198]
+              - cell "hold" [ref=e4199]:
+                - generic [ref=e4200]: hold
+              - cell "09/05, 09:35" [ref=e4202]
+            - row "SOLUSD logo SOLUSD HOLD 0% 94.02 — — - hold 09/05, 09:35" [ref=e4203]:
+              - cell "SOLUSD logo SOLUSD" [ref=e4204]:
+                - generic [ref=e4205]:
+                  - img "SOLUSD logo" [ref=e4208]
+                  - text: SOLUSD
+              - cell "HOLD" [ref=e4209]:
+                - generic [ref=e4210]: HOLD
+              - cell "0%" [ref=e4211]:
+                - generic [ref=e4214]: 0%
+              - cell "94.02" [ref=e4215]
+              - cell "—" [ref=e4216]
+              - cell "—" [ref=e4217]
+              - cell "-" [ref=e4218]
+              - cell "hold" [ref=e4219]:
+                - generic [ref=e4220]: hold
+              - cell "09/05, 09:35" [ref=e4222]
+            - row "DE40 logo DE40 HOLD 0% 0.0 — — - market_closed 09/05, 09:35" [ref=e4223]:
+              - cell "DE40 logo DE40" [ref=e4224]:
+                - generic [ref=e4225]:
+                  - img "DE40 logo" [ref=e4228]
+                  - text: DE40
+              - cell "HOLD" [ref=e4229]:
+                - generic [ref=e4230]: HOLD
+              - cell "0%" [ref=e4231]:
+                - generic [ref=e4234]: 0%
+              - cell "0.0" [ref=e4235]
+              - cell "—" [ref=e4236]
+              - cell "—" [ref=e4237]
+              - cell "-" [ref=e4238]
+              - cell "market_closed" [ref=e4239]:
+                - generic [ref=e4240]: market_closed
+              - cell "09/05, 09:35" [ref=e4242]
+            - row "TSLA logo TSLA HOLD 0% 0.00 — — - market_closed 09/05, 09:35" [ref=e4243]:
+              - cell "TSLA logo TSLA" [ref=e4244]:
+                - generic [ref=e4245]:
+                  - img "TSLA logo" [ref=e4248]
+                  - text: TSLA
+              - cell "HOLD" [ref=e4249]:
+                - generic [ref=e4250]: HOLD
+              - cell "0%" [ref=e4251]:
+                - generic [ref=e4254]: 0%
+              - cell "0.00" [ref=e4255]
+              - cell "—" [ref=e4256]
+              - cell "—" [ref=e4257]
+              - cell "-" [ref=e4258]
+              - cell "market_closed" [ref=e4259]:
+                - generic [ref=e4260]: market_closed
+              - cell "09/05, 09:35" [ref=e4262]
+            - row "NVDA logo NVDA HOLD 0% 0.00 — — - market_closed 09/05, 09:35" [ref=e4263]:
+              - cell "NVDA logo NVDA" [ref=e4264]:
+                - generic [ref=e4265]:
+                  - img "NVDA logo" [ref=e4268]
+                  - text: NVDA
+              - cell "HOLD" [ref=e4269]:
+                - generic [ref=e4270]: HOLD
+              - cell "0%" [ref=e4271]:
+                - generic [ref=e4274]: 0%
+              - cell "0.00" [ref=e4275]
+              - cell "—" [ref=e4276]
+              - cell "—" [ref=e4277]
+              - cell "-" [ref=e4278]
+              - cell "market_closed" [ref=e4279]:
+                - generic [ref=e4280]: market_closed
+              - cell "09/05, 09:35" [ref=e4282]
+            - row "WTIUSD logo WTIUSD HOLD 0% 0.00 — — - market_closed 09/05, 09:35" [ref=e4283]:
+              - cell "WTIUSD logo WTIUSD" [ref=e4284]:
+                - generic [ref=e4285]:
+                  - img "WTIUSD logo" [ref=e4288]
+                  - text: WTIUSD
+              - cell "HOLD" [ref=e4289]:
+                - generic [ref=e4290]: HOLD
+              - cell "0%" [ref=e4291]:
+                - generic [ref=e4294]: 0%
+              - cell "0.00" [ref=e4295]
+              - cell "—" [ref=e4296]
+              - cell "—" [ref=e4297]
+              - cell "-" [ref=e4298]
+              - cell "market_closed" [ref=e4299]:
+                - generic [ref=e4300]: market_closed
+              - cell "09/05, 09:35" [ref=e4302]
+            - row "US500 logo US500 HOLD 0% 0.0 — — - market_closed 09/05, 09:35" [ref=e4303]:
+              - cell "US500 logo US500" [ref=e4304]:
+                - generic [ref=e4305]:
+                  - img "US500 logo" [ref=e4308]
+                  - text: US500
+              - cell "HOLD" [ref=e4309]:
+                - generic [ref=e4310]: HOLD
+              - cell "0%" [ref=e4311]:
+                - generic [ref=e4314]: 0%
+              - cell "0.0" [ref=e4315]
+              - cell "—" [ref=e4316]
+              - cell "—" [ref=e4317]
+              - cell "-" [ref=e4318]
+              - cell "market_closed" [ref=e4319]:
+                - generic [ref=e4320]: market_closed
+              - cell "09/05, 09:35" [ref=e4322]
+            - row "BTCUSD logo BTCUSD HOLD 0% 80,459 — — - hold 09/05, 09:35" [ref=e4323]:
+              - cell "BTCUSD logo BTCUSD" [ref=e4324]:
+                - generic [ref=e4325]:
+                  - img "BTCUSD logo" [ref=e4328]
+                  - text: BTCUSD
+              - cell "HOLD" [ref=e4329]:
+                - generic [ref=e4330]: HOLD
+              - cell "0%" [ref=e4331]:
+                - generic [ref=e4334]: 0%
+              - cell "80,459" [ref=e4335]
+              - cell "—" [ref=e4336]
+              - cell "—" [ref=e4337]
+              - cell "-" [ref=e4338]
+              - cell "hold" [ref=e4339]:
+                - generic [ref=e4340]: hold
+              - cell "09/05, 09:35" [ref=e4342]
+            - row "XAUUSD logo XAUUSD HOLD 0% 0.00 — — - market_closed 09/05, 09:35" [ref=e4343]:
+              - cell "XAUUSD logo XAUUSD" [ref=e4344]:
+                - generic [ref=e4345]:
+                  - img "XAUUSD logo" [ref=e4348]
+                  - text: XAUUSD
+              - cell "HOLD" [ref=e4349]:
+                - generic [ref=e4350]: HOLD
+              - cell "0%" [ref=e4351]:
+                - generic [ref=e4354]: 0%
+              - cell "0.00" [ref=e4355]
+              - cell "—" [ref=e4356]
+              - cell "—" [ref=e4357]
+              - cell "-" [ref=e4358]
+              - cell "market_closed" [ref=e4359]:
+                - generic [ref=e4360]: market_closed
+              - cell "09/05, 09:35" [ref=e4362]
+    - contentinfo [ref=e666]:
+      - generic [ref=e667]: MANTIS AI
+      - generic [ref=e668]: •
+      - generic [ref=e669]: v1.0
+      - generic [ref=e670]: •
+      - generic [ref=e671]: Demo Mode
+  - complementary "Signal audit" [ref=e672]

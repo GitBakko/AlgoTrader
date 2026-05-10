@@ -1,0 +1,54 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-05-10T09:55:01.529Z",
+  "source": "auto-postool",
+  "partial": false,
+  "phase": null,
+  "phase_name": null,
+  "phase_dir": null,
+  "plan": null,
+  "task": null,
+  "total_tasks": null,
+  "status": "auto-checkpoint",
+  "completed_tasks": [],
+  "remaining_tasks": [],
+  "blockers": [],
+  "human_actions_pending": [],
+  "decisions": [],
+  "uncommitted_files": [
+    {
+      "status": "M",
+      "path": ".claude/scheduled_tasks.lock"
+    },
+    {
+      "status": "M",
+      "path": ".serena/project.yml"
+    },
+    {
+      "status": "M",
+      "path": "backend/tests/broker/test_client.py"
+    },
+    {
+      "status": "??",
+      "path": ".planning/HANDOFF.json"
+    },
+    {
+      "status": "??",
+      "path": ".planning/audit-2026-05-09/"
+    },
+    {
+      "status": "??",
+      "path": ".planning/audit-2026-05-10/"
+    },
+    {
+      "status": "??",
+      "path": "backend/.planning/"
+    },
+    {
+      "status": "??",
+      "path": "backend/data/rag_corpus/"
+    }
+  ],
+  "next_action": null,
+  "context_notes": "Recent commits:\n72b2b4e fix(audit-p2-T2-T7): auth + broker + DRL + API + frontend + sweep\n886d724 fix(audit-p2-T1): backend critical — execution + DB + models\n26b1960 fix(strategy-tests): freeze clock + drop shadowing inline datetime imports\nd913d55 test: align stale tests with current asset universe + risk-mgr settings shape\n5af7503 fix(audit): Tier-3+4 batch (H2 H3 H4 H11 H12 H13 M2 M4 M6 M9 M10 M11 M12 M13 M14 M15)"
+}

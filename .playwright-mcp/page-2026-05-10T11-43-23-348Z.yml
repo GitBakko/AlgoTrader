@@ -1,0 +1,137 @@
+- generic [ref=e41]:
+  - generic [ref=e42]:
+    - img [ref=e46]
+    - navigation [ref=e53]:
+      - link [ref=e55] [cursor=pointer]:
+        - /url: "#/dashboard"
+        - img
+      - link [ref=e57] [cursor=pointer]:
+        - /url: "#/positions"
+        - img
+      - link [ref=e59] [cursor=pointer]:
+        - /url: "#/signals"
+        - img
+      - link [ref=e61] [cursor=pointer]:
+        - /url: "#/markets"
+        - img
+      - link [ref=e63] [cursor=pointer]:
+        - /url: "#/news"
+        - img
+      - link [ref=e65] [cursor=pointer]:
+        - /url: "#/paper-trading"
+        - img
+      - link [ref=e67] [cursor=pointer]:
+        - /url: "#/trade-journal"
+        - img
+      - link [ref=e69] [cursor=pointer]:
+        - /url: "#/backtest"
+        - img
+      - link [ref=e71] [cursor=pointer]:
+        - /url: "#/performance"
+        - img
+      - link [ref=e73] [cursor=pointer]:
+        - /url: "#/strategy"
+        - img
+      - link [ref=e75] [cursor=pointer]:
+        - /url: "#/models"
+        - img
+      - link [ref=e77] [cursor=pointer]:
+        - /url: "#/notifications"
+        - img
+      - link [ref=e79] [cursor=pointer]:
+        - /url: "#/settings"
+        - img
+      - link [ref=e81] [cursor=pointer]:
+        - /url: "#/system-logs"
+        - img
+    - button "Toggle sidebar fold" [ref=e83] [cursor=pointer]
+  - generic [ref=e84]:
+    - banner [ref=e85]:
+      - generic [ref=e86]:
+        - button "Toggle navigation" [ref=e87] [cursor=pointer]:
+          - img
+        - navigation [ref=e88]:
+          - link "Dashboard" [ref=e90] [cursor=pointer]:
+            - /url: "#/dashboard"
+          - link "Paper Trading" [ref=e674] [cursor=pointer]:
+            - /url: "#/paper-trading"
+          - link "Posizioni" [ref=e92] [cursor=pointer]:
+            - /url: "#/positions"
+          - link "Segnali" [ref=e94] [cursor=pointer]:
+            - /url: "#/signals"
+        - navigation [ref=e97]:
+          - generic [ref=e99]:
+            - generic [ref=e100]:
+              - generic [ref=e101]: Oggi
+              - generic [ref=e102]: +0,00
+            - generic [ref=e103]:
+              - generic [ref=e104]: Live
+              - generic [ref=e105]: +5,00
+          - generic [ref=e111]: Live
+          - button "Notifiche" [ref=e116] [cursor=pointer]:
+            - img
+          - button "Open theme picker" [ref=e120] [cursor=pointer]:
+            - img
+          - button "User menu" [ref=e125] [cursor=pointer]:
+            - img "Bakko^ avatar" [ref=e128]
+            - generic [ref=e129]: Bakko^
+            - img
+    - generic [ref=e1926]:
+      - banner [ref=e1927]:
+        - generic [ref=e1928]:
+          - generic [ref=e1929]: Trading · Operatività
+          - heading "Posizioni" [level=1] [ref=e1930]
+          - generic [ref=e1931]: 1 aperte · 1145 chiuse
+      - generic [ref=e1932]:
+        - button "Aperte 1" [ref=e1933] [cursor=pointer]:
+          - text: Aperte
+          - generic [ref=e1934]: "1"
+        - button "Storico 1145" [ref=e1935] [cursor=pointer]:
+          - text: Storico
+          - generic [ref=e1936]: "1145"
+      - generic [ref=e1937]:
+        - generic [ref=e1939]:
+          - generic [ref=e1940]: Posizioni Aperte
+          - generic [ref=e1941]: $ +5,00
+        - table [ref=e1944]:
+          - rowgroup [ref=e1945]:
+            - row "Asset Dir Size Entry Live SL TP Risk Trailing Aperta P&L Azioni" [ref=e1946]:
+              - columnheader "Asset" [ref=e1947]
+              - columnheader "Dir" [ref=e1948]
+              - columnheader "Size" [ref=e1949]
+              - columnheader "Entry" [ref=e1950]
+              - columnheader "Live" [ref=e1951]
+              - columnheader "SL" [ref=e1952]
+              - columnheader "TP" [ref=e1953]
+              - columnheader "Risk" [ref=e1954]
+              - columnheader "Trailing" [ref=e1955]
+              - columnheader "Aperta" [ref=e1956]
+              - columnheader "P&L" [ref=e1957]
+              - columnheader "Azioni" [ref=e1958]
+          - rowgroup [ref=e1959]:
+            - row "COPPER logo COPPER SELL 236,0000 6.31755 6.29637 6.35980 6.28580 BROKER — 08/05, 17:39 $ +5,00 Chiudi" [ref=e1960] [cursor=pointer]:
+              - cell "COPPER logo COPPER" [ref=e1961]:
+                - generic [ref=e1962]:
+                  - img "COPPER logo" [ref=e1965]
+                  - text: COPPER
+              - cell "SELL" [ref=e1966]:
+                - generic [ref=e1967]: SELL
+              - cell "236,0000" [ref=e1968]
+              - cell "6.31755" [ref=e1969]
+              - cell "6.29637" [ref=e1970]
+              - cell "6.35980" [ref=e1971]
+              - cell "6.28580" [ref=e1972]
+              - cell "BROKER" [ref=e1973]:
+                - generic [ref=e1974]: BROKER
+              - cell "—" [ref=e1975]
+              - cell "08/05, 17:39" [ref=e1976]
+              - cell "$ +5,00" [ref=e1977]
+              - cell "Chiudi" [ref=e1978]:
+                - button "Chiudi" [ref=e1980]
+    - contentinfo [ref=e666]:
+      - generic [ref=e667]: MANTIS AI
+      - generic [ref=e668]: •
+      - generic [ref=e669]: v1.0
+      - generic [ref=e670]: •
+      - generic [ref=e671]: Demo Mode
+  - complementary "Signal audit" [ref=e672]
