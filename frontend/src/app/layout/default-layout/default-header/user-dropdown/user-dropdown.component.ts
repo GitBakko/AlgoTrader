@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import {
   BadgeComponent,
@@ -33,7 +33,8 @@ import { AvatarComponent as MantisAvatarComponent } from '../../../../shared/com
     MantisAvatarComponent
   ],
   templateUrl: './user-dropdown.component.html',
-  styleUrls: ['./user-dropdown.component.scss']
+  styleUrls: ['./user-dropdown.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class UserDropdownComponent {
   readonly #authService = inject(AuthService);

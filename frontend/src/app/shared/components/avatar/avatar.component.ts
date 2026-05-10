@@ -1,4 +1,4 @@
-import { Component, input, computed, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { environment } from '../../../../environments/environment';
 
@@ -75,7 +75,8 @@ import { environment } from '../../../../environments/environment';
       user-select: none;
       text-transform: uppercase;
     }
-  `]
+  `],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AvatarComponent {
   readonly username = input<string>('');

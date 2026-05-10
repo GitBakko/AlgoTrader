@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink, RouterOutlet } from '@angular/router';
 import { NgScrollbar } from 'ngx-scrollbar';
 
@@ -26,6 +26,7 @@ import { WebSocketService } from '../../core/services/websocket.service';
   selector: 'app-dashboard',
   templateUrl: './default-layout.component.html',
   styleUrls: ['./default-layout.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     SidebarComponent,
     SidebarHeaderComponent,

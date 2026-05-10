@@ -1,4 +1,4 @@
-import { Component, DestroyRef, EventEmitter, Output, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, EventEmitter, Output, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../../core/services/auth.service';
@@ -170,7 +170,8 @@ import { AuthService } from '../../../core/services/auth.service';
     .alert svg {
       flex-shrink: 0;
     }
-  `]
+  `],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AvatarUploadComponent {
   private readonly authService = inject(AuthService);

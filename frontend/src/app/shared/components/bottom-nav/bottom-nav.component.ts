@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { SidebarService } from '@coreui/angular';
 import { IconDirective } from '@coreui/icons-angular';
@@ -7,6 +7,7 @@ import { IconDirective } from '@coreui/icons-angular';
   selector: 'app-bottom-nav',
   standalone: true,
   imports: [RouterLink, RouterLinkActive, IconDirective],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <nav class="bottom-nav d-lg-none">
       <a class="bottom-nav__item" routerLink="/dashboard" routerLinkActive="bottom-nav__item--active">
