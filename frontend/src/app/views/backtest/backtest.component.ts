@@ -13,6 +13,7 @@ import { TvChartComponent, LineDataPoint } from '../../shared/components/tv-char
 import { TradingService } from '../../core/services/trading.service';
 import { ToastService } from '../../shared/services/toast.service';
 import { BacktestRun, BacktestDetail } from '../../core/models';
+import { CHART_GREEN_HEX } from '../../shared/constants/chart-colors';
 
 @Component({
   selector: 'app-backtest',
@@ -304,7 +305,7 @@ import { BacktestRun, BacktestDetail } from '../../core/models';
               mode="area"
               [lineData]="equityLineData()"
               [height]="320"
-              lineColor="#00d97e"
+              [lineColor]="chartGreen"
               areaTopColor="rgba(0, 217, 126, 0.20)"
               areaBottomColor="rgba(0, 217, 126, 0.01)"
             ></app-tv-chart>
@@ -446,6 +447,9 @@ export class BacktestComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
+
+  // M2-FE-AUDIT: palette-synced equity-curve color.
+  readonly chartGreen = CHART_GREEN_HEX;
 
   readonly runs = signal<BacktestRun[]>([]);
   readonly running = signal(false);

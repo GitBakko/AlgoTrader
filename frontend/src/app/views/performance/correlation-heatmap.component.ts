@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, input, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { chartProfitRgba, chartLossRgba } from '../../shared/constants/chart-colors';
 
 export interface CorrelationData {
   epics: string[];
@@ -118,15 +119,9 @@ export class CorrelationHeatmapComponent {
   });
 
   cellColor(val: number): string {
-    if (val >= 0) {
-      // 0 → transparent, +1 → green
-      const alpha = Math.abs(val) * 0.7;
-      return `rgba(57, 255, 20, ${alpha.toFixed(2)})`;
-    } else {
-      // 0 → transparent, -1 → red
-      const alpha = Math.abs(val) * 0.7;
-      return `rgba(255, 61, 87, ${alpha.toFixed(2)})`;
-    }
+    // H4-FE-AUDIT: was raw rgba literals; palette-synced helpers now drive tints.
+    const alpha = Math.abs(val) * 0.7;
+    return val >= 0 ? chartProfitRgba(alpha) : chartLossRgba(alpha);
   }
 
   textColor(val: number): string {

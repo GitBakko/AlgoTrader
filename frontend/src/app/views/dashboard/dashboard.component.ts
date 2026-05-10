@@ -24,6 +24,7 @@ import { SkeletonTableComponent } from '../../shared/components/skeleton-table/s
 import { LoadingButtonComponent } from '../../shared/components/loading-button/loading-button.component';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { ToastService } from '../../shared/services/toast.service';
+import { CHART_GREEN_HEX } from '../../shared/constants/chart-colors';
 
 @Component({
   templateUrl: 'dashboard.component.html',
@@ -51,6 +52,9 @@ export class DashboardComponent implements OnInit {
   readonly auditService = inject(SignalAuditService);
   private readonly confirmDialog = inject(ConfirmDialogService);
   private readonly toast = inject(ToastService);
+
+  // M2-FE-AUDIT: palette-synced equity-curve color.
+  readonly chartGreen = CHART_GREEN_HEX;
 
   /** Recent unread alerts for dashboard widget (max 5) */
   readonly recentAlerts = computed(() =>

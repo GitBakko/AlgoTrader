@@ -20,6 +20,7 @@ import { CalendarHeatmapComponent } from './cockpit-bottom/calendar-heatmap.comp
 import { TradeBreakdownComponent } from './trade-breakdown/trade-breakdown.component';
 import { CbBannerComponent } from '../../../shared/components/cb-banner/cb-banner.component';
 import { currencySymbol } from './shared/currency.util';
+import { CHART_GREEN_HEX } from '../../../shared/constants/chart-colors';
 
 /**
  * DASHBOARD v2 — Deliverable A (Variant B "Cockpit")
@@ -64,6 +65,9 @@ export class DashboardV2Component implements OnInit {
   readonly activeTimeframe = this.timeframeSvc.current;
 
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // M2-FE-AUDIT: palette-synced equity-curve color.
+  readonly chartGreen = CHART_GREEN_HEX;
 
   readonly killSwitchBusy = signal(false);
   readonly customOpen = signal(false);

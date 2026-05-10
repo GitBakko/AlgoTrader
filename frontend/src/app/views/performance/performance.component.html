@@ -21,7 +21,7 @@
         <c-card class="dash-kpi-card h-100">
           <c-card-body class="p-3">
             <div class="dash-kpi-card__label">Trades</div>
-            <div class="dash-kpi-card__value">{{ perf.trade_count }}</div>
+            <div class="dash-kpi-card__value mantis-kpi">{{ perf.trade_count }}</div>
             <div class="dash-kpi-card__detail">{{ perf.win_count }}W / {{ perf.loss_count }}L</div>
           </c-card-body>
           <div class="dash-kpi-card__accent dash-kpi-card__accent--primary"></div>
@@ -31,7 +31,7 @@
         <c-card class="dash-kpi-card h-100">
           <c-card-body class="p-3">
             <div class="dash-kpi-card__label">Win Rate</div>
-            <div class="dash-kpi-card__value">{{ (perf.win_rate * 100) | number:'1.1-1' }}%</div>
+            <div class="dash-kpi-card__value mantis-kpi">{{ (perf.win_rate * 100) | number:'1.1-1' }}%</div>
             <div class="dash-kpi-card__detail">PF: {{ perf.profit_factor | number:'1.2-2' }}</div>
           </c-card-body>
           <div class="dash-kpi-card__accent dash-kpi-card__accent--primary"></div>
@@ -41,7 +41,7 @@
         <c-card class="dash-kpi-card h-100">
           <c-card-body class="p-3">
             <div class="dash-kpi-card__label">Total P&amp;L</div>
-            <div class="dash-kpi-card__value"
+            <div class="dash-kpi-card__value mantis-kpi"
                  [class.text-success]="perf.total_pnl >= 0"
                  [class.text-danger]="perf.total_pnl < 0">
               $ {{ perf.total_pnl >= 0 ? '+' : '' }}{{ perf.total_pnl | number:'1.2-2' }}
@@ -60,7 +60,7 @@
         <c-card class="dash-kpi-card h-100">
           <c-card-body class="p-3">
             <div class="dash-kpi-card__label">Max Drawdown</div>
-            <div class="dash-kpi-card__value text-danger">
+            <div class="dash-kpi-card__value mantis-kpi text-danger">
               {{ ((perf.max_drawdown ?? 0) * 100) | number:'1.2-2' }}%
             </div>
             <div class="dash-kpi-card__detail">
@@ -78,7 +78,7 @@
         <c-card class="dash-kpi-card h-100">
           <c-card-body class="p-3">
             <div class="dash-kpi-card__label">Sharpe Ratio</div>
-            <div class="dash-kpi-card__value"
+            <div class="dash-kpi-card__value mantis-kpi"
                  [class.text-success]="(perf.sharpe_ratio ?? 0) > 1"
                  [class.text-warning]="(perf.sharpe_ratio ?? 0) > 0 && (perf.sharpe_ratio ?? 0) <= 1"
                  [class.text-danger]="(perf.sharpe_ratio ?? 0) <= 0">
@@ -93,7 +93,7 @@
         <c-card class="dash-kpi-card h-100">
           <c-card-body class="p-3">
             <div class="dash-kpi-card__label">Sortino Ratio</div>
-            <div class="dash-kpi-card__value"
+            <div class="dash-kpi-card__value mantis-kpi"
                  [class.text-success]="(perf.sortino_ratio ?? 0) > 1"
                  [class.text-warning]="(perf.sortino_ratio ?? 0) > 0 && (perf.sortino_ratio ?? 0) <= 1"
                  [class.text-danger]="(perf.sortino_ratio ?? 0) <= 0">
@@ -108,7 +108,7 @@
         <c-card class="dash-kpi-card h-100">
           <c-card-body class="p-3">
             <div class="dash-kpi-card__label">Calmar Ratio</div>
-            <div class="dash-kpi-card__value"
+            <div class="dash-kpi-card__value mantis-kpi"
                  [class.text-success]="(perf.calmar_ratio ?? 0) > 1"
                  [class.text-warning]="(perf.calmar_ratio ?? 0) > 0 && (perf.calmar_ratio ?? 0) <= 1"
                  [class.text-danger]="(perf.calmar_ratio ?? 0) <= 0">
@@ -137,7 +137,7 @@
             mode="area"
             [lineData]="equityLineData()"
             [height]="360"
-            lineColor="#00d97e"
+            [lineColor]="chartGreen"
             areaTopColor="rgba(0, 217, 126, 0.25)"
             areaBottomColor="rgba(0, 217, 126, 0.01)"
           ></app-tv-chart>

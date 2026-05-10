@@ -12,6 +12,7 @@ import { TradingService } from '../../core/services/trading.service';
 import { ApiService } from '../../core/services/api.service';
 import { TvChartComponent, LineDataPoint } from '../../shared/components/tv-chart/tv-chart.component';
 import { CorrelationHeatmapComponent, CorrelationData } from './correlation-heatmap.component';
+import { chartPnlRgba, CHART_GREEN_HEX } from '../../shared/constants/chart-colors';
 
 @Component({
   selector: 'app-performance',
@@ -34,6 +35,9 @@ export class PerformanceComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   readonly performance = this.trading.performance;
   readonly correlationData = signal<CorrelationData | null>(null);
+
+  // M2-FE-AUDIT: palette-synced equity-curve color (no scattered hex literals).
+  readonly chartGreen = CHART_GREEN_HEX;
 
   readonly selectedPeriod = signal(30);
   readonly periods = [
@@ -132,7 +136,7 @@ export class PerformanceComponent implements OnInit {
       bins.push({
         label: `${low.toFixed(0)}`,
         count,
-        color: low >= 0 ? 'rgba(57, 255, 20, 0.7)' : 'rgba(255, 61, 87, 0.7)',
+        color: chartPnlRgba(low, 0.7),
       });
     }
 
@@ -181,9 +185,7 @@ export class PerformanceComponent implements OnInit {
       datasets: [{
         label: 'P&L ($)',
         data: items.map(i => i.pnl),
-        backgroundColor: items.map(i =>
-          i.pnl >= 0 ? 'rgba(57, 255, 20, 0.7)' : 'rgba(255, 61, 87, 0.7)'
-        ),
+        backgroundColor: items.map(i => chartPnlRgba(i.pnl, 0.7)),
         borderWidth: 0,
         borderRadius: 2,
       }],

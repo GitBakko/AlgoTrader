@@ -33,6 +33,8 @@
  */
 
 import { Injectable, signal } from '@angular/core';
+import { EPIC_COLORS } from '../../shared/constants/epic-colors';
+import { CHART_NEON_HEX } from '../../shared/constants/chart-colors';
 
 @Injectable({
   providedIn: 'root',
@@ -110,21 +112,10 @@ export class LogoService {
     DE40:     '🇩🇪',
   };
 
-  // Per-epic accent color for the SVG emoji bg (mantis palette mirror).
-  private readonly ACCENT_MAP: Record<string, string> = {
-    XAUUSD: '#FFD700',
-    XAGUSD: '#C0C0C0',
-    BTCUSD: '#F7931A',
-    ETHUSD: '#627EEA',
-    SOLUSD: '#9945FF',
-    BNBUSD: '#F0B90B',
-    DOGUSD: '#C2A633',
-    NVDA:   '#76B900',
-    TSLA:   '#E31937',
-    DE40:   '#FFCE00',
-    NAS100: '#5B9BD5',
-    US500:  '#5B7FFF',
-  };
+  // L4-FE-AUDIT: ACCENT_MAP duplicated EPIC_COLORS in
+  // shared/constants/epic-colors.ts. Single source of truth now lives
+  // there; we just re-use it via the imported constant.
+  private readonly ACCENT_MAP: Record<string, string> = EPIC_COLORS;
 
   readonly logos = signal<Map<string, string[]>>(new Map());
 
@@ -239,7 +230,7 @@ export class LogoService {
   /** Render an inline SVG containing the emoji + tinted backdrop. */
   private emojiSvg(epic: string): string {
     const emoji = this.EMOJI_MAP[epic] ?? '📈';
-    const accent = this.ACCENT_MAP[epic] ?? '#39FF14';
+    const accent = this.ACCENT_MAP[epic] ?? CHART_NEON_HEX;
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
       <rect width="32" height="32" rx="6" fill="${accent}1f"/>
       <text x="50%" y="55%" font-size="18" text-anchor="middle" dominant-baseline="middle">${emoji}</text>
