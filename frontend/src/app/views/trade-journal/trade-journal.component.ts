@@ -10,7 +10,6 @@ import {
 } from '@coreui/angular';
 import { IconDirective } from '@coreui/icons-angular';
 import { TradingService } from '../../core/services/trading.service';
-import { WebSocketService } from '../../core/services/websocket.service';
 import { NewsService } from '../../core/services/news.service';
 import { PriceFormatPipe } from '../../shared/pipes/price-format.pipe';
 import { EpicLogoComponent } from '../../shared/components/epic-logo/epic-logo.component';
@@ -350,17 +349,25 @@ type SortDir = 'asc' | 'desc';
 export class TradeJournalComponent implements OnInit {
   private readonly trading = inject(TradingService);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly ws = inject(WebSocketService);
   readonly newsService = inject(NewsService);
   readonly auditService = inject(SignalAuditService);
 
-  // Map of open positions by epic for quick lookup (includes opened_at for matching)
-  readonly openPositionsByEpic = computed(() => {
-    const map = new Map<string, { direction: string; size: number; level: number; opened_at: string | null }>();
+  // Map of open positions keyed by deal_id (NOT epic).
+  // C3-FE-AUDIT: keying by epic produced wrong direction/size/level when
+  // two positions on the same epic overlapped (close-detection lag, same
+  // epic re-entry) — see badge bug `dea2a29`. We now key by deal_id and
+  // carry epic in the value; the lookup in getPositionInfo iterates
+  // values() and disambiguates by signal-vs-open timestamp proximity.
+  readonly openPositionsByDealId = computed(() => {
+    const map = new Map<string, { epic: string; direction: string; size: number; level: number; opened_at: string | null; upl: number | null }>();
     for (const pos of this.trading.paperPositions()) {
-      map.set(pos.epic, {
-        direction: pos.direction, size: pos.size, level: pos.level,
+      map.set(pos.deal_id, {
+        epic: pos.epic,
+        direction: pos.direction,
+        size: pos.size,
+        level: pos.level,
         opened_at: pos.opened_at ?? null,
+        upl: pos.upl ?? null,
       });
     }
     return map;
@@ -656,37 +663,43 @@ export class TradeJournalComponent implements OnInit {
   /**
    * Get position status for an executed signal.
    * Returns: { status: 'open'|'closed'|null, pnl: number|null }
+   *
+   * C3-FE-AUDIT: lookup is now deal_id-keyed. We iterate the values()
+   * filtering by epic, then pick the position whose opened_at is the
+   * closest match within 5 minutes after the signal timestamp. This
+   * correctly disambiguates same-epic overlap windows that previously
+   * collapsed into a single map entry and produced wrong direction/size.
+   *
+   * P&L for the open branch is taken from broker `upl` only — Trading
+   * Invariant #2 forbids `(current - level) * size` arithmetic fallbacks.
    */
   getPositionInfo(sig: PaperSignal): { status: string | null; pnl: number | null } {
     if (sig.status !== 'executed') return { status: null, pnl: null };
 
-    const openPos = this.openPositionsByEpic().get(sig.epic);
-    if (openPos) {
-      // Check if this signal is the one that opened the current position
-      // by comparing timestamps (signal must be close to position open time)
-      if (openPos.opened_at) {
-        const sigTime = this._utc(sig.timestamp);
-        const posTime = this._utc(openPos.opened_at);
-        // Signal must be within 5 minutes before position open (execution delay)
-        const isMatch = sigTime <= posTime && (posTime - sigTime) < 5 * 60_000;
-        if (!isMatch) {
-          // This signal is for an older position, not the current open one
-          return this._findClosedPnl(sig);
-        }
+    const sigTime = this._utc(sig.timestamp);
+    let bestMatch: { upl: number | null } | null = null;
+    let bestDist = Infinity;
+    for (const pos of this.openPositionsByDealId().values()) {
+      if (pos.epic !== sig.epic) continue;
+      if (!pos.opened_at) {
+        // Without opened_at we can't apply the proximity filter; only
+        // fall back to "first match" if no timestamped match wins.
+        if (!bestMatch) bestMatch = { upl: pos.upl };
+        continue;
       }
-      // Position is still open — compute live P&L
-      const prices = this.ws.prices();
-      const tick = prices[sig.epic];
-      if (tick) {
-        const current = openPos.direction === 'BUY' ? tick.bid : tick.offer;
-        const diff = openPos.direction === 'BUY'
-          ? current - openPos.level
-          : openPos.level - current;
-        return { status: 'open', pnl: Math.round(diff * openPos.size * 100) / 100 };
+      const posTime = this._utc(pos.opened_at);
+      const dist = posTime - sigTime;
+      // Signal must precede the open within a 5-minute execution window.
+      if (dist < 0 || dist >= 5 * 60_000) continue;
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestMatch = { upl: pos.upl };
       }
-      return { status: 'open', pnl: null };
     }
 
+    if (bestMatch) {
+      return { status: 'open', pnl: bestMatch.upl };
+    }
     return this._findClosedPnl(sig);
   }
 

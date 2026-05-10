@@ -125,14 +125,20 @@ export class AuthService {
   }
 
   /**
-   * Logout and clear authentication state
+   * Logout and clear authentication state.
+   * H2-FE-AUDIT: optimistic local clear BEFORE the HTTP round-trip so
+   * `isAuthenticated()` flips immediately — no 200-500ms window where
+   * guards still pass and WS messages keep streaming. A double-click
+   * race is also harmless because the second invocation finds the
+   * state already cleared.
    */
   logout(): void {
-    // Best-effort backend logout (revoke refresh tokens), don't block on failure
+    // Eagerly tear down auth + WS + interceptor state.
+    this.clearAuth();
+    // Best-effort backend logout (revoke refresh tokens), don't block on failure.
     this.http.post(`${this.baseUrl}/api/auth/logout`, {}).pipe(
       catchError(() => of(null))
     ).subscribe(() => {
-      this.clearAuth();
       this.router.navigate(['/login']);
     });
   }

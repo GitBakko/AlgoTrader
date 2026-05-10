@@ -155,20 +155,16 @@ export class DashboardComponent implements OnInit {
       }));
   });
 
-  // All live positions with real-time P&L from WebSocket
+  // All live positions with real-time P&L from broker UPL.
+  // C2-FE-AUDIT: Trading Invariant #2 — never compute (current - level) * size
+  // as a P&L fallback. Sibling views (paper-trading, positions) already
+  // return live_pnl: 0 when upl is null. Aligned here too.
   readonly allLivePositions = computed(() => {
     const positions = this.trading.paperPositions();
-    const prices = this.ws.prices();
-    return positions.map(pos => {
-      if (pos.upl != null) return { ...pos, live_pnl: pos.upl };
-      const tick = prices[pos.epic];
-      if (!tick) return { ...pos, live_pnl: 0 };
-      const currentPrice = pos.direction === 'BUY' ? tick.bid : tick.offer;
-      const diff = pos.direction === 'BUY'
-        ? currentPrice - pos.level
-        : pos.level - currentPrice;
-      return { ...pos, live_pnl: Math.round(diff * pos.size * 100) / 100 };
-    });
+    return positions.map(pos => ({
+      ...pos,
+      live_pnl: pos.upl ?? 0,
+    }));
   });
 
   // First 6 for table display

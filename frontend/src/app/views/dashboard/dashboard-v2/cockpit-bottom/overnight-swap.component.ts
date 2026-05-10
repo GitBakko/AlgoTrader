@@ -40,13 +40,20 @@ export class OvernightSwapComponent {
   /**
    * Display rate = rate applying to the open direction if a position is
    * open for this epic, otherwise long rate. Sign preserved.
+   *
+   * M8-FE-AUDIT: Capital.com emits direction as `'SELL'` (not `'SHORT'`).
+   * The previous `=== 'SHORT'` comparison never matched live broker data
+   * so SELL positions were always charged the long rate visually. We now
+   * accept both spellings.
    */
   readonly displayRate = computed<number>(() => {
     const s = this.swap();
     if (!s) return 0;
     const pos = this.openPosition();
     if (pos) {
-      return pos.direction === 'SHORT' ? s.short_rate_pct : s.long_rate_pct;
+      const dir = pos.direction;
+      const isShort = dir === 'SELL' || dir === 'SHORT';
+      return isShort ? s.short_rate_pct : s.long_rate_pct;
     }
     return s.long_rate_pct;
   });
@@ -66,11 +73,24 @@ export class OvernightSwapComponent {
     return 'var(--mantis-warning)';
   });
 
-  /** First open paper position matching the display epic, if any. */
+  /** Most-recent open paper position matching the display epic, if any.
+   *  H16-FE-AUDIT: when two positions on the same epic overlap (close-
+   *  detection lag, same-epic re-entry) `find()` returned whichever the
+   *  service array yielded first, often the stale one. We now sort by
+   *  opened_at DESC and pick the most recent. `upl != null` filter
+   *  rules out positions the broker has already closed but the local
+   *  array hasn't reconciled yet. */
   readonly openPosition = computed(() => {
     const target = this.epic();
     const positions = this.trading.paperPositions();
-    return positions.find(p => p.epic === target) ?? null;
+    const matches = positions.filter(p => p.epic === target && p.upl != null);
+    if (matches.length === 0) return null;
+    matches.sort((a, b) => {
+      const ta = a.opened_at ? Date.parse(a.opened_at) : 0;
+      const tb = b.opened_at ? Date.parse(b.opened_at) : 0;
+      return tb - ta;
+    });
+    return matches[0];
   });
 
   /** Notional € estimate = size × entry price. */

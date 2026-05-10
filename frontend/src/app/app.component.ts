@@ -9,6 +9,8 @@ import { IconSetService } from '@coreui/icons-angular';
 import { iconSubset } from './icons/icon-subset';
 import { WebSocketService } from './core/services/websocket.service';
 import { NotificationService } from './shared/services/notification.service';
+import { AuthService } from './core/services/auth.service';
+import { NotificationCenterService } from './core/services/notification-center.service';
 
 @Component({
     selector: 'app-root',
@@ -27,6 +29,8 @@ export class AppComponent implements OnInit {
   readonly #iconSetService = inject(IconSetService);
   readonly #ws = inject(WebSocketService);
   readonly #notifications = inject(NotificationService);
+  readonly #authService = inject(AuthService);
+  readonly #notifCenter = inject(NotificationCenterService);
 
   constructor() {
     this.#titleService.setTitle(this.title);
@@ -41,6 +45,14 @@ export class AppComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    // C1-FE-AUDIT: wire AuthService logout teardown so clearAuth() actually
+    // disconnects both WebSockets. Without this call, the lazy refs in
+    // AuthService stay null and the WS auto-reconnects after logout.
+    this.#authService.registerLogoutTeardown({
+      ws: this.#ws,
+      notif: this.#notifCenter,
+    });
+
     // Connect WebSocket channels for real-time prices and trade events
     this.#ws.connectPrices();
     this.#ws.connectTrades();

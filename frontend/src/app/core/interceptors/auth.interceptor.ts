@@ -23,15 +23,17 @@ let isRefreshing = false;
 let refreshTokenSubject = new BehaviorSubject<string | null>(null);
 
 /** Reset interceptor state on logout/login boundary. Called from
- *  AuthService.clearAuth so every new session starts clean. */
+ *  AuthService.clearAuth so every new session starts clean.
+ *  H1-FE-AUDIT: error() instead of complete() so queued subscribers
+ *  on the refresh queue receive an error path (handled in their own
+ *  catchError) instead of a silent stream-complete that drops the
+ *  request without invoking either next or error callbacks. */
 export function resetAuthInterceptorState(): void {
   isRefreshing = false;
-  // Complete the existing subject so any queued subscribers terminate
-  // with a finite-stream rather than emitting against a new session.
   try {
-    refreshTokenSubject.complete();
+    refreshTokenSubject.error(new Error('Session terminated'));
   } catch {
-    /* noop */
+    /* already errored/completed */
   }
   refreshTokenSubject = new BehaviorSubject<string | null>(null);
 }

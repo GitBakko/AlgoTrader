@@ -98,12 +98,16 @@ export class DashboardV2Component implements OnInit {
 
   /** Epic displayed in the overnight-swap tile. Prefers the user pick
    *  when it's still open at broker; falls back to the first open paper
-   *  position; finally XAUUSD. */
+   *  position; finally XAUUSD.
+   *  H16-FE-AUDIT: filter by `upl != null` so a stale closed position
+   *  whose epic is still in the array doesn't keep the user pick alive
+   *  after the broker has closed it. */
   readonly swapEpic = computed<string>(() => {
     const positions = this.trading.paperPositions();
+    const liveOnly = positions.filter(p => p.upl != null);
     const pick = this.userSwapEpic();
-    if (pick && positions.some(p => p.epic === pick)) return pick;
-    return positions[0]?.epic ?? 'XAUUSD';
+    if (pick && liveOnly.some(p => p.epic === pick)) return pick;
+    return liveOnly[0]?.epic ?? positions[0]?.epic ?? 'XAUUSD';
   });
 
   selectSwapEpic(epic: string): void {

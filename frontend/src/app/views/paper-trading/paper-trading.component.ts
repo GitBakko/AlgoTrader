@@ -589,9 +589,16 @@ function adaptPosition(
   // (first poll cycle, broker hiccup) display 0/dash rather than
   // fabricate a number that ignores spreads / multipliers / FX.
   const livePnl = upl != null ? upl : 0;
-  const denom = p.level || 1;
-  const pnlPct = upl != null
-    ? ((current - p.level) / denom) * 100 * (direction === 'BUY' ? 1 : -1)
+  // H17-FE-AUDIT: derive % return from broker UPL + notional rather than
+  // price-arithmetic. The previous `(current - level) / level * direction`
+  // is the price-change percent, which is correct only for USD-quote pairs
+  // and inverts on USD-base instruments (USDJPY). Using `upl / (level*size)`
+  // matches broker-reported P&L and is dimensionally correct for USD-quote
+  // forex/crypto/metals/indices. USD-base forex stays slightly off but the
+  // sign and magnitude track broker reality.
+  const notional = (p.level || 1) * (p.size || 1);
+  const pnlPct = upl != null && notional !== 0
+    ? (upl / notional) * 100
     : 0;
   const openedMs = p.opened_at ? Date.parse(p.opened_at) : nowMs;
   const ageSec = Math.max(0, Math.floor((nowMs - openedMs) / 1000));
