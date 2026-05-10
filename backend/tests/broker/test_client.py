@@ -158,7 +158,14 @@ class TestCapitalComClientRequests:
 
     @pytest.mark.asyncio
     async def test_request_api_error_400(self):
-        """Test request handles 400+ API errors."""
+        """Test request handles 400+ API errors.
+
+        H1-BROKER fix: 429 is now retried inside the loop with backoff
+        +1s buffer. After all retries exhaust, raises CapitalComError
+        with the rate-limit message. Test asserts that contract; fast
+        retries via patched asyncio.sleep so the test doesn't actually
+        wait ~5 seconds.
+        """
         client = CapitalComClient(
             api_url="https://demo-api.example.com",
             api_key="test_key",
@@ -187,8 +194,9 @@ class TestCapitalComClientRequests:
         mock_http_client = AsyncMock(spec=httpx.AsyncClient)
         mock_http_client.request.return_value = mock_response
 
-        with patch.object(client, "_get_http_client", return_value=mock_http_client):
-            with pytest.raises(RateLimitError):
+        with patch.object(client, "_get_http_client", return_value=mock_http_client), \
+             patch("asyncio.sleep", new_callable=AsyncMock):
+            with pytest.raises(CapitalComError, match="429"):
                 await client._request("GET", "/api/v1/test")
 
     @pytest.mark.asyncio
