@@ -1,5 +1,6 @@
 .news-list {
-  max-height: 700px;
+  // M11-FE-AUDIT: was max-height: 700px (fixed pixel breaks responsive); use viewport-relative.
+  max-height: min(700px, 80vh);
   overflow-y: auto;
 
   &::-webkit-scrollbar {

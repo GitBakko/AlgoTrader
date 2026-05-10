@@ -3,8 +3,8 @@
 
 :host {
   display: block;
-  // Align canvas to mock: #0d1117 (surface-1), not darker #0a0e13
-  background: #0d1117;
+  // M5-FE-AUDIT: was raw #0d1117 → palette token surface-1.
+  background: var(--mantis-surface-1);
   min-height: 100vh;
   // Break out of default-layout's c-container horizontal padding + header mb-4
   margin-top: -1.5rem;
@@ -79,9 +79,11 @@
   cursor: pointer;
 
   &.is-active {
+    // M6-FE-AUDIT: was rgba(57,255,20,...) raw — color-mix lets palette --mantis-neon drive opacity tints.
     color: var(--mantis-neon);
-    background: rgba(57, 255, 20, 0.1);
-    box-shadow: 0 0 8px rgba(57, 255, 20, 0.35), inset 0 0 0 1px rgba(57, 255, 20, 0.25);
+    background: color-mix(in srgb, var(--mantis-neon) 10%, transparent);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--mantis-neon) 35%, transparent),
+                inset 0 0 0 1px color-mix(in srgb, var(--mantis-neon) 25%, transparent);
   }
 
   &:hover:not(.is-active) {
@@ -134,8 +136,8 @@
   cursor: pointer;
 
   &--primary {
-    background: rgba(57, 255, 20, 0.12);
-    border-color: rgba(57, 255, 20, 0.4);
+    background: color-mix(in srgb, var(--mantis-neon) 12%, transparent);
+    border-color: color-mix(in srgb, var(--mantis-neon) 40%, transparent);
     color: var(--mantis-neon);
   }
 }
@@ -148,9 +150,9 @@
   min-height: 300px;
   padding: 10px 12px;
   background:
-    radial-gradient(circle at 50% 40%, rgba(57, 255, 20, 0.04), transparent 60%),
-    linear-gradient(180deg, #0d1117 0%, #10161e 100%);
-  border: 1px solid rgba(57, 255, 20, 0.22);
+    radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--mantis-neon) 4%, transparent), transparent 60%),
+    linear-gradient(180deg, var(--mantis-surface-1) 0%, #10161e 100%);
+  border: 1px solid color-mix(in srgb, var(--mantis-neon) 22%, transparent);
   border-radius: var(--mantis-radius-md);
 }
 

@@ -58,14 +58,18 @@ import { LogoService } from '../../../core/services/logo.service';
     }
 
     .logo-fallback {
+      // C5-FE-AUDIT: neon-green is reserved as accent. Was filling the
+      // entire 32x32..96x96 fallback box, violating "neon = accent only".
+      // Use surface-3 elevation for the box and put neon on the text.
       display: flex;
       align-items: center;
       justify-content: center;
-      background-color: var(--mantis-neon, #39ff14);
+      background-color: var(--mantis-surface-3, #1c2128);
+      border: 1px solid var(--mantis-border-accent, rgba(57, 255, 20, 0.18));
       border-radius: var(--mantis-radius-sm, 4px);
 
       .fallback-text {
-        color: var(--mantis-bg, #0d1117);
+        color: var(--mantis-neon, #39ff14);
         font-weight: 700;
         font-size: 0.75em;
         text-transform: uppercase;

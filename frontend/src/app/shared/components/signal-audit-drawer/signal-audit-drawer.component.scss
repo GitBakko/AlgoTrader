@@ -626,13 +626,14 @@
   font-size: var(--mantis-fs-xxs);
   font-weight: 700;
   letter-spacing: .04em;
-  color: #000;
+  // M13-FE-AUDIT: was raw #000 — use mantis-bg token (dark text on bright neon backgrounds).
+  color: var(--mantis-bg);
   min-width: 0;
   transition: width 320ms var(--mantis-ease-out-expo, cubic-bezier(.16, 1, .3, 1));
 
   &--sell { background: p.$mantis-loss; color: var(--fg1); }
   &--hold { background: rgba(139, 148, 158, .8); color: var(--fg1); }
-  &--buy  { background: p.$mantis-neon; color: #000; }
+  &--buy  { background: p.$mantis-neon; color: var(--mantis-bg); }
 }
 
 .ad-class-bar__lbl {

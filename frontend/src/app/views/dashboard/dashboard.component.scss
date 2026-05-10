@@ -164,7 +164,7 @@
 
   // Price grid: value + meta line
   .dash-price-value {
-    font-size: 1.05rem; // off-scale mid-price emphasis
+    font-size: var(--mantis-fs-price); // M7-FE-AUDIT: tokenized off-scale price emphasis
   }
   .dash-price-meta {
     font-size: var(--mantis-fs-xs);

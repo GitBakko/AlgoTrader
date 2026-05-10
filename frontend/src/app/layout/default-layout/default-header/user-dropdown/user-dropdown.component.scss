@@ -141,7 +141,10 @@
 }
 
 // Dark mode adjustments
-@media (prefers-color-scheme: dark) {
+// H13-FE-AUDIT: was @media (prefers-color-scheme: dark) which never fires
+// when the user toggles theme via the in-app switch. App uses CoreUI's
+// attribute-based theming `[data-coreui-theme]`. Switched.
+[data-coreui-theme="dark"] {
   .user-dropdown {
     &__toggle {
       &:hover {

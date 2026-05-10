@@ -90,7 +90,8 @@
   &.blob-3 {
     width: 350px; height: 350px;
     bottom: -5%; left: 30%;
-    background: radial-gradient(circle, #00ff88, transparent);
+    // H15-FE-AUDIT: was #00ff88 (not a palette token), close to but not equal to $mantis-neon/$mantis-green.
+    background: radial-gradient(circle, $mantis-green, transparent);
     animation: float-blob 30s ease-in-out infinite;
   }
 }
@@ -232,11 +233,12 @@
     border-radius: var(--mantis-radius-md);
     margin-bottom: 1.5rem;
 
-    &.alert-danger { background: rgba(220, 53, 69, 0.15); border-color: rgba(220, 53, 69, 0.3); color: #ff6b7a; }
+    // M14-FE-AUDIT: was raw #ff6b7a + rgba(220,53,69,...) — palette $mantis-loss covers this role.
+    &.alert-danger { background: rgba($mantis-loss, 0.15); border-color: rgba($mantis-loss, 0.3); color: $mantis-loss; }
     &.alert-success { background: rgba($mantis-green, 0.15); border-color: rgba($mantis-green, 0.3); color: $mantis-neon; }
   }
 
-  .invalid-feedback { margin-top: 0.5rem; font-size: 0.8125rem; color: #ff6b7a; }
+  .invalid-feedback { margin-top: 0.5rem; font-size: 0.8125rem; color: $mantis-loss; }
 }
 
 // Enhanced Input Groups
@@ -302,8 +304,9 @@
     &.active { background: var(--bar-color, rgba(255, 255, 255, 0.3)); }
   }
 
-  &.weak { --bar-color: #dc3545; .password-strength-meter__label span:last-child { color: #dc3545; font-weight: 600; } }
-  &.medium { --bar-color: #ffc107; .password-strength-meter__label span:last-child { color: #ffc107; font-weight: 600; } }
+  // M14-FE-AUDIT: was bootstrap defaults #dc3545 / #ffc107 — palette tokens cover loss/warning.
+  &.weak { --bar-color: #{$mantis-loss}; .password-strength-meter__label span:last-child { color: $mantis-loss; font-weight: 600; } }
+  &.medium { --bar-color: #{$mantis-warning}; .password-strength-meter__label span:last-child { color: $mantis-warning; font-weight: 600; } }
   &.strong { --bar-color: #{$mantis-neon}; .password-strength-meter__label span:last-child { color: $mantis-neon; font-weight: 600; } }
 }
 

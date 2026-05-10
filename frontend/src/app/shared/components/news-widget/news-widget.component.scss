@@ -2,7 +2,9 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 1rem;
-  max-height: 600px;
+  /* H14-FE-AUDIT: was max-height: 600px, fixed pixel breaks responsive
+     on tall viewports. 60vh adapts. */
+  max-height: 60vh;
   overflow-y: auto;
   overflow-x: hidden; /* Block horizontal scroll */
   padding: 0.5rem;
@@ -64,7 +66,7 @@
   padding: 0.2rem 0.4rem;
   background: var(--cui-dark);
   border-radius: var(--mantis-radius-sm);
-  color: var(--cui-mantis-green, #00d97e);
+  color: var(--mantis-green); /* C6-FE-AUDIT: was --cui-mantis-green (undefined token); always fell through to literal hex */
 }
 
 /* Responsive adjustments */

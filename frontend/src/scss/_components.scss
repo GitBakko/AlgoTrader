@@ -189,16 +189,18 @@
   }
 
   &--local {
-    color: #ffa726;
-    background: rgba(#ffa726, 0.12);
-    border: 1px solid rgba(#ffa726, 0.35);
+    // C4-FE-AUDIT: was hardcoded #ffa726, now mapped to palette warning token.
+    color: $mantis-warning;
+    background: rgba($mantis-warning, 0.12);
+    border: 1px solid rgba($mantis-warning, 0.35);
     animation: local-risk-pulse 3s ease-in-out infinite;
   }
 
   &--none {
-    color: #ef5350;
-    background: rgba(#ef5350, 0.12);
-    border: 1px solid rgba(#ef5350, 0.35);
+    // C4-FE-AUDIT: was hardcoded #ef5350, now mapped to palette loss token.
+    color: $mantis-loss;
+    background: rgba($mantis-loss, 0.12);
+    border: 1px solid rgba($mantis-loss, 0.35);
     animation: none-risk-pulse 2s ease-in-out infinite;
   }
 
@@ -217,8 +219,8 @@
 }
 
 @keyframes none-risk-pulse {
-  0%, 100% { opacity: 1; border-color: rgba(#ef5350, 0.35); }
-  50% { opacity: 0.8; border-color: rgba(#ef5350, 0.7); }
+  0%, 100% { opacity: 1; border-color: rgba($mantis-loss, 0.35); }
+  50% { opacity: 0.8; border-color: rgba($mantis-loss, 0.7); }
 }
 
 // SL Cooldown badge (inline in signal tables)

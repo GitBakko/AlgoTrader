@@ -27,7 +27,7 @@
   .asset-mid-price {
     font-family: var(--mantis-font-mono);
     font-feature-settings: var(--mono-feat);
-    font-size: 1.05rem; // off-scale mid-price emphasis (between fs-lg 16 and fs-xl 18)
+    font-size: var(--mantis-fs-price); // M12-FE-AUDIT: tokenized off-scale price emphasis
     font-weight: 700;
   }
 
