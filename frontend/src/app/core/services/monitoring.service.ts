@@ -1,7 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { environment } from '../../../environments/environment';
 import { firstValueFrom } from 'rxjs';
+import { ApiService } from './api.service';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // API Response Types
@@ -123,12 +122,13 @@ export interface PerformanceResponse {
 // Monitoring Service
 // ═══════════════════════════════════════════════════════════════════════════
 
-@Injectable({
-  providedIn: 'root'
-})
+/**
+ * H4-FE-AUDIT / H1-CORE: migrated from raw HttpClient to ApiService.
+ * Each fetcher now reads the unwrapped envelope `data` directly.
+ */
+@Injectable({ providedIn: 'root' })
 export class MonitoringService {
-  private http = inject(HttpClient);
-  private baseUrl = `${environment.apiUrl}/api/monitoring`;
+  private readonly api = inject(ApiService);
 
   // Reactive state
   signalLogs = signal<SignalLogsResponse | null>(null);
@@ -138,117 +138,61 @@ export class MonitoringService {
   loading = signal<boolean>(false);
   error = signal<string | null>(null);
 
-  /**
-   * Get signal generation statistics
-   */
+  private async fetch<T>(
+    path: string,
+    params: Record<string, number>,
+    setter: (data: T) => void,
+    failureMessage: string,
+  ): Promise<void> {
+    this.loading.set(true);
+    this.error.set(null);
+    try {
+      const data = await firstValueFrom(this.api.get<T>(path, params));
+      if (data) {
+        setter(data);
+      } else {
+        throw new Error(failureMessage);
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      this.error.set(errorMsg);
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
   async getSignalLogs(days: number = 30): Promise<void> {
-    this.loading.set(true);
-    this.error.set(null);
-
-    try {
-      const response = await firstValueFrom(
-        this.http.get<{ success: boolean; data: SignalLogsResponse }>(
-          `${this.baseUrl}/logs/signals?days=${days}`
-        )
-      );
-
-      if (response.success) {
-        this.signalLogs.set(response.data);
-      } else {
-        throw new Error('Failed to fetch signal logs');
-      }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-      this.error.set(errorMsg);
-    } finally {
-      this.loading.set(false);
-    }
+    return this.fetch<SignalLogsResponse>(
+      '/api/monitoring/logs/signals', { days },
+      d => this.signalLogs.set(d),
+      'Failed to fetch signal logs',
+    );
   }
 
-  /**
-   * Get trade execution statistics
-   */
   async getExecutionLogs(days: number = 30): Promise<void> {
-    this.loading.set(true);
-    this.error.set(null);
-
-    try {
-      const response = await firstValueFrom(
-        this.http.get<{ success: boolean; data: ExecutionLogsResponse }>(
-          `${this.baseUrl}/logs/executions?days=${days}`
-        )
-      );
-
-      if (response.success) {
-        this.executionLogs.set(response.data);
-      } else {
-        throw new Error('Failed to fetch execution logs');
-      }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-      this.error.set(errorMsg);
-    } finally {
-      this.loading.set(false);
-    }
+    return this.fetch<ExecutionLogsResponse>(
+      '/api/monitoring/logs/executions', { days },
+      d => this.executionLogs.set(d),
+      'Failed to fetch execution logs',
+    );
   }
 
-  /**
-   * Get risk management event statistics
-   */
   async getRiskEventLogs(days: number = 30): Promise<void> {
-    this.loading.set(true);
-    this.error.set(null);
-
-    try {
-      const response = await firstValueFrom(
-        this.http.get<{ success: boolean; data: RiskEventLogsResponse }>(
-          `${this.baseUrl}/logs/risk-events?days=${days}`
-        )
-      );
-
-      if (response.success) {
-        this.riskEventLogs.set(response.data);
-      } else {
-        throw new Error('Failed to fetch risk event logs');
-      }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-      this.error.set(errorMsg);
-    } finally {
-      this.loading.set(false);
-    }
+    return this.fetch<RiskEventLogsResponse>(
+      '/api/monitoring/logs/risk-events', { days },
+      d => this.riskEventLogs.set(d),
+      'Failed to fetch risk event logs',
+    );
   }
 
-  /**
-   * Get combined performance overview
-   */
   async getPerformanceOverview(days: number = 7): Promise<void> {
-    this.loading.set(true);
-    this.error.set(null);
-
-    try {
-      const response = await firstValueFrom(
-        this.http.get<{ success: boolean; data: PerformanceResponse }>(
-          `${this.baseUrl}/stats/performance?days=${days}`
-        )
-      );
-
-      if (response.success) {
-        this.performance.set(response.data);
-      } else {
-        throw new Error('Failed to fetch performance overview');
-      }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-      this.error.set(errorMsg);
-    } finally {
-      this.loading.set(false);
-    }
+    return this.fetch<PerformanceResponse>(
+      '/api/monitoring/stats/performance', { days },
+      d => this.performance.set(d),
+      'Failed to fetch performance overview',
+    );
   }
 
-  /**
-   * Refresh all monitoring data
-   */
   async refreshAll(days: number = 30): Promise<void> {
     await Promise.all([
       this.getSignalLogs(days),

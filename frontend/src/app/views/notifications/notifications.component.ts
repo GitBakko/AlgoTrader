@@ -58,20 +58,31 @@ export class NotificationsComponent implements OnInit {
 
   loadNotifications(): void {
     this.loading.set(true);
-    const params: Record<string, any> = {
+    // L3-VIEWS-OTHER: typed params instead of `Record<string, any>`.
+    type LoadPageParams = {
+      page?: number;
+      page_size?: number;
+      alert_type?: string;
+      severity?: string;
+      epic?: string;
+      is_read?: boolean;
+    };
+    const params: LoadPageParams = {
       page: this.page(),
       page_size: this.pageSize,
     };
-    if (this.filterAlertType()) params['alert_type'] = this.filterAlertType();
-    if (this.filterSeverity()) params['severity'] = this.filterSeverity();
-    if (this.filterEpic()) params['epic'] = this.filterEpic();
-    if (this.filterUnreadOnly()) params['is_read'] = false;
+    if (this.filterAlertType()) params.alert_type = this.filterAlertType();
+    if (this.filterSeverity()) params.severity = this.filterSeverity();
+    if (this.filterEpic()) params.epic = this.filterEpic();
+    if (this.filterUnreadOnly()) params.is_read = false;
 
+    // H4-FE-AUDIT: loadPage now returns the unwrapped envelope data
+    // (NotificationListResponse) — no `.success` / `.data` to unwrap here.
     this.#notifService.loadPage(params).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: res => {
-        if (res.success) {
-          this.notifications.set(res.data.notifications);
-          this.total.set(res.data.total);
+      next: data => {
+        if (data?.notifications) {
+          this.notifications.set(data.notifications);
+          this.total.set(data.total);
         }
         this.loading.set(false);
       },

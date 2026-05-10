@@ -94,9 +94,9 @@ describe('MarketStatusService', () => {
     });
     await promise2;
 
-    // Get multi-status signal
-    const multiStatus = service.getMultiStatus([epic1, epic2]);
-    const statuses = multiStatus();
+    // Get multi-status snapshot (H4-CORE: was getMultiStatus signal,
+    // now plain snapshot — caller wraps in their own computed).
+    const statuses = service.buildMultiStatus([epic1, epic2]);
 
     expect(Object.keys(statuses).length).toBe(2);
     expect(statuses[epic1].is_open).toBe(true);

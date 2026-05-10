@@ -1,7 +1,6 @@
-import { Injectable, inject, signal, computed } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { environment } from '../../../environments/environment';
+import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
+import { ApiService } from './api.service';
 
 export interface MarketStatusResponse {
   epic: string;
@@ -19,13 +18,22 @@ interface CachedStatus extends MarketStatusResponse {
   _ts: number;
 }
 
+/**
+ * H4-FE-AUDIT / H1-CORE: migrated from raw HttpClient to ApiService.
+ * H4-CORE: removed `getMultiStatus(epics)` which allocated a new
+ * `computed()` per call (unbounded signal-graph growth). Callers now
+ * derive multi-status locally from `statusSnapshot` plus their own
+ * memoised computed.
+ */
 @Injectable({ providedIn: 'root' })
 export class MarketStatusService {
-  private http = inject(HttpClient);
-  private baseUrl = `${environment.apiUrl}/api/markets`;
+  private readonly api = inject(ApiService);
 
   // Cache with timestamp (60s TTL)
   private statusCache = signal<Record<string, CachedStatus>>({});
+
+  /** H4-CORE: read-only snapshot for downstream `computed()` derivations. */
+  readonly statusSnapshot = this.statusCache.asReadonly();
 
   /**
    * Get market status for a specific epic.
@@ -42,24 +50,20 @@ export class MarketStatusService {
     }
 
     try {
-      const response = await firstValueFrom(
-        this.http.get<{ success: boolean; data: MarketStatusResponse }>(
-          `${this.baseUrl}/status/${epic}`
-        )
+      const data = await firstValueFrom(
+        this.api.get<MarketStatusResponse>(`/api/markets/status/${epic}`)
       );
 
-      if (response.success) {
-        // Update cache
+      if (data) {
         this.statusCache.update(cache => ({
           ...cache,
-          [epic]: { ...response.data, _ts: now }
+          [epic]: { ...data, _ts: now }
         }));
-        return response.data;
+        return data;
       }
 
-      throw new Error('API returned success: false');
+      throw new Error('API returned empty data');
     } catch (error) {
-
       // Return cached data if available (even if expired)
       if (cached) {
         const { _ts, ...status } = cached;
@@ -78,21 +82,21 @@ export class MarketStatusService {
   }
 
   /**
-   * Get computed signal for multi-epic status.
-   * Useful for tracking multiple assets simultaneously.
+   * Build a multi-status snapshot for the given epics. NOT a computed —
+   * callers are expected to wrap this in their own `computed()` so the
+   * memoisation is owned by the consumer (no per-call signal-graph
+   * growth).
    */
-  getMultiStatus(epics: string[]) {
-    return computed(() => {
-      const cache = this.statusCache();
-      return epics.reduce((acc, epic) => {
-        const cached = cache[epic];
-        if (cached) {
-          const { _ts, ...status } = cached;
-          acc[epic] = status;
-        }
-        return acc;
-      }, {} as Record<string, MarketStatusResponse>);
-    });
+  buildMultiStatus(epics: string[]): Record<string, MarketStatusResponse> {
+    const cache = this.statusCache();
+    return epics.reduce((acc, epic) => {
+      const cached = cache[epic];
+      if (cached) {
+        const { _ts, ...status } = cached;
+        acc[epic] = status;
+      }
+      return acc;
+    }, {} as Record<string, MarketStatusResponse>);
   }
 
   /**

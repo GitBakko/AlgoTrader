@@ -1,19 +1,25 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { ApiResponse, AppNotification, NotificationListResponse } from '../models';
+import { AppNotification, NotificationListResponse } from '../models';
+import { ApiService } from './api.service';
 
 /**
  * H2-FE fix: removed `OnDestroy` — Angular never calls `ngOnDestroy` on
  * root-scoped services so the previous handler was unreachable. The WS
  * is now torn down explicitly via `disconnectWs()` called from
  * `AuthService.clearAuth()` so the reconnect-loop stops on logout.
+ *
+ * H4-FE-AUDIT: migrated from raw HttpClient to ApiService for envelope
+ * consistency. M3-CORE: single-init guard prevents the duplicate REST
+ * burst caused by both DefaultHeader + Dashboard injecting + calling
+ * init() on first dashboard load.
  */
 @Injectable({ providedIn: 'root' })
 export class NotificationCenterService {
-  private readonly http = inject(HttpClient);
-  private readonly apiUrl = `${environment.apiUrl}/api/notifications`;
+  private readonly api = inject(ApiService);
   private readonly wsUrl = `${environment.wsUrl}/ws/notifications`;
+  private initialized = false;
 
   readonly notifications = signal<AppNotification[]>([]);
   readonly unreadCount = signal(0);
@@ -48,8 +54,10 @@ export class NotificationCenterService {
    *  so logout closes the WS cleanly. Reset on each `connectWs()`. */
   private intentionalDisconnect = false;
 
-  /** Initialize: load from REST + connect WS */
+  /** Initialize: load from REST + connect WS. M3-CORE: idempotent. */
   init(): void {
+    if (this.initialized) return;
+    this.initialized = true;
     this.loadUnreadCount();
     this.loadRecent();
     this.connectWs();
@@ -57,28 +65,22 @@ export class NotificationCenterService {
 
   /** Load recent notifications for dropdown */
   loadRecent(): void {
-    this.http.get<ApiResponse<NotificationListResponse>>(
-      `${this.apiUrl}/?page=1&page_size=20`
-    ).subscribe({
-      next: res => {
-        if (res.success) {
-          this.notifications.set(res.data.notifications);
+    this.api.get<NotificationListResponse>('/api/notifications/', { page: 1, page_size: 20 })
+      .subscribe({
+        next: data => {
+          if (data?.notifications) this.notifications.set(data.notifications);
         }
-      }
-    });
+      });
   }
 
   /** Load unread count for badge */
   loadUnreadCount(): void {
-    this.http.get<ApiResponse<{ count: number }>>(
-      `${this.apiUrl}/unread-count`
-    ).subscribe({
-      next: res => {
-        if (res.success) {
-          this.unreadCount.set(res.data.count);
+    this.api.get<{ count: number }>('/api/notifications/unread-count')
+      .subscribe({
+        next: data => {
+          if (data) this.unreadCount.set(data.count);
         }
-      }
-    });
+      });
   }
 
   /** Load paginated notifications (for full page) */
@@ -89,23 +91,13 @@ export class NotificationCenterService {
     severity?: string;
     epic?: string;
     is_read?: boolean;
-  } = {}) {
-    const query = new URLSearchParams();
-    if (params.page) query.set('page', String(params.page));
-    if (params.page_size) query.set('page_size', String(params.page_size));
-    if (params.alert_type) query.set('alert_type', params.alert_type);
-    if (params.severity) query.set('severity', params.severity);
-    if (params.epic) query.set('epic', params.epic);
-    if (params.is_read !== undefined) query.set('is_read', String(params.is_read));
-
-    return this.http.get<ApiResponse<NotificationListResponse>>(
-      `${this.apiUrl}/?${query.toString()}`
-    );
+  } = {}): Observable<NotificationListResponse> {
+    return this.api.get<NotificationListResponse>('/api/notifications/', { ...params });
   }
 
   /** Mark single notification as read */
   markAsRead(id: number): void {
-    this.http.put<ApiResponse<any>>(`${this.apiUrl}/${id}/read`, {}).subscribe({
+    this.api.put<unknown>(`/api/notifications/${id}/read`, {}).subscribe({
       next: () => {
         this.notifications.update(list =>
           list.map(n => n.id === id ? { ...n, is_read: true } : n)
@@ -117,7 +109,7 @@ export class NotificationCenterService {
 
   /** Mark all as read */
   markAllRead(): void {
-    this.http.put<ApiResponse<any>>(`${this.apiUrl}/read-all`, {}).subscribe({
+    this.api.put<unknown>('/api/notifications/read-all', {}).subscribe({
       next: () => {
         this.notifications.update(list =>
           list.map(n => ({ ...n, is_read: true }))
@@ -129,7 +121,7 @@ export class NotificationCenterService {
 
   /** Delete a notification */
   deleteNotification(id: number): void {
-    this.http.delete<ApiResponse<any>>(`${this.apiUrl}/${id}`).subscribe({
+    this.api.delete<unknown>(`/api/notifications/${id}`).subscribe({
       next: () => {
         const wasUnread = this.notifications().find(n => n.id === id && !n.is_read);
         this.notifications.update(list => list.filter(n => n.id !== id));

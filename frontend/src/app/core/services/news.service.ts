@@ -1,26 +1,22 @@
 /**
  * News and sentiment service.
  * Provides access to news articles, insider sentiment, and analyst data.
+ *
+ * H4-FE-AUDIT / H1-CORE: migrated from raw HttpClient to ApiService so
+ * the response envelope is unwrapped centrally and the request goes
+ * through the same interceptor pipeline as every other API caller.
  */
 
 import { Injectable, inject, signal } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, tap, catchError, of, map } from 'rxjs';
 import { NewsArticle, InsiderSentiment, AnalystConsensus, SentimentSummary } from '../models/news.model';
-import { environment } from '../../../environments/environment';
-
-interface ApiResponse<T> {
-  success: boolean;
-  data: T;
-  error?: string;
-}
+import { ApiService } from './api.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class NewsService {
-  private readonly http = inject(HttpClient);
-  private readonly baseUrl = `${environment.apiUrl}/api/news`;
+  private readonly api = inject(ApiService);
 
   // Signals for reactive state
   readonly news = signal<NewsArticle[]>([]);
@@ -37,48 +33,36 @@ export class NewsService {
     this.isLoading.set(true);
     this.error.set(null);
 
-    const params = new HttpParams()
-      .set('limit', limit.toString())
-      .set('days', days.toString());
-
-    this.http.get<ApiResponse<NewsArticle[]>>(`${this.baseUrl}/${epic}`, { params })
+    this.api.get<NewsArticle[]>(`/api/news/${epic}`, { limit, days })
       .pipe(
-        tap(response => {
-          if (response.success) {
-            this.news.set(response.data);
-          } else {
-            this.error.set(response.error || 'Failed to fetch news');
-          }
-        }),
-        catchError(error => {
+        tap(data => this.news.set(data ?? [])),
+        catchError(() => {
           this.error.set('Failed to fetch news');
           this.news.set([]);
-          return of({ success: false, data: [] as NewsArticle[] });
+          return of([] as NewsArticle[]);
         })
       )
-      .subscribe(() => this.isLoading.set(false));
+      // M1-CORE: explicit error/next callbacks so isLoading always clears.
+      .subscribe({
+        next: () => this.isLoading.set(false),
+        error: () => this.isLoading.set(false),
+      });
   }
 
   /**
    * Get insider sentiment (MSPR) for a stock.
    */
   getInsiderSentiment(epic: string, startDate?: string, endDate?: string): void {
-    let params = new HttpParams();
-    if (startDate) params = params.set('start_date', startDate);
-    if (endDate) params = params.set('end_date', endDate);
+    const params: Record<string, string | number> = {};
+    if (startDate) params['start_date'] = startDate;
+    if (endDate) params['end_date'] = endDate;
 
-    this.http.get<ApiResponse<InsiderSentiment>>(`${this.baseUrl}/insider/${epic}`, { params })
+    this.api.get<InsiderSentiment>(`/api/news/insider/${epic}`, params)
       .pipe(
-        tap(response => {
-          if (response.success) {
-            this.insiderSentiment.set(response.data);
-          } else {
-            this.insiderSentiment.set(null);
-          }
-        }),
-        catchError(error => {
+        tap(data => this.insiderSentiment.set(data ?? null)),
+        catchError(() => {
           this.insiderSentiment.set(null);
-          return of({ success: false, data: null });
+          return of(null);
         })
       )
       .subscribe();
@@ -88,16 +72,14 @@ export class NewsService {
    * Get aggregated sentiment score for an asset.
    */
   getSentiment(epic: string, days: number = 7): Observable<number> {
-    const params = new HttpParams().set('days', days.toString());
-
-    return this.http.get<ApiResponse<SentimentSummary>>(`${this.baseUrl}/sentiment/${epic}`, { params })
+    return this.api.get<SentimentSummary>(`/api/news/sentiment/${epic}`, { days })
       .pipe(
-        map(response => {
-          const sentiment = response.success ? response.data.sentiment : 0;
+        map(data => {
+          const sentiment = data?.sentiment ?? 0;
           this.sentimentScore.set(sentiment);
           return sentiment;
         }),
-        catchError(error => {
+        catchError(() => {
           this.sentimentScore.set(0);
           return of(0);
         })
