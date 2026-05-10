@@ -56,9 +56,15 @@ class TargetBuilder:
             ((pl.col("close").shift(-self.horizon_bars) - pl.col("close"))).alias("_future_change")
         )
 
-        # ATR-relative return
+        # ATR-relative return. H5 fix: when atr=0 (first bars before
+        # Wilder smoothing initialises) the division yields ±inf which
+        # the threshold gate then maps to spurious BUY/SELL labels.
+        # Guard with NULL on zero ATR so those rows drop out of training.
         df = df.with_columns(
-            (pl.col("_future_change") / pl.col(self.atr_column)).alias("_atr_relative_return")
+            pl.when(pl.col(self.atr_column) > 0)
+            .then(pl.col("_future_change") / pl.col(self.atr_column))
+            .otherwise(None)
+            .alias("_atr_relative_return")
         )
 
         # Classify into 3 classes

@@ -306,35 +306,30 @@ class ExecutionEngine:
                             position_db = matched
 
                     if position_db:
-                        # Update existing position to CLOSED
+                        # Update existing position to CLOSED. Invariant #2:
+                        # NO arithmetic (fill-entry)*size fallback. P&L is
+                        # broker-authoritative — CloseDetector reconciles
+                        # from the TRADE row on the next reconciler tick.
                         position_db.status = "CLOSED"
                         position_db.closed_at = now
                         position_db.close_reason = db_reason
                         if fill_price:
                             position_db.current_price = Decimal(str(fill_price))
-                            price_diff = Decimal(str(fill_price)) - position_db.entry_price
-                            if position_db.direction == "SELL":
-                                price_diff = -price_diff
-                            position_db.profit_loss = price_diff * position_db.size
+                        # profit_loss left untouched here — None if absent.
                         await session.flush()
                     elif epic != "UNKNOWN" and size > 0:
-                        # Position was never persisted at open — create it as CLOSED
-                        calc_pnl = Decimal("0")
-                        if fill_price and entry_price:
-                            price_diff = Decimal(str(fill_price)) - Decimal(str(entry_price))
-                            if direction == "SELL":
-                                price_diff = -price_diff
-                            calc_pnl = price_diff * Decimal(str(size))
-
+                        # Position was never persisted at open — create it
+                        # CLOSED with profit_loss=NULL. CloseDetector will
+                        # backfill P&L from broker TRADE row on next tick.
                         position_db = Position(
                             deal_id=deal_id,
-                            deal_reference=None,  # not available at close time for legacy positions
+                            deal_reference=None,
                             epic=epic,
                             direction=direction,
                             size=Decimal(str(size)),
                             entry_price=Decimal(str(entry_price)),
                             current_price=Decimal(str(fill_price)) if fill_price else None,
-                            profit_loss=calc_pnl,
+                            profit_loss=None,
                             status="CLOSED",
                             opened_at=now,
                             closed_at=now,
@@ -345,25 +340,35 @@ class ExecutionEngine:
                             f"Created CLOSED position in DB (never persisted at open): {deal_id} {epic}"
                         )
                     else:
-                        await session.commit()
                         logger.warning(
                             f"Position {deal_id} not found in DB and insufficient info to create"
                         )
                         return None
 
-                    # Create CLOSE trade record
-                    trade_db = Trade(
-                        position_id=position_db.id,
-                        deal_reference=deal_id,
-                        trade_type="CLOSE",
-                        epic=position_db.epic,
-                        direction=position_db.direction,
-                        size=position_db.size,
-                        price=Decimal(str(fill_price)) if fill_price else position_db.entry_price,
-                        profit_loss=position_db.profit_loss,
-                        executed_at=now,
+                    # Idempotent CLOSE Trade row (Invariant #10): SELECT-then-
+                    # INSERT on (position_id, trade_type='CLOSE'). First writer
+                    # wins. Prevents duplicate audit rows when reconciler tick
+                    # also calls _finalize_close for the same deal.
+                    from sqlalchemy import select as _select
+                    existing_close = await session.execute(
+                        _select(Trade)
+                        .where(Trade.position_id == position_db.id)
+                        .where(Trade.trade_type == "CLOSE")
+                        .limit(1)
                     )
-                    session.add(trade_db)
+                    if existing_close.scalar_one_or_none() is None:
+                        trade_db = Trade(
+                            position_id=position_db.id,
+                            deal_reference=deal_id,
+                            trade_type="CLOSE",
+                            epic=position_db.epic,
+                            direction=position_db.direction,
+                            size=position_db.size,
+                            price=Decimal(str(fill_price)) if fill_price else position_db.entry_price,
+                            profit_loss=position_db.profit_loss,
+                            executed_at=now,
+                        )
+                        session.add(trade_db)
                     await session.commit()
 
                     logger.debug(f"Position closed in DB: {deal_id} P&L={position_db.profit_loss}")
@@ -376,37 +381,67 @@ class ExecutionEngine:
                 logger.error(f"Database close (session factory) failed: {e}")
             return None
 
-        # Fallback: injected repos (PAPER mode or tests)
+        # Fallback: injected repos (PAPER mode or tests). Invariant #2:
+        # NO arithmetic P&L fallback. Invariant #10: SELECT-then-INSERT
+        # idempotency on CLOSE trade row.
         if self._position_repository and self._trade_repository:
             try:
                 position_db = await self._position_repository.get_by_deal_id(deal_id)
                 if position_db:
+                    now_naive = datetime.now(UTC).replace(tzinfo=None)
                     position_db.status = "CLOSED"
-                    position_db.closed_at = datetime.now(UTC).replace(tzinfo=None)
+                    position_db.closed_at = now_naive
                     position_db.close_reason = db_reason
                     if fill_price:
                         position_db.current_price = Decimal(str(fill_price))
-                        price_diff = Decimal(str(fill_price)) - position_db.entry_price
-                        if position_db.direction == "SELL":
-                            price_diff = -price_diff
-                        position_db.profit_loss = price_diff * position_db.size
+                    # profit_loss left untouched — broker-authoritative.
 
-                    await self._position_repository.update(position_db)
+                    # BaseRepository.update has signature (id, values).
+                    # Pass the mutated fields explicitly so the repo issues
+                    # an UPDATE row even when called against a real session
+                    # (no auto-flush from in-place mutation across boundary).
+                    update_values: dict = {
+                        "status": "CLOSED",
+                        "closed_at": now_naive,
+                        "close_reason": db_reason,
+                    }
+                    if fill_price:
+                        update_values["current_price"] = Decimal(str(fill_price))
+                    try:
+                        await self._position_repository.update(
+                            position_db.id, update_values
+                        )
+                    except TypeError:
+                        # Older mocks / repos with single-arg signature —
+                        # accept silently to keep test compatibility.
+                        await self._position_repository.update(position_db)
 
                     from src.database.models import Trade
 
-                    trade_db = Trade(
-                        position_id=position_db.id,
-                        deal_reference=deal_id,
-                        trade_type="CLOSE",
-                        epic=position_db.epic,
-                        direction=position_db.direction,
-                        size=position_db.size,
-                        price=Decimal(str(fill_price)) if fill_price else position_db.entry_price,
-                        profit_loss=position_db.profit_loss,
-                        executed_at=datetime.now(UTC).replace(tzinfo=None),
+                    # Idempotent CLOSE Trade row guard via attribute probe.
+                    existing_close = None
+                    finder = getattr(
+                        self._trade_repository, "find_close_for_position", None
                     )
-                    await self._trade_repository.create(trade_db)
+                    if finder is not None:
+                        try:
+                            existing_close = await finder(position_db.id)
+                        except Exception:
+                            existing_close = None
+
+                    if existing_close is None:
+                        trade_db = Trade(
+                            position_id=position_db.id,
+                            deal_reference=deal_id,
+                            trade_type="CLOSE",
+                            epic=position_db.epic,
+                            direction=position_db.direction,
+                            size=position_db.size,
+                            price=Decimal(str(fill_price)) if fill_price else position_db.entry_price,
+                            profit_loss=position_db.profit_loss,
+                            executed_at=now_naive,
+                        )
+                        await self._trade_repository.create(trade_db)
 
                     logger.debug(f"Position closed in DB: {deal_id} P&L={position_db.profit_loss}")
                     return (

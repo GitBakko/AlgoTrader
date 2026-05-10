@@ -270,7 +270,7 @@ class TrainingOrchestrator:
         from src.models.walk_forward import WalkForwardSplitter
         from src.models.xgboost_model import XGBoostClassifier
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
         from src.models.asset_metadata import compute_walk_forward_windows
 

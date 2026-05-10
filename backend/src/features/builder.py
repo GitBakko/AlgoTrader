@@ -8,7 +8,7 @@ Sentiment data flow (Step 8):
 - Sync apply: pass the result dict to `build_features(sentiment_data=...)` or `_apply_sentiment_features()`
 """
 
-from datetime import datetime
+from datetime import UTC, datetime, timedelta  # noqa: F401
 
 import polars as pl
 from loguru import logger
@@ -60,7 +60,10 @@ async def fetch_sentiment_data(
         "news": [],
     }
 
-    now = datetime.now()
+    # H4 fix: tz-aware datetime so comparisons inside provider clients
+    # (Finnhub/Marketaux) don't TypeError. Naive datetime was silently
+    # caught upstream and replaced sentiment data with 0.0 placeholders.
+    now = datetime.now(UTC)
     _end = end_date or now
     _start = start_date or (now - timedelta(days=180))
 

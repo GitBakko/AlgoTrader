@@ -179,8 +179,10 @@ class BackupManager:
             deleted_count = 0
 
             for backup_file in self.backup_dir.glob("mantis_backup_*.sql.gz"):
-                # Get file modification time
-                mtime = datetime.fromtimestamp(backup_file.stat().st_mtime)
+                # Get file modification time. Must be tz-aware to compare
+                # against tz-aware cutoff_date — else TypeError silently
+                # caught and cleanup never runs.
+                mtime = datetime.fromtimestamp(backup_file.stat().st_mtime, tz=UTC)
 
                 if mtime < cutoff_date:
                     backup_file.unlink()

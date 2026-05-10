@@ -11,7 +11,6 @@ from sqlalchemy import (
     BigInteger,
     Column,
     ForeignKey,
-    MetaData,
     Numeric,
     UniqueConstraint,
     text,
@@ -19,8 +18,12 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
-# MetaData object for Alembic migrations
-metadata = MetaData()
+# MetaData object for Alembic migrations.
+# Must reference SQLModel.metadata so every `class Foo(SQLModel, table=True)`
+# is registered with the Alembic target — using a fresh empty MetaData()
+# would make `alembic revision --autogenerate` produce a destructive
+# DROP-ALL migration since no tables would be visible to the diff.
+metadata = SQLModel.metadata
 
 
 class Account(SQLModel, table=True):

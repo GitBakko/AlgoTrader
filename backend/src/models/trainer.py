@@ -231,6 +231,10 @@ class ModelTrainer:
         best_fold_idx = 0
         best_model_path: Path | None = None
         last_split = None
+        # C2 fix: track best-fold val indices so calibrator fits on data
+        # the best model never trained on. Using last_split.val_indices
+        # in rolling walk-forward leaks when best != last fold.
+        best_val_indices = None
 
         # Get timestamps for fold metadata
         timestamps = df_valid["timestamp"].to_list() if "timestamp" in df_valid.columns else None
@@ -298,6 +302,7 @@ class ModelTrainer:
             if val_f1 > best_val_f1:
                 best_val_f1 = val_f1
                 best_fold_idx = split.fold_index
+                best_val_indices = split.val_indices
                 # Save best fold's weights to temp dir
                 best_model_path = tmp_dir / f"fold_{split.fold_index}"
                 model.save(best_model_path)
@@ -318,23 +323,39 @@ class ModelTrainer:
         except OSError as e:
             logger.warning(f"Failed to clean up temp dir {tmp_dir}: {e}")
 
-        # Fit confidence calibrator on last fold's validation set
+        # Fit confidence calibrator on the BEST fold's val set so the
+        # calibrator never sees data the best model trained on. C1 fix:
+        # guard `last_split is None` (zero-iteration loop on edge data
+        # sizes) — abort gracefully rather than AttributeError.
         calibrator = None
-        X_cal = X[last_split.val_indices]
-        y_cal = y[last_split.val_indices]
-        if len(X_cal) >= 30:
-            try:
-                cal_proba = model.predict_proba(X_cal)
-                y_cal_aligned = y_cal[-len(cal_proba) :]
-                calibrator = ConfidenceCalibrator(n_classes=len(np.unique(y)))
-                cal_stats = calibrator.fit(y_cal_aligned, cal_proba)
-                logger.info(
-                    f"Confidence calibration: ECE {cal_stats['ece_before']:.4f} -> "
-                    f"{cal_stats['ece_after']:.4f}"
-                )
-            except Exception as e:
-                logger.warning(f"Calibration fitting failed: {e}")
-                calibrator = None
+        cal_indices = best_val_indices if best_val_indices is not None else (
+            last_split.val_indices if last_split is not None else None
+        )
+        if cal_indices is None:
+            logger.warning(
+                "Walk-forward produced zero folds — skipping calibration "
+                "and returning untrained model. Investigate dataset size / "
+                "splitter configuration."
+            )
+        else:
+            X_cal = X[cal_indices]
+            y_cal = y[cal_indices]
+            if len(X_cal) >= 30:
+                try:
+                    cal_proba = model.predict_proba(X_cal)
+                    y_cal_aligned = y_cal[-len(cal_proba) :]
+                    # M1 fix: hardcode 3-class space (SignalClass) instead
+                    # of `len(np.unique(y))` which silently shrinks if a
+                    # class is absent from the training subset.
+                    calibrator = ConfidenceCalibrator(n_classes=3)
+                    cal_stats = calibrator.fit(y_cal_aligned, cal_proba)
+                    logger.info(
+                        f"Confidence calibration: ECE {cal_stats['ece_before']:.4f} -> "
+                        f"{cal_stats['ece_after']:.4f}"
+                    )
+                except Exception as e:
+                    logger.warning(f"Calibration fitting failed: {e}")
+                    calibrator = None
 
         # Aggregate metrics
         avg_val = self._average_metrics([f.val_metrics for f in fold_results])

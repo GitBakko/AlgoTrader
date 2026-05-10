@@ -6,7 +6,7 @@ Provides generic CRUD operations for all models.
 from typing import Any, Generic, TypeVar
 
 from loguru import logger
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
 
@@ -109,13 +109,15 @@ class BaseRepository(Generic[ModelType]):
 
     async def count(self) -> int:
         """
-        Count total records.
+        Count total records via SQL COUNT(*) instead of materialising rows.
 
         Returns:
             Total record count
         """
-        result = await self.session.execute(select(self.model))
-        return len(list(result.scalars().all()))
+        result = await self.session.execute(
+            select(func.count()).select_from(self.model)
+        )
+        return int(result.scalar_one() or 0)
 
     async def exists(self, id: int) -> bool:
         """
