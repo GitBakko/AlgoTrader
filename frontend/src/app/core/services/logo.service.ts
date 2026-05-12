@@ -16,8 +16,9 @@
  *                  + `cryptoicons.org/api/icon/{symbol}/64`
  *  - Stocks:      `eodhd.com/img/mlogos/US/{ticker}.webp` (primary —
  *                  verified 200 on full stock basket 2026-05-11)
- *                  + `logo.clearbit.com/{domain}` (free tier, often 404)
- *                  + legacy `eodhd.com/img/logos/US/{ticker}.png`
+ *                  + legacy `eodhd.com/img/logos/US/{ticker}.png` as
+ *                  defensive secondary. Clearbit logo service is dead
+ *                  (DNS unresolvable 2026-05-12) — removed.
  *  - Forex:       `flagcdn.com/w40/{cc}.png` for the quote currency
  *                  + circle-flags GitHub Pages SVG fallback
  *  - Commodities: curated inline SVG glyphs (gold bar / silver bar / oil
@@ -42,7 +43,7 @@ import { CHART_NEON_HEX } from '../../shared/constants/chart-colors';
   providedIn: 'root',
 })
 export class LogoService {
-  private readonly CACHE_KEY = 'mantis-logos-v7';
+  private readonly CACHE_KEY = 'mantis-logos-v8';
   private readonly CACHE_TTL_MS = 24 * 60 * 60 * 1000;
   private cache = new Map<string, { urls: string[]; ts: number }>();
 
@@ -174,14 +175,13 @@ export class LogoService {
     }
 
     if (this.STOCK_MAP[epic]) {
-      const domain = this.STOCK_MAP[epic];
       // EODHD `mlogos/{TICKER}.webp` is the authoritative endpoint —
-      // verified 200 on all 8 stocks 2026-05-11. Clearbit free tier
-      // 404s on most tickers without an API key. Put EODHD first;
-      // clearbit + legacy png as secondary safety nets.
+      // verified 200 on all 8 stocks 2026-05-11. Clearbit logo service
+      // was shut down (DNS no longer resolves, ERR_NAME_NOT_RESOLVED on
+      // every host) so it is removed from the chain. Legacy png path
+      // stays as a defensive secondary in case `mlogos` ever shifts.
       return [
         `https://eodhd.com/img/mlogos/US/${epic}.webp`,
-        `https://logo.clearbit.com/${domain}`,
         `https://eodhd.com/img/logos/US/${epic}.png`,
         fallback,
       ];
