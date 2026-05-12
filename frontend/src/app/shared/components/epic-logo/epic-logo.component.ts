@@ -39,8 +39,15 @@ import { LogoService } from '../../../core/services/logo.service';
   `,
   styles: [`
     .epic-logo-wrapper {
-      display: inline-block;
+      // Use inline-flex + centered alignment so the <img> never falls
+      // to the text baseline. The previous inline-block left a baseline
+      // gap that pushed the glyph visibly downward inside the
+      // white-backdrop box (Live Feed bug). Flex centering removes it.
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       position: relative;
+      vertical-align: middle;
 
       // Stock logos from EODHD are typically black / monochromatic on a
       // transparent background (Apple is the obvious case — pure black
@@ -56,6 +63,7 @@ import { LogoService } from '../../../core/services/logo.service';
     }
 
     .epic-logo {
+      display: block;
       width: 100%;
       height: 100%;
       object-fit: contain;
