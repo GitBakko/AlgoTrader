@@ -14,8 +14,10 @@
  *  - Crypto:      `assets.coincap.io/assets/icons/{symbol}@2x.png`
  *                  + `cryptologos.cc/logos/{slug}-{ticker}-logo.svg`
  *                  + `cryptoicons.org/api/icon/{symbol}/64`
- *  - Stocks:      `logo.clearbit.com/{domain}` (free tier, returns image)
- *                  + `eodhd.com/img/logos/US/{ticker}.png`
+ *  - Stocks:      `eodhd.com/img/mlogos/US/{ticker}.webp` (primary —
+ *                  verified 200 on full stock basket 2026-05-11)
+ *                  + `logo.clearbit.com/{domain}` (free tier, often 404)
+ *                  + legacy `eodhd.com/img/logos/US/{ticker}.png`
  *  - Forex:       `flagcdn.com/w40/{cc}.png` for the quote currency
  *                  + circle-flags GitHub Pages SVG fallback
  *  - Commodities: curated inline SVG glyphs (gold bar / silver bar / oil
@@ -40,7 +42,7 @@ import { CHART_NEON_HEX } from '../../shared/constants/chart-colors';
   providedIn: 'root',
 })
 export class LogoService {
-  private readonly CACHE_KEY = 'mantis-logos-v6';
+  private readonly CACHE_KEY = 'mantis-logos-v7';
   private readonly CACHE_TTL_MS = 24 * 60 * 60 * 1000;
   private cache = new Map<string, { urls: string[]; ts: number }>();
 
@@ -173,7 +175,12 @@ export class LogoService {
 
     if (this.STOCK_MAP[epic]) {
       const domain = this.STOCK_MAP[epic];
+      // EODHD `mlogos/{TICKER}.webp` is the authoritative endpoint —
+      // verified 200 on all 8 stocks 2026-05-11. Clearbit free tier
+      // 404s on most tickers without an API key. Put EODHD first;
+      // clearbit + legacy png as secondary safety nets.
       return [
+        `https://eodhd.com/img/mlogos/US/${epic}.webp`,
         `https://logo.clearbit.com/${domain}`,
         `https://eodhd.com/img/logos/US/${epic}.png`,
         fallback,
