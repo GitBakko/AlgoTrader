@@ -158,6 +158,17 @@ export class LogoService {
     return urls[0] ?? this.emojiSvg(epic);
   }
 
+  /**
+   * True when the resolved logo is rendered on transparent and contains
+   * dark / monochromatic glyphs that would vanish on the dark theme
+   * (Apple black silhouette is the worst offender). Stock logos from
+   * EODHD generally need a light backdrop. Crypto / flag / commodity
+   * sources already provide their own background.
+   */
+  needsLightBackdrop(epic: string): boolean {
+    return epic in this.STOCK_MAP;
+  }
+
   private buildUrls(epic: string): string[] {
     const fallback = this.emojiSvg(epic);
 

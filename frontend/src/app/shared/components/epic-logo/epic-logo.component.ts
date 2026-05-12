@@ -17,7 +17,8 @@ import { LogoService } from '../../../core/services/logo.service';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="epic-logo-wrapper" [style.width.px]="size" [style.height.px]="size">
+    <div class="epic-logo-wrapper" [style.width.px]="size" [style.height.px]="size"
+         [class.with-backdrop]="needsBackdrop">
       @if (currentUrl()) {
         <img
           [src]="currentUrl()"
@@ -40,6 +41,18 @@ import { LogoService } from '../../../core/services/logo.service';
     .epic-logo-wrapper {
       display: inline-block;
       position: relative;
+
+      // Stock logos from EODHD are typically black / monochromatic on a
+      // transparent background (Apple is the obvious case — pure black
+      // silhouette that vanishes on the dark theme). Wrap them in a
+      // white rounded backdrop with slight inset padding so the glyph
+      // stays legible without resorting to a per-asset asset chooser.
+      &.with-backdrop {
+        background: #ffffff;
+        border-radius: var(--mantis-radius-sm, 4px);
+        padding: 2px;
+        box-sizing: border-box;
+      }
     }
 
     .epic-logo {
@@ -86,17 +99,20 @@ export class EpicLogoComponent implements OnChanges {
   private urlChain: string[] = [];
   private chainIndex = 0;
   readonly currentUrl = signal<string | null>(null);
+  needsBackdrop = false;
 
   constructor(private logoService: LogoService) {}
 
   ngOnChanges(): void {
     if (!this.epic) {
       this.currentUrl.set(null);
+      this.needsBackdrop = false;
       return;
     }
     this.urlChain = this.logoService.getLogoUrls(this.epic);
     this.chainIndex = 0;
     this.currentUrl.set(this.urlChain[0] ?? null);
+    this.needsBackdrop = this.logoService.needsLightBackdrop(this.epic);
   }
 
   onError(): void {
