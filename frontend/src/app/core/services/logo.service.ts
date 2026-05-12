@@ -40,7 +40,7 @@ import { CHART_NEON_HEX } from '../../shared/constants/chart-colors';
   providedIn: 'root',
 })
 export class LogoService {
-  private readonly CACHE_KEY = 'mantis-logos-v5';
+  private readonly CACHE_KEY = 'mantis-logos-v6';
   private readonly CACHE_TTL_MS = 24 * 60 * 60 * 1000;
   private cache = new Map<string, { urls: string[]; ts: number }>();
 
@@ -57,8 +57,14 @@ export class LogoService {
 
   // Stock epics → primary domain (clearbit lookup)
   private readonly STOCK_MAP: Record<string, string> = {
-    NVDA: 'nvidia.com',
-    TSLA: 'tesla.com',
+    NVDA:  'nvidia.com',
+    TSLA:  'tesla.com',
+    AAPL:  'apple.com',
+    MSFT:  'microsoft.com',
+    GOOGL: 'google.com',
+    AMZN:  'amazon.com',
+    META:  'meta.com',
+    AMD:   'amd.com',
   };
 
   // FOREX pairs → ISO country code for the quote currency. We render a
@@ -69,6 +75,8 @@ export class LogoService {
     EURUSD: 'us',
     GBPUSD: 'us',
     USDJPY: 'jp',
+    USDCHF: 'ch',
+    USDCAD: 'ca',
     DE40:   'de',
     US500:  'us',
     NAS100: 'us',
@@ -107,6 +115,8 @@ export class LogoService {
     EURUSD:   '💶',
     GBPUSD:   '💷',
     USDJPY:   '💴',
+    USDCHF:   '🇨🇭',
+    USDCAD:   '🇨🇦',
     US500:    '📊',
     NAS100:   '💻',
     DE40:     '🇩🇪',

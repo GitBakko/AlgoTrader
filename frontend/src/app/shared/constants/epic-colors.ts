@@ -27,6 +27,15 @@ export const EPIC_COLORS: Record<string, string> = {
   NAS100:   '#5B9BD5',
   DASHUSD:  '#008CE7',
   ICPUSD:   '#29ABE2',
+  // New universe additions 2026-05-11 — brand accent colors.
+  AAPL:     '#A2AAAD',
+  MSFT:     '#00A4EF',
+  GOOGL:    '#4285F4',
+  AMZN:     '#FF9900',
+  META:     '#0866FF',
+  AMD:      '#ED1C24',
+  USDCHF:   '#D52B1E',
+  USDCAD:   '#D52B1E',
 };
 
 const NEUTRAL = '#8B949E';
