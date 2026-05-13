@@ -411,6 +411,34 @@ class Settings(BaseSettings):
         default=0.40, alias="MIN_SIGNAL_RR_THRESHOLD"
     )
 
+    # ===== Entry-Drift Handler =====
+    # Drift = (broker live mid - signal.entry_price) / signal.entry_price.
+    # signal.entry_price is the candle close at prediction time (stale by
+    # up to one candle). Real fill happens at broker live price. When the
+    # two diverge the strategy-calibrated SL/TP — and the R:R floor — are
+    # computed on a phantom entry, producing degenerate trades (META BUY
+    # closed in <1 min at $1.28 TP on 2026-05-13; same root cause as TSLA
+    # 2026-05-04 and BTCUSD 2026-05-04 partial-close loop).
+    #
+    # Strategy:
+    #   - drift_pct < deadband        → no-op (tick noise)
+    #   - deadband ≤ drift_pct ≤ cap  → SHIFT SL/TP by absolute delta,
+    #                                   preserves R:R distance
+    #   - drift_pct > cap             → REJECT (signal features invalid
+    #                                   on the new price; gap / news /
+    #                                   broker halt etc.)
+    # Stocks get a wider cap because intraday gaps on regular-session
+    # open are routine; forex/crypto/indices stay tight.
+    entry_drift_deadband_pct: float = Field(
+        default=0.001, alias="ENTRY_DRIFT_DEADBAND_PCT"
+    )
+    max_entry_drift_shift_pct: float = Field(
+        default=0.01, alias="MAX_ENTRY_DRIFT_SHIFT_PCT"
+    )
+    max_entry_drift_shift_pct_stocks: float = Field(
+        default=0.02, alias="MAX_ENTRY_DRIFT_SHIFT_PCT_STOCKS"
+    )
+
     # Regime Gate (Phase 2)
     regime_gate_enabled: bool = Field(default=False, alias="REGIME_GATE_ENABLED")
     regime_gate_confidence_threshold: float = Field(

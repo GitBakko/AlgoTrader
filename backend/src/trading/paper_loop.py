@@ -39,7 +39,7 @@ from src.risk.trailing_stop_manager import (
 from src.strategy.schemas import SignalDirection
 from src.strategy.strategy_manager import StrategyManager
 from src.utils.config import get_settings
-from src.utils.constants import TRADABLE_ASSETS
+from src.utils.constants import STOCK_ASSETS, TRADABLE_ASSETS
 
 
 @dataclass
@@ -2713,6 +2713,99 @@ class PaperTradingLoop:
         # (line 975: `if epic in open_epics: continue`).
         # No time-based dedup — if a position was closed and the signal is still
         # valid, the system should be free to re-enter immediately.
+
+        # Step 3a-bis: Entry-drift handler.
+        # `signal.entry_price` was stamped on the candle close at prediction
+        # time and is stale relative to the broker live mid by up to one
+        # candle. The strategy's SL/TP — and the risk-manager R:R floor —
+        # were computed on that phantom entry. If the real broker mid has
+        # drifted, we either SHIFT SL/TP by the absolute delta (preserving
+        # R:R) or REJECT outright. See `entry_drift_deadband_pct` /
+        # `max_entry_drift_shift_pct[_stocks]` in config for the bands.
+        # Root cause for META 2026-05-13 sub-minute TP and TSLA 2026-05-04
+        # / BTCUSD 2026-05-04 same-day SL/TP degeneracy.
+        _drift_settings = get_settings()
+        if self.broker and signal.entry_price > 0:
+            try:
+                _drift_details = await self.broker.get_market_details(epic)
+                _drift_snap = _drift_details.get("snapshot", {})
+                _bid = _drift_snap.get("bid", 0)
+                _offer = _drift_snap.get("offer", 0)
+                if _bid and _offer:
+                    live_mid = (float(_bid) + float(_offer)) / 2.0
+                    drift = live_mid - signal.entry_price
+                    drift_pct = abs(drift) / signal.entry_price
+                    deadband = _drift_settings.entry_drift_deadband_pct
+                    is_stock = epic in STOCK_ASSETS
+                    shift_cap = (
+                        _drift_settings.max_entry_drift_shift_pct_stocks
+                        if is_stock
+                        else _drift_settings.max_entry_drift_shift_pct
+                    )
+                    if drift_pct >= deadband:
+                        if drift_pct > shift_cap:
+                            reason = (
+                                f"Entry drift {drift_pct:.2%} > shift cap "
+                                f"{shift_cap:.2%} (signal "
+                                f"{signal.entry_price:.4f} → live "
+                                f"{live_mid:.4f}); signal features invalid "
+                                f"on new price"
+                            )
+                            logger.warning(f"[{epic}] DRIFT REJECT: {reason}")
+                            signal_info["status"] = "rejected"
+                            signal_info["rejection_reason"] = reason
+                            if audit_features is not None:
+                                audit_features["rejection_reason"] = reason
+                                audit_features["drift"] = {
+                                    "drift_pct": round(drift_pct * 100, 4),
+                                    "signal_entry": signal.entry_price,
+                                    "live_mid": live_mid,
+                                    "shift_cap_pct": round(shift_cap * 100, 2),
+                                    "action": "reject",
+                                }
+                                await self._persist_signal_audit(
+                                    epic=epic,
+                                    direction=signal.direction.value,
+                                    confidence=signal.confidence,
+                                    entry_price=signal.entry_price,
+                                    stop_loss=signal.suggested_stop,
+                                    take_profit=signal.suggested_tp,
+                                    status="REJECTED",
+                                    features=audit_features,
+                                )
+                            return
+                        old_entry = signal.entry_price
+                        old_sl = signal.suggested_stop
+                        old_tp = signal.suggested_tp
+                        new_sl = (old_sl + drift) if old_sl is not None else None
+                        new_tp = (old_tp + drift) if old_tp is not None else None
+                        signal = signal.model_copy(
+                            update={
+                                "entry_price": live_mid,
+                                "suggested_stop": new_sl,
+                                "suggested_tp": new_tp,
+                            }
+                        )
+                        logger.info(
+                            f"[{epic}] DRIFT SHIFT: {drift_pct:.2%} "
+                            f"entry {old_entry:.4f}→{live_mid:.4f} "
+                            f"SL {old_sl}→{new_sl} TP {old_tp}→{new_tp}"
+                        )
+                        signal_info["entry_price"] = live_mid
+                        if audit_features is not None:
+                            audit_features["drift"] = {
+                                "drift_pct": round(drift_pct * 100, 4),
+                                "signal_entry": old_entry,
+                                "live_mid": live_mid,
+                                "old_sl": old_sl,
+                                "new_sl": new_sl,
+                                "old_tp": old_tp,
+                                "new_tp": new_tp,
+                                "shift_cap_pct": round(shift_cap * 100, 2),
+                                "action": "shift",
+                            }
+            except Exception as e:
+                logger.debug(f"[{epic}] Drift check failed (non-blocking): {e}")
 
         # Step 3b: Spread filter — reject if spread cost > MAX_SPREAD_PCT of TP distance
         _spread_settings = get_settings()
