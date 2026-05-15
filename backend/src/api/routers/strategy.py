@@ -105,12 +105,16 @@ async def update_risk_limits(
     risk_mgr: RiskManager = Depends(get_risk_manager),
 ):
     """Update risk limits."""
+    # Preserve existing max_total_open_positions / max_total_exposure on PUT
+    # (these are wired from env Settings, not exposed in the body schema).
     risk_mgr.limits = RiskLimits(
         max_risk_per_trade=body.max_risk_per_trade,
         max_daily_drawdown=body.max_daily_drawdown,
         max_total_drawdown=body.max_total_drawdown,
         max_position_pct=body.max_position_pct,
         max_correlated_exposure=body.max_correlated_exposure,
+        max_total_open_positions=risk_mgr.limits.max_total_open_positions,
+        max_total_exposure=risk_mgr.limits.max_total_exposure,
     )
 
     return success_response({"updated": True})

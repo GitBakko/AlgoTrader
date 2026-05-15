@@ -84,6 +84,7 @@ graphify-out/
 .claude-flow/data/
 .claude-flow/logs/
 .claude-flow/sessions/
+.claude-flow/swarm/
 .claude-flow/daemon.pid
 .claude-flow/daemon.log
 .claude-flow/metrics/
@@ -92,6 +93,9 @@ graphify-out/
 .swarm/
 ruvector.db
 .claude/memory.db
+agentdb.rvf
+agentdb.rvf.lock
+/agents/
 
 # ===== Playwright MCP dumps =====
 .playwright-mcp/

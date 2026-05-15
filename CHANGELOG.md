@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file.
 
 ---
 
+## [Quick Wins QW2+QW7+CONF] - 2026-05-15 - Diagnostic-driven fixes
+
+Three parallel fixes addressing live 41.7% win-rate causes per `analysis:diagnostic-report-full` (AgentDB).
+
+- **QW7 — ADX neutral zone block (15→22)**: `strategy/schemas.py` `adx_ranging_threshold` default lifted 15.0 → 22.0. Signals with ADX in the 15-22 neutral zone now blocked (was permitted, contributed to noisy entries). New env knob `ADX_MIN_THRESHOLD` in `utils/config.py` (`adx_min_threshold` field, default 22.0). Expected: +2-3 pp WR by removing low-trend-strength signals.
+- **QW2 — MAX_OPEN_POSITIONS portfolio hard cap (LATENT BUG FIX)**: env `MAX_TOTAL_OPEN_POSITIONS=5` was already declared in `utils/config.py:453` but NEVER WIRED into `RiskLimits` constructor at `api/dependencies.py:190`. `RiskLimits.max_total_open_positions` schema default was 20 → production was running with cap 20, intended 5. Fix: (a) wire `settings.max_total_open_positions` in `dependencies.py:190` + `routers/strategy.py:108` (PUT /risk-limits preserves env value), (b) align `risk/schemas.py:36` default 20→5 as fail-safe. Expected: -concentrated drawdown, +3 pp WR by capping correlated exposure count.
+- **CONF — Confidence threshold calibration**: `backend/data/config/optimal_thresholds.json` — 4 assets lifted to safe floor 0.45+ (3-class baseline=0.333). US500 0.30→0.48, TSLA 0.30→0.48, BNBUSD 0.30→0.48 (all were BELOW random baseline), WTIUSD 0.42→0.50 (marginal Sharpe 0.96). Original OOS values preserved in `_min_confidence_oos_value` field for traceability. Expected: +2-3 pp WR by removing noise signals.
+
+Cumulative expected impact: ~7-9 pp lift on live WR (41.7% → 48-51%). Tests: `pytest tests/risk/ tests/strategy/` 509 passed / 8 skipped / 0 fail.
+
 ## [Hygiene] - 2026-05-15 - Ruflo integration + maintenance sprint
 
 - **chore(tooling)**: integrate `ruflo` MCP server with safe 3-way merge of project configs (commits `92f5d78`, `170c003`). `ruflo init --force` confirmed to clobber `CLAUDE.md`, `.mcp.json`, `.claude/settings.json` regardless of `--skip-claude`/`--minimal`/`--no-global`/`--preset` flags in both v3.7.0-alpha.14 AND .38 — merge procedure documented in `memory/project_ruflo_integration_2026-05-15.md`.

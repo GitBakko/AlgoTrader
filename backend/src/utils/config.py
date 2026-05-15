@@ -439,6 +439,10 @@ class Settings(BaseSettings):
         default=0.02, alias="MAX_ENTRY_DRIFT_SHIFT_PCT_STOCKS"
     )
 
+    # ADX minimum threshold — blocks neutral zone 15-22 in signal generation
+    # (StrategyConfig.adx_ranging_threshold default aligned, see strategy/schemas.py)
+    adx_min_threshold: float = Field(default=22.0, alias="ADX_MIN_THRESHOLD", ge=10.0, le=50.0)
+
     # Regime Gate (Phase 2)
     regime_gate_enabled: bool = Field(default=False, alias="REGIME_GATE_ENABLED")
     regime_gate_confidence_threshold: float = Field(

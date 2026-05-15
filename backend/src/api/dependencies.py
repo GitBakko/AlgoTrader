@@ -192,6 +192,7 @@ def init_services(app) -> None:
         max_daily_drawdown=settings.max_daily_drawdown,
         max_total_drawdown=settings.max_total_drawdown,
         max_total_exposure=settings.max_total_exposure,
+        max_total_open_positions=settings.max_total_open_positions,
     )
 
     # Core trading services

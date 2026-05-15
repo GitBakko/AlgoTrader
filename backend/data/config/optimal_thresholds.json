@@ -27,7 +27,9 @@
       "failed_criteria": []
     },
     "US500": {
-      "min_confidence": 0.3,
+      "min_confidence": 0.48,
+      "_min_confidence_calibrated_2026_05_15": "lifted 0.30 -> 0.48 (3-class baseline=0.333; safe floor 0.45)",
+      "_min_confidence_oos_value": 0.3,
       "decision": "KEEP",
       "sharpe": 2.202,
       "sortino": 2.914,
@@ -39,7 +41,9 @@
       "failed_criteria": []
     },
     "WTIUSD": {
-      "min_confidence": 0.42,
+      "min_confidence": 0.5,
+      "_min_confidence_calibrated_2026_05_15": "lifted 0.42 -> 0.50 (marginal Sharpe 0.96; tightened per CONF plan)",
+      "_min_confidence_oos_value": 0.42,
       "decision": "KEEP",
       "sharpe": 0.958,
       "sortino": 1.282,
@@ -81,7 +85,9 @@
       ]
     },
     "TSLA": {
-      "min_confidence": 0.3,
+      "min_confidence": 0.48,
+      "_min_confidence_calibrated_2026_05_15": "lifted 0.30 -> 0.48 (3-class baseline=0.333; safe floor 0.45)",
+      "_min_confidence_oos_value": 0.3,
       "decision": "KEEP",
       "sharpe": 1.398,
       "sortino": 1.937,
@@ -129,7 +135,9 @@
       "failed_criteria": []
     },
     "BNBUSD": {
-      "min_confidence": 0.3,
+      "min_confidence": 0.48,
+      "_min_confidence_calibrated_2026_05_15": "lifted 0.30 -> 0.48 (3-class baseline=0.333; safe floor 0.45)",
+      "_min_confidence_oos_value": 0.3,
       "decision": "KEEP",
       "sharpe": 2.236,
       "sortino": 2.75,
