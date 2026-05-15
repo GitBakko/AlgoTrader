@@ -449,6 +449,21 @@ class Settings(BaseSettings):
     # realized R on winning trades. See risk/trailing_stop_manager.py.
     tp1_fraction: float = Field(default=0.70, alias="TP1_FRACTION", ge=0.1, le=1.0)
 
+    # Per-asset-class spread filter limits (QW3 2026-05-15).
+    # Applied at paper_loop.py spread filter step 3b. Threshold compares
+    # spread_ratio = (offer - bid) / tp_distance against the asset class limit.
+    # Selected via get_spread_limit(epic) helper; max_spread_pct (above)
+    # kept as legacy/global fallback if class lookup ever returns None.
+    spread_limit_crypto: float = Field(
+        default=0.15, alias="SPREAD_LIMIT_CRYPTO", ge=0.01, le=1.0
+    )
+    spread_limit_precious: float = Field(
+        default=0.12, alias="SPREAD_LIMIT_PRECIOUS", ge=0.01, le=1.0
+    )
+    spread_limit_default: float = Field(
+        default=0.08, alias="SPREAD_LIMIT_DEFAULT", ge=0.01, le=1.0
+    )
+
     # Regime Gate (Phase 2)
     regime_gate_enabled: bool = Field(default=False, alias="REGIME_GATE_ENABLED")
     regime_gate_confidence_threshold: float = Field(

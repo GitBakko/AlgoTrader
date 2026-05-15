@@ -166,6 +166,46 @@ paper_pnl_snapshot_counter = Counter(
     ["outcome"],  # success | empty | error
 )
 
+# ===== QW3 Spread Filter Metrics =====
+# Per-asset-class spread filter blocks (paper_loop.py spread filter step 3b).
+mantis_spread_filter_blocked_total = Counter(
+    "mantis_spread_filter_blocked_total",
+    "Trades blocked by the per-asset-class spread filter (QW3)",
+    ["epic", "asset_class"],  # asset_class: crypto | precious | default
+)
+
+# ===== QW5 Slippage Observability Metrics =====
+# Captures the broker-side execution slippage (|fill_price - signal_price|)
+# from the ExecutionEngine pipeline. Buckets tuned for typical price-scale
+# slippage on Capital.com instruments (5-200 points absolute).
+mantis_slippage_points = Histogram(
+    "mantis_slippage_points",
+    "Absolute execution slippage in price points (|fill - signal|)",
+    ["epic", "direction"],
+    buckets=(5, 10, 20, 30, 50, 75, 100, 150, 200, 500),
+)
+mantis_slippage_pct = Histogram(
+    "mantis_slippage_pct",
+    "Relative execution slippage as fraction of signal price",
+    ["epic"],
+    buckets=(0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.10),
+)
+
+# ===== QW5 Live WR Tracker =====
+# Per-epic rolling live win rate over the analytics endpoint window (default
+# 21d). Updated every time GET /api/analytics/live-wr is invoked. Includes
+# delta vs the OOS expectation from optimal_thresholds.json.
+mantis_live_wr_gauge = Gauge(
+    "mantis_live_wr",
+    "Per-epic rolling live win-rate (TP / decided trades)",
+    ["epic"],
+)
+mantis_live_wr_oos_delta_gauge = Gauge(
+    "mantis_live_wr_oos_delta",
+    "Live WR minus OOS WR (negative = live underperforms OOS)",
+    ["epic"],
+)
+
 
 class MetricsCollector:
     """
@@ -321,6 +361,53 @@ class MetricsCollector:
             close_detection_shadow_disagreement_counter.labels(
                 v1_path=v1_path, v2_outcome=v2_outcome, epic=epic
             ).inc()
+        except Exception:
+            pass
+
+    @classmethod
+    def record_spread_filter_blocked(cls, *, epic: str, asset_class: str) -> None:
+        """Record a QW3 spread-filter block.
+
+        Args:
+            epic: Asset epic (e.g., BTCUSD, XAUUSD, US500)
+            asset_class: 'crypto' | 'precious' | 'default'
+        """
+        try:
+            mantis_spread_filter_blocked_total.labels(
+                epic=epic, asset_class=asset_class
+            ).inc()
+        except Exception:
+            pass
+
+    @classmethod
+    def record_slippage(
+        cls, *, epic: str, direction: str, signal_price: float, fill_price: float
+    ) -> None:
+        """Record execution slippage histograms (QW5).
+
+        Captures both absolute (points) and relative (pct) slippage so we can
+        attribute the H1 "TP almost hit but reversed" pattern to either entry
+        slippage (high relative) or exit slippage (high absolute on big moves).
+        """
+        if signal_price <= 0 or fill_price <= 0:
+            return
+        try:
+            slip_pts = abs(fill_price - signal_price)
+            slip_pct = slip_pts / signal_price
+            mantis_slippage_points.labels(epic=epic, direction=direction).observe(slip_pts)
+            mantis_slippage_pct.labels(epic=epic).observe(slip_pct)
+        except Exception:
+            pass
+
+    @classmethod
+    def update_live_wr(
+        cls, *, epic: str, live_wr: float, oos_delta: float | None
+    ) -> None:
+        """Push the latest live WR gauge for an epic (QW5)."""
+        try:
+            mantis_live_wr_gauge.labels(epic=epic).set(live_wr)
+            if oos_delta is not None:
+                mantis_live_wr_oos_delta_gauge.labels(epic=epic).set(oos_delta)
         except Exception:
             pass
 

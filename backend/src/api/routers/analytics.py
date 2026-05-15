@@ -2,13 +2,32 @@
 Analytics router — portfolio correlation matrix and advanced analytics.
 """
 
+import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import polars as pl
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.api.dependencies import get_db_session
+from src.database.models import Position
+from src.monitoring.metrics import MetricsCollector
 
 router = APIRouter()
+
+# QW5 2026-05-15: live WR tracker constants.
+_OOS_THRESHOLDS_PATH = (
+    Path(__file__).resolve().parent.parent.parent.parent
+    / "data"
+    / "config"
+    / "optimal_thresholds.json"
+)
+_MIN_TRADES_FOR_WR = 5
+_OVERFIT_DELTA_THRESHOLD = -0.15
 
 EPICS = [
     "XAUUSD",
@@ -137,3 +156,96 @@ async def get_regime_status(request: Request):
             "data": {"enabled": False, "reason": "regime gate not initialized"},
         }
     return {"success": True, "data": {"enabled": True, **gate.get_stats()}}
+
+
+def _load_oos_win_rates() -> dict[str, float]:
+    """Load per-epic OOS win-rate expectations from optimal_thresholds.json.
+
+    Returns {} on any failure so the endpoint still works without the JSON.
+    """
+    try:
+        with open(_OOS_THRESHOLDS_PATH) as fh:
+            data = json.load(fh)
+        return {
+            epic: float(info["win_rate"])
+            for epic, info in data.get("per_asset", {}).items()
+            if info.get("win_rate") is not None
+        }
+    except Exception:
+        return {}
+
+
+@router.get("/live-wr")
+async def get_live_win_rate(
+    window_days: int = Query(default=21, ge=1, le=365),
+    session: AsyncSession | None = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Per-instrument live win-rate over the last `window_days` (QW5).
+
+    Compares the realized close outcomes against the OOS win-rate baked into
+    optimal_thresholds.json. Flags any epic whose live WR is more than
+    15 pp below the OOS expectation (likely walk-forward overfit).
+    """
+    if session is None:
+        return {
+            "success": True,
+            "data": {
+                "window_days": window_days,
+                "generated_at": datetime.now(UTC).isoformat(),
+                "instruments": {},
+                "overfit_flags": [],
+                "warning": "no DB session available",
+            },
+        }
+
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=window_days)
+    stmt = (
+        select(Position.epic, Position.close_reason)
+        .where(Position.status == "CLOSED")
+        .where(Position.closed_at.is_not(None))
+        .where(Position.closed_at >= cutoff)
+    )
+    rows = (await session.execute(stmt)).all()
+
+    by_epic: dict[str, dict[str, int]] = {}
+    for epic, reason in rows:
+        bucket = by_epic.setdefault(epic, {"trades": 0, "wins": 0})
+        bucket["trades"] += 1
+        if reason == "TP":
+            bucket["wins"] += 1
+
+    oos_wr = _load_oos_win_rates()
+    instruments: dict[str, dict[str, Any]] = {}
+    overfit_flags: list[str] = []
+
+    for epic, counts in by_epic.items():
+        if counts["trades"] < _MIN_TRADES_FOR_WR:
+            continue
+        live_wr = counts["wins"] / counts["trades"]
+        epic_oos = oos_wr.get(epic)
+        delta = (live_wr - epic_oos) if epic_oos is not None else None
+        instruments[epic] = {
+            "trades": counts["trades"],
+            "wins": counts["wins"],
+            "wr": round(live_wr, 4),
+            "oos_wr": round(epic_oos, 4) if epic_oos is not None else None,
+            "oos_delta": round(delta, 4) if delta is not None else None,
+        }
+        MetricsCollector.update_live_wr(epic=epic, live_wr=live_wr, oos_delta=delta)
+        if delta is not None and delta < _OVERFIT_DELTA_THRESHOLD:
+            overfit_flags.append(
+                f"{epic}: live {live_wr:.3f} vs OOS {epic_oos:.3f} "
+                f"(delta {delta:+.3f}) — overfit suspect"
+            )
+
+    return {
+        "success": True,
+        "data": {
+            "window_days": window_days,
+            "generated_at": datetime.now(UTC).isoformat(),
+            "min_trades_threshold": _MIN_TRADES_FOR_WR,
+            "overfit_delta_threshold": _OVERFIT_DELTA_THRESHOLD,
+            "instruments": instruments,
+            "overfit_flags": overfit_flags,
+        },
+    }
