@@ -624,7 +624,11 @@ def test_full_lifecycle_sell_initial_to_trailing(manager):
 @pytest.mark.unit
 @pytest.mark.risk
 def test_register_position_with_take_profit_anchors_tp1_at_midpoint_buy(manager):
-    """When take_profit is supplied, TP1 = midpoint(entry, TP), TP2 = TP."""
+    """When take_profit is supplied, TP1 = entry + tp1_fraction * (TP - entry).
+
+    QW6 (2026-05-15): tp1_fraction default lifted 0.50 → 0.70 to capture more
+    realized R on winning trades. TP2 still = take_profit (strategy TP).
+    """
     state = manager.register_position(
         deal_id="DEAL-TP-BUY",
         epic="XAUUSD",
@@ -634,8 +638,8 @@ def test_register_position_with_take_profit_anchors_tp1_at_midpoint_buy(manager)
         atr=10.0,
         take_profit=2010.0,  # strategy R:R = 0.5 (well below 1× risk_multiple)
     )
-    # Strategy-anchored: TP1 = (2000 + 2010) / 2 = 2005, TP2 = 2010.
-    assert state.tp1_level == pytest.approx(2005.0)
+    # Strategy-anchored: TP1 = 2000 + 0.70 * (2010 - 2000) = 2007, TP2 = 2010.
+    assert state.tp1_level == pytest.approx(2007.0)
     assert state.tp2_level == pytest.approx(2010.0)
     # Risk distance is unchanged — only the TP ladder is re-anchored.
     assert state.risk_distance == pytest.approx(20.0)
@@ -644,7 +648,10 @@ def test_register_position_with_take_profit_anchors_tp1_at_midpoint_buy(manager)
 @pytest.mark.unit
 @pytest.mark.risk
 def test_register_position_with_take_profit_anchors_tp1_at_midpoint_sell(manager):
-    """SELL variant — strategy-TP-anchored ladder is below entry."""
+    """SELL variant — strategy-TP-anchored ladder is below entry.
+
+    QW6 (2026-05-15): tp1_fraction default lifted 0.50 → 0.70.
+    """
     state = manager.register_position(
         deal_id="DEAL-TP-SELL",
         epic="NVDA",
@@ -654,8 +661,8 @@ def test_register_position_with_take_profit_anchors_tp1_at_midpoint_sell(manager
         atr=2.0,
         take_profit=210.2833,  # strategy R:R = 0.25 — TP < TP1 of legacy ladder
     )
-    # TP1 = (211.36 + 210.2833) / 2 = 210.82165
-    assert state.tp1_level == pytest.approx(210.82165, abs=1e-4)
+    # TP1 = 211.36 + 0.70 * (210.2833 - 211.36) = 211.36 - 0.75369 = 210.60631
+    assert state.tp1_level == pytest.approx(210.60631, abs=1e-4)
     # TP2 = 210.2833 (= strategy TP, broker would close here)
     assert state.tp2_level == pytest.approx(210.2833, abs=1e-4)
     # Critical regression guard: legacy risk_multiple ladder would have placed
@@ -704,16 +711,77 @@ def test_restore_state_with_take_profit_overrides_persisted_levels(manager):
         tp2_level=204.8995,  # stale
         take_profit=210.2833,  # live strategy TP
     )
-    # Override applied: TP1 at midpoint, TP2 at strategy TP.
-    assert state.tp1_level == pytest.approx(210.82165, abs=1e-4)
+    # Override applied: TP1 at tp1_fraction=0.70 progress, TP2 at strategy TP.
+    # TP1 = 211.36 + 0.70 * (210.2833 - 211.36) = 210.60631
+    assert state.tp1_level == pytest.approx(210.60631, abs=1e-4)
     assert state.tp2_level == pytest.approx(210.2833, abs=1e-4)
 
 
 @pytest.mark.unit
 @pytest.mark.risk
+@pytest.mark.unit
+@pytest.mark.risk
+def test_tp1_fraction_buy_simple(manager):
+    """QW6 spec case: BUY entry=100, TP=120 → TP1=114.0 (was 110.0 midpoint)."""
+    state = manager.register_position(
+        deal_id="QW6-BUY",
+        epic="TEST",
+        direction="BUY",
+        entry_price=100.0,
+        stop_loss=95.0,
+        atr=1.0,
+        take_profit=120.0,
+    )
+    assert state.tp1_level == pytest.approx(114.0)
+    assert state.tp2_level == pytest.approx(120.0)
+
+
+@pytest.mark.unit
+@pytest.mark.risk
+def test_tp1_fraction_sell_simple(manager):
+    """QW6 spec case: SELL entry=100, TP=80 → TP1=86.0 (was 90.0 midpoint)."""
+    state = manager.register_position(
+        deal_id="QW6-SELL",
+        epic="TEST",
+        direction="SELL",
+        entry_price=100.0,
+        stop_loss=105.0,
+        atr=1.0,
+        take_profit=80.0,
+    )
+    assert state.tp1_level == pytest.approx(86.0)
+    assert state.tp2_level == pytest.approx(80.0)
+
+
+@pytest.mark.unit
+@pytest.mark.risk
+def test_tp1_fraction_custom_via_config():
+    """tp1_fraction is configurable — verify a non-default 0.50 reproduces
+    legacy midpoint behavior for backward compatibility."""
+    cfg = TrailingStopConfig(
+        tp1_risk_multiple=1.0,
+        tp2_risk_multiple=2.0,
+        trailing_atr_multiplier=1.5,
+        breakeven_offset_pct=0.0,
+        tp1_fraction=0.50,
+    )
+    mgr = TrailingStopManager(config=cfg)
+    state = mgr.register_position(
+        deal_id="LEGACY-MIDPOINT",
+        epic="TEST",
+        direction="BUY",
+        entry_price=100.0,
+        stop_loss=95.0,
+        atr=1.0,
+        take_profit=120.0,
+    )
+    # tp1_fraction=0.50 reproduces pre-QW6 midpoint
+    assert state.tp1_level == pytest.approx(110.0)
+
+
 def test_phase_advances_on_strategy_tp_progress_sell(manager):
     """End-to-end: SELL position with strategy-anchored TP advances to
-    BREAKEVEN at 50% strategy progress, not at 1× risk_multiple."""
+    BREAKEVEN at tp1_fraction (0.70) strategy progress, not at 1× risk_multiple."""
     deal_id = "DEAL-E2E"
     manager.register_position(
         deal_id=deal_id,
@@ -724,9 +792,10 @@ def test_phase_advances_on_strategy_tp_progress_sell(manager):
         atr=2.0,
         take_profit=210.2833,
     )
-    # Price drops to midpoint (210.82) — should fire BREAKEVEN.
+    # Price drops to TP1 (210.60631 at 70% progress) — should fire BREAKEVEN.
+    # QW6 2026-05-15: tp1_fraction lifted 0.50 → 0.70, so trigger is closer to TP.
     new_stop, phase = manager.update_price(
-        deal_id=deal_id, current_price=210.82, current_atr=2.0
+        deal_id=deal_id, current_price=210.60, current_atr=2.0
     )
     assert phase == TrailingPhase.BREAKEVEN
     # SELL breakeven SL = entry - offset (entry * breakeven_offset_pct = 0.001).
