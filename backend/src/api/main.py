@@ -252,6 +252,7 @@ async def lifespan(app: FastAPI):
         TrailingStopConfig(
             tp1_risk_multiple=_ts_settings.scalp_tp1_risk_multiple,
             tp2_risk_multiple=_ts_settings.scalp_tp2_risk_multiple,
+            tp1_fraction=_ts_settings.tp1_fraction,
         )
     )
 

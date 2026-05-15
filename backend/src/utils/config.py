@@ -443,6 +443,12 @@ class Settings(BaseSettings):
     # (StrategyConfig.adx_ranging_threshold default aligned, see strategy/schemas.py)
     adx_min_threshold: float = Field(default=22.0, alias="ADX_MIN_THRESHOLD", ge=10.0, le=50.0)
 
+    # Trailing TP1 fraction — strategy-anchored partial-close midpoint.
+    # When strategy supplies take_profit, TP1 = entry + tp1_fraction * (TP - entry).
+    # Lifted 0.50 -> 0.70 on 2026-05-15 (QW6) to capture more effective
+    # realized R on winning trades. See risk/trailing_stop_manager.py.
+    tp1_fraction: float = Field(default=0.70, alias="TP1_FRACTION", ge=0.1, le=1.0)
+
     # Regime Gate (Phase 2)
     regime_gate_enabled: bool = Field(default=False, alias="REGIME_GATE_ENABLED")
     regime_gate_confidence_threshold: float = Field(

@@ -24,6 +24,13 @@ class TrailingStopConfig(BaseModel):
     tp1_risk_multiple: float = Field(default=0.5, ge=0.1, le=5.0)
     tp2_risk_multiple: float = Field(default=1.5, ge=0.5, le=10.0)
     trailing_atr_multiplier: float = Field(default=1.5, ge=0.5, le=5.0)
+    # Strategy-anchored TP1 fraction: when strategy-level take_profit is
+    # supplied, TP1 = entry + tp1_fraction * (TP - entry) for BUY (symmetric
+    # for SELL). Default 0.70 (was implicit 0.50 midpoint, pre 2026-05-15).
+    # Lifted to capture more effective realized R on winning trades:
+    # at 0.50, half the position locked at midpoint (R=1.25 if R:R=2.5);
+    # at 0.70 the partial captures R=1.75. Configurable via env TP1_FRACTION.
+    tp1_fraction: float = Field(default=0.70, ge=0.1, le=1.0)
     # 0.0 = pure breakeven (SL exactly at entry, maximum buffer between
     # current price and SL). Non-zero values lock a small profit at the
     # cost of a tighter buffer — fine on calm assets, but on noisy or
@@ -313,9 +320,11 @@ class TrailingStopManager:
         """Compute (tp1, tp2) for the trailing phase ladder.
 
         When ``take_profit`` is provided, anchor the ladder to the strategy's
-        actual TP: TP1 = midpoint(entry, TP) (= 50% progress to target),
-        TP2 = TP. When ``take_profit`` is None, fall back to the legacy
-        risk_multiple ladder (TP1 = risk_multiple × risk_distance from entry).
+        actual TP: TP1 = entry + tp1_fraction * (TP - entry) for BUY
+        (symmetric for SELL); TP2 = TP. Default tp1_fraction = 0.70 captures
+        more realized R per winning trade than the prior 0.50 midpoint.
+        When ``take_profit`` is None, fall back to the legacy risk_multiple
+        ladder (TP1 = tp1_risk_multiple × risk_distance from entry).
         """
         if take_profit is not None and take_profit > 0:
             tp2 = float(take_profit)
@@ -336,7 +345,7 @@ class TrailingStopManager:
                     f"falling back to legacy risk-multiple ladder"
                 )
             else:
-                tp1 = entry_price + (tp2 - entry_price) * 0.5
+                tp1 = entry_price + (tp2 - entry_price) * self.config.tp1_fraction
                 return tp1, tp2
 
         if direction == "BUY":

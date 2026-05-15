@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 ---
 
+## [TP1 Lift QW6] - 2026-05-15 - Trailing partial-close lifted from midpoint to 0.70
+
+- **fix(risk)**: `backend/src/risk/trailing_stop_manager.py` — `TrailingStopConfig.tp1_fraction` new field, default 0.70 (was implicit 0.50 hardcoded). `_derive_tp_levels()` now computes TP1 = entry + tp1_fraction × (TP - entry) for BUY (symmetric for SELL) instead of `(tp2 - entry_price) * 0.5`. TP2 unchanged (still = strategy take_profit). Direction-aware fallback to legacy `tp1_risk_multiple` ladder preserved when `take_profit=None` or wrong-sided. Breakeven offset 0.0 + max_ladder_cycles=2 invariants preserved.
+- **feat(config)**: new env `TP1_FRACTION` (range 0.1-1.0, default 0.70) in `utils/config.py` (`tp1_fraction` field). Wired into `TrailingStopConfig` at construction time in `api/main.py:251`.
+- **test**: `backend/tests/risk/test_trailing_stop_manager.py` updated. Existing midpoint-anchored tests rewritten for 0.70 expected values + 3 new QW6 cases (BUY entry=100/TP=120→TP1=114, SELL entry=100/TP=80→TP1=86, custom tp1_fraction=0.50 reproduces legacy midpoint).
+- **expected impact**: effective realized R on winning trades ~1.25 → ~1.75 (with strategy R:R 2.5). Combined with WR ~42% post-other-QW fixes, projected net edge positive vs prior breakeven.
+- **tests**: `pytest tests/risk/` 201 passed / 0 failed in 5.52s.
+
 ## [Quick Wins QW2+QW7+CONF] - 2026-05-15 - Diagnostic-driven fixes
 
 Three parallel fixes addressing live 41.7% win-rate causes per `analysis:diagnostic-report-full` (AgentDB).
