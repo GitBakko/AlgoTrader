@@ -558,6 +558,21 @@ class Settings(BaseSettings):
     sil_calendar_gate_enabled: bool = Field(default=True, alias="SIL_CALENDAR_GATE_ENABLED")
     sil_calendar_minutes_before: int = Field(default=30, alias="SIL_CALENDAR_MINUTES_BEFORE")
     sil_calendar_minutes_after: int = Field(default=15, alias="SIL_CALENDAR_MINUTES_AFTER")
+
+    # ===== Economic Calendar Gate Activation Mode (QW4 2026-05-15) =====
+    # Decouples the calendar gate from the SIL master flag so the gate can
+    # rollout independently. Mode controls what happens on a blackout match:
+    #   off       — gate skipped entirely (legacy behavior when sil_enabled
+    #               was the only switch)
+    #   log_only  — detect + log + Prometheus counter, DO NOT block trade
+    #               (safe 48h rollout before flipping to block)
+    #   block     — full gating: reject new entry with reason="ECONOMIC_CALENDAR_GATE"
+    #
+    # Default 'log_only' ships the observability without changing behavior
+    # so we can measure block-rate before committing to the real gate.
+    calendar_gate_mode: str = Field(
+        default="log_only", alias="CALENDAR_GATE_MODE", pattern="^(off|log_only|block)$"
+    )
     nasdaq_data_link_api_key: str = Field(default="", alias="NASDAQ_DATA_LINK_API_KEY")
 
     # ===== Multi-Agent System (Sprint 1) =====

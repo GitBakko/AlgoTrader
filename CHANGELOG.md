@@ -4,6 +4,45 @@ All notable changes to this project are documented in this file.
 
 ---
 
+## [QW4 — Economic Calendar Gate Activation] - 2026-05-15
+
+The `EconomicCalendarGate` (`backend/src/risk/economic_calendar_gate.py`) was already fully implemented and wired at `paper_loop.py:2513` Step 0b (before ML prediction). Root cause of inactivity: gate init gated behind `SIL_ENABLED=false` master flag → `_calendar_gate=None` short-circuited the check.
+
+### Activation strategy — safe 48h rollout
+
+- **new env**: `CALENDAR_GATE_MODE` ∈ {`off`, `log_only`, `block`}, default `log_only` (`utils/config.py`).
+  - `off`: gate skipped entirely (legacy when `SIL_ENABLED=false`)
+  - `log_only`: detect blackout windows, log + Prometheus counter, **DO NOT block trade**
+  - `block`: full gating — reject entry with reason `ECONOMIC_CALENDAR_GATE`
+- **standalone init**: `paper_loop.py:314+` now initializes `_calendar_gate` independently of `sil_enabled` when `CALENDAR_GATE_MODE != "off"`. Lets calendar ship without the heavier SIL pipeline (FRED/COT/AlphaVantage).
+- **mode-driven wiring**: `paper_loop.py:2513-2546` branches on `_cal_mode` — log_only logs the would-block + Prometheus counter then falls through to ML prediction; block performs the existing rejection path.
+
+### Existing implementation (untouched, validated by risk-assessment)
+
+- **Data source**: Finnhub `/calendar/economic` daily cache. Requires `FINNHUB_API_KEY` (already used by sentiment pipeline). Non-blocking on fetch failure (stale cache fallback). Free-tier sufficient (1 call/UTC day).
+- **Coverage**: 23 high-impact event keywords (CPI/NFP/FOMC/GDP/PPI/ECB/BOE/BOJ/Jobless Claims/Retail Sales/Unemployment/PMI).
+- **Asset mapping** (`EPIC_CURRENCIES` dict): per-currency granularity. USD pairs → all high-impact US events. EUR pairs → ECB. GBP → BOE. JPY → BOJ. **Crypto** (BTCUSD/ETHUSD/SOLUSD/BNBUSD/DOGUSD/DASHUSD/ICPUSD) → REDUCED `USD_MAJOR` set (Fed Rate + CPI only, not Retail Sales/PMI).
+- **Windows**: 30min before, 15min after (existing `SIL_CALENDAR_MINUTES_{BEFORE,AFTER}`).
+- **Scope**: blocks NEW entries only at Step 0b. Never touches trailing stops, reconciler, close detector, or open-position management.
+
+### Observability
+
+- **Prometheus**: new `mantis_calendar_gate_blocked_total{epic, mode}` Counter. `mode` distinguishes log_only (observation) from block (real gate) so dashboards measure block-rate without confusing rollout phases.
+- **MetricsCollector**: new `record_calendar_gate_blocked(epic, mode)` method.
+
+### Tests
+
+- `backend/tests/monitoring/test_qw4_calendar_gate_mode.py` (4 cases): default mode = log_only, valid value acceptance (off/log_only/block), invalid value rejected by pattern validator, counter increment per mode label.
+- Existing 38 tests in `tests/risk/test_economic_calendar_gate.py` continue to pass (gate behavior itself unchanged).
+- Full regression: pytest `tests/risk/ tests/strategy/ tests/backtest/ tests/monitoring/ tests/trading/ tests/execution/` → 0 failures.
+
+### Rollout plan
+
+1. Deploy `CALENDAR_GATE_MODE=log_only` (default) → 48h observation period
+2. Inspect `mantis_calendar_gate_blocked_total{mode="log_only"}` rate per epic via Grafana / `GET /api/sil/calendar`
+3. If block-rate looks reasonable (< 10% of trades on USD pairs around FOMC/CPI days, near zero on quiet days) → flip env to `block` in production `.env`
+4. If block-rate too aggressive → tighten event keyword set or shrink windows before flipping
+
 ## [QW3 + QW5 — Spread Filter Per-Class + Slippage/Live-WR Observability] - 2026-05-15
 
 Two parallel fixes covering execution quality (QW3) and observability (QW5) — branch `fix/qw3-qw5-execution-observability`.

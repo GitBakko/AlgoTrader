@@ -315,6 +315,22 @@ class PaperTradingLoop:
         if _settings.sil_enabled:
             self._init_sil_clients()
 
+        # QW4 2026-05-15: standalone calendar gate init when SIL master is off
+        # but CALENDAR_GATE_MODE != "off". Lets the calendar gate ship
+        # independently of the (heavier) SIL pipeline so we can rollout
+        # blackout detection without enabling all of FRED/COT/AlphaVantage etc.
+        if self._calendar_gate is None and _settings.calendar_gate_mode != "off":
+            try:
+                from src.risk.economic_calendar_gate import EconomicCalendarGate
+
+                self._calendar_gate = EconomicCalendarGate()
+                logger.info(
+                    f"[CalendarGate] Initialized standalone "
+                    f"(mode={_settings.calendar_gate_mode})"
+                )
+            except Exception as e:
+                logger.warning(f"[CalendarGate] Standalone init failed: {e}")
+
         # MANTIS-EVOLUTION: Multi-agent orchestrator (optional, feature-flag gated)
         self._agents_enabled = _init_settings.agents_enabled
         self._orchestrator = None
@@ -2510,24 +2526,40 @@ class PaperTradingLoop:
             logger.info(f"[{epic}] {closed_reason}")
             return
 
-        # Step 0b: Economic Calendar gate (SIL)
-        if self._calendar_gate is not None:
+        # Step 0b: Economic Calendar gate (QW4 2026-05-15)
+        # Mode-driven: off skips, log_only records the would-block without
+        # rejecting the trade, block performs the full gating.
+        _cal_settings = get_settings()
+        _cal_mode = _cal_settings.calendar_gate_mode
+        if self._calendar_gate is not None and _cal_mode != "off":
             try:
                 is_blackout, blackout_reason = await self._calendar_gate.is_blackout(epic)
                 if is_blackout:
-                    signal_info = {
-                        "epic": epic,
-                        "direction": "HOLD",
-                        "confidence": 0.0,
-                        "entry_price": 0.0,
-                        "timestamp": datetime.now(UTC).isoformat(),
-                        "status": "calendar_blackout",
-                        "rejection_reason": blackout_reason,
-                    }
-                    self._last_signals[epic] = signal_info
-                    self._signal_history.appendleft(signal_info)
-                    logger.info(f"[{epic}] {blackout_reason}")
-                    return
+                    try:
+                        MetricsCollector.record_calendar_gate_blocked(
+                            epic=epic, mode=_cal_mode
+                        )
+                    except Exception:
+                        pass
+                    if _cal_mode == "block":
+                        signal_info = {
+                            "epic": epic,
+                            "direction": "HOLD",
+                            "confidence": 0.0,
+                            "entry_price": 0.0,
+                            "timestamp": datetime.now(UTC).isoformat(),
+                            "status": "calendar_blackout",
+                            "rejection_reason": blackout_reason,
+                            "calendar_gate_mode": "block",
+                        }
+                        self._last_signals[epic] = signal_info
+                        self._signal_history.appendleft(signal_info)
+                        logger.info(f"[{epic}] {blackout_reason}")
+                        return
+                    else:  # log_only
+                        logger.info(
+                            f"[{epic}] CALENDAR_LOG_ONLY would-block: {blackout_reason}"
+                        )
             except Exception as e:
                 logger.debug(f"[{epic}] Calendar gate error (non-blocking): {e}")
 
