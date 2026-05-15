@@ -197,7 +197,15 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 
 ## Ruflo Integration (optional)
 
-Ruflo MCP server is registered globally (`~/.claude.json`) and project-locally (`.mcp.json`). Project-level assets live in `.claude-flow/` (runtime), `.claude/agents/` (98 agent templates), `.claude/commands/`, `.claude/helpers/`. **Do NOT run `ruflo init --force` again** — it overwrites `CLAUDE.md`, `.mcp.json`, `.claude/settings.json` regardless of `--skip-claude`/`--minimal`/`--no-global` flags (v3.7.0-alpha.14 bug). Use `ruflo init upgrade` for future updates.
+Ruflo MCP server is registered globally (`~/.claude.json`) and project-locally (`.mcp.json`). Project-level assets live in `.claude-flow/` (runtime), `.claude/agents/` (98 agent templates), `.claude/commands/`, `.claude/helpers/`. Memory DB: `.swarm/memory.db` (primary, sqlite + HNSW + temporal decay) + `.claude/memory.db` (mirror). Vector DB: `ruvector.db`. Daemon PID: `.claude-flow/daemon.pid`. **Do NOT run `ruflo init --force` again** — it overwrites `CLAUDE.md`, `.mcp.json`, `.claude/settings.json` regardless of `--skip-claude`/`--minimal`/`--no-global`/`--preset` flags (v3.7.0-alpha.14 AND .38 both confirmed bugged). Use `ruflo init upgrade` for future updates.
+
+Services bootstrap (after init):
+```bash
+ruflo daemon start    # background workers (PID written to .claude-flow/daemon.pid)
+ruflo memory init     # sqlite schema + HNSW + controllers (15/23 activated)
+ruflo memory stats    # health check
+ruflo daemon stop     # stop daemon
+```
 
 ### Agent Comms (SendMessage-First)
 

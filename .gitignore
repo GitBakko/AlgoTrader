@@ -84,7 +84,14 @@ graphify-out/
 .claude-flow/data/
 .claude-flow/logs/
 .claude-flow/sessions/
+.claude-flow/daemon.pid
+.claude-flow/daemon.log
+.claude-flow/metrics/
+.claude-flow/security/
 .ruflo/
+.swarm/
+ruvector.db
+.claude/memory.db
 
 # ===== Playwright MCP dumps =====
 .playwright-mcp/

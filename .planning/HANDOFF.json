@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-15T07:43:21.831Z",
+  "timestamp": "2026-05-15T08:02:09.825Z",
   "source": "auto-postool",
   "partial": false,
   "phase": null,
@@ -18,29 +18,45 @@
   "uncommitted_files": [
     {
       "status": "M",
+      "path": ".claude-flow/CAPABILITIES.md"
+    },
+    {
+      "status": "M",
+      "path": ".claude-flow/config.yaml"
+    },
+    {
+      "status": "D",
+      "path": ".claude-flow/metrics/learning.json"
+    },
+    {
+      "status": "D",
+      "path": ".claude-flow/metrics/swarm-activity.json"
+    },
+    {
+      "status": "D",
+      "path": ".claude-flow/metrics/v3-progress.json"
+    },
+    {
+      "status": "D",
+      "path": ".claude-flow/security/audit-status.json"
+    },
+    {
+      "status": "M",
+      "path": ".claude/settings.json"
+    },
+    {
+      "status": "M",
+      "path": ".gitignore"
+    },
+    {
+      "status": "M",
       "path": ".planning/HANDOFF.json"
     },
     {
       "status": "M",
-      "path": "backend/.planning/HANDOFF.json"
-    },
-    {
-      "status": "??",
-      "path": ".playwright-mcp/page-2026-05-12T13-05-33-537Z.yml"
-    },
-    {
-      "status": "??",
-      "path": ".playwright-mcp/page-2026-05-12T13-05-58-800Z.yml"
-    },
-    {
-      "status": "??",
-      "path": "CI"
-    },
-    {
-      "status": "??",
-      "path": "openapi_tmp.json"
+      "path": "CLAUDE.md"
     }
   ],
   "next_action": null,
-  "context_notes": "Recent commits:\n92f5d78 chore(tooling): integrate ruflo MCP server with safe merge of project configs\n132ea74 fix(risk): entry-drift handler shifts/rejects on stale candle vs broker mid\n227d1b3 fix(logos): center img in white-backdrop wrapper (was baseline-shifted)\n1605e37 ui(logos): white backdrop on stock logos so dark glyphs stay legible\nea0bfd7 fix(logos): remove dead clearbit.com from stock-logo chain"
+  "context_notes": "Recent commits:\n3840de9 chore(planning): sync HANDOFF state + gitignore playwright dumps and temp JSONs\n92f5d78 chore(tooling): integrate ruflo MCP server with safe merge of project configs\n132ea74 fix(risk): entry-drift handler shifts/rejects on stale candle vs broker mid\n227d1b3 fix(logos): center img in white-backdrop wrapper (was baseline-shifted)\n1605e37 ui(logos): white backdrop on stock logos so dark glyphs stay legible"
 }
