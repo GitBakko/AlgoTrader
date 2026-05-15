@@ -4,6 +4,88 @@ All notable changes to this project are documented in this file.
 
 ---
 
+## [Hygiene] - 2026-05-15 - Ruflo integration + maintenance sprint
+
+- **chore(tooling)**: integrate `ruflo` MCP server with safe 3-way merge of project configs (commits `92f5d78`, `170c003`). `ruflo init --force` confirmed to clobber `CLAUDE.md`, `.mcp.json`, `.claude/settings.json` regardless of `--skip-claude`/`--minimal`/`--no-global`/`--preset` flags in both v3.7.0-alpha.14 AND .38 — merge procedure documented in `memory/project_ruflo_integration_2026-05-15.md`.
+- **chore(planning)**: sync HANDOFF state + gitignore `.playwright-mcp/`, `openapi_tmp.json`, `*_tmp.json` (commit `3840de9`).
+- **ci**: fix `.github/workflows/ci.yml` branch trigger `master` → `main` (default branch renamed 2026-04-23).
+- **docs**: refresh CHANGELOG.md with 3 months of post-2026-02-19 work.
+
+## [Entry-Drift Handler] - 2026-05-13 - Stale-candle vs broker-mid drift gate
+
+- **fix(risk)**: `paper_loop` drift handler shifts entry or rejects trade when stale candle diverges from broker mid by configured band (commit `132ea74`). Closes META sub-min TP root cause. Bands 0.10-1/2%.
+
+## [LIVE-Deploy Gate Cleared] - 2026-05-06 - RR floor + Binance plan + clean baseline
+
+- **fix(risk)**: `RiskManager.check_trade` step 4-ter — `MIN_SIGNAL_RR_THRESHOLD=0.40` REJECT floor (no widening). Closes TSLA hard-blocker.
+- **feat**: `docs/evolutive/BINANCE_MIGRATION_WAVE_PLAN.md` delivered, replaces Bybit migration plan.
+- **test**: pytest baseline cleared 16 → 0 failures; coverage 70.59% > CI 70%. Global autouse disables MR/ML primaries.
+- **feat**: trailing ladder cap `max_ladder_cycles=2`; tz residuals fixed; `prediction_service` docstring hardened.
+
+## [BTCUSD Partial-Close Loop Fix] - 2026-05-04 - SL/TP trigger source rule
+
+- **fix(critical)**: `prediction_service.get_market_data().current_price` returns 1h candle close (NOT live mid). Using it as SL/TP trigger source caused BTCUSD partial-close runaway. Hard rule: ONLY `broker.get_market_details().snapshot` for SL/TP triggers.
+
+## [Audit Drawer Overhaul] - 2026-04-30 - Idempotent CLOSE + GOING/TP/SL badge
+
+- **feat**: SignalAuditDrawer Audit/History tabs + outcome badge GOING/TP/SL (commits `1c32dc4`, `6578cc1`, `1cdd48f`, `dea2a29`).
+- **fix(critical)**: idempotent CLOSE Trade row — SELECT-then-INSERT on `(position_id, trade_type='CLOSE')` (commit `ce2c3e1`). First writer wins, second caller skips insert but still commits Position update. Prevents duplicate audit rows when v1+v2 close detectors and dealId-rotation paths each fire `_finalize_close` for same disappeared position. DELETE 677 historical duplicates.
+- **fix(frontend)**: `livePosition` lookups match by `deal_id` NOT `epic` (post bug `dea2a29` — epic-only matching falsely flagged closed audits as GOING).
+
+## [Forex Pip-Aware Sizing + Reconciler Split + Trailing Anchored + R:R Inversion Fix] - 2026-04-29
+
+- **fix(critical)**: SL/TP paired-pair rule (commit `745f2ee`). When `TradingSignal` carries BOTH `suggested_stop` and `suggested_tp`, `RiskManager.check_trade` MUST use the pair as-is. Production was at R:R 0.13-0.30 due to `min`/`max` flip + unconditional TP override. Restored to strategy-calibrated ≥0.75.
+- **fix**: `MIN_NOTIONAL_USD=$200` floor in PositionSizer/KellySizer; `MIN_RISK_AMOUNT_USD=$5` post-sizing floor in `RiskManager.check_trade` step 7-bis via pip-aware `_compute_risk_usd(epic, entry, sl, size)` (USDJPY base / EURUSD quote / non-forex). Cap-blocked path approves at residual risk (`lift_bounded_by_cap=true`) instead of rejecting. Commits `e6efede`, `b9f31ba`, `9723dfc`.
+- **fix**: `FOREX_USD_BASE_SIZE_MULTIPLIER=30` cap multiplier for USDJPY/USDCHF/USDCAD — without it, cap blocked at ~14 units producing $0.02 risk per SL hit.
+- **feat**: Reconciler split — dedicated 15s asyncio task for `_detect_broker_closed` + `_update_trailing_stops` + `_check_stop_losses` when `RECONCILER_DEDICATED_ENABLED=true` (default). Cuts close-detection lag from 20min → <30s. Commits `5c2e7da`, `10fdd8c`, `9a1f16c`, `5233bbe`.
+- **feat**: Trailing strategy-anchored — `TrailingStopManager.register_position` accepts optional `take_profit`. TP1 = midpoint(entry, TP), TP2 = TP (was `risk_multiple × risk_distance`). Without anchor, tight-R:R signals had trailing TP1 BELOW strategy TP. Commits `8288cad`, `971907d`.
+- **fix**: `breakeven_offset_pct` default flipped `0.001` → `0.0` (pure breakeven). 0.1% profit lock chopped post-TP1 buffer to sub-spread on tight-stop assets.
+
+## [Phase 0/2/3/5 Evolutive Validation] - 2026-04-28
+
+- **Phase 0 PASS**: walk-forward OOS validation gate; 10 KEEP / 3 REVIEW / 5 EXCLUDE (ICPUSD, NATGAS, EURUSD, DOGUSD, GBPUSD auto-cut).
+- **Phase 2 FAIL**: regime gate not productive at current Sharpe/DD; `REGIME_GATE_ENABLED=false`. Detectors saved.
+- **Phase 3 PASS**: realistic spreads (ETH 4.2× / BNB 7.5× under-priced fixed). Mean Sharpe 4.35 (-7.8%); BNB hit hardest 3.62→1.95 but still KEEP.
+- **Phase 5 PoC FAIL**: PPO concordance ensemble harms Sharpe -54% BTC / -85% SOL. Defer Phase 5-bis until sizing soak + 500K samples + position-aware reward.
+
+## [USDJPY Micro-Position Fix] - 2026-04-27 - Forex sizing floor
+
+- **fix(risk)**: `MR_MIN_TP_PCT` / `MR_MIN_TP_PCT_FOREX` + `MIN_NOTIONAL_USD` floors active (commit `90dd85c`).
+
+## [Paper Trading v2 Cockpit + 60s P&L Snapshot + Logo Service] - 2026-04-27
+
+- **feat**: Paper Trading v2 cockpit revamp shipped (PR #8/9/10/11 stacked on `main`).
+- **feat**: 60s P&L snapshot system — `PnlSnapshotScheduler` writes `paper_pnl_snapshots` (global) + `position_pnl_snapshots` (per deal) every 60s + 04:30 UTC prune. Live mid-price via WS quote cache (`broker_ws._quote_listeners` fan-out) → REST `get_market_details(epic).snapshot` → UPL reconstruction. Endpoints: `/api/trading/pnl-history`, `/api/trading/positions/{deal_id}/pnl-history`. Migration `c3d8e9f0a1b2`.
+- **feat**: `LogoService.getLogoUrls(epic): string[]` returns static URL chain (no API calls). `EpicLogoComponent` walks chain via `<img onerror>`. Final fallback inline SVG `data:` URI. Cache `mantis-logos-v2`.
+- **rule**: "NO MOCK DATA NELLE MASCHERE" invariant — synthetic ramps, in-memory ws-only ring buffers, fake placeholders forbidden. Charts/KPIs must source from persisted backend tables (`paperPnlHistory()`, `positionPnlHistory()[deal_id]`).
+
+## [Style Bible Audit + Dashboard v2 Phase 1-4 + Close-Detection v2 Authoritative] - 2026-04-23..2026-04-25
+
+- **feat**: All 14 frontend pages audited and CONFORMI to `STYLE_BIBLE.md` §3 Top 12 Violazioni (commits per page documented).
+- **feat**: Dashboard v2 cockpit — mock fidelity Phase 1-3 (Calmar/DD/Live-P&L/overnight-swap/going-counter, 429-row cascade DB cleanup, commit `25444fd`). Phase 4 — `/performance/delta` + `/swap-accum` endpoints, Win-Rate delta in cockpit, 14 new tests (commit `d1f804a`).
+- **feat**: Close-detection v2 promoted authoritative fallback (v1 Strategy 1+2 miss → v2 activity-SoT) + `to_dt` clamp. 6 UNRECONCILED rows backfilled (commit `81062fe`).
+- **feat**: Full token layer + SCSS split (`_palette.scss` + themed partials) + `/design-system` route + ~99.7% compliance (master→main rename).
+- **feat**: PR #7 persist-close triple-fallback upsert closes pre-close dealId rotation bug (commit `e9b6c2f`).
+
+## [Close-Detection v2 Build] - 2026-04-21..2026-04-22
+
+- **feat**: PR #2 — 3-tier close detection (primary Transaction API with 3 match strategies → deferred 10min retry → UNRECONCILED with pnl=NULL + dedicated alert + CLI recovery). `Position.deal_reference` persisted at open (migration `284b174b7dc0`). Backfill executed on prod DB (4 rows reconciled, 0 UNRECONCILED residual).
+- **discovery**: Capital.com emits NEW dealId (pos+1 hex) on TP/SL closes — exact-match fails; use `/history/activity` openPrice match.
+
+## [Critical P&L Bug Resolution] - 2026-03-31
+
+- **fix(critical)**: P&L resolved twice. Use broker `Transaction.size` (TRADE row = realized P&L string) or `Position.upl`. Legacy `(exit-entry)*size` fallback REMOVED. No code path invents P&L.
+- **feat**: Correlation Intelligence deployed (3 levels: cross-asset features L1, regime detection L2, dynamic correlation guard L3).
+- **feat**: Spread filter `MAX_SPREAD_PCT=15%` blocks high-spread epics (DOGUSD, ETHUSD).
+
+## [Sentiment Pipeline Fix + Sizing Relaxed for DEMO] - 2026-03-20..2026-03-24
+
+- **fix**: SIL sentiment pipeline fix.
+- **chore**: 3 risk params relaxed for DEMO trading. MUST revert before LIVE production.
+- **fix**: Recurring circuit breaker silent halt issues addressed.
+
+---
+
 ## [Phase 18d] - 2026-02-19 - Broker-Closed Position Detection
 
 - **fix**: Detect positions closed by Capital.com (SL/TP hit on broker side) and persist to DB
@@ -176,4 +258,4 @@ All notable changes to this project are documented in this file.
 
 ---
 
-Last updated: 2026-02-19 (Phase 18d)
+Last updated: 2026-05-15 (Hygiene + Ruflo integration)
