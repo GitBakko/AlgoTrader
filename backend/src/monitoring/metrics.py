@@ -174,6 +174,17 @@ mantis_spread_filter_blocked_total = Counter(
     ["epic", "asset_class"],  # asset_class: crypto | precious | default
 )
 
+# ===== QW4 Calendar Gate Metrics =====
+# Trades blocked (or would-be-blocked in log_only mode) by the economic
+# calendar gate. `mode` distinguishes log_only (observation) from block
+# (real gate) so dashboards can compute block-rate without confusing the
+# two phases of the rollout.
+mantis_calendar_gate_blocked_total = Counter(
+    "mantis_calendar_gate_blocked_total",
+    "Trades blocked by the economic calendar gate (QW4)",
+    ["epic", "mode"],  # mode: log_only | block
+)
+
 # ===== QW5 Slippage Observability Metrics =====
 # Captures the broker-side execution slippage (|fill_price - signal_price|)
 # from the ExecutionEngine pipeline. Buckets tuned for typical price-scale
@@ -361,6 +372,20 @@ class MetricsCollector:
             close_detection_shadow_disagreement_counter.labels(
                 v1_path=v1_path, v2_outcome=v2_outcome, epic=epic
             ).inc()
+        except Exception:
+            pass
+
+    @classmethod
+    def record_calendar_gate_blocked(cls, *, epic: str, mode: str) -> None:
+        """Record an economic-calendar blackout match (QW4).
+
+        Args:
+            epic: Asset epic
+            mode: 'log_only' (would-block, trade still proceeded) or
+                  'block' (actually rejected)
+        """
+        try:
+            mantis_calendar_gate_blocked_total.labels(epic=epic, mode=mode).inc()
         except Exception:
             pass
 
