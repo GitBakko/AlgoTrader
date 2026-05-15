@@ -194,3 +194,51 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 2. Use `detect_changes` for code review.
 3. Use `get_affected_flows` to understand impact.
 4. Use `query_graph` pattern="tests_for" to check coverage.
+
+## Ruflo Integration (optional)
+
+Ruflo MCP server is registered globally (`~/.claude.json`) and project-locally (`.mcp.json`). Project-level assets live in `.claude-flow/` (runtime), `.claude/agents/` (98 agent templates), `.claude/commands/`, `.claude/helpers/`. **Do NOT run `ruflo init --force` again** — it overwrites `CLAUDE.md`, `.mcp.json`, `.claude/settings.json` regardless of `--skip-claude`/`--minimal`/`--no-global` flags (v3.7.0-alpha.14 bug). Use `ruflo init upgrade` for future updates.
+
+### Agent Comms (SendMessage-First)
+
+Named agents coordinate via `SendMessage`, not polling or shared state. ALL agents in ONE message with `run_in_background: true`; lead kicks off pipeline via `SendMessage`.
+
+Patterns: **Pipeline** A→B→C (sequential dependencies) · **Fan-out** Lead→A,B,C→Lead (independent parallel) · **Supervisor** Lead↔workers (ongoing coordination).
+
+### Memory & Routing
+
+```bash
+# Before any task
+ruflo memory search --query "[task keywords]" --namespace patterns
+ruflo hooks route --task "[task description]"
+
+# After success
+ruflo memory store --namespace patterns --key "[name]" --value "[what worked]"
+ruflo hooks post-task --task-id "[id]" --success true --store-results true
+```
+
+### Key MCP Tools (discover via `ToolSearch("ruflo <keyword>")`)
+
+| Category | Key tools |
+|----------|-----------|
+| Memory | `memory_store`, `memory_search`, `memory_search_unified` |
+| Swarm | `swarm_init`, `swarm_status`, `swarm_health` |
+| Agents | `agent_spawn`, `agent_list`, `agent_status` |
+| Hooks | `hooks_route`, `hooks_post-task`, `hooks_worker-dispatch` |
+| Security | `aidefence_scan`, `aidefence_is_safe`, `aidefence_has_pii` |
+| Hive-Mind | `hive-mind_init`, `hive-mind_consensus`, `hive-mind_spawn` |
+
+### When to Swarm
+
+- **YES**: 3+ files, new features, cross-module refactor, API changes, security, performance
+- **NO**: single file edits, 1-2 line fixes, docs updates, config, questions
+
+### Background Workers (`ruflo hooks worker dispatch --trigger X`)
+
+| Worker | When |
+|--------|------|
+| `audit` | After security changes |
+| `optimize` | After performance work |
+| `testgaps` | After adding features |
+| `map` | Every 5+ file changes |
+| `document` | After API changes |

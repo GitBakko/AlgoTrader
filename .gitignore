@@ -79,3 +79,9 @@ nul
 graphify-out/
 # Added by code-review-graph
 .code-review-graph/
+
+# ===== Ruflo / Claude-Flow runtime =====
+.claude-flow/data/
+.claude-flow/logs/
+.claude-flow/sessions/
+.ruflo/
