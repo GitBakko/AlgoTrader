@@ -4,6 +4,25 @@ All notable changes to this project are documented in this file.
 
 ---
 
+## [QW1 OOS Threshold Refresh] - 2026-05-15 - Recalibration on post-quick-wins window
+
+- **fix(ml)**: re-ran `backend/scripts/batch_oos_scorecard.py --no-monte-carlo` over full walk-forward through 2026-05-15 (post QW2+QW7+CONF+QW6). Replaces optimal_thresholds.json frozen 2026-04-28.
+- **Massive Sharpe lift across KEEP set** (post-fix re-evaluation):
+  - XAUUSD: Sharpe 2.91 → 13.90 (WR 62.5% → 77.1%)
+  - BTCUSD: 5.20 → 13.14 (WR 72.7% → 75.4%)
+  - US500: 2.20 → 12.95 (WR 56.9% → 76.1%) — threshold 0.48 (CONF) → 0.55
+  - WTIUSD: 0.96 → 14.72 (WR 55.3% → 77.9%) — was marginal, now top-3 Sharpe
+  - DE40: 1.70 → 14.05 (WR 57.3% → 73.1%)
+  - NVDA: 0.22 → 12.21 (WR 47.9% → 72.2%) — REVIEW → KEEP
+  - PLATINUM: 2.05 → 11.41 (WR 63.1% → 76.3%)
+  - SOLUSD/ETHUSD/TSLA/BNBUSD: all 7-12 Sharpe, 71-76% WR
+- **6 NEW assets first-time in scorecard**: AAPL, AMD, AMZN, GOOGL, META, MSFT — all KEEP with WR 75.8-80.3%, Sharpe 6.8-11.6.
+- **New EXCLUDES**: USDCAD (WR 0%, Sharpe -15.96), USDCHF (WR 0%, Sharpe -16.63). COPPER remains EXCLUDE (was REVIEW). USDJPY stays REVIEW (Sharpe -7.04, WR 41.4%).
+- **5 preserved old EXCLUDE entries** (no recent OOS data): DOGUSD, EURUSD, GBPUSD, ICPUSD, NATGAS.
+- **Merge policy**: `final = max(new_oos_threshold, conf_floor=0.45)` for 3-class KEEPs. Only META hit floor lift (0.42 → 0.45). All CONF floors (US500/TSLA/BNBUSD/WTIUSD) preserved or raised by new OOS.
+- **`_meta` block** added with generation timestamp, period, script, post_fixes list, merge policy, assets_new + assets_preserved.
+- **Validation**: 26 instruments total (17 KEEP, 1 REVIEW, 8 EXCLUDE). pytest `tests/strategy/ tests/backtest/` → 381 passed / 8 skipped / 0 fail.
+
 ## [TP1 Lift QW6] - 2026-05-15 - Trailing partial-close lifted from midpoint to 0.70
 
 - **fix(risk)**: `backend/src/risk/trailing_stop_manager.py` — `TrailingStopConfig.tp1_fraction` new field, default 0.70 (was implicit 0.50 hardcoded). `_derive_tp_levels()` now computes TP1 = entry + tp1_fraction × (TP - entry) for BUY (symmetric for SELL) instead of `(tp2 - entry_price) * 0.5`. TP2 unchanged (still = strategy take_profit). Direction-aware fallback to legacy `tp1_risk_multiple` ladder preserved when `take_profit=None` or wrong-sided. Breakeven offset 0.0 + max_ladder_cycles=2 invariants preserved.
