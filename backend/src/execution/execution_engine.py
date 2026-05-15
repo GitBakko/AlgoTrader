@@ -103,13 +103,25 @@ class ExecutionEngine:
         result = await self._order_manager.submit_order(order)
 
         if result.success and result.fill_price is not None:
-            # Record slippage
+            # Record slippage (in-memory tracker + QW5 Prometheus histograms)
             self._slippage_tracker.record_slippage(
                 epic=signal.epic,
                 expected_price=signal.entry_price,
                 actual_price=result.fill_price,
                 direction=signal.direction.value,
             )
+            try:
+                from src.monitoring.metrics import MetricsCollector
+
+                MetricsCollector.record_slippage(
+                    epic=signal.epic,
+                    direction=signal.direction.value,
+                    signal_price=signal.entry_price,
+                    fill_price=result.fill_price,
+                )
+            except Exception:
+                # Prometheus instrumentation must never block trade execution
+                pass
 
             # Track position locally (all modes - needed for trailing stops, etc.)
             if result.deal_id:

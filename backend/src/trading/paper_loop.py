@@ -41,6 +41,41 @@ from src.strategy.strategy_manager import StrategyManager
 from src.utils.config import get_settings
 from src.utils.constants import STOCK_ASSETS, TRADABLE_ASSETS
 
+# QW3 2026-05-15: per-asset-class spread filter limits.
+# spread_ratio (= broker spread / TP distance) compared against the
+# tier limit at paper_loop.py spread filter step 3b. Crypto runs wider
+# spreads (15% of TP), precious metals tighter (12%), all others 8%.
+_CRYPTO_EPICS: frozenset[str] = frozenset(
+    {
+        "BTCUSD",
+        "ETHUSD",
+        "BNBUSD",
+        "XRPUSD",
+        "SOLUSD",
+        "ADAUSD",
+        "DOTUSD",
+        "DOGUSD",
+        "DASHUSD",
+        "ICPUSD",
+        "SUIUSD",
+    }
+)
+_PRECIOUS_EPICS: frozenset[str] = frozenset({"XAUUSD", "XAGUSD", "PLATINUM"})
+
+
+def get_spread_limit(epic: str) -> tuple[float, str]:
+    """Return (limit, asset_class) for QW3 spread filter.
+
+    asset_class is one of {"crypto", "precious", "default"} — used for
+    Prometheus label cardinality control and audit/log clarity.
+    """
+    _settings = get_settings()
+    if epic in _CRYPTO_EPICS:
+        return _settings.spread_limit_crypto, "crypto"
+    if epic in _PRECIOUS_EPICS:
+        return _settings.spread_limit_precious, "precious"
+    return _settings.spread_limit_default, "default"
+
 
 @dataclass
 class PendingClose:
@@ -930,7 +965,8 @@ class PaperTradingLoop:
         """Re-evaluate spread-blocked epics every hour.
 
         Queries current bid/offer for each blocked epic and unblocks
-        those whose spread has come back within MAX_SPREAD_PCT of TP distance.
+        those whose spread has come back within the per-asset-class limit
+        of TP distance (QW3 2026-05-15: crypto 15% / precious 12% / default 8%).
         """
         now = _time.monotonic()
         if now - self._last_spread_refresh < 3600:  # 1 hour
@@ -941,9 +977,6 @@ class PaperTradingLoop:
             return
 
         _settings = get_settings()
-        if _settings.max_spread_pct <= 0:
-            return
-
         _tp_rr = _settings.scalp_tp_risk_reward if _settings.scalp_mode_enabled else 2.5
         unblocked = []
 
@@ -966,17 +999,19 @@ class PaperTradingLoop:
 
                 tp_distance = market_data["atr"] * _tp_rr
                 spread_ratio = spread / tp_distance if tp_distance > 0 else 1.0
+                epic_limit, epic_class = get_spread_limit(epic)
 
-                if spread_ratio <= _settings.max_spread_pct:
+                if spread_ratio <= epic_limit:
                     unblocked.append(epic)
                     logger.info(
                         f"[{epic}] Spread improved: {spread_ratio:.1%} <= "
-                        f"{_settings.max_spread_pct:.0%} limit — unblocked"
+                        f"{epic_limit:.0%} limit (class={epic_class}) — unblocked"
                     )
                 else:
                     # Update stored spread info
                     self._spread_blocked_epics[epic]["spread"] = round(spread, 8)
                     self._spread_blocked_epics[epic]["spread_pct"] = round(spread_ratio * 100, 1)
+                    self._spread_blocked_epics[epic]["asset_class"] = epic_class
             except Exception as e:
                 logger.debug(f"[{epic}] Spread refresh failed: {e}")
 
@@ -2807,9 +2842,12 @@ class PaperTradingLoop:
             except Exception as e:
                 logger.debug(f"[{epic}] Drift check failed (non-blocking): {e}")
 
-        # Step 3b: Spread filter — reject if spread cost > MAX_SPREAD_PCT of TP distance
+        # Step 3b: Spread filter — reject if spread cost > limit of TP distance.
+        # QW3 (2026-05-15): per-asset-class limits (crypto 15% / precious 12% /
+        # default 8%) replace the prior uniform MAX_SPREAD_PCT gate.
         _spread_settings = get_settings()
-        if self.broker and _spread_settings.max_spread_pct > 0:
+        spread_limit, asset_class = get_spread_limit(epic)
+        if self.broker and spread_limit > 0:
             try:
                 market_details = await self.broker.get_market_details(epic)
                 snapshot = market_details.get("snapshot", {})
@@ -2826,11 +2864,11 @@ class PaperTradingLoop:
                     tp_distance = market_data["atr"] * _tp_rr
                     if tp_distance > 0:
                         spread_ratio = spread / tp_distance
-                        if spread_ratio > _spread_settings.max_spread_pct:
+                        if spread_ratio > spread_limit:
                             reason = (
                                 f"Spread too high: {spread:.6f} = "
                                 f"{spread_ratio:.1%} of TP distance "
-                                f"(limit {_spread_settings.max_spread_pct:.0%})"
+                                f"(limit {spread_limit:.0%} / class={asset_class})"
                             )
                             logger.warning(f"[{epic}] {reason}")
                             signal_info["status"] = "rejected"
@@ -2839,9 +2877,16 @@ class PaperTradingLoop:
                             self._spread_blocked_epics[epic] = {
                                 "spread": round(spread, 8),
                                 "spread_pct": round(spread_ratio * 100, 1),
-                                "limit_pct": round(_spread_settings.max_spread_pct * 100, 1),
+                                "limit_pct": round(spread_limit * 100, 1),
+                                "asset_class": asset_class,
                                 "since": datetime.now(UTC).isoformat(),
                             }
+                            try:
+                                MetricsCollector.record_spread_filter_blocked(
+                                    epic=epic, asset_class=asset_class
+                                )
+                            except Exception:
+                                pass
                             return
                         else:
                             # Clear block if spread came back to normal

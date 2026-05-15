@@ -4,6 +4,42 @@ All notable changes to this project are documented in this file.
 
 ---
 
+## [QW3 + QW5 — Spread Filter Per-Class + Slippage/Live-WR Observability] - 2026-05-15
+
+Two parallel fixes covering execution quality (QW3) and observability (QW5) — branch `fix/qw3-qw5-execution-observability`.
+
+### QW3 — Per-Asset-Class Spread Filter
+
+- **fix(execution)**: replaced uniform `MAX_SPREAD_PCT=15%` gate in `backend/src/trading/paper_loop.py` with per-asset-class limits selected via new helper `get_spread_limit(epic) -> (limit, asset_class)`:
+  - **crypto** (BTCUSD/ETHUSD/BNBUSD/XRPUSD/SOLUSD/ADAUSD/DOTUSD/DOGUSD/DASHUSD/ICPUSD/SUIUSD): 15% — `SPREAD_LIMIT_CRYPTO`
+  - **precious** (XAUUSD/XAGUSD/PLATINUM): 12% — `SPREAD_LIMIT_PRECIOUS`
+  - **default** (equity, FX, indices, oil, natgas): 8% — `SPREAD_LIMIT_DEFAULT`
+- Formula unchanged: `spread_ratio = (offer - bid) / tp_distance`, where `tp_distance = atr × tp_rr`. Only the threshold per epic varies.
+- **paper_loop.py**: spread filter step 3b at line 2810+ uses `get_spread_limit(epic)`; passive unblock refresh at `_refresh_spread_blocks` uses the same per-class limit.
+- **Prometheus**: new `mantis_spread_filter_blocked_total{epic,asset_class}` counter (`monitoring/metrics.py`). Wired via `MetricsCollector.record_spread_filter_blocked()`.
+- **Expected impact**: tightens spread cap on stocks/FX/indices (currently 8% vs prior lax 15%); crypto unchanged at 15%. Reduces fills during high-spread windows on the assets that need it.
+
+### QW5 — Slippage Baseline + Live WR Tracker
+
+- **observability**: `ExecutionEngine.execute_signal` now calls `MetricsCollector.record_slippage(epic, direction, signal_price, fill_price)` immediately after the in-memory `SlippageTracker.record_slippage()` (which already existed). Adds two Prometheus histograms:
+  - `mantis_slippage_points{epic,direction}` — buckets 5/10/20/30/50/75/100/150/200/500 points
+  - `mantis_slippage_pct{epic}` — buckets 0.0005/0.001/0.002/0.005/0.01/0.02/0.05/0.10
+  Backstops trade execution: instrumentation try/except so Prometheus failures never block fills.
+- **endpoint**: new `GET /api/analytics/live-wr?window_days=21` (`api/routers/analytics.py`):
+  - Queries `positions` table for closed trades in the window, groups by `epic`, computes WR = TP/(TP+SL+TIME_STOP+EXTERNAL).
+  - Loads OOS WR from `optimal_thresholds.json` and computes `oos_delta = live_wr - oos_wr`.
+  - Flags any epic with `oos_delta < -0.15` as "overfit suspect" in `overfit_flags` array.
+  - Min sample = 5 trades per epic (below threshold → excluded).
+  - Each call also pushes `mantis_live_wr{epic}` + `mantis_live_wr_oos_delta{epic}` gauges for Prometheus.
+- **Use case**: QW1 OOS scorecard showed Sharpe 11-14 across KEEP set — suspiciously high (walk-forward overfit signature). This endpoint surfaces the live divergence so we can validate or invalidate the OOS calibration in real money.
+
+### Tests + smoke
+
+- `tests/trading/test_spread_filter_per_class.py` (9 tests: tier classification + 9 boundary parametrized cases).
+- `tests/monitoring/test_qw5_observability.py` (6 tests: histogram observation, gauge updates, edge cases).
+- Full regression: `pytest tests/risk/ tests/strategy/ tests/backtest/ tests/monitoring/ tests/trading/ tests/execution/` → all pass.
+- Smoke: `get_settings().spread_limit_{crypto,precious,default}` resolve to (0.15, 0.12, 0.08); `get_spread_limit("BTCUSD")` → `(0.15, "crypto")`; classify mapping verified for 6 epics.
+
 ## [QW1 OOS Threshold Refresh] - 2026-05-15 - Recalibration on post-quick-wins window
 
 - **fix(ml)**: re-ran `backend/scripts/batch_oos_scorecard.py --no-monte-carlo` over full walk-forward through 2026-05-15 (post QW2+QW7+CONF+QW6). Replaces optimal_thresholds.json frozen 2026-04-28.
