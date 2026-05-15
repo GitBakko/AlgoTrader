@@ -85,3 +85,10 @@ graphify-out/
 .claude-flow/logs/
 .claude-flow/sessions/
 .ruflo/
+
+# ===== Playwright MCP dumps =====
+.playwright-mcp/
+
+# ===== Temp dumps =====
+openapi_tmp.json
+*_tmp.json

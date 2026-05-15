@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-10T11:51:54.402Z",
+  "timestamp": "2026-05-15T07:43:21.831Z",
   "source": "auto-postool",
   "partial": false,
   "phase": null,
@@ -18,73 +18,29 @@
   "uncommitted_files": [
     {
       "status": "M",
-      "path": ".claude/scheduled_tasks.lock"
-    },
-    {
-      "status": "M",
-      "path": ".serena/project.yml"
-    },
-    {
-      "status": "??",
       "path": ".planning/HANDOFF.json"
     },
     {
-      "status": "??",
-      "path": ".planning/audit-2026-05-09/"
+      "status": "M",
+      "path": "backend/.planning/HANDOFF.json"
     },
     {
       "status": "??",
-      "path": ".planning/audit-2026-05-10/01-execution.md"
+      "path": ".playwright-mcp/page-2026-05-12T13-05-33-537Z.yml"
     },
     {
       "status": "??",
-      "path": ".planning/audit-2026-05-10/02-models-prediction.md"
+      "path": ".playwright-mcp/page-2026-05-12T13-05-58-800Z.yml"
     },
     {
       "status": "??",
-      "path": ".planning/audit-2026-05-10/03-database.md"
+      "path": "CI"
     },
     {
       "status": "??",
-      "path": ".planning/audit-2026-05-10/04-broker.md"
-    },
-    {
-      "status": "??",
-      "path": ".planning/audit-2026-05-10/05-api-routers.md"
-    },
-    {
-      "status": "??",
-      "path": ".planning/audit-2026-05-10/06-features-drl-backtest.md"
-    },
-    {
-      "status": "??",
-      "path": ".planning/audit-2026-05-10/07-frontend.md"
-    },
-    {
-      "status": "??",
-      "path": ".planning/audit-2026-05-10/REVIEW.md"
-    },
-    {
-      "status": "??",
-      "path": ".playwright-mcp/"
-    },
-    {
-      "status": "??",
-      "path": "backend/.planning/"
-    },
-    {
-      "status": "??",
-      "path": "backend/data/rag_corpus/"
-    },
-    {
-      "status": "??",
-      "path": "v01-dashboard.png"
-    },
-    {
-      "status": "??",
-      "path": "visual-01-login.png"
+      "path": "openapi_tmp.json"
     }
   ],
   "next_action": null,
-  "context_notes": "Recent commits:\n916ff60 ui(frontend-audit): visual-axis pass + V1 sticky-thead fix on /markets\ne428ddb fix(frontend-audit): T7+T8 — view-level cleanups + dead code purge\nc074633 ui(frontend-audit): T6 — OnPush sweep (H12)\nec91f8c refactor(frontend-audit): T5 — ApiService migration + DELETE + params builder + signal-graph leak fix\n82ae6b4 ui(frontend-audit): T4 — chart palette constants + KPI tabular figures + logo dedupe"
+  "context_notes": "Recent commits:\n92f5d78 chore(tooling): integrate ruflo MCP server with safe merge of project configs\n132ea74 fix(risk): entry-drift handler shifts/rejects on stale candle vs broker mid\n227d1b3 fix(logos): center img in white-backdrop wrapper (was baseline-shifted)\n1605e37 ui(logos): white backdrop on stock logos so dark glyphs stay legible\nea0bfd7 fix(logos): remove dead clearbit.com from stock-logo chain"
 }
