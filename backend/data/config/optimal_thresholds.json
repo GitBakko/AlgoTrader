@@ -41,11 +41,23 @@
       "GBPUSD",
       "ICPUSD",
       "NATGAS"
-    ]
+    ],
+    "qw1ter_2026_05_18": {
+      "reason": "live WR underperforms OOS by 17-49 pp on 6 KEEP epics; bump confidence +0.05 to reduce volume + raise precision",
+      "bumps": [
+        "BTCUSD: 0.5 -> 0.55",
+        "TSLA: 0.48 -> 0.53",
+        "WTIUSD: 0.48 -> 0.53",
+        "PLATINUM: 0.45 -> 0.5",
+        "XAUUSD: 0.55 -> 0.6",
+        "US500: 0.55 -> 0.6"
+      ],
+      "source": "GET /api/analytics/live-wr 2026-05-18T14:55Z window_days=21"
+    }
   },
   "per_asset": {
     "XAUUSD": {
-      "min_confidence": 0.55,
+      "min_confidence": 0.6,
       "decision": "KEEP",
       "sharpe": 13.9,
       "sortino": 42.208,
@@ -54,10 +66,12 @@
       "profit_factor": 4.874,
       "total_trades": 384,
       "total_return_pct": 13.79,
-      "failed_criteria": []
+      "failed_criteria": [],
+      "_min_confidence_pre_qw1ter": 0.55,
+      "_min_confidence_qw1ter_2026_05_18": "lifted 0.55 -> 0.60 (live WR overfit, see /api/analytics/live-wr 2026-05-18)"
     },
     "BTCUSD": {
-      "min_confidence": 0.5,
+      "min_confidence": 0.55,
       "decision": "KEEP",
       "sharpe": 13.142,
       "sortino": 22.335,
@@ -66,10 +80,12 @@
       "profit_factor": 3.78,
       "total_trades": 863,
       "total_return_pct": 43.27,
-      "failed_criteria": []
+      "failed_criteria": [],
+      "_min_confidence_pre_qw1ter": 0.5,
+      "_min_confidence_qw1ter_2026_05_18": "lifted 0.50 -> 0.55 (live WR overfit, see /api/analytics/live-wr 2026-05-18)"
     },
     "US500": {
-      "min_confidence": 0.55,
+      "min_confidence": 0.6,
       "decision": "KEEP",
       "sharpe": 12.954,
       "sortino": 28.031,
@@ -78,10 +94,12 @@
       "profit_factor": 4.611,
       "total_trades": 669,
       "total_return_pct": 14.02,
-      "failed_criteria": []
+      "failed_criteria": [],
+      "_min_confidence_pre_qw1ter": 0.55,
+      "_min_confidence_qw1ter_2026_05_18": "lifted 0.55 -> 0.60 (live WR overfit, see /api/analytics/live-wr 2026-05-18)"
     },
     "WTIUSD": {
-      "min_confidence": 0.48,
+      "min_confidence": 0.53,
       "decision": "KEEP",
       "sharpe": 14.72,
       "sortino": 48.032,
@@ -90,7 +108,9 @@
       "profit_factor": 4.979,
       "total_trades": 863,
       "total_return_pct": 47.04,
-      "failed_criteria": []
+      "failed_criteria": [],
+      "_min_confidence_pre_qw1ter": 0.48,
+      "_min_confidence_qw1ter_2026_05_18": "lifted 0.48 -> 0.53 (live WR overfit, see /api/analytics/live-wr 2026-05-18)"
     },
     "NVDA": {
       "min_confidence": 0.5,
@@ -105,7 +125,7 @@
       "failed_criteria": []
     },
     "TSLA": {
-      "min_confidence": 0.48,
+      "min_confidence": 0.53,
       "decision": "KEEP",
       "sharpe": 12.275,
       "sortino": 21.444,
@@ -114,7 +134,9 @@
       "profit_factor": 3.646,
       "total_trades": 531,
       "total_return_pct": 39.66,
-      "failed_criteria": []
+      "failed_criteria": [],
+      "_min_confidence_pre_qw1ter": 0.48,
+      "_min_confidence_qw1ter_2026_05_18": "lifted 0.48 -> 0.53 (live WR overfit, see /api/analytics/live-wr 2026-05-18)"
     },
     "DE40": {
       "min_confidence": 0.5,
@@ -181,7 +203,7 @@
       ]
     },
     "PLATINUM": {
-      "min_confidence": 0.45,
+      "min_confidence": 0.5,
       "decision": "KEEP",
       "sharpe": 11.411,
       "sortino": 44.012,
@@ -190,7 +212,9 @@
       "profit_factor": 4.16,
       "total_trades": 676,
       "total_return_pct": 42.22,
-      "failed_criteria": []
+      "failed_criteria": [],
+      "_min_confidence_pre_qw1ter": 0.45,
+      "_min_confidence_qw1ter_2026_05_18": "lifted 0.45 -> 0.50 (live WR overfit, see /api/analytics/live-wr 2026-05-18)"
     },
     "USDJPY": {
       "min_confidence": 0.55,
