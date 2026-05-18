@@ -4,6 +4,38 @@ All notable changes to this project are documented in this file.
 
 ---
 
+## [QW1-ter — Overfit-driven Threshold Bump + Calendar Wiring Smoke Test] - 2026-05-18
+
+### Threshold bumps on 6 overfit-flagged epics (data from `/api/analytics/live-wr`)
+
+Live WR vs OOS WR delta after 21d window:
+- BTCUSD: live 26.3% vs OOS 75.4% (delta **-49.1 pp**) → threshold 0.50 → 0.55
+- TSLA: live 30.0% vs OOS 71.4% (delta -41.4 pp) → 0.48 → 0.53
+- WTIUSD: live 40.0% vs OOS 77.9% (delta -37.9 pp) → 0.48 → 0.53
+- US500: live 42.9% vs OOS 76.1% (delta -33.2 pp) → 0.55 → 0.60
+- PLATINUM: live 50.0% vs OOS 76.3% (delta -26.3 pp) → 0.45 → 0.50
+- XAUUSD: live 60.0% vs OOS 77.1% (delta -17.1 pp) → 0.55 → 0.60
+
+All bumps +0.05 conservative direction (raises filter strictness). Audit fields per entry: `_min_confidence_pre_qw1ter` (original) + `_min_confidence_qw1ter_2026_05_18` (reason). `_meta.qw1ter_2026_05_18` block at top of JSON.
+
+### Calendar gate wiring smoke test
+
+3 days of `CALENDAR_GATE_MODE=log_only` produced **zero** `Calendar blackout` log lines despite Finnhub fetching 86-108 events/day (21 high-impact on 2026-05-18 alone). Suspicion: wiring bug OR statistical (events not landing in eval moments).
+
+New `backend/tests/risk/test_calendar_gate_wiring_smoke.py` (6 cases) forces controlled scenarios to validate wiring:
+- Fed Rate Decision +10min → XAUUSD blackout ✅
+- CPI -10min → XAUUSD post-window blackout ✅
+- NFP +2h → no blackout (outside window) ✅
+- ECB Rate +10min on XAUUSD → no blackout (USD-only epic) ✅
+- ECB Rate +10min on DE40 → blackout (EUR) ✅
+- Retail Sales on BTCUSD → no blackout (USD_MAJOR reduced set); Fed Rate on BTCUSD → blackout ✅
+
+**All 6 pass** → wiring is correct. Zero production matches is a STATISTICAL artifact (low overlap between 1h signal-eval moments and ±30/+15min event windows), not a bug. Need 1-2 more weeks across NFP / FOMC / CPI to accumulate observability before flipping to `block`.
+
+### Tests
+
+Targeted: pytest `tests/risk/test_calendar_gate_wiring_smoke.py tests/risk/test_economic_calendar_gate.py tests/monitoring/test_qw1bis_oos_exclude.py` → 29 passed / 0 failed.
+
 ## [QW1-bis — Honor OOS Scorecard EXCLUDE Decisions] - 2026-05-18
 
 **LATENT BUG FIX**: `StrategyManager.from_optimal_thresholds()` (`strategy/strategy_manager.py:65-101`) populates `self.excluded_epics` set from `decision=EXCLUDE` entries in `optimal_thresholds.json`, but the set was **never consulted** in the decision pipeline. As a result, 8 epics that the OOS scorecard flagged as catastrophically loss-making (USDCAD, USDCHF, COPPER, EURUSD, DOGUSD, GBPUSD, ICPUSD, NATGAS — all Sharpe ≤ -5, WR ≤ 11%, max DD ≥ 30%) could still open trades.
