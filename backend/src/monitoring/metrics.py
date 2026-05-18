@@ -185,6 +185,17 @@ mantis_calendar_gate_blocked_total = Counter(
     ["epic", "mode"],  # mode: log_only | block
 )
 
+# ===== QW1-bis OOS EXCLUDE Skip Metrics =====
+# Trades skipped because the epic is in StrategyManager.excluded_epics
+# (populated from optimal_thresholds.json EXCLUDE decisions). Hardens the
+# QW1 OOS scorecard contract that was silently bypassed in the decision
+# pipeline pre-2026-05-18.
+mantis_oos_excluded_skipped_total = Counter(
+    "mantis_oos_excluded_skipped_total",
+    "Signals skipped because the epic is in OOS scorecard EXCLUDE (QW1-bis)",
+    ["epic"],
+)
+
 # ===== QW5 Slippage Observability Metrics =====
 # Captures the broker-side execution slippage (|fill_price - signal_price|)
 # from the ExecutionEngine pipeline. Buckets tuned for typical price-scale
@@ -372,6 +383,14 @@ class MetricsCollector:
             close_detection_shadow_disagreement_counter.labels(
                 v1_path=v1_path, v2_outcome=v2_outcome, epic=epic
             ).inc()
+        except Exception:
+            pass
+
+    @classmethod
+    def record_oos_excluded_skipped(cls, *, epic: str) -> None:
+        """Record a signal skipped because the epic is OOS-EXCLUDE (QW1-bis)."""
+        try:
+            mantis_oos_excluded_skipped_total.labels(epic=epic).inc()
         except Exception:
             pass
 

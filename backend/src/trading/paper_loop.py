@@ -2509,6 +2509,22 @@ class PaperTradingLoop:
             if excluded:
                 return
 
+        # QW1-bis (2026-05-18): honor OOS scorecard EXCLUDE decisions.
+        # `StrategyManager.from_optimal_thresholds` populates the
+        # `excluded_epics` set from optimal_thresholds.json decision=EXCLUDE
+        # entries (Sharpe ≤ 0.3, WR < 40%, max_dd > 30%). Pre-fix the set
+        # was loaded but never consulted, so EXCLUDE epics (e.g. USDCAD,
+        # USDCHF, COPPER, EURUSD, DOGUSD, GBPUSD, ICPUSD, NATGAS) could
+        # still be traded against the OOS contract. Skip them here, right
+        # after the rolling 14-day exclusion so both guards run consistently.
+        if epic in self.strategy_manager.excluded_epics:
+            logger.info(f"[{epic}] Skipped: OOS scorecard EXCLUDE (QW1-bis)")
+            try:
+                MetricsCollector.record_oos_excluded_skipped(epic=epic)
+            except Exception:
+                pass
+            return
+
         # Step 0: Market hours check (DEMO/LIVE only)
         is_open, closed_reason = await self._is_market_open(epic)
         if not is_open:
