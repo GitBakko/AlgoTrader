@@ -4,6 +4,35 @@ All notable changes to this project are documented in this file.
 
 ---
 
+## [QW1-bis — Honor OOS Scorecard EXCLUDE Decisions] - 2026-05-18
+
+**LATENT BUG FIX**: `StrategyManager.from_optimal_thresholds()` (`strategy/strategy_manager.py:65-101`) populates `self.excluded_epics` set from `decision=EXCLUDE` entries in `optimal_thresholds.json`, but the set was **never consulted** in the decision pipeline. As a result, 8 epics that the OOS scorecard flagged as catastrophically loss-making (USDCAD, USDCHF, COPPER, EURUSD, DOGUSD, GBPUSD, ICPUSD, NATGAS — all Sharpe ≤ -5, WR ≤ 11%, max DD ≥ 30%) could still open trades.
+
+Discovery: live USDCAD position 2026-05-18 (Sharpe -15.96 OOS, WR 0%) confirmed the gap. Audit `grep -rn "excluded_epics" backend/src/` returned 5 hits, **all inside `strategy_manager.py` itself** — zero consumer in the trade pipeline.
+
+### Fix
+
+- `backend/src/trading/paper_loop.py` — new guard right after the rolling 14-day `_asset_tracker.is_excluded` check (~line 2510), before market hours check:
+  ```python
+  if epic in self.strategy_manager.excluded_epics:
+      logger.info(f"[{epic}] Skipped: OOS scorecard EXCLUDE (QW1-bis)")
+      MetricsCollector.record_oos_excluded_skipped(epic=epic)
+      return
+  ```
+- `backend/src/monitoring/metrics.py` — new `mantis_oos_excluded_skipped_total{epic}` Counter + `MetricsCollector.record_oos_excluded_skipped()` method.
+
+### Tests
+
+- `backend/tests/monitoring/test_qw1bis_oos_exclude.py` (3 cases):
+  - Counter increments per epic label via MetricsCollector
+  - `StrategyManager.from_optimal_thresholds()` correctly classifies KEEP/REVIEW/EXCLUDE
+  - Excluded epics have no StrategyConfig entry
+- Targeted regression: 391 passed / 8 skipped / 0 failed.
+
+### Impact
+
+Post-restart, 8 OOS-EXCLUDE epics are blocked at signal-generation entry. Existing positions on those epics are NOT auto-closed (operator decision). The defensive `_asset_tracker.is_excluded(epic)` rolling guard remains active in parallel — both layers run.
+
 ## [QW4 — Economic Calendar Gate Activation] - 2026-05-15
 
 The `EconomicCalendarGate` (`backend/src/risk/economic_calendar_gate.py`) was already fully implemented and wired at `paper_loop.py:2513` Step 0b (before ML prediction). Root cause of inactivity: gate init gated behind `SIL_ENABLED=false` master flag → `_calendar_gate=None` short-circuited the check.
