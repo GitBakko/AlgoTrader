@@ -4336,6 +4336,10 @@ class PaperTradingLoop:
             },
             "circuit_breakers_tripped": cb_tripped,
             "trailing_stops_tracked": len(trailing_tracked),
+            "position_trading_hours": {
+                deal_id: round(secs / 3600.0, 4)
+                for deal_id, secs in self._position_trading_seconds.items()
+            },
             "equity_curve_below_sma": eq_below_sma,
             "kelly_trade_history_size": len(self._trade_history),
             "kelly_stats": self._get_kelly_stats(),
