@@ -135,6 +135,87 @@ async def test_closed_then_open_does_not_double_count(loop):
 
 
 @pytest.mark.asyncio
+async def test_authoritative_snapshot_overrides_stale_position_status():
+    """Capital.com /positions[].market.marketStatus can lag /markets/{epic}.snapshot
+    during extended-hours (US stocks at 08:00 UTC). Snapshot is authoritative;
+    accumulator must advance when snapshot says TRADEABLE even if position field
+    says CLOSED.
+    """
+    broker = MagicMock()
+    broker.get_market_details = AsyncMock(
+        return_value={
+            "snapshot": {"marketStatus": "TRADEABLE", "bid": 100.0, "offer": 100.0}
+        }
+    )
+    pl = PaperTradingLoop(
+        prediction_service=MagicMock(),
+        strategy_manager=MagicMock(),
+        risk_manager=MagicMock(),
+        execution_engine=MagicMock(),
+        data_access=MagicMock(),
+        broker=broker,
+        epics=["AAPL"],
+    )
+    pl.execution_engine.close_position = AsyncMock(
+        return_value=ExecutionResult(success=True, deal_id="DEAL1", realized_pnl=0.0)
+    )
+
+    pos = _pos("CLOSED", datetime.now(UTC) - timedelta(hours=1))
+    pl._position_last_tick["DEAL1"] = datetime.now(UTC) - timedelta(minutes=10)
+    pl._position_trading_seconds["DEAL1"] = 0.0
+
+    with patch("src.trading.paper_loop.get_settings") as gs:
+        gs.return_value.mr_primary_enabled = True
+        gs.return_value.mr_max_hold_hours = 12.0
+        gs.return_value.scalp_max_hold_hours = 12.0
+        gs.return_value.mr_ou_halflife_enabled = False
+        await pl._check_stop_losses([pos])
+
+    elapsed = pl._position_trading_seconds["DEAL1"]
+    assert 590 < elapsed < 610, (
+        f"Expected ~600s accumulated (snapshot authoritative TRADEABLE), got {elapsed}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_resolve_market_status_caches_within_ttl(loop):
+    """Two calls within TTL → broker hit only once. Third after TTL expiry → 2 hits."""
+    loop.broker.get_market_details = AsyncMock(
+        return_value={"snapshot": {"marketStatus": "TRADEABLE"}}
+    )
+    s1 = await loop._resolve_market_status("AAPL", "CLOSED")
+    s2 = await loop._resolve_market_status("AAPL", "CLOSED")
+    assert s1 == s2 == "TRADEABLE"
+    assert loop.broker.get_market_details.await_count == 1
+
+    # Force TTL expiry by aging the cache entry.
+    status, _ts = loop._market_status_cache["AAPL"]
+    loop._market_status_cache["AAPL"] = (status, 0.0)
+
+    s3 = await loop._resolve_market_status("AAPL", "CLOSED")
+    assert s3 == "TRADEABLE"
+    assert loop.broker.get_market_details.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_authoritative_status_falls_back_on_broker_error(loop):
+    """Broker unreachable → fall back to position.market_status (legacy behavior)."""
+    loop.broker.get_market_details = AsyncMock(side_effect=TimeoutError("net down"))
+    pos = _pos("CLOSED", datetime.now(UTC) - timedelta(hours=24))
+
+    with patch("src.trading.paper_loop.get_settings") as gs:
+        gs.return_value.mr_primary_enabled = True
+        gs.return_value.mr_max_hold_hours = 12.0
+        gs.return_value.scalp_max_hold_hours = 12.0
+        gs.return_value.mr_ou_halflife_enabled = False
+        await loop._check_stop_losses([pos])
+
+    # CLOSED fallback honored: no accumulation, no close.
+    assert loop._position_trading_seconds.get("DEAL1", 0.0) == 0.0
+    loop.execution_engine.close_position.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_gc_clears_closed_deals(loop):
     """Deals not in current_positions get evicted from accumulator dicts."""
     loop._position_trading_seconds["GHOST"] = 3600.0

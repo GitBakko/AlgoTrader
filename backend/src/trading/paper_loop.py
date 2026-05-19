@@ -303,6 +303,13 @@ class PaperTradingLoop:
         # Reset to None on a non-TRADEABLE tick so next TRADEABLE tick baselines fresh.
         self._position_trading_seconds: dict[str, float] = {}
         self._position_last_tick: dict[str, datetime] = {}
+        # MT5 2026-05-19 follow-up: authoritative market_status cache.
+        # Capital.com /positions[].market.marketStatus lags /markets/{epic}.snapshot
+        # during extended-hours sessions (US stocks 08:00 UTC) — pauses time-stop
+        # accumulator + skips local SL/TP. Use snapshot as authoritative with 60s
+        # TTL; positions field is fallback only.
+        self._market_status_cache: dict[str, tuple[str, float]] = {}
+        self._market_status_cache_ttl = 60.0
         self._last_spread_refresh: float = 0.0  # timestamp of last hourly spread check
         self._correlation_regime: str = "normal"
         self._correlation_regime_ts: float = 0.0
@@ -3771,6 +3778,38 @@ class PaperTradingLoop:
                 except Exception as e:
                     logger.warning(f"[{epic}] TP1 partial close failed: {e}")
 
+    async def _resolve_market_status(self, epic: str, fallback: str) -> str:
+        """Authoritative market_status from broker snapshot, 60s cached.
+
+        Capital.com /positions[].market.marketStatus can lag /markets/{epic}.snapshot
+        during extended-hours sessions (e.g. US stocks 08:00 UTC). Using the stale
+        positions field pauses the time-stop accumulator and skips local SL/TP/
+        trailing checks even though the market is tradeable.
+
+        Resolution order:
+          1. Cached snapshot status (if < TTL old)
+          2. Fresh broker.get_market_details(epic).snapshot.marketStatus
+          3. ``fallback`` (caller-supplied position.market_status)
+        """
+        now_ts = _time.time()
+        cached = self._market_status_cache.get(epic)
+        if cached and (now_ts - cached[1]) < self._market_status_cache_ttl:
+            return cached[0]
+        try:
+            details = await asyncio.wait_for(
+                self.broker.get_market_details(epic), timeout=2.0
+            )
+            status = (details or {}).get("snapshot", {}).get("marketStatus")
+            if status:
+                self._market_status_cache[epic] = (status, now_ts)
+                return status
+        except Exception as e:
+            logger.debug(
+                f"[{epic}] authoritative market_status fetch failed ({e}); "
+                f"falling back to position field='{fallback}'"
+            )
+        return fallback
+
     async def _check_stop_losses(self, current_positions: list[dict]) -> None:
         """
         CRITICAL: Check if any open position has violated its stop loss OR take profit
@@ -3870,7 +3909,10 @@ class PaperTradingLoop:
             # just spams errors (e.g. weekends for stocks/indices).
             # MT5 2026-05-19: also pauses the trading-time accumulator so the
             # 12h timer doesn't burn through weekends/overnight closures.
-            market_status = position.get("market_status", "TRADEABLE")
+            # MT5 2026-05-19 follow-up: authoritative source is snapshot, not
+            # positions field (Capital.com stale CLOSED on extended-hours).
+            position_status = position.get("market_status", "TRADEABLE")
+            market_status = await self._resolve_market_status(epic, position_status)
             if market_status != "TRADEABLE":
                 # Drop tick baseline; next TRADEABLE tick re-anchors fresh.
                 if deal_id:
