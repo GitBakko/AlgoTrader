@@ -295,6 +295,14 @@ class PaperTradingLoop:
         # Tracks the difference between what we requested at order creation and
         # what the broker actually applied (due to min-distance constraints).
         self._level_deviations: dict[str, dict] = {}
+        # MT5 2026-05-19: trading-time accumulator for time-stop.
+        # Wall-clock max_hold_hours killed positions opened evenings/Fridays
+        # that lived only 1-2h of actual TRADEABLE market time.
+        # _position_trading_seconds: deal_id -> accumulated TRADEABLE seconds.
+        # _position_last_tick: deal_id -> last tick wall-time observed TRADEABLE.
+        # Reset to None on a non-TRADEABLE tick so next TRADEABLE tick baselines fresh.
+        self._position_trading_seconds: dict[str, float] = {}
+        self._position_last_tick: dict[str, datetime] = {}
         self._last_spread_refresh: float = 0.0  # timestamp of last hourly spread check
         self._correlation_regime: str = "normal"
         self._correlation_regime_ts: float = 0.0
@@ -3832,6 +3840,15 @@ class PaperTradingLoop:
             except Exception as e:
                 logger.debug(f"MR OU half-life pass failed: {e}")
 
+        # MT5 2026-05-19: GC trading-time accumulators for deals no longer open.
+        current_deal_ids = {
+            p.get("deal_id") for p in current_positions if p.get("deal_id")
+        }
+        for stale_did in list(self._position_trading_seconds.keys()):
+            if stale_did not in current_deal_ids:
+                self._position_trading_seconds.pop(stale_did, None)
+                self._position_last_tick.pop(stale_did, None)
+
         for position in current_positions:
             deal_id = position.get("deal_id")
             epic = position.get("epic", "")
@@ -3851,19 +3868,37 @@ class PaperTradingLoop:
             # --- Time-based stop: close stale positions ---
             # Skip if market is closed — can't close, and retrying every 15min
             # just spams errors (e.g. weekends for stocks/indices).
+            # MT5 2026-05-19: also pauses the trading-time accumulator so the
+            # 12h timer doesn't burn through weekends/overnight closures.
             market_status = position.get("market_status", "TRADEABLE")
             if market_status != "TRADEABLE":
+                # Drop tick baseline; next TRADEABLE tick re-anchors fresh.
+                if deal_id:
+                    self._position_last_tick.pop(deal_id, None)
                 continue
 
-            opened_at_str = position.get("opened_at")
+            # Accumulate TRADEABLE-only elapsed seconds for this deal.
+            if deal_id:
+                last_tick = self._position_last_tick.get(deal_id)
+                if last_tick is not None:
+                    delta = (now_utc - last_tick).total_seconds()
+                    # Clamp to guard against clock jumps / stale baselines.
+                    if 0 < delta < 3600:
+                        self._position_trading_seconds[deal_id] = (
+                            self._position_trading_seconds.get(deal_id, 0.0) + delta
+                        )
+                else:
+                    # First TRADEABLE observation: seed accumulator if missing.
+                    self._position_trading_seconds.setdefault(deal_id, 0.0)
+                self._position_last_tick[deal_id] = now_utc
+
             epic_hold_cap = per_epic_max_hold.get(epic, default_max_hold)
-            if opened_at_str and epic_hold_cap < 9000:
+            if deal_id and epic_hold_cap < 9000:
                 try:
-                    opened_at = datetime.fromisoformat(str(opened_at_str))
-                    if opened_at.tzinfo is None:
-                        opened_at = opened_at.replace(tzinfo=UTC)
-                    age_hours = (now_utc - opened_at).total_seconds() / 3600
-                    if age_hours >= epic_hold_cap:
+                    trading_hours = (
+                        self._position_trading_seconds.get(deal_id, 0.0) / 3600
+                    )
+                    if trading_hours >= epic_hold_cap:
                         _cap_src = (
                             "OU half-life"
                             if epic in per_epic_max_hold
@@ -3871,7 +3906,8 @@ class PaperTradingLoop:
                         )
                         logger.warning(
                             f"⏰ [{epic}] TIME STOP ({_cap_src}): position {deal_id} "
-                            f"held {age_hours:.1f}h >= {epic_hold_cap:.1f}h limit"
+                            f"held {trading_hours:.1f}h TRADEABLE "
+                            f">= {epic_hold_cap:.1f}h limit"
                         )
                         try:
                             result = await self.execution_engine.close_position(
@@ -3887,7 +3923,8 @@ class PaperTradingLoop:
                                 # broker TRADE row + FX.
                                 logger.info(
                                     f"[{epic}] Time stop close submitted — awaiting "
-                                    f"broker reconciliation (held {age_hours:.1f}h)"
+                                    f"broker reconciliation (held {trading_hours:.1f}h "
+                                    f"TRADEABLE)"
                                 )
                                 continue  # Skip SL/TP — close in flight
                             # H4 fix: when result.success=False (e.g., market
@@ -3902,7 +3939,9 @@ class PaperTradingLoop:
                         except Exception as e:
                             logger.warning(f"[{epic}] Time stop close failed: {e}")
                 except (ValueError, TypeError) as e:
-                    logger.debug(f"[{epic}] Could not parse opened_at '{opened_at_str}': {e}")
+                    logger.debug(
+                        f"[{epic}] Trading-time stop check failed for {deal_id}: {e}"
+                    )
 
             # Skip if no stop loss AND no take profit set
             if (stop_level is None or stop_level <= 0) and (

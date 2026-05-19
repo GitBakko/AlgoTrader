@@ -4,6 +4,36 @@ All notable changes to this project are documented in this file.
 
 ---
 
+## [MT5 — Trading-Hours Time-Stop] - 2026-05-19
+
+### Problem
+User report: AAPL + AMD opened evening (19:00-22:00 Rome / 16-20 UTC) on 2026-05-18, market closed shortly after. Wall-clock `mr_max_hold_hours=12.0` timer would fire at NY open even though both positions had only ~1-2h of TRADEABLE time. Same pattern for Friday-evening opens closed Monday gap.
+
+### Fix
+`paper_loop.py::_check_stop_losses` now drives the time-stop off an **accumulator of TRADEABLE-only seconds** instead of wall-clock `(now - opened_at)`:
+
+- `self._position_trading_seconds: dict[deal_id, float]` — incremented each tick by `(now - last_tick)` ONLY when `market_status == "TRADEABLE"`.
+- `self._position_last_tick: dict[deal_id, datetime]` — cleared on every non-TRADEABLE tick so the next reopen re-anchors fresh (no closed-gap counted).
+- GC pass each tick removes entries whose `deal_id` is no longer in `current_positions`.
+- Clock-jump guard: deltas <0 or ≥3600s are dropped.
+
+Effect: a position opened minutes before market close gets pause through the entire closed interval. When the market reopens it has the full `mr_max_hold_hours` of trading time still available.
+
+### Tests
+`backend/tests/trading/test_time_stop_trading_hours.py` — 5/5 pass:
+- CLOSED market for 24h → no accumulation, no TIME_STOP.
+- Two TRADEABLE ticks 30 min apart → ~30 min accumulated.
+- Accumulator at 12.5h → TIME_STOP fires.
+- CLOSED→TRADEABLE transition does NOT count the closed gap.
+- GC evicts deal_ids no longer in `current_positions`.
+
+Regression sweep: `tests/trading/test_stop_loss_check.py` + `test_paper_loop.py` + `test_paper_loop_wiring.py` → 42/42 pass.
+
+### Rollback
+Revert `paper_loop.py` to pre-MT5 wall-clock `age_hours` block. State is in-memory only — no DB migration.
+
+---
+
 ## [QW1-ter — Overfit-driven Threshold Bump + Calendar Wiring Smoke Test] - 2026-05-18
 
 ### Threshold bumps on 6 overfit-flagged epics (data from `/api/analytics/live-wr`)
