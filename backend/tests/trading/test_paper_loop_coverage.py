@@ -164,6 +164,59 @@ class TestIsMarketOpen:
         assert is_open is True
         mock_broker.get_market_details.assert_called_once_with("XAUUSD")
 
+    async def test_closed_cache_uses_short_ttl(self, paper_loop_with_broker, mock_broker):
+        """MT5 2026-05-19: CLOSED cache > 60s old → refresh to detect reopen.
+
+        Regression: cache TTL was 3600s for all states. Stock pre-market open
+        (e.g. NVDA at 09:00 UTC) was masked for up to 1h after the first CLOSED
+        observation, blocking all signals during the early extended-hours
+        window.
+        """
+        paper_loop_with_broker._market_info_cache["NVDA"] = {
+            "snapshot": {"marketStatus": "CLOSED"},
+        }
+        # 90s old → past the 60s short TTL for CLOSED entries
+        paper_loop_with_broker._market_cache_ts["NVDA"] = _time.monotonic() - 90
+
+        mock_broker.get_market_details.return_value = {
+            "snapshot": {"marketStatus": "TRADEABLE"},
+        }
+
+        is_open, reason = await paper_loop_with_broker._is_market_open("NVDA")
+
+        assert is_open is True
+        assert reason is None
+        mock_broker.get_market_details.assert_called_once_with("NVDA")
+
+    async def test_closed_cache_within_short_ttl_does_not_refetch(
+        self, paper_loop_with_broker, mock_broker
+    ):
+        """CLOSED cache < 60s old → still served from cache (no spam)."""
+        paper_loop_with_broker._market_info_cache["NVDA"] = {
+            "snapshot": {"marketStatus": "CLOSED"},
+        }
+        paper_loop_with_broker._market_cache_ts["NVDA"] = _time.monotonic() - 10
+
+        is_open, reason = await paper_loop_with_broker._is_market_open("NVDA")
+
+        assert is_open is False
+        assert reason is not None
+        mock_broker.get_market_details.assert_not_called()
+
+    async def test_tradeable_cache_keeps_long_ttl(
+        self, paper_loop_with_broker, mock_broker
+    ):
+        """TRADEABLE cache 10 min old → still cached (long TTL preserved)."""
+        paper_loop_with_broker._market_info_cache["XAUUSD"] = {
+            "snapshot": {"marketStatus": "TRADEABLE"},
+        }
+        paper_loop_with_broker._market_cache_ts["XAUUSD"] = _time.monotonic() - 600
+
+        is_open, reason = await paper_loop_with_broker._is_market_open("XAUUSD")
+
+        assert is_open is True
+        mock_broker.get_market_details.assert_not_called()
+
 
 # ===========================================================================
 # _run_iteration() tests

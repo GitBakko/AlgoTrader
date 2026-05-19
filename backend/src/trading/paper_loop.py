@@ -270,7 +270,12 @@ class PaperTradingLoop:
         self._last_candle_ts: dict[str, datetime] = {}
         # Market info cache (avoid repeated API calls)
         self._market_info_cache: dict[str, dict] = {}
-        self._market_cache_ttl = 3600  # 1 hour
+        self._market_cache_ttl = 3600  # 1 hour — for TRADEABLE entries (status stable)
+        # MT5 2026-05-19 follow-up: shorter TTL when cached marketStatus is NOT
+        # TRADEABLE. With a flat 3600s TTL, the first CLOSED observation at boot
+        # masked reopens for up to 1h (e.g. US stocks pre-market open at 09:00
+        # UTC if backend booted at 08:20 UTC). Poll every 60s while closed.
+        self._market_cache_ttl_closed = 60
         self._market_cache_ts: dict[str, float] = {}
         # Dedicated min deal size cache (seeded from DB at startup, updated per-iteration)
         self._min_deal_size_cache: dict[str, float] = {}
@@ -2249,8 +2254,24 @@ class PaperTradingLoop:
 
         now = _time.monotonic()
         cached_ts = self._market_cache_ts.get(epic, 0)
-        if epic in self._market_info_cache and (now - cached_ts) < self._market_cache_ttl:
-            info = self._market_info_cache[epic]
+        cached_info = self._market_info_cache.get(epic)
+        # MT5 2026-05-19 follow-up: differentiated TTL. CLOSED entries expire
+        # fast (60s) so a reopen is picked up next tick; TRADEABLE entries
+        # keep the long TTL to avoid spamming broker for static fields
+        # (dealingRules, instrument metadata).
+        if cached_info is not None:
+            cached_status = (
+                cached_info.get("snapshot", {}).get("marketStatus", "TRADEABLE")
+            )
+            effective_ttl = (
+                self._market_cache_ttl_closed
+                if cached_status != "TRADEABLE"
+                else self._market_cache_ttl
+            )
+        else:
+            effective_ttl = 0  # force fetch on cache miss
+        if cached_info is not None and (now - cached_ts) < effective_ttl:
+            info = cached_info
         else:
             try:
                 info = await asyncio.wait_for(self.broker.get_market_details(epic), timeout=10.0)
