@@ -23,6 +23,7 @@ env/
 backend/data/historical/
 backend/data/models/
 backend/data/cache/
+backend/data/diagnostics/
 *.parquet
 *.h5
 *.pt
