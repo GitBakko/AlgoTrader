@@ -1,0 +1,73 @@
+{
+  "generated_at": "2026-05-23T12:32:25",
+  "elapsed_total_sec": 56.8,
+  "methodology": "walk_forward no tune + sweep-threshold, ASSET_SPREADS p95x1.1 (21 epics)",
+  "prior_run": "phase3_2026-04-28_fdb70f0 mean_sharpe=4.35",
+  "results": {
+    "SOLUSD": {
+      "sharpe": 5.501331947019724,
+      "sortino": 8.94460174846694,
+      "win_rate": 0.7350427350427351,
+      "max_drawdown": 0.0162723151521034,
+      "profit_factor": 3.4705605874347127,
+      "total_trades": 234,
+      "total_return_pct": 34.58479354476381,
+      "min_confidence": 0.4,
+      "prior_sharpe": 4.956,
+      "delta_sharpe": 0.545331947019724,
+      "elapsed_sec": 13.0
+    },
+    "BTCUSD": {
+      "sharpe": 5.259950368785014,
+      "sortino": 7.318465528049908,
+      "win_rate": 0.7309417040358744,
+      "max_drawdown": 0.008670860813978066,
+      "profit_factor": 3.200854872458572,
+      "total_trades": 223,
+      "total_return_pct": 17.366797090623894,
+      "min_confidence": 0.4,
+      "prior_sharpe": 6.579,
+      "delta_sharpe": -1.3190496312149858,
+      "elapsed_sec": 13.4
+    },
+    "ETHUSD": {
+      "sharpe": 5.028113552564742,
+      "sortino": 9.001092620977941,
+      "win_rate": 0.6666666666666666,
+      "max_drawdown": 0.013807251143884007,
+      "profit_factor": 2.7520585064324137,
+      "total_trades": 279,
+      "total_return_pct": 27.256750893948684,
+      "min_confidence": 0.4,
+      "prior_sharpe": 4.968,
+      "delta_sharpe": 0.06011355256474182,
+      "elapsed_sec": 11.5
+    },
+    "XAUUSD": {
+      "sharpe": 2.5712915082615164,
+      "sortino": 2.768251504781198,
+      "win_rate": 0.625,
+      "max_drawdown": 0.008991190392659271,
+      "profit_factor": 2.2689838711663226,
+      "total_trades": 72,
+      "total_return_pct": 3.279728716350674,
+      "min_confidence": 0.4,
+      "prior_sharpe": 3.291,
+      "delta_sharpe": -0.7197084917384835,
+      "elapsed_sec": 6.0
+    },
+    "BNBUSD": {
+      "sharpe": 0.6187086690092104,
+      "sortino": 0.6892190091549583,
+      "win_rate": 0.5588235294117647,
+      "max_drawdown": 0.025994337714648392,
+      "profit_factor": 1.1793184935344798,
+      "total_trades": 136,
+      "total_return_pct": 2.040929014655376,
+      "min_confidence": 0.4,
+      "prior_sharpe": 1.954,
+      "delta_sharpe": -1.3352913309907897,
+      "elapsed_sec": 12.8
+    }
+  }
+}

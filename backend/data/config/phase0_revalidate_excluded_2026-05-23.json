@@ -1,0 +1,167 @@
+{
+  "generated_at": "2026-05-23T13:20:12",
+  "elapsed_total_sec": 147.3,
+  "gate": {
+    "sharpe": 0.3,
+    "win_rate": 0.4,
+    "max_dd": 0.3
+  },
+  "methodology": "walk_forward no tune + sweep-threshold, post-spread-recalib p95x1.1",
+  "results": {
+    "PLATINUM": {
+      "sharpe": 1.3916236848237058,
+      "win_rate": 0.6153846153846154,
+      "max_drawdown": 0.014072468774454408,
+      "profit_factor": 1.6989874082611243,
+      "total_trades": 65,
+      "total_return_pct": 3.7660342654141643,
+      "decision": "KEEP",
+      "elapsed_sec": 6.5
+    },
+    "DE40": {
+      "sharpe": 1.5143570490985618,
+      "win_rate": 0.5680933852140078,
+      "max_drawdown": 0.006411847972116233,
+      "profit_factor": 1.378688214224282,
+      "total_trades": 257,
+      "total_return_pct": 1.9110799625714572,
+      "decision": "KEEP",
+      "elapsed_sec": 18.2
+    },
+    "WTIUSD": {
+      "sharpe": 3.3393666606573307,
+      "win_rate": 0.6688741721854304,
+      "max_drawdown": 0.008367505310072668,
+      "profit_factor": 2.3324456405456555,
+      "total_trades": 151,
+      "total_return_pct": 8.624195999959284,
+      "decision": "KEEP",
+      "elapsed_sec": 7.6
+    },
+    "COPPER": {
+      "sharpe": 2.2049720246339044,
+      "win_rate": 0.5819672131147541,
+      "max_drawdown": 0.005982158233392498,
+      "profit_factor": 1.726913386814131,
+      "total_trades": 122,
+      "total_return_pct": 3.2761807296963528,
+      "decision": "KEEP",
+      "elapsed_sec": 6.3
+    },
+    "TSLA": {
+      "sharpe": 1.2823109336826028,
+      "win_rate": 0.5492957746478874,
+      "max_drawdown": 0.01482881623804745,
+      "profit_factor": 1.3178154243655331,
+      "total_trades": 142,
+      "total_return_pct": 4.374499679017263,
+      "decision": "KEEP",
+      "elapsed_sec": 6.7
+    },
+    "NVDA": {
+      "sharpe": 0.5993255611599559,
+      "win_rate": 0.5,
+      "max_drawdown": 0.023869168434971836,
+      "profit_factor": 1.1552467461298366,
+      "total_trades": 104,
+      "total_return_pct": 1.3524632381988704,
+      "decision": "KEEP",
+      "elapsed_sec": 9.0
+    },
+    "AAPL": {
+      "sharpe": 1.1606644023285475,
+      "win_rate": 0.5045871559633027,
+      "max_drawdown": 0.009730245836129907,
+      "profit_factor": 1.3195666016955176,
+      "total_trades": 109,
+      "total_return_pct": 1.9699910164771608,
+      "decision": "KEEP",
+      "elapsed_sec": 9.4
+    },
+    "MSFT": {
+      "sharpe": 1.858572122731609,
+      "win_rate": 0.6379310344827587,
+      "max_drawdown": 0.012404340066974766,
+      "profit_factor": 1.6116527472409432,
+      "total_trades": 116,
+      "total_return_pct": 3.2706388707426592,
+      "decision": "KEEP",
+      "elapsed_sec": 12.4
+    },
+    "GOOGL": {
+      "sharpe": 1.2942984408010925,
+      "win_rate": 0.59375,
+      "max_drawdown": 0.015586294079303066,
+      "profit_factor": 1.348223542894377,
+      "total_trades": 160,
+      "total_return_pct": 2.76004465486154,
+      "decision": "KEEP",
+      "elapsed_sec": 10.9
+    },
+    "AMZN": {
+      "sharpe": 0.12110110171865467,
+      "win_rate": 0.5,
+      "max_drawdown": 0.010397240077572152,
+      "profit_factor": 1.0574203552861285,
+      "total_trades": 34,
+      "total_return_pct": 0.14513127022744812,
+      "decision": "REVIEW",
+      "elapsed_sec": 9.3
+    },
+    "META": {
+      "sharpe": 0.5180526843184068,
+      "win_rate": 0.5138888888888888,
+      "max_drawdown": 0.017502613585437463,
+      "profit_factor": 1.1758431478525604,
+      "total_trades": 72,
+      "total_return_pct": 0.8955032975377799,
+      "decision": "KEEP",
+      "elapsed_sec": 9.2
+    },
+    "AMD": {
+      "sharpe": 1.2226627090122255,
+      "win_rate": 0.5909090909090909,
+      "max_drawdown": 0.03472154932111935,
+      "profit_factor": 1.3959774612357656,
+      "total_trades": 132,
+      "total_return_pct": 4.663488247993919,
+      "decision": "KEEP",
+      "elapsed_sec": 11.3
+    },
+    "USDJPY": {
+      "sharpe": 1.70745101367993,
+      "win_rate": 0.5675675675675675,
+      "max_drawdown": 0.0032185244908496053,
+      "profit_factor": 1.4480456232323704,
+      "total_trades": 148,
+      "total_return_pct": 0.7687040031217112,
+      "decision": "KEEP",
+      "elapsed_sec": 8.6
+    },
+    "USDCHF": {
+      "sharpe": 3.7542570772195907,
+      "win_rate": 0.6440677966101694,
+      "max_drawdown": 0.001975446495488071,
+      "profit_factor": 2.3446763935605337,
+      "total_trades": 236,
+      "total_return_pct": 2.625170841701329,
+      "decision": "KEEP",
+      "elapsed_sec": 12.7
+    },
+    "USDCAD": {
+      "sharpe": 2.981650219109577,
+      "win_rate": 0.6611570247933884,
+      "max_drawdown": 0.0010236905183935914,
+      "profit_factor": 2.4281964714021873,
+      "total_trades": 121,
+      "total_return_pct": 1.1941614474848392,
+      "decision": "KEEP",
+      "elapsed_sec": 9.1
+    }
+  },
+  "decision_counts": {
+    "KEEP": 14,
+    "REVIEW": 1,
+    "EXCLUDE": 0
+  }
+}
