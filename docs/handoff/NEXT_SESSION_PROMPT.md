@@ -1,110 +1,153 @@
-# MANTIS — Next Session Handoff (frozen 2026-04-28)
+# MANTIS — Next Session Prompt (frozen 2026-05-23)
 
 Read first: `CLAUDE.md` (project rules) + `MEMORY.md` (auto-memory index).
 
-## What landed today
+## Stato a fine sessione 2026-05-23
 
-| Track | Commit | Status |
-|---|---|---|
-| Phase 0 validation re-run | `a5a8b4f` | PASS |
-| Phase 1 Optuna+prune top-5 | `2931789` | gate FAIL +12.1% (practical PASS, mean Sharpe 4.72) |
-| WTIUSD TP reconcile | manual DB | reconciled +$53.09 |
-| Phase 2 regime gate eval | `40dfbe9` | gate FAIL — `REGIME_GATE_ENABLED=False` |
-| Phase 3 realistic costs | `fdb70f0` | **PASS** mean Sharpe 4.35 |
-| Sizing revert intermediate | `bfec4aa` | applied (0.20 / ×0.75 / 0.70) — 2-week soak then full-prod |
-| Position-card EXP indicator | `65ce137` | live (notional + % equity) |
-| Phase 5 RL PoC | `c428dd7` | FAIL — defer Phase 5-bis |
-| Settings (#12) Style Bible | `c8d1724` | DONE |
-| Trade Journal (#04) Style Bible | `2f0d273` | DONE |
-| Strategia (#07) Style Bible | `81de886` | DONE |
-| Phase 5-bis foundation (XGB-marginal reward + overlay env) | `f0da610` | shipped, untested live |
-| Bybit adapter spec + mock + 17 tests | `64dbc59` | shipped, stub awaits real account |
-| **CRITICAL R:R inversion fix** | `745f2ee` | shipped, backend restarted 17:24 UTC |
-| MR stale tests aligned | `92eff51` | 7/7 MR pass |
-
-## Hot decision needed at session start
-
-**Verify R:R fix held in production.** Fix shipped 2026-04-28 17:24. Run this query at session start (>24h after fix):
-
-```sql
-SELECT epic,
-       AVG(ABS(take_profit - entry_price) / ABS(stop_loss - entry_price)) AS avg_rr,
-       COUNT(*) AS n
-FROM positions
-WHERE opened_at > '2026-04-28 17:24'
-  AND stop_loss IS NOT NULL AND take_profit IS NOT NULL
-GROUP BY epic
-ORDER BY avg_rr;
+### 5 commit landed on `main`
+```
+94ffabe  docs(phase3,phase0): re-validation reports + result snapshots
+7c3d074  feat(phase3): re-run Optuna 50 trials × top-5 with new ASSET_SPREADS
+373713c  docs(spread-audit): 2026-05-23 recalibration handoff + Phase 3-bis proposal
+15aba8d  fix(costs): recalibrate ASSET_SPREADS from 74h audit (p95×1.1, 21 epics)
+87ddf2f  fix(monitoring): add risk_event_log.source column + alembic migration
 ```
 
-Expected: avg_rr ≥ 0.75 across the basket. If anything still shows < 0.5, the fix is incomplete or another path bypasses `RiskManager.check_trade`. Investigate `_signal_handler` / `_process_epic` in `paper_loop.py` for any direct broker `create_position` that skips the SL/TP reconciliation block.
+### Servizi residui
+- **Backend uvicorn :8000** — running (task `bmpce8pt0`). Verifica: `Get-NetTCPConnection -LocalPort 8000`
+- **Frontend ng serve :4321** — running (task `blrc3ck6f`). Verifica: `Get-NetTCPConnection -LocalPort 4321`
+- **Paper trading loop** — STOPPED via `/api/trading/stop`
+- **Spread audit collector** — STOPPED
+- **Monitors stream** — TUTTI stoppati
 
-## Open follow-ups (in priority order)
+Per stoppare residui: `POST http://localhost:8000/api/trading/stop` non serve (loop già off). Kill processi se vuoi pulizia totale.
 
-### 1. Style Bible refactor — remaining 7 pages
+### Working dir
+- Pulito da 13 scratch files (tmp_*.json + here-string remnants)
+- Resta solo WIP non-related: `paper_loop.py`, `paper-trading.component.*`, `paper-trading.ts` model (modifiche pre-sessione, non toccate)
+- `.claude/scheduled_tasks.lock` deleted, `.planning/HANDOFF.json` modified (background hooks)
 
-Promote PARZIALE → CONFORME via HDR-02/03 + Bible buttons + form tokens.
-Order: Posizioni #03 → Modelli AI #08 → Risk Manager #09 → Broker #10 →
-Notifications #11 → Segnali AI #05 → Backtest #06.
+## Tradable basket expansion 5 → 19
 
-Patterns to copy from today's commits (`c8d1724`, `2f0d273`, `81de886`):
-- Eyebrow + title + meta header strip
-- `.{view}-btn--ghost/secondary/primary/success` button variants
-- Uppercase mono labels with letter-spacing 0.14em
-- Card top-border accent variants (warning/info/danger)
-- Card radius pinned to `var(--mantis-radius-sm)` (6px)
+Phase 0 originale (2026-04-28) era 10 KEEP / 3 REVIEW / 5 EXCLUDE su 21 asset. Spread audit ha rivelato che **8 esclusioni erano cost-driven** (fallback 0.5 catastrofico per forex, ~2272× troppo largo per USDCAD).
 
-### 2. Sizing revert stage 2 (full-prod)
+Post-recalibration ri-validation: **14 KEEP / 1 REVIEW (AMZN) / 0 EXCLUDE** sui 15 esclusi.
 
-After 2-week soak with intermediate sizing, evaluate:
-- Daily P&L variance vs intermediate baseline
-- Per-trade risk in $ terms vs configured 2%
+| Asset class | Pre | Post | Note |
+|---|---|---|---|
+| Crypto (BTC/ETH/SOL/BNB) | KEEP | KEEP | Phase 3 PASS, mean Sharpe 3.95 |
+| Gold (XAU) | KEEP | KEEP* | Sharpe -1.51 (spread +37.5%), watch |
+| Indices (US500/DE40) | 1 KEEP / 1 EXCL | 2 KEEP | DE40 Sharpe 1.51 post-recalib |
+| Commodities (WTI/PLAT/COPPER) | 1 KEEP / 2 EXCL | 3 KEEP | PLATINUM 1.39, COPPER 2.21 |
+| US Stocks (8) | 0 KEEP / 8 mixed | 7 KEEP / 1 REVIEW | AMZN REVIEW Sharpe 0.12 |
+| Forex (USDJPY/CHF/CAD) | 0 KEEP / 3 EXCL | 3 KEEP | USDCHF top 3.75 |
 
-If healthy → cut to (`max_position_pct=0.05`, kelly fallback `×0.50`,
-`reduction_factor=0.50`). Required before LIVE deploy.
-File: `C:\Users\bakko\.claude\projects\d--Develop-AI--ClaudeCode-AlgoTrader\memory\project_sizing_relaxed_for_demo.md`.
+## Priorità prossima sessione
 
-### 3. Phase 4 Bybit migration (when account opens)
+### Priorità ALTA — Phase 1 expansion
+Estendere `backend/scripts/phase1_optuna_top5.py` → `phase1_optuna_full_basket.py` con 19 asset basket. Optuna 100 trials × 19 = ~25 min compute. Output: `data/config/optimal_thresholds_phase1_expanded_2026-XX-XX.json`.
 
-Stub at `backend/src/broker/bybit_client.py` raises `BybitNotImplementedError` on every method. Replace bodies with real V5 REST + WS calls. Protocol contract enforced by `tests/broker/test_broker_protocol.py` (17 tests). Add `BybitClient` to `runtime_protocol_check` after implementation.
+Asset list:
+```python
+EXPANDED_BASKET = [
+    # Core top-5 (kept from original Phase 1)
+    "SOLUSD", "BTCUSD", "ETHUSD", "XAUUSD", "BNBUSD",
+    # Forex (newly viable post-recalib)
+    "USDCHF", "USDCAD", "USDJPY",
+    # Commodities
+    "WTIUSD", "PLATINUM", "COPPER",
+    # Indices
+    "US500", "DE40",
+    # US Stocks
+    "MSFT", "GOOGL", "AAPL", "TSLA", "AMD", "META", "NVDA",
+    # SKIP AMZN — REVIEW Sharpe 0.12 PF 1.06 (deep-dive separato)
+]
+```
 
-Sprint 2 of Phase 4: funding rate engine using `get_funding_rate_history` + 14 funding-rate features for XGBoost.
+### Priorità ALTA — Kelly sizer + correlation review
+Con 19 asset concorrenti, Kelly sizer + cap exposure + correlation guard devono essere rivisti. Domande:
+- `MAX_OPEN_POSITIONS` attuale supporta 19?
+- Cap per-asset (`MAX_POSITION_SIZE_PCT_EQUITY`) congruo?
+- `DynamicCorrelationGuard` thresholds tarati per 5 asset — funzionano per 19?
+- Kelly fraction calcolato globalmente o per-asset?
 
-### 4. Phase 5-bis RL revisit (after sizing-revert soak)
+Files coinvolti:
+- `backend/src/risk/risk_manager.py`
+- `backend/src/risk/kelly_sizer.py` / `position_sizer.py`
+- `backend/src/risk/correlation_guard.py`
+- `backend/.env` (caps + flags)
 
-Foundation ready: `src/rl/xgb_overlay_env.py:XGBOverlayEnv` + `xgb_marginal_reward`. Next steps:
-- Wire a runner script that uses `XGBOverlayEnv` instead of bare `MantisRLEnvironment`.
-- Train PPO 500 K steps + per-fold retrain (vs PoC 50 K single-shot).
-- Compare to XGBoost-only baseline post sizing-revert soak data.
+### Priorità MEDIA — AMZN deep-dive
+AMZN unico REVIEW (Sharpe 0.12, PF 1.06, WR 50%, 34 trade). Edge marginale o sample-driven? Run isolato:
+```
+cd backend && .venv/Scripts/python.exe scripts/walk_forward_backtest.py --epic AMZN --tune --tune-trials 100 --prune-pct 0.25 --sweep-threshold --monte-carlo
+```
 
-### 5. Baseline test failures (~28 chronic)
+### Priorità MEDIA — Phase 1 gate re-evaluation
+Phase 1 originale FAILED al gate (top-5 mean Sharpe -6.2% vs Phase 0 baseline 4.21, target +20%). Con expanded basket il target +20% va riformulato (baseline diversa). Definire nuovo gate criteria.
 
-Mostly:
-- `tests/strategy/test_strategy_manager*.py` — need `get_settings` mocks setting `mr_primary_enabled=False` / `ml_primary_enabled=False` since production `.env` ships both true.
-- `tests/trading/test_paper_loop*.py` + `test_persist_unreconciled.py` — incomplete `AsyncMock` setups (`MagicMock can't be used in 'await' expression`).
-- 1 `tests/strategy/test_orb_fvg.py` — m1_bars routing.
+### Priorità BASSA — minor
+- Fix `backend/scripts/spread_audit.py` — `--duration-hours` ignorato → unbounded. Enforce default 72h.
+- Investigare `[close-v2] authoritative detect raised: CapitalComError('{"errorCode":"error.invalid.daterange"}')` — regressione clamp `to_dt` post commit `81062fe`.
+- R:R floor verifica `MIN_SIGNAL_RR_THRESHOLD=0.40` attivo in `risk_manager.check_trade` step 4-ter (false alarm sessione precedente).
+- Aggiungere OVERNIGHT_RATES per 10 epics missing (`backend/src/backtest/costs.py:46`).
 
-Per-test surgery, ~2-3h focused. Not a one-shot pass. Track in CI floor decisions.
+## Hard rules da preservare
 
-## Operational checklist for first 30 minutes of next session
+- **NO MOCK DATA NELLE MASCHERE** — invariant
+- **Backend off limits unless task explicitly says backend** — autorizzato per spread audit + cost recalib in sessione `2026-05-23`
+- **SL/TP paired-pair rule** (post `745f2ee`) — when strategy populates BOTH suggested_stop+suggested_tp, use pair as-is
+- **MIN_RISK_AMOUNT_USD=$5** floor in step 7-bis (post `e6efede`)
+- **Asyncpg tz-aware datetime**: `.replace(tzinfo=None)` per qualsiasi write Postgres
+- **Reconciler split** flag-rollback via `RECONCILER_DEDICATED_ENABLED=false` se necessario
+- **Capital.com Position model NO `current_price` field** — only `level` (entry) + `upl`. Live price → WS quote cache / REST `get_market_details.snapshot.{bid,offer}` / UPL reconstruction
 
-1. Read `MEMORY.md` (auto-loaded) + `CLAUDE.md`.
-2. Run R:R verification SQL (see "Hot decision" above).
-3. `git log --oneline -20` to see recent commits.
-4. Backend status: `curl http://localhost:8000/health`.
-5. Frontend status: ng serve usually on `:4321` (started by user).
-6. `gh pr list -R GitBakko/AlgoTrader` if working PRs.
+## Reference artifacts (sessione 2026-05-23)
 
-## Files / commits to remember
+| Risorsa | Path |
+|---|---|
+| Spread audit parquet (74h, 18,732 obs) | `backend/data/diagnostics/spread_audit/2026-05.parquet` |
+| Phase 3-bis proposal | `backend/docs/reports/2026-05-23_phase3-bis_spread_recalibration_PROPOSAL.md` |
+| Phase 3 re-run report | `backend/docs/reports/2026-05-23_phase3_rerun.md` |
+| Phase 0 ri-val report | `backend/docs/reports/2026-05-23_phase0_revalidate_excluded.md` |
+| Phase 3 thresholds (Optuna 50) | `backend/data/config/optimal_thresholds_phase3_rerun_2026-05-23.json` |
+| Phase 3 thresholds (no-tune) | `backend/data/config/phase3_rerun_untuned_2026-05-23.json` |
+| Phase 0 ri-val snapshot | `backend/data/config/phase0_revalidate_excluded_2026-05-23.json` |
+| Spread audit handoff | `docs/handoff/spread_audit_2026-05-23.md` |
+| Spread audit log | `D:/tmp/algotrader/spread_audit.log` |
+| Phase 3 Optuna log | `D:/tmp/algotrader/phase3_optuna_rerun.log` |
+| Phase 0 ri-val log | `D:/tmp/algotrader/phase0_revalidate_excluded.log` |
+| Backend log | `D:/tmp/algotrader/backend.log` |
+| Frontend log | `D:/tmp/algotrader/frontend.log` |
+| Re-run script | `D:/tmp/algotrader/phase3_rerun.py` |
+| Phase 0 ri-val script | `D:/tmp/algotrader/phase0_revalidate_excluded.py` |
 
-- `backend/src/risk/risk_manager.py` §4-bis — **paired SL/TP rule**.
-- `backend/src/backtest/costs.py` — calibrated `ASSET_SPREADS` + `OVERNIGHT_RATES` for 11 epics (was 3).
-- `backend/data/models/{epic}/regime/` — HMM detectors trained but `REGIME_GATE_ENABLED=False`.
-- `backend/data/models/{BTCUSD,SOLUSD}/rl/ppo_phase5.zip` — PoC PPOs, kept for inspection.
-- `backend/data/config/optimal_thresholds_phase3.json` — best per-asset thresholds with realistic costs.
-- `backend/src/broker/protocol.py` + `bybit_client.py` + `mock_client.py` — Phase 4 seam.
-- `backend/src/rl/xgb_overlay_env.py` — Phase 5-bis env wrapper.
+## Stato roadmap evolution
 
-## Pending verification
+- ✅ Phase 0 Validation Gate (2026-04-28) — original 10/3/5
+- ✅ Phase 1 Optuna top-5 (2026-04-28) — FAIL gate +20% target
+- ✅ Phase 2 Regime gate (2026-04-28) — FAIL, gate stays disabled
+- ✅ Phase 3 real costs (2026-04-28) — PASS
+- ✅ Phase 4 BTC walk-forward OOS (2026-05-20) — PASS Sharpe 5.81 / MC 0.43
+- ✅ Phase 3-bis spread audit (2026-05-20→05-23) — 74h passive collector + recalib
+- ✅ **Phase 3 cost re-run** (2026-05-23) — PASS post-recalib
+- ✅ **Phase 0 ri-validation EXCLUDE** (2026-05-23) — 14 KEEP / 1 REVIEW / 0 EXCLUDE
+- ⏳ **Phase 1 expansion 19-asset basket** — NEXT
+- ⏸ Phase 5 RL PoC FAIL (2026-04-28, deferred Phase 5-bis)
+- ⏸ Binance migration prep (gated su Phase 1 expansion + Kelly review)
 
-- User has not yet confirmed the position-card EXP indicator is visible after hard refresh (commit `65ce137` verified in dist + chunk-UFIKR5M2.js + ng serve up). If still invisible: open DevTools → Network → Disable cache → `Ctrl+Shift+R`.
+## Quick start prossima sessione
+
+```bash
+# 1. Verify services
+Get-NetTCPConnection -LocalPort 8000,4321 -ErrorAction SilentlyContinue
+
+# 2. If needed restart backend
+cd backend && .venv/Scripts/python.exe -m uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+
+# 3. Phase 1 expansion (NEW SCRIPT TO BUILD)
+cd backend && .venv/Scripts/python.exe scripts/phase1_optuna_full_basket.py --tune-trials 100 --prune-pct 0.25
+
+# 4. AMZN deep-dive
+cd backend && .venv/Scripts/python.exe scripts/walk_forward_backtest.py --epic AMZN --tune --tune-trials 100 --prune-pct 0.25 --sweep-threshold --monte-carlo
+```
