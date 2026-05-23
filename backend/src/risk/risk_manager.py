@@ -209,7 +209,7 @@ class RiskManager:
             )
 
         # 1c. Check total exposure cap
-        if self.limits.max_total_exposure < 1.0 and open_positions and equity > 0:
+        if self.limits.max_total_exposure <= 1.0 and open_positions and equity > 0:
             total_notional = sum(
                 _position_notional_account_ccy(p, account_currency="USD")
                 for p in open_positions

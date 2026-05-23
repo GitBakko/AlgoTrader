@@ -468,12 +468,18 @@ class TestRiskManager:
             assert audit.get("approved") is True
             assert audit["computed_risk_usd"] >= 5.0
 
-    def test_exposure_check_skipped_when_default(self):
-        """Default max_total_exposure=1.0 skips the check entirely."""
+    def test_exposure_check_active_at_default(self):
+        """Phase 1 expansion (2026-05-23): default max_total_exposure=1.0
+        now ENFORCES the cap (gate flipped `< 1.0` → `<= 1.0`).
+
+        Was: ``test_exposure_check_skipped_when_default`` — documented the
+        legacy bug where the entire branch was skipped at the production
+        default. Inverted as part of activating the guard.
+        """
         rm = RiskManager(initial_equity=10000.0)
         assert rm.limits.max_total_exposure == 1.0
 
-        # Even with huge notional, should pass (cap disabled)
+        # 10 BTC * 68k = 680k notional → 6800% of 10k equity → reject
         open_positions = [
             {"epic": "BTCUSD", "direction": "BUY", "size": 10.0, "level": 68000.0},
         ]
@@ -482,10 +488,8 @@ class TestRiskManager:
             signal=signal, equity=10000.0, atr=20.0,
             open_positions=open_positions,
         )
-        # Should NOT be rejected for exposure (may be rejected for other reasons
-        # but not for "Total exposure")
-        if not result.approved:
-            assert "Total exposure" not in (result.rejection_reason or "")
+        assert result.approved is False
+        assert "Total exposure" in (result.rejection_reason or "")
 
 
 class TestRRFloor:
