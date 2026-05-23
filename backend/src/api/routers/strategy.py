@@ -94,7 +94,6 @@ async def get_risk_limits(
             max_daily_drawdown=limits.max_daily_drawdown,
             max_total_drawdown=limits.max_total_drawdown,
             max_position_pct=limits.max_position_pct,
-            max_correlated_exposure=limits.max_correlated_exposure,
         ).model_dump()
     )
 
@@ -112,7 +111,6 @@ async def update_risk_limits(
         max_daily_drawdown=body.max_daily_drawdown,
         max_total_drawdown=body.max_total_drawdown,
         max_position_pct=body.max_position_pct,
-        max_correlated_exposure=body.max_correlated_exposure,
         max_total_open_positions=risk_mgr.limits.max_total_open_positions,
         max_total_exposure=risk_mgr.limits.max_total_exposure,
     )

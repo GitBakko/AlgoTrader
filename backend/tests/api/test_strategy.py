@@ -89,7 +89,6 @@ class TestRiskLimits:
             "max_daily_drawdown": 0.06,
             "max_total_drawdown": 0.20,
             "max_position_pct": 0.10,
-            "max_correlated_exposure": 0.60,
         }
         resp = client.put("/api/strategy/risk-limits", json=new_limits)
         assert resp.status_code == 200

@@ -212,7 +212,6 @@ class RiskLimitsResponse(BaseModel):
     max_daily_drawdown: float
     max_total_drawdown: float
     max_position_pct: float
-    max_correlated_exposure: float
 
 
 class AllocationResponse(BaseModel):
