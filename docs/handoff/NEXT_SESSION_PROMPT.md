@@ -2,6 +2,47 @@
 
 Read first: `CLAUDE.md` (project rules) + `MEMORY.md` (auto-memory index).
 
+## ⏳ Paper soak in corso
+
+- **Start**: 2026-05-23 15:51:17 UTC
+- **End target**: 2026-06-06 (14 giorni)
+- **Mode**: DEMO via Capital.com
+- **Basket**: 18 asset (post Phase 1 expansion, AMD/META/AMZN esclusi)
+- **Loop**: `POST /api/trading/start` HIT → `running=True`
+- **Backend**: uvicorn :8000 (start log `D:/tmp/algotrader/backend_papersoak.log`)
+- **Config attiva**: MAX_TOTAL_OPEN_POSITIONS=10, max_position_pct=0.10, MAX_TOTAL_EXPOSURE=1.0 (enforced), DYNAMIC_CORRELATION_ENABLED=true, MIN_RISK_AMOUNT_USD=10
+
+### Monitoring during soak
+```bash
+# Status
+curl -s http://localhost:8000/api/trading/status | jq
+
+# Per-asset signal counts
+curl -s http://localhost:8000/api/trading/status | jq '.data.last_signals | keys'
+
+# Equity / Kelly drift
+curl -s http://localhost:8000/api/trading/status | jq '.data.kelly_stats'
+
+# Correlation guard activations
+curl -s "http://localhost:8000/api/risk/audit-trail?limit=50" | jq '.data[] | select(.correlation.multiplier < 1.0)'
+
+# Concurrent positions
+curl -s http://localhost:8000/api/trading/status | jq '.data.open_positions'
+
+# Quick health
+curl -s http://localhost:8000/api/health | jq '.data.status'
+```
+
+### Soak verdict criteria (rivedere 2026-06-06)
+- 0 critical alerts in 14 giorni
+- Realised DD < 5 % equity
+- Concurrent positions distribution: target ~5-8 di 10 slots utilizzati
+- Per-asset Kelly fraction non drifta > 2× tra epic
+- Correlation guard size-multiplier rejections < 30 % delle signals
+
+Se PASS → promote LIVE + per-asset Kelly (Phase 2 Kelly review).
+Se FAIL → rollback `DYNAMIC_CORRELATION_ENABLED=false` + investigate.
+
 ## Stato a fine sessione 2026-05-23
 
 ### 5 commit landed on `main`
