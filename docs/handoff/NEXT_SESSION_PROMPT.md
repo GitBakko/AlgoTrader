@@ -44,53 +44,38 @@ Post-recalibration ri-validation: **14 KEEP / 1 REVIEW (AMZN) / 0 EXCLUDE** sui 
 
 ## Priorità prossima sessione
 
-### Priorità ALTA — Phase 1 expansion
-Estendere `backend/scripts/phase1_optuna_top5.py` → `phase1_optuna_full_basket.py` con 19 asset basket. Optuna 100 trials × 19 = ~25 min compute. Output: `data/config/optimal_thresholds_phase1_expanded_2026-XX-XX.json`.
+### Priorità ALTA — 2-week paper soak validation
+Enable expanded 18-asset basket (drop AMD + META REVIEW + AMZN excluded) in DEMO paper trading. Monitor for 14 days:
+- Concurrent position count distribution (target: utilizing ~5-8 of 10 slots)
+- Per-asset Kelly fraction drift (log `kelly_stats` every 30 min)
+- Correlation guard size-multiplier rejections (count per epic)
+- Realised vs expected DD (should stay < Phase 0 baseline)
 
-Asset list:
+Promotion to LIVE only if all above pass + no new failures appear.
+
+Tradable basket (18 assets):
 ```python
-EXPANDED_BASKET = [
-    # Core top-5 (kept from original Phase 1)
+PAPER_SOAK_BASKET = [
+    # Core (5)
     "SOLUSD", "BTCUSD", "ETHUSD", "XAUUSD", "BNBUSD",
-    # Forex (newly viable post-recalib)
+    # Forex (3)
     "USDCHF", "USDCAD", "USDJPY",
-    # Commodities
+    # Commodities (3)
     "WTIUSD", "PLATINUM", "COPPER",
-    # Indices
+    # Indices (2)
     "US500", "DE40",
-    # US Stocks
-    "MSFT", "GOOGL", "AAPL", "TSLA", "AMD", "META", "NVDA",
-    # SKIP AMZN — REVIEW Sharpe 0.12 PF 1.06 (deep-dive separato)
+    # US Stocks (5) — AMD + META + AMZN excluded
+    "MSFT", "GOOGL", "AAPL", "TSLA", "NVDA",
 ]
 ```
 
-### Priorità ALTA — Kelly sizer + correlation review
-Con 19 asset concorrenti, Kelly sizer + cap exposure + correlation guard devono essere rivisti. Domande:
-- `MAX_OPEN_POSITIONS` attuale supporta 19?
-- Cap per-asset (`MAX_POSITION_SIZE_PCT_EQUITY`) congruo?
-- `DynamicCorrelationGuard` thresholds tarati per 5 asset — funzionano per 19?
-- Kelly fraction calcolato globalmente o per-asset?
+### Priorità MEDIA — Per-asset Kelly stats
+After 2-week soak, implement `epic → deque(maxlen=100)` per-asset Kelly stats. Fallback to global when `len < min_trades=30`. ~30 lines, no architectural change. See `docs/handoff/kelly_correlation_review_2026-05-23.md` §6 (Phase 2).
 
-Files coinvolti:
-- `backend/src/risk/risk_manager.py`
-- `backend/src/risk/kelly_sizer.py` / `position_sizer.py`
-- `backend/src/risk/correlation_guard.py`
-- `backend/.env` (caps + flags)
-
-### Priorità MEDIA — AMZN deep-dive
-AMZN unico REVIEW (Sharpe 0.12, PF 1.06, WR 50%, 34 trade). Edge marginale o sample-driven? Run isolato:
-```
-cd backend && .venv/Scripts/python.exe scripts/walk_forward_backtest.py --epic AMZN --tune --tune-trials 100 --prune-pct 0.25 --sweep-threshold --monte-carlo
-```
-
-### Priorità MEDIA — Phase 1 gate re-evaluation
-Phase 1 originale FAILED al gate (top-5 mean Sharpe -6.2% vs Phase 0 baseline 4.21, target +20%). Con expanded basket il target +20% va riformulato (baseline diversa). Definire nuovo gate criteria.
-
-### Priorità BASSA — minor
-- Fix `backend/scripts/spread_audit.py` — `--duration-hours` ignorato → unbounded. Enforce default 72h.
-- Investigare `[close-v2] authoritative detect raised: CapitalComError('{"errorCode":"error.invalid.daterange"}')` — regressione clamp `to_dt` post commit `81062fe`.
-- R:R floor verifica `MIN_SIGNAL_RR_THRESHOLD=0.40` attivo in `risk_manager.check_trade` step 4-ter (false alarm sessione precedente).
-- Aggiungere OVERNIGHT_RATES per 10 epics missing (`backend/src/backtest/costs.py:46`).
+### Priorità BASSA — Cleanup
+- Wire OR delete the deprecated paper_loop pre-session WIP bundled into commit `48c6128` (market_status override / `_status_from_opening_hours`).
+- Fix `backend/scripts/spread_audit.py` `--duration-hours` default 72h enforcement.
+- `OVERNIGHT_RATES` for 10 missing epics in `backend/src/backtest/costs.py:46`.
 
 ## Hard rules da preservare
 
@@ -132,9 +117,12 @@ Phase 1 originale FAILED al gate (top-5 mean Sharpe -6.2% vs Phase 0 baseline 4.
 - ✅ Phase 3-bis spread audit (2026-05-20→05-23) — 74h passive collector + recalib
 - ✅ **Phase 3 cost re-run** (2026-05-23) — PASS post-recalib
 - ✅ **Phase 0 ri-validation EXCLUDE** (2026-05-23) — 14 KEEP / 1 REVIEW / 0 EXCLUDE
-- ⏳ **Phase 1 expansion 19-asset basket** — NEXT
+- ✅ **Phase 1 expansion 20-asset basket Optuna 100 trials** (2026-05-23) — PASS (18/20 KEEP, median Sharpe 2.10, top-5 mean 4.28 vs Phase 3 re-run 3.95 +8.5%; AMD + META REVIEW)
+- ✅ **Risk-stack config landed** (2026-05-23) — schemas 10 slots / 0.10 pos cap, exposure guard active at default 1.0, dynamic correlation matrix decoupled + full basket + NaN/Inf validation, dead `max_correlated_exposure` cleanup
+- ⏳ **2-week paper soak** — NEXT (DEMO validation before LIVE promotion)
+- ⏸ Per-asset Kelly stats (Phase 2 of Kelly/correlation review) — deferred until soak data is in
 - ⏸ Phase 5 RL PoC FAIL (2026-04-28, deferred Phase 5-bis)
-- ⏸ Binance migration prep (gated su Phase 1 expansion + Kelly review)
+- ⏸ Binance migration prep — still gated on paper soak completion
 
 ## Quick start prossima sessione
 
