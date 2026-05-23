@@ -228,9 +228,7 @@ class Settings(BaseSettings):
     # `CorrelationGuard` every 30 min using the full self.epics basket
     # (no `[:10]` cap). Used by `RiskManager.check_trade` step 5 to
     # downsize correlated exposures via `check_exposure_dynamic`.
-    dynamic_correlation_enabled: bool = Field(
-        default=True, alias="DYNAMIC_CORRELATION_ENABLED"
-    )
+    dynamic_correlation_enabled: bool = Field(default=True, alias="DYNAMIC_CORRELATION_ENABLED")
     # Minimum number of epics with sufficient candle data (>=100 bars)
     # required before computing the correlation matrix. Below this floor
     # the refresh is skipped and the prior matrix (or static-pair fallback)
@@ -255,12 +253,8 @@ class Settings(BaseSettings):
     # decoupled from the strategy signal loop. When False (default), legacy
     # behavior: all three calls happen inside _run_iteration at the strategy
     # tick cadence (SCALP_CHECK_INTERVAL).
-    reconciler_dedicated_enabled: bool = Field(
-        default=False, alias="RECONCILER_DEDICATED_ENABLED"
-    )
-    reconciler_interval_seconds: int = Field(
-        default=15, alias="RECONCILER_INTERVAL_SECONDS"
-    )
+    reconciler_dedicated_enabled: bool = Field(default=False, alias="RECONCILER_DEDICATED_ENABLED")
+    reconciler_interval_seconds: int = Field(default=15, alias="RECONCILER_INTERVAL_SECONDS")
     # Strategy signal loop bar-alignment. When True, the strategy loop wakes
     # at exact UTC bar-close boundaries (e.g. 4h grid → 00:00/04:00/08:00/
     # 12:00/16:00/20:00 UTC) + a small offset to let the broker publish the
@@ -269,9 +263,7 @@ class Settings(BaseSettings):
     # guards keep running on the 15s reconciler task while the strategy loop
     # waits for the next slot. When False (legacy), the loop sleeps a fixed
     # `interval_seconds` regardless of bar boundaries.
-    signal_loop_align_to_bar: bool = Field(
-        default=True, alias="SIGNAL_LOOP_ALIGN_TO_BAR"
-    )
+    signal_loop_align_to_bar: bool = Field(default=True, alias="SIGNAL_LOOP_ALIGN_TO_BAR")
     signal_loop_post_bar_offset_seconds: int = Field(
         default=10, alias="SIGNAL_LOOP_POST_BAR_OFFSET_SECONDS"
     )
@@ -291,9 +283,7 @@ class Settings(BaseSettings):
     #   - Mid-range losers (-$1k to -$3k):
     #     BTCUSD/SOLUSD/NVDA/COPPER → 0.5
     #   - Proven winners: TSLA (+$2.2k) / USDJPY (+$1.1k, 75% WR) → 1.5
-    epic_risk_multipliers_str: str = Field(
-        default="", alias="EPIC_RISK_MULTIPLIERS"
-    )
+    epic_risk_multipliers_str: str = Field(default="", alias="EPIC_RISK_MULTIPLIERS")
     # ===== LLM Provider (Phase 14: local Ollama, 2026-05-08) =====
     # Backend abstraction for text gen + vision + embeddings. Default
     # routes everything to the GX10 NVIDIA AI box on the LAN — zero
@@ -302,21 +292,11 @@ class Settings(BaseSettings):
     # in Phase 14a) for cloud deployments where the GX10 is not
     # reachable.
     llm_backend: str = Field(default="ollama", alias="LLM_BACKEND")
-    ollama_base_url: str = Field(
-        default="http://192.168.3.191:11434", alias="OLLAMA_BASE_URL"
-    )
-    ollama_generation_model: str = Field(
-        default="qwen3.6:35b", alias="OLLAMA_GENERATION_MODEL"
-    )
-    ollama_vision_model: str = Field(
-        default="qwen2.5vl:7b", alias="OLLAMA_VISION_MODEL"
-    )
-    ollama_embedding_model: str = Field(
-        default="bge-m3:latest", alias="OLLAMA_EMBEDDING_MODEL"
-    )
-    ollama_embedding_dim: int = Field(
-        default=1024, alias="OLLAMA_EMBEDDING_DIM"
-    )
+    ollama_base_url: str = Field(default="http://192.168.3.191:11434", alias="OLLAMA_BASE_URL")
+    ollama_generation_model: str = Field(default="qwen3.6:35b", alias="OLLAMA_GENERATION_MODEL")
+    ollama_vision_model: str = Field(default="qwen2.5vl:7b", alias="OLLAMA_VISION_MODEL")
+    ollama_embedding_model: str = Field(default="bge-m3:latest", alias="OLLAMA_EMBEDDING_MODEL")
+    ollama_embedding_dim: int = Field(default=1024, alias="OLLAMA_EMBEDDING_DIM")
     # `keep_alive=-1` pins the generation model in VRAM forever so
     # qwen3.6 doesn't get evicted by other tenants. Vision model
     # tolerates eviction since cold start is ~25s and we run at most
@@ -324,12 +304,8 @@ class Settings(BaseSettings):
     ollama_keep_alive_generation: str | int = Field(
         default=-1, alias="OLLAMA_KEEP_ALIVE_GENERATION"
     )
-    ollama_keep_alive_vision: str = Field(
-        default="1h", alias="OLLAMA_KEEP_ALIVE_VISION"
-    )
-    ollama_timeout_seconds: float = Field(
-        default=60.0, alias="OLLAMA_TIMEOUT_SECONDS"
-    )
+    ollama_keep_alive_vision: str = Field(default="1h", alias="OLLAMA_KEEP_ALIVE_VISION")
+    ollama_timeout_seconds: float = Field(default=60.0, alias="OLLAMA_TIMEOUT_SECONDS")
 
     @property
     def epic_risk_multipliers(self) -> dict[str, float]:
@@ -349,6 +325,7 @@ class Settings(BaseSettings):
             except ValueError:
                 continue
         return out
+
     # Forex with USD as the base currency (USDJPY, USDCHF, USDCAD) has a
     # pip value much smaller than $1 per micro-unit, so the standard
     # max_position_pct (~20% notional) caps the size at a level where
@@ -423,9 +400,7 @@ class Settings(BaseSettings):
     # with strategy TP (which would re-introduce the 2026-04-28 inversion
     # bug). Set to 0.40 = TP must be at least 40% of SL distance for the
     # trade to clear.
-    min_signal_rr_threshold: float = Field(
-        default=0.40, alias="MIN_SIGNAL_RR_THRESHOLD"
-    )
+    min_signal_rr_threshold: float = Field(default=0.40, alias="MIN_SIGNAL_RR_THRESHOLD")
 
     # ===== Entry-Drift Handler =====
     # Drift = (broker live mid - signal.entry_price) / signal.entry_price.
@@ -445,12 +420,8 @@ class Settings(BaseSettings):
     #                                   broker halt etc.)
     # Stocks get a wider cap because intraday gaps on regular-session
     # open are routine; forex/crypto/indices stay tight.
-    entry_drift_deadband_pct: float = Field(
-        default=0.001, alias="ENTRY_DRIFT_DEADBAND_PCT"
-    )
-    max_entry_drift_shift_pct: float = Field(
-        default=0.01, alias="MAX_ENTRY_DRIFT_SHIFT_PCT"
-    )
+    entry_drift_deadband_pct: float = Field(default=0.001, alias="ENTRY_DRIFT_DEADBAND_PCT")
+    max_entry_drift_shift_pct: float = Field(default=0.01, alias="MAX_ENTRY_DRIFT_SHIFT_PCT")
     max_entry_drift_shift_pct_stocks: float = Field(
         default=0.02, alias="MAX_ENTRY_DRIFT_SHIFT_PCT_STOCKS"
     )
@@ -470,15 +441,11 @@ class Settings(BaseSettings):
     # spread_ratio = (offer - bid) / tp_distance against the asset class limit.
     # Selected via get_spread_limit(epic) helper; max_spread_pct (above)
     # kept as legacy/global fallback if class lookup ever returns None.
-    spread_limit_crypto: float = Field(
-        default=0.15, alias="SPREAD_LIMIT_CRYPTO", ge=0.01, le=1.0
-    )
+    spread_limit_crypto: float = Field(default=0.15, alias="SPREAD_LIMIT_CRYPTO", ge=0.01, le=1.0)
     spread_limit_precious: float = Field(
         default=0.12, alias="SPREAD_LIMIT_PRECIOUS", ge=0.01, le=1.0
     )
-    spread_limit_default: float = Field(
-        default=0.08, alias="SPREAD_LIMIT_DEFAULT", ge=0.01, le=1.0
-    )
+    spread_limit_default: float = Field(default=0.08, alias="SPREAD_LIMIT_DEFAULT", ge=0.01, le=1.0)
 
     # Regime Gate (Phase 2)
     regime_gate_enabled: bool = Field(default=False, alias="REGIME_GATE_ENABLED")
@@ -522,15 +489,9 @@ class Settings(BaseSettings):
     # paper_loop computes a per-epic OU half-life (AR(1) regression on
     # 4h close residuals) and uses it as the time-stop ceiling, capped
     # at mr_max_hold_hours. False → original fixed 12h behaviour.
-    mr_ou_halflife_enabled: bool = Field(
-        default=False, alias="MR_OU_HALFLIFE_ENABLED"
-    )
-    mr_ou_halflife_bar_hours: float = Field(
-        default=4.0, alias="MR_OU_HALFLIFE_BAR_HOURS"
-    )
-    mr_ou_halflife_lookback_bars: int = Field(
-        default=30, alias="MR_OU_HALFLIFE_LOOKBACK_BARS"
-    )
+    mr_ou_halflife_enabled: bool = Field(default=False, alias="MR_OU_HALFLIFE_ENABLED")
+    mr_ou_halflife_bar_hours: float = Field(default=4.0, alias="MR_OU_HALFLIFE_BAR_HOURS")
+    mr_ou_halflife_lookback_bars: int = Field(default=30, alias="MR_OU_HALFLIFE_LOOKBACK_BARS")
     mr_ou_halflife_candle_history_bars: int = Field(
         default=200, alias="MR_OU_HALFLIFE_CANDLE_HISTORY_BARS"
     )

@@ -79,9 +79,7 @@ class CorrelationGuard:
             return
         self._epic_index = {_normalize_epic(e): i for i, e in enumerate(epics)}
         self._matrix = matrix_arr
-        logger.info(
-            f"Correlation matrix updated: {len(epics)} epics, shape={self._matrix.shape}"
-        )
+        logger.info(f"Correlation matrix updated: {len(epics)} epics, shape={self._matrix.shape}")
 
     def get_dynamic_correlation(self, epic_a: str, epic_b: str) -> float | None:
         """Return the dynamic correlation between two epics, or None if unavailable."""

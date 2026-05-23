@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import numpy as np
+import polars as pl
 from loguru import logger
 
 from src.broker.client import CapitalComClient
@@ -150,9 +151,7 @@ def _resolution_to_seconds(resolution: str) -> int | None:
     return _RESOLUTION_SECONDS.get(resolution.strip().lower())
 
 
-def _seconds_to_next_aligned_slot(
-    now: datetime, grid_seconds: int, offset_seconds: int
-) -> float:
+def _seconds_to_next_aligned_slot(now: datetime, grid_seconds: int, offset_seconds: int) -> float:
     """Seconds from `now` to next UTC-aligned bar-close slot + offset.
 
     Grid is anchored to the UTC epoch (1970-01-01 00:00). For grid=14400
@@ -385,9 +384,7 @@ class PaperTradingLoop:
         # candle close and signal generation. Requires reconciler dedicated
         # so SL guards keep running while the strategy loop waits.
         self._signal_loop_align: bool = _init_settings.signal_loop_align_to_bar
-        self._signal_post_bar_offset: int = (
-            _init_settings.signal_loop_post_bar_offset_seconds
-        )
+        self._signal_post_bar_offset: int = _init_settings.signal_loop_post_bar_offset_seconds
 
     @property
     def is_running(self) -> bool:
@@ -827,13 +824,15 @@ class PaperTradingLoop:
                 # context).
                 from sqlalchemy import select as _sa_select
 
-                existing_close_q = _sa_select(Trade).where(
-                    Trade.position_id == pos.id,
-                    Trade.trade_type == "CLOSE",
-                ).limit(1)
-                existing_close = (
-                    await session.execute(existing_close_q)
-                ).scalar_one_or_none()
+                existing_close_q = (
+                    _sa_select(Trade)
+                    .where(
+                        Trade.position_id == pos.id,
+                        Trade.trade_type == "CLOSE",
+                    )
+                    .limit(1)
+                )
+                existing_close = (await session.execute(existing_close_q)).scalar_one_or_none()
                 if existing_close is not None:
                     await session.commit()
                     logger.info(
@@ -975,7 +974,7 @@ class PaperTradingLoop:
             return
 
         try:
-            all_dfs: dict[str, "pl.DataFrame"] = {}
+            all_dfs: dict[str, pl.DataFrame] = {}
             for epic in self.epics:  # full basket — no [:10]
                 try:
                     df = self.data_access.get_candles(epic, self._candle_resolution)
@@ -1039,7 +1038,7 @@ class PaperTradingLoop:
             from src.features.cross_asset import CrossAssetEngine
 
             engine = CrossAssetEngine()
-            all_dfs: dict[str, "pl.DataFrame"] = {}
+            all_dfs: dict[str, pl.DataFrame] = {}
             for epic in self.epics[:10]:
                 try:
                     df = self.data_access.get_candles(epic, self._candle_resolution)
@@ -1055,8 +1054,7 @@ class PaperTradingLoop:
                     self._correlation_regime = last.get("correlation_regime") or "normal"
                     mean_corr = last.get("mean_correlation", 0)
                     logger.info(
-                        f"Correlation regime: {self._correlation_regime} "
-                        f"(mean={mean_corr:.3f})"
+                        f"Correlation regime: {self._correlation_regime} " f"(mean={mean_corr:.3f})"
                     )
         except Exception as exc:
             logger.debug(f"Correlation regime update failed: {exc}")
@@ -1143,11 +1141,7 @@ class PaperTradingLoop:
         cached = getattr(self, cache_attr, None)
         cached_ts = getattr(self, cache_ts_attr, None)
         cache_ttl = max(10, int(getattr(self, "_reconciler_interval", 15)))
-        if (
-            cached is not None
-            and cached_ts
-            and (now - cached_ts).total_seconds() < cache_ttl
-        ):
+        if cached is not None and cached_ts and (now - cached_ts).total_seconds() < cache_ttl:
             return cached
 
         try:
@@ -1344,23 +1338,17 @@ class PaperTradingLoop:
                             disappeared_for_window = [
                                 (did, ppos)
                                 for did, ppos in v2_previous.items()
-                                if did and did not in {
-                                    p.get("deal_id") for p in current_positions
-                                }
+                                if did and did not in {p.get("deal_id") for p in current_positions}
                             ]
                             if disappeared_for_window:
                                 from_dt, to_dt = detector._compute_window(
                                     disappeared_for_window, now
                                 )
-                                _v2_activities = (
-                                    await self.broker.get_activity_history(
-                                        from_dt, to_dt
-                                    )
+                                _v2_activities = await self.broker.get_activity_history(
+                                    from_dt, to_dt
                                 )
                         except Exception as _ae:
-                            logger.debug(
-                                f"[close-v2] activity prefetch skipped: {_ae!r}"
-                            )
+                            logger.debug(f"[close-v2] activity prefetch skipped: {_ae!r}")
                     v2_outcomes = await detector.detect(
                         previous=v2_previous,
                         current=current_positions,
@@ -1958,9 +1946,7 @@ class PaperTradingLoop:
                     size=Decimal(str(size)),
                     price=Decimal(str(price)),
                     profit_loss=(
-                        Decimal(str(round(profit_loss, 2)))
-                        if profit_loss is not None
-                        else None
+                        Decimal(str(round(profit_loss, 2))) if profit_loss is not None else None
                     ),
                     notes=notes[:255] if notes else None,
                     executed_at=datetime.now(UTC).replace(tzinfo=None),
@@ -1968,13 +1954,11 @@ class PaperTradingLoop:
                 session.add(trade)
                 await session.commit()
                 logger.info(
-                    f"[{epic}] Trailing event persisted: {trade_type} "
-                    f"@ {price:.4f} ({notes})"
+                    f"[{epic}] Trailing event persisted: {trade_type} " f"@ {price:.4f} ({notes})"
                 )
         except Exception as e:
             logger.warning(
-                f"Trailing event persistence failed for {deal_id} "
-                f"({trade_type}): {e}"
+                f"Trailing event persistence failed for {deal_id} " f"({trade_type}): {e}"
             )
 
     async def _persist_trailing_stop_state(self, deal_id: str) -> None:
@@ -2048,8 +2032,7 @@ class PaperTradingLoop:
             )
             self._reconciler_task.add_done_callback(self._on_reconciler_done)
             logger.info(
-                f"Paper reconciler loop started "
-                f"(interval={self._reconciler_interval}s)"
+                f"Paper reconciler loop started " f"(interval={self._reconciler_interval}s)"
             )
 
     def stop(self) -> None:
@@ -2152,13 +2135,9 @@ class PaperTradingLoop:
         `_check_stop_losses`).
         """
         try:
-            current_positions = await asyncio.wait_for(
-                self.get_positions_async(), timeout=10.0
-            )
+            current_positions = await asyncio.wait_for(self.get_positions_async(), timeout=10.0)
         except (TimeoutError, Exception) as e:
-            logger.warning(
-                f"Reconciler position fetch failed ({e}), using local cache"
-            )
+            logger.warning(f"Reconciler position fetch failed ({e}), using local cache")
             current_positions = self.get_paper_positions()
 
         await self._detect_broker_closed(current_positions)
@@ -2177,9 +2156,7 @@ class PaperTradingLoop:
                 loop = asyncio.get_event_loop()
                 loop.call_later(30.0, self._auto_restart_reconciler)
             except RuntimeError:
-                logger.error(
-                    "Cannot auto-restart reconciler: no event loop available"
-                )
+                logger.error("Cannot auto-restart reconciler: no event loop available")
 
     def _auto_restart_reconciler(self) -> None:
         """Auto-restart the reconciler loop after a crash.
@@ -2324,9 +2301,7 @@ class PaperTradingLoop:
         # keep the long TTL to avoid spamming broker for static fields
         # (dealingRules, instrument metadata).
         if cached_info is not None:
-            cached_status = (
-                cached_info.get("snapshot", {}).get("marketStatus", "TRADEABLE")
-            )
+            cached_status = cached_info.get("snapshot", {}).get("marketStatus", "TRADEABLE")
             effective_ttl = (
                 self._market_cache_ttl_closed
                 if cached_status != "TRADEABLE"
@@ -2653,9 +2628,7 @@ class PaperTradingLoop:
                 is_blackout, blackout_reason = await self._calendar_gate.is_blackout(epic)
                 if is_blackout:
                     try:
-                        MetricsCollector.record_calendar_gate_blocked(
-                            epic=epic, mode=_cal_mode
-                        )
+                        MetricsCollector.record_calendar_gate_blocked(epic=epic, mode=_cal_mode)
                     except Exception:
                         pass
                     if _cal_mode == "block":
@@ -2674,9 +2647,7 @@ class PaperTradingLoop:
                         logger.info(f"[{epic}] {blackout_reason}")
                         return
                     else:  # log_only
-                        logger.info(
-                            f"[{epic}] CALENDAR_LOG_ONLY would-block: {blackout_reason}"
-                        )
+                        logger.info(f"[{epic}] CALENDAR_LOG_ONLY would-block: {blackout_reason}")
             except Exception as e:
                 logger.debug(f"[{epic}] Calendar gate error (non-blocking): {e}")
 
@@ -3704,8 +3675,7 @@ class PaperTradingLoop:
 
             if current_price <= 0:
                 logger.debug(
-                    f"[{epic}] Trailing tick skipped — no broker live price "
-                    f"(deal {deal_id})"
+                    f"[{epic}] Trailing tick skipped — no broker live price " f"(deal {deal_id})"
                 )
                 continue
 
@@ -3840,10 +3810,9 @@ class PaperTradingLoop:
                                 # reached — the residue then locks captured
                                 # profit instead of triggering another partial
                                 # on the compressed band.
-                                new_entry = (
-                                    float(getattr(result, "fill_price", None) or 0)
-                                    or float(state.entry_price)
-                                )
+                                new_entry = float(
+                                    getattr(result, "fill_price", None) or 0
+                                ) or float(state.entry_price)
                                 migrated = self.trailing_stop_manager.register_migration(
                                     old_deal_id=deal_id,
                                     new_deal_id=new_deal_id,
@@ -3865,9 +3834,7 @@ class PaperTradingLoop:
                     logger.warning(f"[{epic}] TP1 partial close failed: {e}")
 
     @staticmethod
-    def _status_from_opening_hours(
-        opening_hours: dict | None, now_utc: datetime
-    ) -> str | None:
+    def _status_from_opening_hours(opening_hours: dict | None, now_utc: datetime) -> str | None:
         """Parse Capital.com instrument.openingHours and return TRADEABLE/CLOSED.
 
         Capital.com snapshot.marketStatus is unreliable for US stocks: returns
@@ -3931,14 +3898,10 @@ class PaperTradingLoop:
         if cached and (now_ts - cached[1]) < self._market_status_cache_ttl:
             return cached[0]
         try:
-            details = await asyncio.wait_for(
-                self.broker.get_market_details(epic), timeout=2.0
-            )
+            details = await asyncio.wait_for(self.broker.get_market_details(epic), timeout=2.0)
             payload = details or {}
             opening_hours = (payload.get("instrument") or {}).get("openingHours")
-            status_from_hours = self._status_from_opening_hours(
-                opening_hours, datetime.now(UTC)
-            )
+            status_from_hours = self._status_from_opening_hours(opening_hours, datetime.now(UTC))
             if status_from_hours is not None:
                 self._market_status_cache[epic] = (status_from_hours, now_ts)
                 return status_from_hours
@@ -3991,9 +3954,7 @@ class PaperTradingLoop:
                 bar_hours = float(_loop_settings.mr_ou_halflife_bar_hours)
                 lookback = int(_loop_settings.mr_ou_halflife_lookback_bars)
                 history = int(_loop_settings.mr_ou_halflife_candle_history_bars)
-                resolution = (
-                    f"{int(bar_hours)}h" if bar_hours.is_integer() else f"{bar_hours}h"
-                )
+                resolution = f"{int(bar_hours)}h" if bar_hours.is_integer() else f"{bar_hours}h"
                 seen_epics: set[str] = set()
                 for _p in current_positions:
                     _epic = _p.get("epic")
@@ -4023,9 +3984,7 @@ class PaperTradingLoop:
                 logger.debug(f"MR OU half-life pass failed: {e}")
 
         # MT5 2026-05-19: GC trading-time accumulators for deals no longer open.
-        current_deal_ids = {
-            p.get("deal_id") for p in current_positions if p.get("deal_id")
-        }
+        current_deal_ids = {p.get("deal_id") for p in current_positions if p.get("deal_id")}
         for stale_did in list(self._position_trading_seconds.keys()):
             if stale_did not in current_deal_ids:
                 self._position_trading_seconds.pop(stale_did, None)
@@ -4080,15 +4039,9 @@ class PaperTradingLoop:
             epic_hold_cap = per_epic_max_hold.get(epic, default_max_hold)
             if deal_id and epic_hold_cap < 9000:
                 try:
-                    trading_hours = (
-                        self._position_trading_seconds.get(deal_id, 0.0) / 3600
-                    )
+                    trading_hours = self._position_trading_seconds.get(deal_id, 0.0) / 3600
                     if trading_hours >= epic_hold_cap:
-                        _cap_src = (
-                            "OU half-life"
-                            if epic in per_epic_max_hold
-                            else "default"
-                        )
+                        _cap_src = "OU half-life" if epic in per_epic_max_hold else "default"
                         logger.warning(
                             f"⏰ [{epic}] TIME STOP ({_cap_src}): position {deal_id} "
                             f"held {trading_hours:.1f}h TRADEABLE "
@@ -4124,9 +4077,7 @@ class PaperTradingLoop:
                         except Exception as e:
                             logger.warning(f"[{epic}] Time stop close failed: {e}")
                 except (ValueError, TypeError) as e:
-                    logger.debug(
-                        f"[{epic}] Trading-time stop check failed for {deal_id}: {e}"
-                    )
+                    logger.debug(f"[{epic}] Trading-time stop check failed for {deal_id}: {e}")
 
             # Skip if no stop loss AND no take profit set
             if (stop_level is None or stop_level <= 0) and (
@@ -4165,8 +4116,7 @@ class PaperTradingLoop:
 
             if current_price <= 0:
                 logger.debug(
-                    f"[{epic}] SL/TP check skipped — no broker live price "
-                    f"(deal {deal_id})"
+                    f"[{epic}] SL/TP check skipped — no broker live price " f"(deal {deal_id})"
                 )
                 continue
 

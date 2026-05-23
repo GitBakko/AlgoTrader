@@ -20,9 +20,7 @@ from src.utils.config import get_settings
 from src.utils.constants import FOREX_ASSETS
 
 
-def _compute_risk_usd(
-    epic: str, entry: float, stop_loss: float, size: float
-) -> float:
+def _compute_risk_usd(epic: str, entry: float, stop_loss: float, size: float) -> float:
     """Compute USD-denominated risk on a trade given size + stop distance.
 
     Non-forex (stocks/crypto/commodities/indices): price is in USD per
@@ -50,9 +48,7 @@ def _compute_risk_usd(
     return size_f * stop_distance
 
 
-def _position_notional_account_ccy(
-    position: dict, account_currency: str = "USD"
-) -> float:
+def _position_notional_account_ccy(position: dict, account_currency: str = "USD") -> float:
     """Estimate per-position notional in the account currency.
 
     The naive ``size * entry_price`` formula is correct only when the
@@ -211,8 +207,7 @@ class RiskManager:
         # 1c. Check total exposure cap
         if self.limits.max_total_exposure <= 1.0 and open_positions and equity > 0:
             total_notional = sum(
-                _position_notional_account_ccy(p, account_currency="USD")
-                for p in open_positions
+                _position_notional_account_ccy(p, account_currency="USD") for p in open_positions
             )
             exposure_ratio = total_notional / equity
             if exposure_ratio >= self.limits.max_total_exposure:
@@ -334,9 +329,7 @@ class RiskManager:
         # re-introduce the 2026-04-28 mix-and-match inversion bug.
         sl_dist_check = abs(signal.entry_price - stop_loss)
         tp_dist_check = abs(take_profit - signal.entry_price)
-        rr_check = (
-            tp_dist_check / sl_dist_check if sl_dist_check > 0 else 0.0
-        )
+        rr_check = tp_dist_check / sl_dist_check if sl_dist_check > 0 else 0.0
         min_rr = float(_risk_settings.min_signal_rr_threshold)
         if sl_dist_check > 0 and rr_check < min_rr:
             reason = (
@@ -398,9 +391,7 @@ class RiskManager:
                 max_position_pct=self.limits.max_position_pct,
                 min_notional_usd=_risk_settings.min_notional_usd,
                 epic=signal.epic,
-                forex_usd_base_size_multiplier=(
-                    _risk_settings.forex_usd_base_size_multiplier
-                ),
+                forex_usd_base_size_multiplier=(_risk_settings.forex_usd_base_size_multiplier),
             )
             if sizing_method != "fixed_fractional":
                 adjustments.append(f"Sizing: {sizing_method}")
@@ -419,9 +410,7 @@ class RiskManager:
                 max_position_pct=self.limits.max_position_pct,
                 min_notional_usd=_risk_settings.min_notional_usd,
                 epic=signal.epic,
-                forex_usd_base_size_multiplier=(
-                    _risk_settings.forex_usd_base_size_multiplier
-                ),
+                forex_usd_base_size_multiplier=(_risk_settings.forex_usd_base_size_multiplier),
             )
 
         # 6-bis. Per-epic risk multiplier (Phase 12 universe-tuning,
@@ -435,8 +424,7 @@ class RiskManager:
             return RiskCheckResult(
                 approved=False,
                 rejection_reason=(
-                    f"Epic {signal.epic} disabled "
-                    f"(epic_risk_multiplier={epic_mult})"
+                    f"Epic {signal.epic} disabled " f"(epic_risk_multiplier={epic_mult})"
                 ),
                 audit=audit,
             )
@@ -504,22 +492,18 @@ class RiskManager:
                 # Standard multiplier used by PositionSizer / KellySizer for
                 # USD-base forex pairs.
                 base_fx_mult = 1.0
-                is_usd_base_forex = (
-                    signal.epic in FOREX_ASSETS and signal.epic.startswith("USD")
-                )
+                is_usd_base_forex = signal.epic in FOREX_ASSETS and signal.epic.startswith("USD")
                 if is_usd_base_forex:
                     try:
-                        base_fx_mult = float(
-                            _risk_settings.forex_usd_base_size_multiplier
-                        )
+                        base_fx_mult = float(_risk_settings.forex_usd_base_size_multiplier)
                     except (TypeError, ValueError):
                         base_fx_mult = 1.0
                     if base_fx_mult < 1.0:
                         base_fx_mult = 1.0
                 effective_pct = self.limits.max_position_pct * base_fx_mult
                 max_size_by_exposure = (
-                    equity * effective_pct
-                ) / signal.entry_price if signal.entry_price else 0.0
+                    (equity * effective_pct) / signal.entry_price if signal.entry_price else 0.0
+                )
                 # Step 7-bis-A — DYNAMIC LEVERAGE for USD-base forex.
                 #
                 # Intent of MIN_RISK_AMOUNT_USD: open a meaningful position
@@ -537,23 +521,23 @@ class RiskManager:
                 max_leverage_cap_hit = False
                 if is_usd_base_forex and lifted_size > max_size_by_exposure > 0:
                     try:
-                        max_fx_mult = float(
-                            _risk_settings.forex_max_leverage_multiplier
-                        )
+                        max_fx_mult = float(_risk_settings.forex_max_leverage_multiplier)
                     except (TypeError, ValueError):
                         max_fx_mult = base_fx_mult
                     max_fx_mult = max(max_fx_mult, base_fx_mult)
                     # Required multiplier to fit lifted_size in the cap.
-                    required_mult = (
-                        lifted_size * signal.entry_price
-                    ) / (equity * self.limits.max_position_pct)
+                    required_mult = (lifted_size * signal.entry_price) / (
+                        equity * self.limits.max_position_pct
+                    )
                     target_mult = min(required_mult, max_fx_mult)
                     if target_mult > base_fx_mult:
                         effective_mult_used = target_mult
                         effective_pct = self.limits.max_position_pct * target_mult
                         max_size_by_exposure = (
-                            equity * effective_pct
-                        ) / signal.entry_price if signal.entry_price else 0.0
+                            (equity * effective_pct) / signal.entry_price
+                            if signal.entry_price
+                            else 0.0
+                        )
                     if required_mult > max_fx_mult:
                         max_leverage_cap_hit = True
 
@@ -564,9 +548,7 @@ class RiskManager:
                 # — final_size is therefore always >= position_size and we
                 # never *shrink* the position here.
                 final_size = (
-                    min(lifted_size, max_size_by_exposure)
-                    if max_size_by_exposure > 0
-                    else 0.0
+                    min(lifted_size, max_size_by_exposure) if max_size_by_exposure > 0 else 0.0
                 )
                 if final_size <= 0:
                     # Cap is zero (zero or negative equity) — reject
