@@ -109,6 +109,20 @@ _EXCLUDED_ASSETS = {
     "AUDUSD",
     "EURJPY",
     "NZDUSD",
+    # Phase 1 expansion Optuna 2026-05-23 — REVIEW/EXCLUDE on the
+    # tuned 20-asset basket (`backend/docs/reports/2026-05-23_phase1_expansion_optuna.md`):
+    #   AMD:  Sharpe -0.22, WR 47.3%, PF 0.93 over 93 trades — REVIEW
+    #   META: Sharpe -0.43, WR 50.6%, PF 0.90 over 166 trades — REVIEW
+    #   AMZN: Sharpe -1.07, WR 37.0%, PF 0.66 over 46 trades (Monte
+    #         Carlo p=0.91, no statistical edge) — EXCLUDE from dedicated
+    #         deep-dive (`docs/handoff/NEXT_SESSION_PROMPT.md` AMZN
+    #         section). See `project_amzn_excluded_2026-05-23.md` memory.
+    # Both REVIEW assets behave like AMZN — sample-driven edge collapses
+    # when threshold sweep narrows to high-confidence band. Same path
+    # to potential reactivation: spread audit + cost recalib + re-tune.
+    "AMD",
+    "META",
+    "AMZN",
 }
 TRADABLE_ASSETS: list[str] = [a for a in ALL_ASSETS if a not in _EXCLUDED_ASSETS]
 
