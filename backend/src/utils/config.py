@@ -458,7 +458,7 @@ class Settings(BaseSettings):
     paper_trading: bool = Field(default=True, alias="PAPER_TRADING")
     execution_mode: str = Field(default="PAPER", alias="EXECUTION_MODE")
     min_confidence_threshold: float = Field(default=0.65, alias="MIN_CONFIDENCE_THRESHOLD")
-    max_total_open_positions: int = Field(default=5, alias="MAX_TOTAL_OPEN_POSITIONS")
+    max_total_open_positions: int = Field(default=10, alias="MAX_TOTAL_OPEN_POSITIONS")
     max_total_exposure: float = Field(default=1.0, alias="MAX_TOTAL_EXPOSURE")
 
     # ===== Close Detection (State Recovery) =====
