@@ -103,6 +103,7 @@ CREATE INDEX IF NOT EXISTS idx_execution_log_open_positions
 CREATE TABLE IF NOT EXISTS risk_event_log (
     id SERIAL PRIMARY KEY,
     timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
+    source VARCHAR(40) NOT NULL DEFAULT 'unknown',  -- paper_trading / demo_trading / live_trading / api_test
     event_type VARCHAR(30) NOT NULL CHECK (event_type IN (
         'circuit_breaker', 'position_limit', 'drawdown_limit',
         'equity_filter', 'consecutive_loss', 'daily_loss'
@@ -129,6 +130,7 @@ CREATE TABLE IF NOT EXISTS risk_event_log (
 CREATE INDEX IF NOT EXISTS idx_risk_event_log_timestamp ON risk_event_log (timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_risk_event_log_event_type ON risk_event_log (event_type);
 CREATE INDEX IF NOT EXISTS idx_risk_event_log_epic ON risk_event_log (epic);
+CREATE INDEX IF NOT EXISTS idx_risk_event_log_source ON risk_event_log (source);
 
 -- Composite index for circuit breaker analysis
 CREATE INDEX IF NOT EXISTS idx_risk_event_log_type_timestamp
