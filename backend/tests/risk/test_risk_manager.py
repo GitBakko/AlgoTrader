@@ -337,7 +337,13 @@ class TestRiskManager:
                 forex_usd_base_size_multiplier=30.0,
             ),
         ):
-            rm = RiskManager(initial_equity=10000.0)
+            # Pin max_position_pct=0.20 (pre Phase-1-expansion default) so
+            # the cap-fallback math below remains the subject of the test
+            # — the Phase 1 expansion (2026-05-23) lowered the schema
+            # default to 0.10 for the 10-slot basket; this test is about
+            # leverage-aware cap math, not about the default.
+            limits = RiskLimits(max_position_pct=0.20)
+            rm = RiskManager(initial_equity=10000.0, limits=limits)
             signal = _make_signal(epic="USDJPY", price=159.0)
             result = rm.check_trade(signal=signal, equity=10000.0, atr=0.05)
             assert result.approved is True
@@ -395,7 +401,13 @@ class TestRiskManager:
                 forex_max_leverage_multiplier=200.0,
             ),
         ):
-            rm = RiskManager(initial_equity=11000.0)
+            # Pin max_position_pct=0.20 (pre Phase-1-expansion default) so
+            # the cap-fallback math in the comment below stays the subject
+            # of the test — Phase 1 expansion (2026-05-23) lowered the
+            # schema default to 0.10 for the 10-slot basket; this test is
+            # about leverage-aware cap math, not about the default.
+            limits = RiskLimits(max_position_pct=0.20)
+            rm = RiskManager(initial_equity=11000.0, limits=limits)
             # USDJPY entry 159, ATR 0.05, SL distance 0.10. To clear $10
             # floor: lifted_size ≈ 15.9k. Standard 60× cap allows ~830
             # units (~$0.52 risk). With max_leverage 200×, cap rises to

@@ -31,19 +31,30 @@ class RiskLimits(BaseModel):
     max_risk_per_trade: float = Field(default=0.02, ge=0.001, le=0.10)
     max_daily_drawdown: float = Field(default=0.05, ge=0.01, le=0.50)
     max_total_drawdown: float = Field(default=0.15, ge=0.01, le=0.50)
-    max_position_pct: float = Field(default=0.20, ge=0.01, le=1.0)
-    max_correlated_exposure: float = Field(default=0.50, ge=0.0, le=1.0)
+    max_position_pct: float = Field(
+        default=0.10,
+        ge=0.01,
+        le=1.0,
+        description=(
+            "Max per-position notional as fraction of equity. "
+            "Phase 1 expansion 2026-05-23: lowered 0.20 → 0.10 to keep "
+            "100% gross exposure ceiling at the new 10-slot cap."
+        ),
+    )
     max_total_open_positions: int = Field(
-        default=5,
+        default=10,
         ge=1,
         le=50,
-        description="Maximum total open positions across all assets (hard cap, 2026-05-15: lowered 20→5 portfolio safety)",
+        description=(
+            "Maximum total open positions across all assets (hard cap). "
+            "Phase 1 expansion 2026-05-23: raised 5 → 10 for 19-asset basket."
+        ),
     )
     max_total_exposure: float = Field(
         default=1.0,
         ge=0.01,
         le=1.0,
-        description="Maximum total exposure as fraction of equity (1.0 = no cap)",
+        description="Maximum total exposure as fraction of equity (1.0 = 100% cap, enforced).",
     )
 
 
