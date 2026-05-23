@@ -1,0 +1,250 @@
+{
+  "generated_at": "2026-05-23T13:51:49.725968+00:00",
+  "default_confidence": 0.4,
+  "per_asset": {
+    "SOLUSD": {
+      "min_confidence": 0.42,
+      "decision": "KEEP",
+      "sharpe": 5.015,
+      "sortino": 7.225,
+      "win_rate": 0.68,
+      "max_drawdown": 0.018,
+      "profit_factor": 2.648,
+      "total_trades": 325,
+      "total_return_pct": 35.09,
+      "failed_criteria": []
+    },
+    "BTCUSD": {
+      "min_confidence": 0.3,
+      "decision": "KEEP",
+      "sharpe": 6.226,
+      "sortino": 10.742,
+      "win_rate": 0.718,
+      "max_drawdown": 0.008,
+      "profit_factor": 3.356,
+      "total_trades": 273,
+      "total_return_pct": 20.45,
+      "failed_criteria": []
+    },
+    "ETHUSD": {
+      "min_confidence": 0.5,
+      "decision": "KEEP",
+      "sharpe": 4.62,
+      "sortino": 6.976,
+      "win_rate": 0.722,
+      "max_drawdown": 0.013,
+      "profit_factor": 3.38,
+      "total_trades": 158,
+      "total_return_pct": 20.59,
+      "failed_criteria": []
+    },
+    "XAUUSD": {
+      "min_confidence": 0.45,
+      "decision": "KEEP",
+      "sharpe": 3.257,
+      "sortino": 5.007,
+      "win_rate": 0.631,
+      "max_drawdown": 0.009,
+      "profit_factor": 2.058,
+      "total_trades": 157,
+      "total_return_pct": 4.39,
+      "failed_criteria": []
+    },
+    "BNBUSD": {
+      "min_confidence": 0.55,
+      "decision": "KEEP",
+      "sharpe": 2.304,
+      "sortino": 3.027,
+      "win_rate": 0.63,
+      "max_drawdown": 0.016,
+      "profit_factor": 1.926,
+      "total_trades": 135,
+      "total_return_pct": 7.72,
+      "failed_criteria": []
+    },
+    "USDCHF": {
+      "min_confidence": 0.42,
+      "decision": "KEEP",
+      "sharpe": 4.283,
+      "sortino": 6.013,
+      "win_rate": 0.651,
+      "max_drawdown": 0.002,
+      "profit_factor": 2.527,
+      "total_trades": 269,
+      "total_return_pct": 3.09,
+      "failed_criteria": []
+    },
+    "USDCAD": {
+      "min_confidence": 0.42,
+      "decision": "KEEP",
+      "sharpe": 2.103,
+      "sortino": 2.617,
+      "win_rate": 0.627,
+      "max_drawdown": 0.002,
+      "profit_factor": 1.783,
+      "total_trades": 150,
+      "total_return_pct": 0.98,
+      "failed_criteria": []
+    },
+    "USDJPY": {
+      "min_confidence": 0.5,
+      "decision": "KEEP",
+      "sharpe": 0.979,
+      "sortino": 1.434,
+      "win_rate": 0.494,
+      "max_drawdown": 0.002,
+      "profit_factor": 1.296,
+      "total_trades": 79,
+      "total_return_pct": 0.36,
+      "failed_criteria": []
+    },
+    "WTIUSD": {
+      "min_confidence": 0.3,
+      "decision": "KEEP",
+      "sharpe": 3.176,
+      "sortino": 4.122,
+      "win_rate": 0.646,
+      "max_drawdown": 0.008,
+      "profit_factor": 2.213,
+      "total_trades": 181,
+      "total_return_pct": 8.02,
+      "failed_criteria": []
+    },
+    "PLATINUM": {
+      "min_confidence": 0.48,
+      "decision": "KEEP",
+      "sharpe": 1.166,
+      "sortino": 1.182,
+      "win_rate": 0.62,
+      "max_drawdown": 0.015,
+      "profit_factor": 1.431,
+      "total_trades": 79,
+      "total_return_pct": 2.59,
+      "failed_criteria": []
+    },
+    "COPPER": {
+      "min_confidence": 0.45,
+      "decision": "KEEP",
+      "sharpe": 1.809,
+      "sortino": 2.136,
+      "win_rate": 0.645,
+      "max_drawdown": 0.01,
+      "profit_factor": 1.786,
+      "total_trades": 93,
+      "total_return_pct": 2.65,
+      "failed_criteria": []
+    },
+    "US500": {
+      "min_confidence": 0.3,
+      "decision": "KEEP",
+      "sharpe": 3.032,
+      "sortino": 3.835,
+      "win_rate": 0.651,
+      "max_drawdown": 0.007,
+      "profit_factor": 2.174,
+      "total_trades": 281,
+      "total_return_pct": 4.66,
+      "failed_criteria": []
+    },
+    "DE40": {
+      "min_confidence": 0.42,
+      "decision": "KEEP",
+      "sharpe": 2.029,
+      "sortino": 2.995,
+      "win_rate": 0.558,
+      "max_drawdown": 0.007,
+      "profit_factor": 1.484,
+      "total_trades": 251,
+      "total_return_pct": 2.38,
+      "failed_criteria": []
+    },
+    "MSFT": {
+      "min_confidence": 0.45,
+      "decision": "KEEP",
+      "sharpe": 2.094,
+      "sortino": 2.639,
+      "win_rate": 0.624,
+      "max_drawdown": 0.009,
+      "profit_factor": 1.83,
+      "total_trades": 101,
+      "total_return_pct": 3.43,
+      "failed_criteria": []
+    },
+    "GOOGL": {
+      "min_confidence": 0.55,
+      "decision": "KEEP",
+      "sharpe": 2.711,
+      "sortino": 3.148,
+      "win_rate": 0.636,
+      "max_drawdown": 0.007,
+      "profit_factor": 2.514,
+      "total_trades": 66,
+      "total_return_pct": 3.85,
+      "failed_criteria": []
+    },
+    "AAPL": {
+      "min_confidence": 0.48,
+      "decision": "KEEP",
+      "sharpe": 1.708,
+      "sortino": 1.705,
+      "win_rate": 0.677,
+      "max_drawdown": 0.01,
+      "profit_factor": 1.927,
+      "total_trades": 62,
+      "total_return_pct": 3.01,
+      "failed_criteria": []
+    },
+    "TSLA": {
+      "min_confidence": 0.3,
+      "decision": "KEEP",
+      "sharpe": 1.698,
+      "sortino": 2.353,
+      "win_rate": 0.566,
+      "max_drawdown": 0.02,
+      "profit_factor": 1.448,
+      "total_trades": 145,
+      "total_return_pct": 5.76,
+      "failed_criteria": []
+    },
+    "AMD": {
+      "min_confidence": 0.45,
+      "decision": "REVIEW",
+      "sharpe": -0.217,
+      "sortino": -0.221,
+      "win_rate": 0.473,
+      "max_drawdown": 0.027,
+      "profit_factor": 0.931,
+      "total_trades": 93,
+      "total_return_pct": -0.75,
+      "failed_criteria": [
+        "sharpe -0.22 < 0.3"
+      ]
+    },
+    "META": {
+      "min_confidence": 0.3,
+      "decision": "REVIEW",
+      "sharpe": -0.427,
+      "sortino": -0.511,
+      "win_rate": 0.506,
+      "max_drawdown": 0.04,
+      "profit_factor": 0.902,
+      "total_trades": 166,
+      "total_return_pct": -0.97,
+      "failed_criteria": [
+        "sharpe -0.43 < 0.3"
+      ]
+    },
+    "NVDA": {
+      "min_confidence": 0.5,
+      "decision": "KEEP",
+      "sharpe": 2.018,
+      "sortino": 2.513,
+      "win_rate": 0.581,
+      "max_drawdown": 0.01,
+      "profit_factor": 1.732,
+      "total_trades": 86,
+      "total_return_pct": 4.4,
+      "failed_criteria": []
+    }
+  }
+}
