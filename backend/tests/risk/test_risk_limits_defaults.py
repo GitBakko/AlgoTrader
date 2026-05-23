@@ -32,3 +32,20 @@ def test_default_max_total_exposure_unchanged() -> None:
 def test_default_max_risk_per_trade_unchanged() -> None:
     """Per-trade risk cap untouched by Phase 1 expansion."""
     assert RiskLimits().max_risk_per_trade == 0.02
+
+
+# --- Phase 1 expansion: dynamic correlation settings ---
+
+
+def test_dynamic_correlation_enabled_default_true() -> None:
+    """Independent of CORRELATION_REGIME_ENABLED (Phase 2 regime gate)."""
+    from src.utils.config import Settings
+
+    assert Settings().dynamic_correlation_enabled is True
+
+
+def test_dynamic_correlation_bootstrap_min_assets_default_5() -> None:
+    """Need >=5 epics with data to compute a meaningful NxN matrix."""
+    from src.utils.config import Settings
+
+    assert Settings().dynamic_correlation_bootstrap_min_assets == 5

@@ -222,6 +222,22 @@ class Settings(BaseSettings):
     correlation_regime_size_reduction: float = Field(
         default=0.50, alias="CORRELATION_REGIME_SIZE_REDUCTION"
     )
+    # Phase 1 expansion 2026-05-23: dynamic correlation matrix flag,
+    # decoupled from `correlation_regime_enabled` (Phase 2 panic regime).
+    # When True, paper_loop refreshes the NxN correlation matrix in
+    # `CorrelationGuard` every 30 min using the full self.epics basket
+    # (no `[:10]` cap). Used by `RiskManager.check_trade` step 5 to
+    # downsize correlated exposures via `check_exposure_dynamic`.
+    dynamic_correlation_enabled: bool = Field(
+        default=True, alias="DYNAMIC_CORRELATION_ENABLED"
+    )
+    # Minimum number of epics with sufficient candle data (>=100 bars)
+    # required before computing the correlation matrix. Below this floor
+    # the refresh is skipped and the prior matrix (or static-pair fallback)
+    # is used.
+    dynamic_correlation_bootstrap_min_assets: int = Field(
+        default=5, alias="DYNAMIC_CORRELATION_BOOTSTRAP_MIN_ASSETS"
+    )
     # Close-detection reconciliation: how long to wait for a transaction match
     # before giving up and finalising a pending close with a heuristic P&L.
     close_reconciliation_timeout_seconds: int = Field(
