@@ -59,13 +59,29 @@ class CorrelationGuard:
     def update_matrix(self, epics: list[str], matrix: np.ndarray) -> None:
         """Store an NxN correlation matrix for the given epics.
 
+        Rejects matrices containing NaN or Inf entries: such values
+        typically come from a constant-price epic in `np.corrcoef`
+        (zero variance → divide-by-zero in the correlation formula).
+        Accepting them would propagate a NaN multiplier into the
+        position-sizing chain and silently zero out the trade.
+
         Args:
             epics: Ordered list of epic names (canonical form preferred).
             matrix: NxN numpy array of pairwise correlations.
         """
+        matrix_arr = np.asarray(matrix, dtype=float)
+        if not np.isfinite(matrix_arr).all():
+            bad_count = int(np.sum(~np.isfinite(matrix_arr)))
+            logger.error(
+                f"Correlation matrix rejected: {bad_count} non-finite values "
+                f"(NaN/Inf) — prior matrix preserved"
+            )
+            return
         self._epic_index = {_normalize_epic(e): i for i, e in enumerate(epics)}
-        self._matrix = np.array(matrix, dtype=float)
-        logger.info(f"Correlation matrix updated: {len(epics)} epics, shape={self._matrix.shape}")
+        self._matrix = matrix_arr
+        logger.info(
+            f"Correlation matrix updated: {len(epics)} epics, shape={self._matrix.shape}"
+        )
 
     def get_dynamic_correlation(self, epic_a: str, epic_b: str) -> float | None:
         """Return the dynamic correlation between two epics, or None if unavailable."""
