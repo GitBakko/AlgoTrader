@@ -967,10 +967,11 @@ class PaperTradingLoop:
         now = _time.monotonic()
         if not force and now - self._correlation_matrix_ts < 1800:
             return
-        self._correlation_matrix_ts = now
 
         _settings = get_settings()
         if not _settings.dynamic_correlation_enabled:
+            # Don't bump throttle timestamp — flipping the flag True at
+            # runtime should fire on the next tick, not in 30 min.
             return
 
         try:
@@ -985,6 +986,9 @@ class PaperTradingLoop:
 
             min_assets = _settings.dynamic_correlation_bootstrap_min_assets
             if len(all_dfs) < min_assets:
+                # Don't bump throttle — transient bootstrap miss
+                # (e.g. backfill not finished) should retry on next tick,
+                # not wait 30 min.
                 logger.info(
                     f"Correlation matrix update skipped: "
                     f"{len(all_dfs)} < {min_assets} epics with sufficient data"
@@ -1008,6 +1012,7 @@ class PaperTradingLoop:
             )
             corr_matrix = np.corrcoef(returns)
             self.risk_manager.correlation_guard.update_matrix(epics_list, corr_matrix)
+            self._correlation_matrix_ts = now  # bump only on success
 
             triu = corr_matrix[np.triu_indices_from(corr_matrix, k=1)]
             mean_abs = float(np.abs(triu).mean()) if triu.size else 0.0
@@ -1016,6 +1021,8 @@ class PaperTradingLoop:
                 f"mean|corr|={mean_abs:.3f}"
             )
         except Exception as exc:
+            # Don't bump throttle — transient failure (data access, math)
+            # should retry on next tick, not wait 30 min.
             logger.debug(f"Correlation matrix refresh failed: {exc}")
 
     async def _refresh_correlation_regime(self) -> None:

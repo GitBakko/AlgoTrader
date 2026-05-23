@@ -130,3 +130,46 @@ async def test_matrix_refresh_force_bypasses_throttle() -> None:
         await PaperTradingLoop._refresh_correlation_matrix(loop, force=True)
 
         assert guard.update_matrix.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_matrix_refresh_flag_off_does_not_bump_throttle() -> None:
+    """Flipping DYNAMIC_CORRELATION_ENABLED True at runtime must fire
+    on the next tick, not wait 30 min. So a flag=False call must NOT
+    bump the throttle timestamp."""
+    from src.trading.paper_loop import PaperTradingLoop
+
+    epics = [f"EPIC{i:02d}" for i in range(6)]
+    loop, guard = _make_loop_stub(epics)
+
+    with patch("src.trading.paper_loop.get_settings") as mock_settings:
+        # First call with flag OFF — should NOT bump _correlation_matrix_ts
+        mock_settings.return_value.dynamic_correlation_enabled = False
+        mock_settings.return_value.dynamic_correlation_bootstrap_min_assets = 5
+        await PaperTradingLoop._refresh_correlation_matrix(loop)
+        assert loop._correlation_matrix_ts == 0.0, (
+            "flag-off path must not bump throttle (would silently delay "
+            "first refresh by 30 min after a runtime flag flip)"
+        )
+
+        # Second call with flag ON — should fire immediately
+        mock_settings.return_value.dynamic_correlation_enabled = True
+        await PaperTradingLoop._refresh_correlation_matrix(loop)
+        assert guard.update_matrix.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_matrix_refresh_below_min_does_not_bump_throttle() -> None:
+    """Transient bootstrap miss (e.g. backfill not finished, only 3 of 5
+    required epics have ≥100 bars) must retry on the next tick, not
+    wait 30 min. So the floor-skip path must NOT bump the throttle."""
+    from src.trading.paper_loop import PaperTradingLoop
+
+    loop, guard = _make_loop_stub(["BTCUSD", "ETHUSD", "XAUUSD"])
+    with patch("src.trading.paper_loop.get_settings") as mock_settings:
+        mock_settings.return_value.dynamic_correlation_enabled = True
+        mock_settings.return_value.dynamic_correlation_bootstrap_min_assets = 5
+        await PaperTradingLoop._refresh_correlation_matrix(loop)
+
+    assert loop._correlation_matrix_ts == 0.0
+    assert not guard.update_matrix.called
