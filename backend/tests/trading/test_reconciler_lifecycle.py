@@ -149,6 +149,7 @@ async def test_strategy_loop_skips_reconciler_calls_when_enabled(loop_factory):
     loop = loop_factory(reconciler_enabled=True)
     loop.get_positions_async = AsyncMock(return_value=[])
     loop._refresh_spread_blocks = AsyncMock()
+    loop._refresh_correlation_matrix = AsyncMock()
     loop._refresh_correlation_regime = AsyncMock()
     loop._init_regime_gate = MagicMock()
 
@@ -167,6 +168,7 @@ async def test_strategy_loop_calls_reconciler_methods_when_disabled(loop_factory
     loop = loop_factory(reconciler_enabled=False)
     loop.get_positions_async = AsyncMock(return_value=[])
     loop._refresh_spread_blocks = AsyncMock()
+    loop._refresh_correlation_matrix = AsyncMock()
     loop._refresh_correlation_regime = AsyncMock()
     loop._init_regime_gate = MagicMock()
 

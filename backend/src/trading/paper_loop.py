@@ -318,6 +318,7 @@ class PaperTradingLoop:
         self._last_spread_refresh: float = 0.0  # timestamp of last hourly spread check
         self._correlation_regime: str = "normal"
         self._correlation_regime_ts: float = 0.0
+        self._correlation_matrix_ts: float = 0.0
 
         # Regime Gate (Phase 2)
         self._regime_gate: object | None = None
@@ -544,6 +545,20 @@ class PaperTradingLoop:
                         break
             if deviation:
                 pos["level_deviation"] = deviation
+
+            # Override broker-positions `market_status` with the authoritative
+            # snapshot status. Capital.com /positions[].market.marketStatus
+            # lags /markets/{epic}.snapshot during extended-hours sessions —
+            # so the API would otherwise serve stale CLOSED even when the
+            # market is tradeable (e.g. US stocks pre-/post-market window).
+            # `_resolve_market_status` is 60s-cached per epic so per-call
+            # cost is bounded.
+            epic_for_status = pos.get("epic")
+            if epic_for_status:
+                pos["market_status"] = await self._resolve_market_status(
+                    epic_for_status,
+                    pos.get("market_status", "TRADEABLE"),
+                )
         return positions
 
     def get_paper_positions(self) -> list[dict]:
@@ -938,8 +953,79 @@ class PaperTradingLoop:
             logger.debug(f"_read_broker_stops failed: {e}")
         return None, None
 
+    async def _refresh_correlation_matrix(self, force: bool = False) -> None:
+        """Recompute pairwise correlation matrix for the full epic basket.
+
+        Runs at most every 30 min unless ``force=True`` (used for startup
+        bootstrap so the matrix is hot before the first signal tick).
+        Gated by ``DYNAMIC_CORRELATION_ENABLED`` — independent from the
+        Phase 2 ``CORRELATION_REGIME_ENABLED`` flag.
+
+        Pushes the matrix into ``risk_manager.correlation_guard`` for use by
+        ``check_exposure_dynamic``. On failure (data access, math, NaN/Inf)
+        the prior matrix is preserved.
+        """
+        now = _time.monotonic()
+        if not force and now - self._correlation_matrix_ts < 1800:
+            return
+        self._correlation_matrix_ts = now
+
+        _settings = get_settings()
+        if not _settings.dynamic_correlation_enabled:
+            return
+
+        try:
+            all_dfs: dict[str, "pl.DataFrame"] = {}
+            for epic in self.epics:  # full basket — no [:10]
+                try:
+                    df = self.data_access.get_candles(epic, self._candle_resolution)
+                    if df is not None and len(df) >= 100:
+                        all_dfs[epic] = df
+                except Exception:
+                    pass
+
+            min_assets = _settings.dynamic_correlation_bootstrap_min_assets
+            if len(all_dfs) < min_assets:
+                logger.info(
+                    f"Correlation matrix update skipped: "
+                    f"{len(all_dfs)} < {min_assets} epics with sufficient data"
+                )
+                return
+
+            epics_list = sorted(all_dfs.keys())
+            common_len = min(len(df) for df in all_dfs.values())
+            returns = np.array(
+                [
+                    np.diff(
+                        np.log(
+                            np.maximum(
+                                all_dfs[e]["close"].tail(common_len).to_numpy(),
+                                1e-10,
+                            )
+                        )
+                    )
+                    for e in epics_list
+                ]
+            )
+            corr_matrix = np.corrcoef(returns)
+            self.risk_manager.correlation_guard.update_matrix(epics_list, corr_matrix)
+
+            triu = corr_matrix[np.triu_indices_from(corr_matrix, k=1)]
+            mean_abs = float(np.abs(triu).mean()) if triu.size else 0.0
+            logger.info(
+                f"Correlation matrix refreshed: {len(epics_list)} epics, "
+                f"mean|corr|={mean_abs:.3f}"
+            )
+        except Exception as exc:
+            logger.debug(f"Correlation matrix refresh failed: {exc}")
+
     async def _refresh_correlation_regime(self) -> None:
-        """Recompute correlation regime every 30 minutes."""
+        """Classify cross-asset correlation regime (panic vs normal).
+
+        Gated by ``CORRELATION_REGIME_ENABLED`` (Phase 2 flag, currently
+        disabled in production). Matrix population was moved to
+        ``_refresh_correlation_matrix``.
+        """
         now = _time.monotonic()
         if now - self._correlation_regime_ts < 1800:
             return
@@ -953,7 +1039,7 @@ class PaperTradingLoop:
             from src.features.cross_asset import CrossAssetEngine
 
             engine = CrossAssetEngine()
-            all_dfs = {}
+            all_dfs: dict[str, "pl.DataFrame"] = {}
             for epic in self.epics[:10]:
                 try:
                     df = self.data_access.get_candles(epic, self._candle_resolution)
@@ -969,33 +1055,11 @@ class PaperTradingLoop:
                     self._correlation_regime = last.get("correlation_regime") or "normal"
                     mean_corr = last.get("mean_correlation", 0)
                     logger.info(
-                        f"Correlation regime: {self._correlation_regime} " f"(mean={mean_corr:.3f})"
+                        f"Correlation regime: {self._correlation_regime} "
+                        f"(mean={mean_corr:.3f})"
                     )
-
-                    # Also update CorrelationGuard's dynamic matrix
-                    try:
-                        epics_list = sorted(all_dfs.keys())
-                        common_len = min(len(df) for df in all_dfs.values())
-                        returns = np.array(
-                            [
-                                np.diff(
-                                    np.log(
-                                        np.maximum(
-                                            all_dfs[e]["close"].tail(common_len).to_numpy(),
-                                            1e-10,
-                                        )
-                                    )
-                                )
-                                for e in epics_list
-                            ]
-                        )
-                        corr_matrix = np.corrcoef(returns)
-                        self.risk_manager.correlation_guard.update_matrix(epics_list, corr_matrix)
-                        logger.debug(f"Updated CorrelationGuard matrix: {len(epics_list)} assets")
-                    except Exception as e:
-                        logger.debug(f"CorrelationGuard matrix update failed: {e}")
-        except Exception as e:
-            logger.debug(f"Correlation regime update failed: {e}")
+        except Exception as exc:
+            logger.debug(f"Correlation regime update failed: {exc}")
 
     async def _refresh_spread_blocks(self) -> None:
         """Re-evaluate spread-blocked epics every hour.
@@ -2374,6 +2438,7 @@ class PaperTradingLoop:
 
         # Refresh spread blocks hourly — unblock epics whose spread improved
         await self._refresh_spread_blocks()
+        await self._refresh_correlation_matrix()
         await self._refresh_correlation_regime()
         self._init_regime_gate()
 
@@ -3799,17 +3864,66 @@ class PaperTradingLoop:
                 except Exception as e:
                     logger.warning(f"[{epic}] TP1 partial close failed: {e}")
 
+    @staticmethod
+    def _status_from_opening_hours(
+        opening_hours: dict | None, now_utc: datetime
+    ) -> str | None:
+        """Parse Capital.com instrument.openingHours and return TRADEABLE/CLOSED.
+
+        Capital.com snapshot.marketStatus is unreliable for US stocks: returns
+        CLOSED during regular hours while prices stream live (updateTime fresh,
+        bid/offer valid). The authoritative signal is the per-instrument
+        `openingHours` map, which uses ``zone: UTC`` and per-weekday windows
+        such as ``"08:00 - 00:00"``. An end time of ``00:00`` is interpreted
+        as end-of-day (24:00) — Capital.com encodes overnight sessions this way.
+
+        Returns ``None`` when openingHours is missing/malformed so the caller
+        falls back to snapshot.marketStatus.
+        """
+        if not opening_hours or opening_hours.get("zone", "UTC").upper() != "UTC":
+            return None
+        weekday_key = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"][now_utc.weekday()]
+        windows = opening_hours.get(weekday_key) or []
+        if not windows:
+            return "CLOSED"
+        now_minutes = now_utc.hour * 60 + now_utc.minute
+
+        def _parse_hm(hm: str) -> int | None:
+            try:
+                h_str, m_str = hm.strip().split(":")
+                return int(h_str) * 60 + int(m_str)
+            except (ValueError, AttributeError):
+                return None
+
+        for window in windows:
+            try:
+                start_s, end_s = (p.strip() for p in window.split("-"))
+            except ValueError:
+                continue
+            start = _parse_hm(start_s)
+            end = _parse_hm(end_s)
+            if start is None or end is None:
+                continue
+            if end == 0:
+                # "00:00" end = end of day (24:00 same day, not 00:00 same day).
+                end = 24 * 60
+            if start <= now_minutes < end:
+                return "TRADEABLE"
+        return "CLOSED"
+
     async def _resolve_market_status(self, epic: str, fallback: str) -> str:
-        """Authoritative market_status from broker snapshot, 60s cached.
+        """Authoritative market_status, 60s cached.
 
         Capital.com /positions[].market.marketStatus can lag /markets/{epic}.snapshot
-        during extended-hours sessions (e.g. US stocks 08:00 UTC). Using the stale
-        positions field pauses the time-stop accumulator and skips local SL/TP/
-        trailing checks even though the market is tradeable.
+        AND snapshot.marketStatus itself is unreliable for US stocks (returns
+        CLOSED during regular hours while bid/offer/updateTime stream live).
+        The authoritative signal is instrument.openingHours (zone: UTC).
 
         Resolution order:
-          1. Cached snapshot status (if < TTL old)
-          2. Fresh broker.get_market_details(epic).snapshot.marketStatus
+          1. Cached status (if < TTL old)
+          2. Fresh broker.get_market_details(epic):
+             a. Parse instrument.openingHours vs now_utc — primary source
+             b. snapshot.marketStatus — secondary fallback
           3. ``fallback`` (caller-supplied position.market_status)
         """
         now_ts = _time.time()
@@ -3820,7 +3934,15 @@ class PaperTradingLoop:
             details = await asyncio.wait_for(
                 self.broker.get_market_details(epic), timeout=2.0
             )
-            status = (details or {}).get("snapshot", {}).get("marketStatus")
+            payload = details or {}
+            opening_hours = (payload.get("instrument") or {}).get("openingHours")
+            status_from_hours = self._status_from_opening_hours(
+                opening_hours, datetime.now(UTC)
+            )
+            if status_from_hours is not None:
+                self._market_status_cache[epic] = (status_from_hours, now_ts)
+                return status_from_hours
+            status = payload.get("snapshot", {}).get("marketStatus")
             if status:
                 self._market_status_cache[epic] = (status, now_ts)
                 return status
