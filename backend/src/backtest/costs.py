@@ -7,22 +7,37 @@ from datetime import datetime, timedelta
 
 # Capital.com typical FULL bid-ask spreads (in price units).
 # These represent the full spread (ask - bid), not the half-spread.
-# Calibrated 2026-04-28 from live broker snapshots × 1.2x buffer for off-hours
-# widening. See docs/reports/2026-04-28_phase3_real_costs.md.
+# Recalibrated 2026-05-23 from 74h passive snapshot collector (n=14,349 tradeable
+# obs across 21 epics). Values = measured_p95 × 1.1 buffer (Phase 3-bis methodology).
+# See `backend/docs/reports/2026-05-23_phase3-bis_spread_recalibration_PROPOSAL.md`
+# + `data/diagnostics/spread_audit/2026-05.parquet`.
 ASSET_SPREADS = {
-    "XAUUSD": 0.60,   # snap 0.50 × 1.2
-    "BTCUSD": 60.0,   # snap 50.0 × 1.2
-    "ETHUSD": 2.10,   # snap 1.75 × 1.2 (was hidden behind default 0.5)
-    "SOLUSD": 0.50,   # snap 0.42 × 1.2
-    "BNBUSD": 3.75,   # snap 3.11 × 1.2 (was hidden behind default 0.5)
-    "US500": 0.50,
-    # Other top-13 KEEP basket spreads — conservative defaults pending
-    # Phase 3-bis sweep:
-    "WTIUSD": 0.04,   # ~0.04 USD on $100 oil
-    "DE40": 1.00,     # ~1.0 point on DAX
-    "PLATINUM": 1.00,
-    "TSLA": 0.10,
-    "NVDA": 0.10,
+    # Crypto (Capital.com demo)
+    "XAUUSD": 0.825,   # p95 0.75 × 1.1 (was 0.60)
+    "BTCUSD": 55.0,    # p95 50.0 × 1.1 (was 60.0)
+    "ETHUSD": 1.925,   # p95 1.75 × 1.1 (was 2.10)
+    "SOLUSD": 0.481,   # p95 0.4373 × 1.1 (was 0.50)
+    "BNBUSD": 3.63,    # p95 3.30 × 1.1 (was 3.75)
+    # Indices
+    "US500": 0.66,     # p95 0.60 × 1.1 (was 0.50)
+    "DE40": 8.80,      # p95 8.00 × 1.1 (was 1.00 — +780% understated, Asia session spike)
+    # Commodities
+    "WTIUSD": 0.044,   # p95 0.04 × 1.1 (was 0.04)
+    "PLATINUM": 7.70,  # p95 7.00 × 1.1 (was 1.00 — +670% understated)
+    "COPPER": 0.0030,  # p95 0.0027 × 1.1 (was missing)
+    # US Stocks (high session-dependent variance, p95 dominated by Asia/pre-market)
+    "TSLA": 0.495,     # p95 0.45 × 1.1 (was 0.10 — +395% understated)
+    "NVDA": 0.308,     # p95 0.28 × 1.1 (was 0.10 — +208% understated)
+    "AAPL": 0.517,     # p95 0.47 × 1.1 (was missing)
+    "MSFT": 0.66,      # p95 0.60 × 1.1 (was missing)
+    "GOOGL": 0.583,    # p95 0.53 × 1.1 (was missing)
+    "AMZN": 0.55,      # p95 0.50 × 1.1 (was missing)
+    "META": 1.144,     # p95 1.04 × 1.1 (was missing)
+    "AMD": 1.078,      # p95 0.98 × 1.1 (was missing)
+    # Forex (USD-base / quote pairs)
+    "USDJPY": 0.0154,  # p95 0.014 × 1.1 (was missing, fallback 0.5 was 32× too wide)
+    "USDCAD": 0.00022, # p95 0.0002 × 1.1 (was missing, fallback was 2272× too wide)
+    "USDCHF": 0.00033, # p95 0.0003 × 1.1 (was missing, fallback was 1515× too wide)
 }
 
 # Typical overnight swap rates (daily, as fraction of position value).
