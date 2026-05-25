@@ -39,7 +39,7 @@ class TrainingJob:
             "epic": self.epic,
             "status": self.status.value,
             "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "completed_at": (self.completed_at.isoformat() if self.completed_at else None),
             "error": self.error,
             "metrics": self.metrics,
             "progress": self.progress,
@@ -296,6 +296,15 @@ class TrainingOrchestrator:
             )
             model = XGBoostClassifier()
 
+            # SHAP-prune allowlist: validated keep-list per asset (A/B tested
+            # 2026-05-25, safe→beneficial). Gated by config["shap_prune"]
+            # (default on); None when no keep-list file → full feature set.
+            allowlist = None
+            if config.get("shap_prune", True):
+                from src.models.feature_selector import load_shap_allowlist
+
+                allowlist = load_shap_allowlist(epic, timeframe)
+
             result = trainer.train(
                 model=model,
                 epic=epic,
@@ -303,6 +312,7 @@ class TrainingOrchestrator:
                 save_best=True,
                 multi_timeframe=config.get("multi_timeframe", True),
                 include_sentiment=config.get("include_sentiment", False),
+                feature_allowlist=allowlist,
             )
 
             # Extract metrics from TrainingResult

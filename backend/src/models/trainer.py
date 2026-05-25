@@ -59,6 +59,7 @@ class ModelTrainer:
         multi_timeframe: bool = False,
         include_sentiment: bool = False,
         sil_data=None,
+        feature_allowlist: list[str] | None = None,
     ) -> TrainingResult:
         """
         Run the full training pipeline.
@@ -110,6 +111,7 @@ class ModelTrainer:
             epic=epic,
             timeframe=timeframe,
             save_best=save_best,
+            feature_allowlist=feature_allowlist,
         )
 
         result.training_duration_seconds = time.time() - start_time
@@ -129,6 +131,7 @@ class ModelTrainer:
         epic: str,
         timeframe: str,
         save_best: bool = True,
+        feature_allowlist: list[str] | None = None,
     ) -> TrainingResult:
         """
         Train on a pre-built DataFrame (useful for testing).
@@ -161,6 +164,7 @@ class ModelTrainer:
             epic=epic,
             timeframe=timeframe,
             save_best=save_best,
+            feature_allowlist=feature_allowlist,
         )
 
     def _train_on_dataframe(
@@ -171,6 +175,7 @@ class ModelTrainer:
         epic: str,
         timeframe: str,
         save_best: bool,
+        feature_allowlist: list[str] | None = None,
     ) -> TrainingResult:
         """Internal: run walk-forward training on a prepared DataFrame."""
         # Filter rows with valid targets
@@ -194,6 +199,19 @@ class ModelTrainer:
 
         # Exclude known problematic features (e.g. collinear regime one-hots)
         feature_cols = [c for c in feature_cols if c not in EXCLUDE_FEATURES]
+
+        # Optional SHAP-prune allowlist: restrict to validated keep-list when given.
+        # (None -> no restriction, identical to legacy behavior.)
+        if feature_allowlist:
+            allow = set(feature_allowlist)
+            restricted = [c for c in feature_cols if c in allow]
+            if restricted:
+                logger.info(
+                    f"Feature allowlist active: {len(feature_cols)} -> {len(restricted)} features"
+                )
+                feature_cols = restricted
+            else:
+                logger.warning("Feature allowlist matched 0 columns — ignoring, using full set.")
 
         if not feature_cols:
             raise ValueError("No feature columns found in DataFrame.")
@@ -328,8 +346,10 @@ class ModelTrainer:
         # guard `last_split is None` (zero-iteration loop on edge data
         # sizes) — abort gracefully rather than AttributeError.
         calibrator = None
-        cal_indices = best_val_indices if best_val_indices is not None else (
-            last_split.val_indices if last_split is not None else None
+        cal_indices = (
+            best_val_indices
+            if best_val_indices is not None
+            else (last_split.val_indices if last_split is not None else None)
         )
         if cal_indices is None:
             logger.warning(

@@ -7,6 +7,9 @@ Provides two mechanisms:
 3. EXCLUDE_FEATURES — known problematic features to always exclude
 """
 
+import json
+from pathlib import Path
+
 import numpy as np
 from loguru import logger
 
@@ -21,6 +24,34 @@ EXCLUDE_FEATURES = {
     "regime_trending_down_zscore",
     "regime_ranging_zscore",
 }
+
+# Per-asset SHAP-prune keep-lists produced by scripts/shap_analysis.py.
+_SHAP_DIR = Path(__file__).resolve().parents[2] / "data" / "shap_analysis"
+
+
+def load_shap_allowlist(
+    epic: str, timeframe: str = "1h", shap_dir: Path | None = None
+) -> list[str] | None:
+    """Load the validated SHAP keep-list for an asset, if present.
+
+    Returns the ``keep_features`` list from
+    ``data/shap_analysis/{epic}_{timeframe}_features.json`` (written by the SHAP
+    analysis tool), or ``None`` when no file exists — in which case the trainer
+    falls back to the full feature set (legacy behavior).
+    """
+    d = shap_dir or _SHAP_DIR
+    path = d / f"{epic}_{timeframe}_features.json"
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text())
+        keep = data.get("keep_features") or None
+        if keep:
+            logger.info(f"SHAP allowlist for {epic}/{timeframe}: {len(keep)} features")
+        return keep
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning(f"Failed to load SHAP allowlist for {epic}: {e}")
+        return None
 
 
 def select_top_features(
