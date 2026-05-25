@@ -116,6 +116,52 @@ export class PositionCardComponent {
     return null;
   });
 
+  /** Market-status badge: TRADEABLE / CLOSED / pre-market. Drives both the
+   *  visual chip and a card-level dim when contrattazioni are closed (timer
+   *  pauses, no SL/TP trigger, broker may not accept close). */
+  readonly marketBadge = computed<{
+    label: string;
+    tone: 'open' | 'closed' | 'pending' | 'unknown';
+    tooltip: string;
+  } | null>(() => {
+    const raw = (this.position().marketStatus ?? '').toUpperCase();
+    if (!raw) return null;
+    if (raw === 'TRADEABLE') {
+      return {
+        label: 'MKT OPEN',
+        tone: 'open',
+        tooltip:
+          'Contrattazioni attive — broker accetta close, SL/TP triggerano, ' +
+          'timer di vita posizione incrementa.',
+      };
+    }
+    if (raw === 'CLOSED') {
+      return {
+        label: 'MKT CLOSED',
+        tone: 'closed',
+        tooltip:
+          'Contrattazioni chiuse — broker non accetta close, SL/TP ' +
+          'in pausa, accumulatore time-stop fermo (MT5 2026-05-19).',
+      };
+    }
+    if (raw === 'EDITS_ONLY' || raw === 'OFFLINE' || raw === 'SUSPENDED') {
+      return {
+        label: raw,
+        tone: 'pending',
+        tooltip: `Stato broker: ${raw}. Solo modifiche consentite, niente close immediato.`,
+      };
+    }
+    return {
+      label: raw,
+      tone: 'unknown',
+      tooltip: `Stato broker non riconosciuto: ${raw}`,
+    };
+  });
+
+  /** Card-level "market closed" dim flag — used by template to fade the card
+   *  slightly so the user sees at a glance that this row is dormant. */
+  readonly marketClosed = computed(() => this.marketBadge()?.tone === 'closed');
+
   readonly rangeMarkers = computed(() => buildRangeMarkers(this.position()));
 
   readonly trendPath = computed(() => buildSparkPath(this.position().pricePath));

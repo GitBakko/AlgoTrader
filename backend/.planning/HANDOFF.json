@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-13T16:22:13.291Z",
+  "timestamp": "2026-05-23T15:25:49.923Z",
   "source": "auto-postool",
   "partial": false,
   "phase": null,
@@ -18,6 +18,14 @@
   "uncommitted_files": [
     {
       "status": "M",
+      "path": ".claude-flow/config.yaml"
+    },
+    {
+      "status": "D",
+      "path": ".claude/scheduled_tasks.lock"
+    },
+    {
+      "status": "M",
       "path": ".planning/HANDOFF.json"
     },
     {
@@ -26,25 +34,81 @@
     },
     {
       "status": "M",
-      "path": "backend/src/trading/paper_loop.py"
+      "path": "frontend/src/app/core/models/paper-trading.ts"
     },
     {
       "status": "M",
-      "path": "backend/src/utils/config.py"
+      "path": "frontend/src/app/views/paper-trading/components/position-card/position-card.component.html"
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/app/views/paper-trading/components/position-card/position-card.component.scss"
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/app/views/paper-trading/components/position-card/position-card.component.ts"
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/app/views/paper-trading/paper-trading.component.ts"
     },
     {
       "status": "??",
-      "path": ".playwright-mcp/page-2026-05-12T13-05-33-537Z.yml"
+      "path": ".claude/helpers/context-persistence-hook.mjs"
     },
     {
       "status": "??",
-      "path": ".playwright-mcp/page-2026-05-12T13-05-58-800Z.yml"
+      "path": ".parquet`"
     },
     {
       "status": "??",
-      "path": "openapi_tmp.json"
+      "path": "1.2"
+    },
+    {
+      "status": "??",
+      "path": "100"
+    },
+    {
+      "status": "??",
+      "path": "100%"
+    },
+    {
+      "status": "??",
+      "path": "40"
+    },
+    {
+      "status": "??",
+      "path": "5"
+    },
+    {
+      "status": "??",
+      "path": "5.0,"
+    },
+    {
+      "status": "??",
+      "path": "None"
+    },
+    {
+      "status": "??",
+      "path": "backend/dict"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/phase1_optuna_full_basket.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/tests/trading/test_market_status_opening_hours.py"
+    },
+    {
+      "status": "??",
+      "path": "dict"
+    },
+    {
+      "status": "??",
+      "path": "limit"
     }
   ],
   "next_action": null,
-  "context_notes": "Recent commits:\n227d1b3 fix(logos): center img in white-backdrop wrapper (was baseline-shifted)\n1605e37 ui(logos): white backdrop on stock logos so dark glyphs stay legible\nea0bfd7 fix(logos): remove dead clearbit.com from stock-logo chain\n755497b ui(logos): use eodhd /mlogos/.webp as primary stock-logo source\n8c240f8 ui(logos): add real logos for 8 new universe epics (AAPL/MSFT/GOOGL/AMZN/META/AMD + USDCHF/USDCAD)"
+  "context_notes": "Recent commits:\n4fdb612 feat(constants): drop AMD + META + AMZN from TRADABLE_ASSETS (18-asset paper soak basket)\ndcfd8f8 fix(paper_loop): retry correlation matrix on next tick after failure\nc8e41c1 feat(config): Settings.max_total_open_positions default 5 → 10\n5f31b1a style: ruff + black fixup for Phase 1 expansion changes\n8adf153 docs(handoff): Phase 1 expansion DONE — paper soak now NEXT"
 }

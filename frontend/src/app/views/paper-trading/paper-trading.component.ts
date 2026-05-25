@@ -632,6 +632,7 @@ function adaptPosition(
     trailingPhase: phaseRaw,
     rr,
     pricePath,
+    marketStatus: p.market_status ?? undefined,
   };
 }
 

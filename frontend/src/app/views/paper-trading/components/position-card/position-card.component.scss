@@ -23,6 +23,24 @@
     border-left-color: p.$mantis-loss;
   }
 
+  // Market closed — dim the whole card so the user sees at a glance that
+  // contrattazioni are dormant (no SL/TP triggers, no time-stop accumulation,
+  // broker may refuse close-now). Leaves the border-left state color intact
+  // so the profit/loss tone remains readable.
+  &.is-market-closed {
+    background: linear-gradient(
+      0deg,
+      rgba(13, 17, 23, .35),
+      rgba(13, 17, 23, .35)
+    ), p.$mantis-surface-2;
+    opacity: .82;
+
+    .pv-pc__pnl-quote,
+    .pv-pc__pnl-trend {
+      opacity: .7;
+    }
+  }
+
   &:hover,
   &:focus-visible {
     transform: translateY(-1px);
@@ -183,6 +201,55 @@
       border-color: var(--mantis-border-soft);
     }
   }
+
+  &--market {
+    border-radius: 2px;
+    font-size: var(--mantis-fs-xxs);
+    cursor: help;
+    gap: 4px;
+
+    .pv-pc__chip-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    &[data-tone='open'] {
+      color: p.$mantis-green;
+      background: rgba(0, 217, 126, .12);
+      border-color: rgba(0, 217, 126, .4);
+
+      .pv-pc__chip-dot {
+        box-shadow: 0 0 6px rgba(0, 217, 126, .55);
+        animation: pv-pc-pulse 1.8s ease-in-out infinite;
+      }
+    }
+
+    &[data-tone='closed'] {
+      color: var(--fg-soft);
+      background: rgba(139, 148, 158, .1);
+      border-color: var(--mantis-border-soft);
+    }
+
+    &[data-tone='pending'] {
+      color: p.$mantis-warning;
+      background: rgba(255, 176, 32, .12);
+      border-color: rgba(255, 176, 32, .42);
+    }
+
+    &[data-tone='unknown'] {
+      color: var(--fg2);
+      background: var(--mantis-ghost-1);
+      border-color: var(--mantis-border-soft);
+    }
+  }
+}
+
+@keyframes pv-pc-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .45; }
 }
 
 // COL 2 — range visualization + triplet

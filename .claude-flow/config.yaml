@@ -10,7 +10,8 @@ swarm:
   coordinationStrategy: consensus
 
 memory:
-  backend: hybrid
+  backend: agentdb
+  embedding_provider: local
   enableHNSW: true
   persistPath: .claude-flow/data
   cacheSize: 100

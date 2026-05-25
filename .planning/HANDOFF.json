@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-15T08:02:09.825Z",
+  "timestamp": "2026-05-25T08:51:46.136Z",
   "source": "auto-postool",
   "partial": false,
   "phase": null,
@@ -18,35 +18,11 @@
   "uncommitted_files": [
     {
       "status": "M",
-      "path": ".claude-flow/CAPABILITIES.md"
-    },
-    {
-      "status": "M",
       "path": ".claude-flow/config.yaml"
     },
     {
       "status": "D",
-      "path": ".claude-flow/metrics/learning.json"
-    },
-    {
-      "status": "D",
-      "path": ".claude-flow/metrics/swarm-activity.json"
-    },
-    {
-      "status": "D",
-      "path": ".claude-flow/metrics/v3-progress.json"
-    },
-    {
-      "status": "D",
-      "path": ".claude-flow/security/audit-status.json"
-    },
-    {
-      "status": "M",
-      "path": ".claude/settings.json"
-    },
-    {
-      "status": "M",
-      "path": ".gitignore"
+      "path": ".claude/scheduled_tasks.lock"
     },
     {
       "status": "M",
@@ -54,9 +30,81 @@
     },
     {
       "status": "M",
-      "path": "CLAUDE.md"
+      "path": "backend/.planning/HANDOFF.json"
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/app/core/models/paper-trading.ts"
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/app/views/paper-trading/components/position-card/position-card.component.html"
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/app/views/paper-trading/components/position-card/position-card.component.scss"
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/app/views/paper-trading/components/position-card/position-card.component.ts"
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/app/views/paper-trading/paper-trading.component.ts"
+    },
+    {
+      "status": "??",
+      "path": ".claude/helpers/context-persistence-hook.mjs"
+    },
+    {
+      "status": "??",
+      "path": ".parquet`"
+    },
+    {
+      "status": "??",
+      "path": "1.2"
+    },
+    {
+      "status": "??",
+      "path": "100"
+    },
+    {
+      "status": "??",
+      "path": "100%"
+    },
+    {
+      "status": "??",
+      "path": "40"
+    },
+    {
+      "status": "??",
+      "path": "5"
+    },
+    {
+      "status": "??",
+      "path": "5.0,"
+    },
+    {
+      "status": "??",
+      "path": "None"
+    },
+    {
+      "status": "??",
+      "path": "backend/dict"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/phase1_optuna_full_basket.py"
+    },
+    {
+      "status": "??",
+      "path": "dict"
+    },
+    {
+      "status": "??",
+      "path": "limit"
     }
   ],
   "next_action": null,
-  "context_notes": "Recent commits:\n3840de9 chore(planning): sync HANDOFF state + gitignore playwright dumps and temp JSONs\n92f5d78 chore(tooling): integrate ruflo MCP server with safe merge of project configs\n132ea74 fix(risk): entry-drift handler shifts/rejects on stale candle vs broker mid\n227d1b3 fix(logos): center img in white-backdrop wrapper (was baseline-shifted)\n1605e37 ui(logos): white backdrop on stock logos so dark glyphs stay legible"
+  "context_notes": "Recent commits:\n1674dba docs(handoff): paper soak started 2026-05-23 — check 2026-06-06\nb817122 test(paper_loop): unit tests for _status_from_opening_hours\n4fdb612 feat(constants): drop AMD + META + AMZN from TRADABLE_ASSETS (18-asset paper soak basket)\ndcfd8f8 fix(paper_loop): retry correlation matrix on next tick after failure\nc8e41c1 feat(config): Settings.max_total_open_positions default 5 → 10"
 }

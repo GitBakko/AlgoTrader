@@ -1,6 +1,7 @@
 <article class="pv-pc"
          [class.is-profit]="inProfit()"
          [class.is-loss]="!inProfit()"
+         [class.is-market-closed]="marketClosed()"
          (click)="onCardClick()"
          tabindex="0"
          role="button"
@@ -35,6 +36,13 @@
               [attr.data-tone]="pb.tone"
               [title]="pb.tooltip">
           {{ pb.label }}
+        </span>
+      }
+      @if (marketBadge(); as mb) {
+        <span class="pv-pc__chip pv-pc__chip--market mantis-mono"
+              [attr.data-tone]="mb.tone"
+              [title]="mb.tooltip">
+          <span class="pv-pc__chip-dot" aria-hidden="true"></span>{{ mb.label }}
         </span>
       }
     </div>

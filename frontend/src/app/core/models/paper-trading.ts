@@ -157,6 +157,10 @@ export interface PaperTradingPosition {
   rr: number;
   /** 60-point sparkline of price since entry. */
   pricePath: number[];
+  /** Raw broker market status (TRADEABLE / CLOSED / EDITS_ONLY / ...). Drives
+   *  the market-open/closed chip on the position card. Undefined when the
+   *  broker payload didn't include the field. */
+  marketStatus?: string;
 }
 
 /** Signals Heatmap cell — one per asset (21 total). */
