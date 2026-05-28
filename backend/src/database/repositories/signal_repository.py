@@ -96,9 +96,7 @@ class SignalRepository(BaseRepository[Signal]):
         # the day-rollover bug where `since.hour - hours` produced negatives.
         from datetime import timedelta
 
-        since = (datetime.now(UTC) - timedelta(hours=hours)).replace(
-            microsecond=0, tzinfo=None
-        )
+        since = (datetime.now(UTC) - timedelta(hours=hours)).replace(microsecond=0, tzinfo=None)
 
         query = select(Signal).where(Signal.epic == epic).where(Signal.generated_at >= since)
         if direction:
@@ -160,21 +158,35 @@ class SignalRepository(BaseRepository[Signal]):
         take_profit: float | None,
         status: str,
         features: dict,
+        timeframe: str = "15min",
+        model_version: str = "unknown",
     ) -> int | None:
-        """Create a signal record with full audit trail JSONB."""
+        """Create a signal record with full audit trail JSONB.
+
+        ``timeframe`` must be the loop's actual decision resolution
+        (``PaperTradingLoop._candle_resolution``). It was previously hardcoded
+        to "15min", which silently mislabelled every persisted signal once the
+        loop moved to 4h (``SCALP_CANDLE_RESOLUTION``) — corrupting any analysis
+        that grouped/sliced signals by timeframe.
+
+        ``model_version`` is the real producing strategy/model (e.g. the
+        ``TradingSignal.strategy_name``). It was previously hardcoded to
+        "scalp_score_v1" regardless of which chain (MR / ML / scalp / ORB_FVG)
+        actually generated the signal.
+        """
         from decimal import Decimal
 
         now = datetime.now(UTC).replace(tzinfo=None)
 
         signal = Signal(
             epic=epic,
-            timeframe="15min",
+            timeframe=timeframe,
             direction=direction,
             confidence=Decimal(str(round(confidence, 4))),
             predicted_price=Decimal(str(round(entry_price, 4))) if entry_price else None,
             stop_loss_price=Decimal(str(round(stop_loss, 4))) if stop_loss else None,
             take_profit_price=Decimal(str(round(take_profit, 4))) if take_profit else None,
-            model_version="scalp_score_v1",
+            model_version=model_version,
             features=features,
             status=status,
             generated_at=now,

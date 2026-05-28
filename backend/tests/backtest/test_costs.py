@@ -4,7 +4,12 @@ from datetime import datetime
 
 import pytest
 
-from src.backtest.costs import CostSimulator, ASSET_SPREADS, SL_SLIPPAGE_FACTOR
+from src.backtest.costs import (
+    ASSET_SPREADS,
+    SPREAD_FALLBACK_PCT,
+    CostSimulator,
+    resolve_spread,
+)
 
 
 class TestCostSimulator:
@@ -46,14 +51,17 @@ class TestCostSimulator:
         sim = CostSimulator()
         # 1 bar of 1h = 60 min, < 1 day => no overnight
         cost = sim.calculate_total_cost(
-            epic="XAUUSD", size=1.0, entry_price=2000.0,
-            direction="LONG", bars_held=1, timeframe_minutes=60,
+            epic="XAUUSD",
+            size=1.0,
+            entry_price=2000.0,
+            direction="LONG",
+            bars_held=1,
+            timeframe_minutes=60,
         )
         assert cost > 0  # Should have spread + slippage
         # No overnight since 1h < 24h
-        spread_slip = (
-            sim.calculate_spread_cost("XAUUSD", 1.0)
-            + sim.calculate_slippage("XAUUSD", 1.0)
+        spread_slip = sim.calculate_spread_cost("XAUUSD", 1.0) + sim.calculate_slippage(
+            "XAUUSD", 1.0
         )
         assert cost == pytest.approx(spread_slip)
 
@@ -61,12 +69,15 @@ class TestCostSimulator:
         sim = CostSimulator()
         # 48 bars of 1h = 48h = 2 nights
         cost = sim.calculate_total_cost(
-            epic="XAUUSD", size=1.0, entry_price=2000.0,
-            direction="LONG", bars_held=48, timeframe_minutes=60,
+            epic="XAUUSD",
+            size=1.0,
+            entry_price=2000.0,
+            direction="LONG",
+            bars_held=48,
+            timeframe_minutes=60,
         )
-        spread_slip = (
-            sim.calculate_spread_cost("XAUUSD", 1.0)
-            + sim.calculate_slippage("XAUUSD", 1.0)
+        spread_slip = sim.calculate_spread_cost("XAUUSD", 1.0) + sim.calculate_slippage(
+            "XAUUSD", 1.0
         )
         assert cost > spread_slip  # Should include overnight fees
 
@@ -74,13 +85,21 @@ class TestCostSimulator:
         """SL exit should cost more than normal exit."""
         sim = CostSimulator()
         normal_cost = sim.calculate_total_cost(
-            epic="XAUUSD", size=10.0, entry_price=2000.0,
-            direction="LONG", bars_held=5, timeframe_minutes=60,
+            epic="XAUUSD",
+            size=10.0,
+            entry_price=2000.0,
+            direction="LONG",
+            bars_held=5,
+            timeframe_minutes=60,
             is_sl_exit=False,
         )
         sl_cost = sim.calculate_total_cost(
-            epic="XAUUSD", size=10.0, entry_price=2000.0,
-            direction="LONG", bars_held=5, timeframe_minutes=60,
+            epic="XAUUSD",
+            size=10.0,
+            entry_price=2000.0,
+            direction="LONG",
+            bars_held=5,
+            timeframe_minutes=60,
             is_sl_exit=True,
         )
         assert sl_cost > normal_cost
@@ -95,21 +114,60 @@ class TestCostSimulator:
         assert weekend == 2
         assert weekday == 1
 
+    def test_listed_epic_ignores_price_fallback(self):
+        """Listed epics use the measured spread regardless of price arg."""
+        sim = CostSimulator()
+        assert sim.calculate_spread_cost("XAUUSD", 1.0, price=2000.0) == ASSET_SPREADS["XAUUSD"]
+        # resolve_spread returns the measured value, not a proportional one
+        assert resolve_spread("XAUUSD", price=2000.0) == ASSET_SPREADS["XAUUSD"]
+
+    def test_unlisted_epic_uses_proportional_fallback(self):
+        """Unlisted epics fall back to a fraction of price, not the flat 0.5."""
+        assert "DOGUSD" not in ASSET_SPREADS  # guards the premise of this test
+        spread = resolve_spread("DOGUSD", price=0.10)
+        assert spread == pytest.approx(0.10 * SPREAD_FALLBACK_PCT)
+
+    def test_unlisted_epic_not_catastrophic(self):
+        """The legacy flat-0.5 default produced a 500% spread on $0.10 DOGUSD.
+
+        Regression guard: spread cost must be a tiny fraction of notional, not
+        dominate it.
+        """
+        sim = CostSimulator()
+        size, price = 1000.0, 0.10
+        notional = size * price  # $100
+        cost = sim.calculate_spread_cost("DOGUSD", size, price=price)
+        assert cost < notional * 0.05  # << old 0.5*1000 = $500 (5x notional)
+
+    def test_unlisted_epic_no_price_uses_flat_fallback(self):
+        """Without a reference price we cannot go proportional — flat fallback."""
+        # premise: epic not listed
+        assert "ZZZUSD" not in ASSET_SPREADS
+        assert resolve_spread("ZZZUSD", price=None) == 0.5
+
     def test_weekend_multiplier_increases_overnight(self):
         """Trades spanning weekends should have higher overnight fees."""
         sim = CostSimulator()
         # Monday entry, 2 nights (Mon-Tue, Tue-Wed) = 2 weekday nights
         monday = datetime(2025, 1, 6, 10, 0, 0)  # Monday
         cost_weekday = sim.calculate_total_cost(
-            epic="XAUUSD", size=1.0, entry_price=2000.0,
-            direction="LONG", bars_held=48, timeframe_minutes=60,
+            epic="XAUUSD",
+            size=1.0,
+            entry_price=2000.0,
+            direction="LONG",
+            bars_held=48,
+            timeframe_minutes=60,
             entry_time=monday,
         )
         # Friday entry, 2 nights (Fri-Sat, Sat-Sun) = 2 weekend nights (3x each)
         friday = datetime(2025, 1, 10, 10, 0, 0)  # Friday
         cost_weekend = sim.calculate_total_cost(
-            epic="XAUUSD", size=1.0, entry_price=2000.0,
-            direction="LONG", bars_held=48, timeframe_minutes=60,
+            epic="XAUUSD",
+            size=1.0,
+            entry_price=2000.0,
+            direction="LONG",
+            bars_held=48,
+            timeframe_minutes=60,
             entry_time=friday,
         )
         assert cost_weekend > cost_weekday

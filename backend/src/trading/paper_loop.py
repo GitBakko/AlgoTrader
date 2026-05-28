@@ -2774,6 +2774,7 @@ class PaperTradingLoop:
                 audit_features = {
                     "version": 1,
                     "rejection_reason": None,
+                    "strategy_name": signal.strategy_name,
                     "votes": signal.metadata.get("votes"),
                     "gates": signal.metadata.get("gates"),
                     "ml": signal.metadata.get("ml"),
@@ -3604,6 +3605,10 @@ class PaperTradingLoop:
                 from src.database.repositories.signal_repository import SignalRepository
 
                 repo = SignalRepository(session)
+                # Real producer of the signal (ScalpScore / MR / ML / ORB_FVG …),
+                # carried in the audit features. Replaces the legacy hardcoded
+                # "scalp_score_v1" that mislabelled every signal regardless of source.
+                model_version = (features or {}).get("strategy_name") or "unknown"
                 signal_id = await repo.create_from_audit(
                     epic=epic,
                     direction=direction,
@@ -3613,6 +3618,8 @@ class PaperTradingLoop:
                     take_profit=take_profit,
                     status=status,
                     features=features,
+                    timeframe=self._candle_resolution,
+                    model_version=model_version,
                 )
                 await session.commit()
                 logger.info(f"[{epic}] Signal audit persisted (id={signal_id}, status={status})")
