@@ -98,7 +98,10 @@ class ExperimentScheduler:
         from src.broker.client import CapitalComClient
         broker_epic = (CapitalComClient._to_broker_epic(row["epic"])
                        if hasattr(self.client, "_to_broker_epic") else row["epic"])
-        txns = await self.client.get_transaction_history(limit=50)
+        from datetime import timedelta
+        to_date = datetime.now(timezone.utc)
+        from_date = to_date - timedelta(days=2)
+        txns = await self.client.get_transaction_history(from_date, to_date)
         best = None
         for t in txns:
             if (t.transaction_type or "").upper() != "TRADE":

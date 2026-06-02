@@ -30,3 +30,32 @@ async def test_on_session_open_enters_on_gap(tmp_path, monkeypatch):
     await sched.on_session_open(now=now)
     client.create_position.assert_awaited_once()
     assert len(ex.ledger.list_open()) == 1
+
+
+@pytest.mark.asyncio
+async def test_mark_pass_closes_and_reconciles(tmp_path):
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import GapFadeStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+    from src.broker.models import Transaction
+
+    client = AsyncMock()
+    client.get_market_details.return_value = {"snapshot": {"bid": 101.4, "offer": 101.6}}
+    client.list_positions.return_value = []  # broker already closed the position
+    client.get_transaction_history.return_value = [
+        Transaction(date=datetime(2026, 6, 2, 16, 0, tzinfo=timezone.utc), reference="r1",
+                    transactionType="TRADE", instrumentName="AAPL", size="2.91", currency="USD")]
+
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP123",
+                            ledger=ForwardLedger(tmp_path / "m.db"), dry_run=False)
+    ex.ledger.record_open(strategy="gap_fade", epic="AAPL", session_date="2026-06-02",
+                          deal_id="D1", direction="SELL", entry=103.0, size=1.94,
+                          stop_level=105.0, rationale="x", opened_at="2026-06-02T14:00:00+00:00")
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategy=GapFadeStrategy(epics=["AAPL"]))
+    await sched.mark_pass(now=datetime(2026, 6, 2, 16, 0, tzinfo=timezone.utc))
+    rz = ex.ledger.realized("gap_fade")
+    assert len(rz) == 1
+    assert rz[0]["net_pnl"] == 2.91
+    assert rz[0]["close_reason"] == "BROKER_TRADE"
