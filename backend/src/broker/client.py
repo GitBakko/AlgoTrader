@@ -526,6 +526,21 @@ class CapitalComClient:
         accounts_data = response.get("accounts", [])
         return [Account(**acc) for acc in accounts_data]
 
+    async def switch_account(self, account_id: str) -> dict[str, Any]:
+        """Switch the ACTIVE trading account for THIS session (PUT /session).
+
+        Capital.com scopes the active account to the CST token, so a dedicated
+        client instance (its own SessionManager => own CST) can hold a different
+        active account than the soak client. The forward-lab validates this
+        independence before any live order.
+        """
+        return await self._request("PUT", "/api/v1/session", json={"accountId": account_id})
+
+    async def get_active_account_id(self) -> str:
+        """Return the accountId currently active on THIS session (GET /session)."""
+        data = await self._request("GET", "/api/v1/session")
+        return str(data.get("accountId", ""))
+
     async def get_transaction_history(
         self,
         from_date: datetime,
