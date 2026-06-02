@@ -36,3 +36,36 @@ def test_atr_stop_used_when_present():
     s = GapFadeStrategy(epics=["AAPL"], gap_threshold=0.01, stop_atr_mult=2.0)
     sig = s.should_enter(_ctx(100.0, 103.0, 103.0, atr=1.0))
     assert sig.stop_level == 105.0                     # open + 2*ATR
+
+
+def _pos(direction, prev, open_, entry):
+    from forward.strategy import OpenPosition
+    from datetime import datetime, timezone
+    return OpenPosition("AAPL", direction, entry, 1.0, 0.0, prev, open_,
+                        datetime(2026, 6, 2, 14, 0, tzinfo=timezone.utc), "D1")
+
+
+def test_short_exits_at_50pct_fill():
+    from forward.strategy import GapFadeStrategy
+    s = GapFadeStrategy(epics=["AAPL"], fill_fraction=0.5)
+    pos = _pos(Direction.SELL, 100.0, 104.0, 104.0)   # gap +4 -> target 102.0
+    assert s.exit_rule(pos, _ctx(100.0, 104.0, 102.0)) is True    # reached
+    assert s.exit_rule(pos, _ctx(100.0, 104.0, 103.0)) is False   # not yet
+
+
+def test_long_exits_at_50pct_fill():
+    from forward.strategy import GapFadeStrategy
+    s = GapFadeStrategy(epics=["AAPL"], fill_fraction=0.5)
+    pos = _pos(Direction.BUY, 100.0, 96.0, 96.0)      # gap -4 -> target 98.0
+    assert s.exit_rule(pos, _ctx(100.0, 96.0, 98.0)) is True
+    assert s.exit_rule(pos, _ctx(100.0, 96.0, 97.0)) is False
+
+
+def test_eod_flatten():
+    from forward.strategy import GapFadeStrategy
+    from datetime import datetime, timezone
+    s = GapFadeStrategy(epics=["AAPL"])
+    pos = _pos(Direction.SELL, 100.0, 104.0, 104.0)
+    late = datetime(2026, 6, 2, 21, 0, tzinfo=timezone.utc)
+    sc = datetime(2026, 6, 2, 20, 45, tzinfo=timezone.utc)
+    assert s.exit_rule(pos, _ctx(100.0, 104.0, 104.0, now=late, session_close=sc)) is True
