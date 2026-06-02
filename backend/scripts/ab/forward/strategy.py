@@ -57,3 +57,46 @@ class ForwardStrategy(ABC):
     @abstractmethod
     def exit_rule(self, pos: OpenPosition, ctx: MarketContext) -> bool:
         """True if the position should be closed now (SL is broker-side, not here)."""
+
+
+from dataclasses import field
+
+
+@dataclass
+class GapFadeStrategy(ForwardStrategy):
+    epics: list[str]
+    gap_threshold: float = 0.01
+    stop_atr_mult: float = 1.0
+    stop_pct_fallback: float = 0.015
+    fill_fraction: float = 0.5
+    name: str = field(default="gap_fade")
+
+    def universe(self) -> list[str]:
+        return list(self.epics)
+
+    def _stop_distance(self, ctx: MarketContext) -> float:
+        if ctx.atr and ctx.atr > 0:
+            return ctx.atr * self.stop_atr_mult
+        return ctx.today_open * self.stop_pct_fallback
+
+    def should_enter(self, ctx: MarketContext) -> Signal | None:
+        if ctx.prev_close <= 0:
+            return None
+        gap = ctx.gap
+        if abs(gap) < self.gap_threshold:
+            return None
+        dist = self._stop_distance(ctx)
+        if gap > 0:  # gap up -> fade short, stop above
+            return Signal(ctx.epic, Direction.SELL, ctx.today_open + dist,
+                          f"gap +{gap * 100:.2f}% fade short")
+        return Signal(ctx.epic, Direction.BUY, ctx.today_open - dist,  # gap down -> fade long
+                      f"gap {gap * 100:.2f}% fade long")
+
+    def exit_rule(self, pos: OpenPosition, ctx: MarketContext) -> bool:
+        if ctx.now >= ctx.session_close:  # EOD flatten (time stop)
+            return True
+        gap_size = pos.today_open - pos.prev_close
+        target = pos.today_open - self.fill_fraction * gap_size  # 50% retrace toward prev_close
+        if pos.direction == Direction.SELL:
+            return ctx.current_price <= target
+        return ctx.current_price >= target
