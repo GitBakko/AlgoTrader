@@ -24,6 +24,9 @@ backend/data/historical/
 backend/data/models/
 backend/data/cache/
 backend/data/diagnostics/
+backend/data/crypto_perp/
+backend/data/sharadar/
+backend/data/forward_lab/
 *.parquet
 *.h5
 *.pt

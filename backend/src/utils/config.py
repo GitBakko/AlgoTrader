@@ -80,6 +80,14 @@ class Settings(BaseSettings):
     capital_live_email: str = Field(default="", alias="CAPITAL_LIVE_EMAIL")
     capital_live_password: str = Field(default="", alias="CAPITAL_LIVE_PASSWORD")
 
+    # --- Forward Demo Lab (experiment account, isolated from soak) ---
+    capital_experiment_account_id: str | None = None
+    forward_lab_notional_usd: float = 200.0
+    forward_lab_max_concurrent: int = 5
+    forward_lab_daily_loss_limit_usd: float = 100.0
+    forward_lab_gap_threshold: float = 0.01
+    forward_lab_eod_flatten_utc: str = "20:45"  # HH:MM UTC cash-session flatten
+
     # ===== Auth Gate =====
     # When True, every state-changing API endpoint requires a valid JWT.
     # Default False so the existing test fixtures (which don't ship
