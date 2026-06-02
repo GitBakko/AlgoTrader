@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from src.broker.models import Direction
@@ -57,9 +57,6 @@ class ForwardStrategy(ABC):
     @abstractmethod
     def exit_rule(self, pos: OpenPosition, ctx: MarketContext) -> bool:
         """True if the position should be closed now (SL is broker-side, not here)."""
-
-
-from dataclasses import field
 
 
 @dataclass

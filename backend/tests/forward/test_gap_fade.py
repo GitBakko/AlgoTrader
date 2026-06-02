@@ -69,3 +69,18 @@ def test_eod_flatten():
     late = datetime(2026, 6, 2, 21, 0, tzinfo=timezone.utc)
     sc = datetime(2026, 6, 2, 20, 45, tzinfo=timezone.utc)
     assert s.exit_rule(pos, _ctx(100.0, 104.0, 104.0, now=late, session_close=sc)) is True
+
+
+def test_nonpositive_prev_close_no_trade():
+    from forward.strategy import GapFadeStrategy
+    s = GapFadeStrategy(epics=["AAPL"], gap_threshold=0.01)
+    assert s.should_enter(_ctx(0.0, 103.0, 103.0)) is None
+
+
+def test_open_position_field_order():
+    from forward.strategy import OpenPosition
+    from datetime import datetime, timezone
+    p = OpenPosition("AAPL", Direction.SELL, 103.0, 1.5, 105.0, 100.0, 103.0,
+                     datetime(2026, 6, 2, 14, 0, tzinfo=timezone.utc), "D1")
+    assert p.entry == 103.0 and p.size == 1.5 and p.stop_level == 105.0
+    assert p.prev_close == 100.0 and p.today_open == 103.0 and p.deal_id == "D1"
