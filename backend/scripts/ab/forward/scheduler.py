@@ -110,23 +110,19 @@ class ExperimentScheduler:
                             f"net={net:+.2f} ({reason})")
 
     async def _realized(self, row: dict, fallback_px: float) -> tuple[float, float, str]:
-        """Realized P&L from the latest TRADE transaction for this epic (broker truth)."""
-        from src.broker.client import CapitalComClient
-        broker_epic = (CapitalComClient._to_broker_epic(row["epic"])
-                       if hasattr(self.client, "_to_broker_epic") else row["epic"])
+        """Realized P&L from the broker TRADE transaction matching this row's dealId
+        (broker truth). dealId is the deterministic match key for /history/transactions
+        TRADE rows; an unmatched id (e.g. broker SL/TP rotation) stays PENDING_RECONCILE
+        rather than guessing — no invented P&L."""
         from datetime import timedelta
         to_date = datetime.now(timezone.utc)
         from_date = to_date - timedelta(days=2)
         txns = await self.client.get_transaction_history(from_date, to_date)
-        best = None
         for t in txns:
             if (t.transaction_type or "").upper() != "TRADE":
                 continue
-            if t.instrument_name in (row["epic"], broker_epic):
-                best = t
-                break
-        if best is not None:
-            pnl = best.pl_value_in("USD")
-            if pnl is not None:
-                return float(pnl), fallback_px, "BROKER_TRADE"
+            if t.deal_id and t.deal_id == row["deal_id"]:
+                pnl = t.pl_value_in("USD")
+                if pnl is not None:
+                    return float(pnl), fallback_px, "BROKER_TRADE"
         return 0.0, fallback_px, "PENDING_RECONCILE"
