@@ -254,8 +254,10 @@ class ExperimentScheduler:
                 whose details.openPrice == our entry (and date >= opened_at)
                 carries the close-side dealId, which matches the TRADE row for P&L.
         Else:   PENDING_RECONCILE (no guess, no invented P&L)."""
-        to_date = datetime.now(timezone.utc)
-        from_date = to_date - timedelta(days=2)
+        now = datetime.now(timezone.utc)
+        to_date = now - timedelta(seconds=60)   # broker rejects future `to` (error.invalid.daterange); clamp for clock drift
+        opened = self._parse_dt(row.get("opened_at"))
+        from_date = (opened - timedelta(hours=1)) if opened else (to_date - timedelta(days=1))
         txns = await self.client.get_transaction_history(from_date, to_date)
         trades = [t for t in txns if (t.transaction_type or "").upper() == "TRADE"]
 

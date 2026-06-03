@@ -118,3 +118,41 @@ async def test_realized_no_match_anywhere_is_pending(tmp_path):
            "opened_at": "2026-06-03T14:30:00+00:00", "direction": "BUY"}
     net, _px, reason = await sched._realized(row, fallback_px=100.0)
     assert net == 0.0 and reason == "PENDING_RECONCILE"
+
+
+@pytest.mark.asyncio
+async def test_realized_window_clamps_future_to_and_uses_opened_at(tmp_path):
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import GapFadeStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+
+    captured = {}
+
+    async def _txns(frm, to):
+        captured["txn"] = (frm, to)
+        return []
+
+    async def _acts(frm, to):
+        captured["act"] = (frm, to)
+        return []
+
+    client = AsyncMock()
+    client.get_transaction_history.side_effect = _txns
+    client.get_activity_history.side_effect = _acts
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(tmp_path / "win.db"), dry_run=False)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[GapFadeStrategy(epics=["AMD"])])
+    row = {"epic": "AMD", "deal_id": "DX", "entry": 533.79,
+           "opened_at": "2026-06-03T13:36:44+00:00", "direction": "SELL"}
+    net, _px, reason = await sched._realized(row, fallback_px=100.0)
+    now = datetime.now(timezone.utc)
+    frm_t, to_t = captured["txn"]
+    # `to` must NOT be in the future (clamped to ~now-60s)
+    assert to_t <= now
+    assert (now - to_t).total_seconds() >= 55
+    # `from` tied to opened_at (1h before), and activity uses the SAME window
+    assert frm_t < to_t
+    assert captured["act"] == captured["txn"]
+    assert reason == "PENDING_RECONCILE"   # empty histories -> pending (no invented P&L)
