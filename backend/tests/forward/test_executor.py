@@ -65,3 +65,58 @@ async def test_live_refuses_when_wrong_account(tmp_path):
     with pytest.raises(IsolationError):
         await ex.try_enter(_strat(), _ctx(100.0, 103.0, 103.0), "2026-06-02")
     client.create_position.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Task 5 — size on current_price + idempotent entry guard
+# ---------------------------------------------------------------------------
+
+def _orb_ctx(today_open, current):
+    from forward.strategy import MarketContext
+    now = datetime(2026, 6, 3, 14, 30, tzinfo=timezone.utc)
+    sc = datetime(2026, 6, 3, 20, 45, tzinfo=timezone.utc)
+    return MarketContext("AAPL", 100.0, today_open, current, now, sc,
+                         or_high=199.0, or_low=190.0, rvol=2.0)
+
+
+def _orb_client():
+    client = AsyncMock()
+    client.get_active_account_id.return_value = "EXP"
+    client.create_position.return_value = DealConfirmation.model_validate({
+        "dealId": "D9", "dealReference": "R9", "dealStatus": "ACCEPTED", "epic": "AAPL",
+        "direction": "BUY", "size": 1.0, "level": 200.0, "status": "OPEN"})
+    return client
+
+
+@pytest.mark.asyncio
+async def test_size_uses_current_price_not_today_open(tmp_path):
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+    from forward.strategy import ORBStrategy
+
+    client = _orb_client()
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(tmp_path / "e.db"),
+                            notional_usd=200.0, dry_run=False)
+    s = ORBStrategy(epics=["AAPL"], rvol_min=1.5)
+    # today_open 100 (stale), current_price 200 (breakout) -> size 200/200 = 1.0, not 2.0
+    await ex.try_enter(s, _orb_ctx(100.0, 200.0), "2026-06-03")
+    args, kwargs = client.create_position.call_args
+    assert kwargs.get("request", args[0]).size == 1.0
+
+
+@pytest.mark.asyncio
+async def test_try_enter_idempotent_no_double_order(tmp_path):
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+    from forward.strategy import ORBStrategy
+
+    client = _orb_client()
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(tmp_path / "i.db"),
+                            notional_usd=200.0, dry_run=False)
+    s = ORBStrategy(epics=["AAPL"], rvol_min=1.5)
+    await ex.try_enter(s, _orb_ctx(200.0, 200.0), "2026-06-03")   # 1st: orders + records
+    await ex.try_enter(s, _orb_ctx(200.0, 200.0), "2026-06-03")   # 2nd: guard skips
+    assert client.create_position.await_count == 1
+    assert len(ex.ledger.list_open()) == 1

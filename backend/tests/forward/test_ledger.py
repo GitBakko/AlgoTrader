@@ -20,3 +20,17 @@ def test_ledger_open_close_roundtrip_and_idempotent(tmp_path):
     assert led.list_open() == []
     rz = led.realized("gap_fade")
     assert len(rz) == 1 and rz[0]["net_pnl"] == 2.91
+
+
+def test_exists_true_after_open_open_or_closed(tmp_path):
+    import sys, pathlib
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "scripts" / "ab"))
+    from forward.ledger import ForwardLedger
+    led = ForwardLedger(tmp_path / "x.db")
+    assert led.exists("orb", "AAPL", "2026-06-03") is False
+    led.record_open(strategy="orb", epic="AAPL", session_date="2026-06-03", deal_id="D1",
+                    direction="BUY", entry=100.0, size=1.0, stop_level=98.0,
+                    rationale="x", opened_at="2026-06-03T14:00:00+00:00")
+    assert led.exists("orb", "AAPL", "2026-06-03") is True
+    assert led.exists("orb", "AAPL", "2026-06-04") is False    # different day
+    assert led.exists("gap_fade", "AAPL", "2026-06-03") is False  # different strategy

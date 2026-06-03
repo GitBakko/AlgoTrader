@@ -52,6 +52,13 @@ class ForwardLedger:
             return [dict(r) for r in c.execute(
                 "SELECT * FROM trades WHERE closed_at IS NULL")]
 
+    def exists(self, strategy: str, epic: str, session_date: str) -> bool:
+        with self._conn() as c:
+            row = c.execute(
+                "SELECT 1 FROM trades WHERE strategy=? AND epic=? AND session_date=? LIMIT 1",
+                (strategy, epic, session_date)).fetchone()
+            return row is not None
+
     def record_close(self, *, deal_id: str, exit_price: float, net_pnl: float,
                      closed_at: str, close_reason: str) -> None:
         with self._conn() as c:

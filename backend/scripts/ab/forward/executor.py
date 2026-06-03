@@ -39,13 +39,15 @@ class ExperimentExecutor:
                         session_date: str) -> Signal | object | None:
         if self._halted:
             return None
+        if self.ledger.exists(strat.name, ctx.epic, session_date):
+            return None                              # one trade per strategy/epic/day (idempotent)
         if len(self.ledger.list_open()) >= self.max_concurrent:
             logger.warning(f"[forward-lab] max_concurrent={self.max_concurrent} reached — skip")
             return None
         sig = strat.should_enter(ctx)
         if sig is None:
             return None
-        size = self._size_for(ctx.today_open)
+        size = self._size_for(ctx.current_price)
         if self.dry_run:
             logger.info(f"[DRY-RUN] {strat.name} {sig.direction.value} {sig.epic} "
                         f"size={size} sl={sig.stop_level:.4f} :: {sig.rationale}")
