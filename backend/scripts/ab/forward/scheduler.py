@@ -56,6 +56,19 @@ class ExperimentScheduler:
     def _registry(self) -> dict[str, ForwardStrategy]:
         return {s.name: s for s in self.strategies}
 
+    async def _ensure_account(self) -> None:
+        """Re-assert the experiment account. The broker session re-authenticates
+        periodically and reverts to the API key's DEFAULT account, so a one-time
+        startup switch is not enough — every pass must re-ensure before broker calls."""
+        acct = self.executor.experiment_account_id
+        if not acct:
+            return
+        try:
+            if await self.client.get_active_account_id() != acct:
+                await self.client.switch_account(acct)
+        except Exception as e:  # noqa: BLE001 — never let an account-check hiccup kill the pass
+            logger.warning(f"[forward-lab] account re-assert failed: {e}")
+
     async def _prev_close(self, epic: str, now: datetime) -> float | None:
         """Previous daily close, fetched LIVE from the broker (always fresh — no
         dependency on the local daily cache). prev_close = the most recent
@@ -121,6 +134,7 @@ class ExperimentScheduler:
         if not self._in_window(now):
             return
         self._state.ensure_day(now.date())
+        await self._ensure_account()
         session_date = now.date().isoformat()
         open_dt = self._et_to_utc(now.date(), self.session_open_et)
         or_ready = now >= open_dt + timedelta(minutes=self.or_window_min)
@@ -211,6 +225,7 @@ class ExperimentScheduler:
         open_rows = self.executor.ledger.list_open()
         if not open_rows:
             return
+        await self._ensure_account()
         registry = self._registry
         broker_positions = await self.client.list_positions()
         for row in open_rows:

@@ -8,6 +8,66 @@ from src.broker.models import Direction
 
 
 @pytest.mark.asyncio
+async def test_ensure_account_switches_when_reverted(tmp_path):
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import GapFadeStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+
+    client = AsyncMock()
+    client.get_active_account_id.return_value = "WRONG_DEFAULT"   # reverted after re-auth
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP_ACCT",
+                            ledger=ForwardLedger(tmp_path / "ea.db"), dry_run=False)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[GapFadeStrategy(epics=["AAPL"])])
+    await sched._ensure_account()
+    client.switch_account.assert_awaited_once_with("EXP_ACCT")
+
+
+@pytest.mark.asyncio
+async def test_ensure_account_noop_when_already_active(tmp_path):
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import GapFadeStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+
+    client = AsyncMock()
+    client.get_active_account_id.return_value = "EXP_ACCT"
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP_ACCT",
+                            ledger=ForwardLedger(tmp_path / "eb.db"), dry_run=False)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[GapFadeStrategy(epics=["AAPL"])])
+    await sched._ensure_account()
+    client.switch_account.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_mark_pass_reasserts_account_before_list_positions(tmp_path):
+    # mark_pass must re-assert the experiment account (session reverts on re-auth) BEFORE reading positions
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import GapFadeStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+
+    client = AsyncMock()
+    client.get_active_account_id.return_value = "WRONG_DEFAULT"   # reverted
+    client.get_market_details.return_value = {"snapshot": {"bid": 100.0, "offer": 100.0}}
+    client.list_positions.return_value = []
+    client.get_transaction_history.return_value = []
+    client.get_activity_history.return_value = []
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP_ACCT",
+                            ledger=ForwardLedger(tmp_path / "mp.db"), dry_run=False)
+    ex.ledger.record_open(strategy="gap_fade", epic="AAPL", session_date="2026-06-03",
+                          deal_id="D1", direction="SELL", entry=100.0, size=1.0,
+                          stop_level=102.0, rationale="x", opened_at="2026-06-03T14:00:00+00:00",
+                          prev_close=98.0, today_open=100.0)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[GapFadeStrategy(epics=["AAPL"])])
+    await sched.mark_pass(now=datetime(2026, 6, 3, 17, 0, tzinfo=timezone.utc))
+    client.switch_account.assert_awaited_with("EXP_ACCT")   # re-asserted before reading positions
+
+
+@pytest.mark.asyncio
 async def test_on_session_open_enters_on_gap(tmp_path, monkeypatch):
     from forward.scheduler import ExperimentScheduler
     from forward.strategy import GapFadeStrategy
