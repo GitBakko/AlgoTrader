@@ -24,7 +24,7 @@ async def test_on_session_open_enters_on_gap(tmp_path, monkeypatch):
     ex = ExperimentExecutor(client=client, experiment_account_id="EXP123",
                             ledger=ForwardLedger(tmp_path / "s.db"), dry_run=False)
     sched = ExperimentScheduler(client=client, executor=ex,
-                                strategy=GapFadeStrategy(epics=["AAPL"], gap_threshold=0.01))
+                                strategies=[GapFadeStrategy(epics=["AAPL"], gap_threshold=0.01)])
     monkeypatch.setattr(sched, "_prev_close", AsyncMock(return_value=100.0))
     now = datetime(2026, 6, 2, 14, 0, tzinfo=timezone.utc)
     await sched.on_session_open(now=now)
@@ -45,7 +45,8 @@ async def test_mark_pass_closes_and_reconciles(tmp_path):
     client.list_positions.return_value = []  # broker already closed the position
     client.get_transaction_history.return_value = [
         Transaction(date=datetime(2026, 6, 2, 16, 0, tzinfo=timezone.utc), reference="r1",
-                    transactionType="TRADE", instrumentName="AAPL", size="2.91", currency="USD")]
+                    dealId="D1", transactionType="TRADE", instrumentName="AAPL",
+                    size="2.91", currency="USD")]
 
     ex = ExperimentExecutor(client=client, experiment_account_id="EXP123",
                             ledger=ForwardLedger(tmp_path / "m.db"), dry_run=False)
@@ -53,7 +54,7 @@ async def test_mark_pass_closes_and_reconciles(tmp_path):
                           deal_id="D1", direction="SELL", entry=103.0, size=1.94,
                           stop_level=105.0, rationale="x", opened_at="2026-06-02T14:00:00+00:00")
     sched = ExperimentScheduler(client=client, executor=ex,
-                                strategy=GapFadeStrategy(epics=["AAPL"]))
+                                strategies=[GapFadeStrategy(epics=["AAPL"])])
     await sched.mark_pass(now=datetime(2026, 6, 2, 16, 0, tzinfo=timezone.utc))
     rz = ex.ledger.realized("gap_fade")
     assert len(rz) == 1
@@ -85,7 +86,43 @@ async def test_prev_close_from_broker_last_completed(tmp_path):
     ex = ExperimentExecutor(client=client, experiment_account_id="X",
                             ledger=ForwardLedger(tmp_path / "p.db"), dry_run=True)
     sched = ExperimentScheduler(client=client, executor=ex,
-                                strategy=GapFadeStrategy(epics=["AMD"]))
+                                strategies=[GapFadeStrategy(epics=["AMD"])])
     assert await sched._prev_close("AMD", now) == 98.0
     client.get_historical_prices.return_value = []
     assert await sched._prev_close("AMD", now) is None
+
+
+@pytest.mark.asyncio
+async def test_mark_pass_dispatches_exit_rule_by_owning_strategy(tmp_path):
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import GapFadeStrategy, ORBStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+    from src.broker.models import Transaction
+
+    client = AsyncMock()
+    client.get_market_details.return_value = {"snapshot": {"bid": 101.0, "offer": 101.0}}
+    client.list_positions.return_value = []          # both broker-closed -> realize both
+    client.get_transaction_history.return_value = [
+        Transaction(date=datetime(2026, 6, 3, 21, 0, tzinfo=timezone.utc), reference="rg",
+                    dealId="DG", transactionType="TRADE", instrumentName="AAPL",
+                    size="1.50", currency="USD"),
+        Transaction(date=datetime(2026, 6, 3, 21, 0, tzinfo=timezone.utc), reference="ro",
+                    dealId="DO", transactionType="TRADE", instrumentName="NVDA",
+                    size="-2.00", currency="USD")]
+
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(tmp_path / "mm.db"), dry_run=False)
+    ex.ledger.record_open(strategy="gap_fade", epic="AAPL", session_date="2026-06-03",
+                          deal_id="DG", direction="SELL", entry=103.0, size=1.0,
+                          stop_level=105.0, rationale="x", opened_at="2026-06-03T14:00:00+00:00")
+    ex.ledger.record_open(strategy="orb", epic="NVDA", session_date="2026-06-03",
+                          deal_id="DO", direction="BUY", entry=500.0, size=1.0,
+                          stop_level=490.0, rationale="y", opened_at="2026-06-03T14:30:00+00:00")
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[GapFadeStrategy(epics=["AAPL"]),
+                                            ORBStrategy(epics=["NVDA"])])
+    # past session_close -> both exit_rules return True (EOD)
+    await sched.mark_pass(now=datetime(2026, 6, 3, 21, 0, tzinfo=timezone.utc))
+    assert ex.ledger.realized("gap_fade")[0]["net_pnl"] == 1.50
+    assert ex.ledger.realized("orb")[0]["net_pnl"] == -2.00

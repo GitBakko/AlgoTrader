@@ -20,8 +20,12 @@ from src.broker.models import Direction, Resolution  # noqa: E402
 class ExperimentScheduler:
     client: object
     executor: ExperimentExecutor
-    strategy: ForwardStrategy
+    strategies: list[ForwardStrategy]
     eod_flatten_utc: str = "20:45"
+
+    @property
+    def _registry(self) -> dict[str, ForwardStrategy]:
+        return {s.name: s for s in self.strategies}
 
     async def _prev_close(self, epic: str, now: datetime) -> float | None:
         """Previous daily close, fetched LIVE from the broker (always fresh — no
@@ -54,16 +58,17 @@ class ExperimentScheduler:
     async def on_session_open(self, now: datetime | None = None) -> None:
         now = now or datetime.now(timezone.utc)
         session_date = now.date().isoformat()
-        for epic in self.strategy.universe():
-            prev_close = await self._prev_close(epic, now)
-            mid = await self._mid(epic)
-            if prev_close is None or mid is None:
-                logger.warning(f"[forward-lab] missing price for {epic} — skip")
-                continue
-            ctx = MarketContext(epic=epic, prev_close=prev_close, today_open=mid,
-                                current_price=mid, now=now,
-                                session_close=self._session_close(now))
-            await self.executor.try_enter(self.strategy, ctx, session_date)
+        for strat in self.strategies:
+            for epic in strat.universe():
+                prev_close = await self._prev_close(epic, now)
+                mid = await self._mid(epic)
+                if prev_close is None or mid is None:
+                    logger.warning(f"[forward-lab] missing price for {epic} — skip")
+                    continue
+                ctx = MarketContext(epic=epic, prev_close=prev_close, today_open=mid,
+                                    current_price=mid, now=now,
+                                    session_close=self._session_close(now))
+                await self.executor.try_enter(strat, ctx, session_date)
 
     async def mark_pass(self, now: datetime | None = None) -> None:
         """Close positions whose exit_rule fires, then reconcile realized P&L
@@ -74,8 +79,13 @@ class ExperimentScheduler:
         open_rows = self.executor.ledger.list_open()
         if not open_rows:
             return
+        registry = self._registry
         positions = {p.deal_id: p for p in await self.client.list_positions()}
         for row in open_rows:
+            strat = registry.get(row["strategy"])
+            if strat is None:
+                logger.warning(f"[forward-lab] no strategy {row['strategy']!r} for open row — skip")
+                continue
             mid = await self._mid(row["epic"])
             if mid is None:
                 continue
@@ -88,7 +98,7 @@ class ExperimentScheduler:
                                 current_price=mid, now=now,
                                 session_close=self._session_close(now))
             still_open = row["deal_id"] in positions
-            should_exit = self.strategy.exit_rule(pos, ctx)
+            should_exit = strat.exit_rule(pos, ctx)
             if still_open and should_exit:
                 await self.client.close_position(row["deal_id"])
             if not still_open or should_exit:
@@ -96,7 +106,8 @@ class ExperimentScheduler:
                 self.executor.ledger.record_close(
                     deal_id=row["deal_id"], exit_price=exitpx, net_pnl=net,
                     closed_at=now.isoformat(), close_reason=reason)
-                logger.info(f"[forward-lab] closed {row['epic']} net={net:+.2f} ({reason})")
+                logger.info(f"[forward-lab] closed {row['epic']} ({row['strategy']}) "
+                            f"net={net:+.2f} ({reason})")
 
     async def _realized(self, row: dict, fallback_px: float) -> tuple[float, float, str]:
         """Realized P&L from the latest TRADE transaction for this epic (broker truth)."""
