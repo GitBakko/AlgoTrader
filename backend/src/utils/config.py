@@ -93,12 +93,12 @@ class Settings(BaseSettings):
     forward_lab_daily_loss_limit_usd: float = 100.0
     forward_lab_gap_threshold: float = 0.01
     forward_lab_eod_flatten_utc: str = "20:45"  # HH:MM UTC cash-session flatten
-    forward_lab_orb_or_window_min: int = 30          # opening-range minutes (Yahoo delay -> 30)
-    forward_lab_orb_watch_end_utc: str = "16:00"     # breakout watch cutoff (UTC)
-    forward_lab_orb_rvol_min: float = 1.5            # min relative volume to be "in play"
-    forward_lab_orb_top_k: int = 5                   # max in-play names per day
-    forward_lab_orb_breakout_buffer: float = 0.0     # fraction beyond OR required
-    forward_lab_orb_stop_atr_mult: float = 1.0       # SL ATR floor multiplier
+    forward_lab_orb_or_window_min: int = 30  # opening-range minutes (Yahoo delay -> 30)
+    forward_lab_orb_watch_end_utc: str = "16:00"  # breakout watch cutoff (UTC)
+    forward_lab_orb_rvol_min: float = 1.5  # min relative volume to be "in play"
+    forward_lab_orb_top_k: int = 5  # max in-play names per day
+    forward_lab_orb_breakout_buffer: float = 0.0  # fraction beyond OR required
+    forward_lab_orb_stop_atr_mult: float = 1.0  # SL ATR floor multiplier
 
     # ===== Auth Gate =====
     # When True, every state-changing API endpoint requires a valid JWT.
