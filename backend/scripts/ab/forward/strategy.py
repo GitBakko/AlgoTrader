@@ -16,6 +16,9 @@ class MarketContext:
     now: datetime
     session_close: datetime
     atr: float | None = None
+    or_high: float | None = None
+    or_low: float | None = None
+    rvol: float | None = None
 
     @property
     def gap(self) -> float:
