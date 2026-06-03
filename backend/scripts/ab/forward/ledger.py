@@ -35,7 +35,10 @@ class ForwardLedger:
             existing = {row[1] for row in c.execute("PRAGMA table_info(trades)")}
             for col in ("prev_close", "today_open"):
                 if col not in existing:
-                    c.execute(f"ALTER TABLE trades ADD COLUMN {col} REAL")
+                    try:
+                        c.execute(f"ALTER TABLE trades ADD COLUMN {col} REAL")
+                    except sqlite3.OperationalError:
+                        pass  # lost the migration race — column already added by a concurrent init
 
     def record_open(self, *, strategy: str, epic: str, session_date: str, deal_id: str,
                     direction: str, entry: float, size: float, stop_level: float,

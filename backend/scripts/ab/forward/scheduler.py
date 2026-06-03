@@ -212,6 +212,7 @@ class ExperimentScheduler:
                 prev_close=row["prev_close"] if row.get("prev_close") is not None else 0.0,
                 today_open=row["today_open"] if row.get("today_open") is not None else row["entry"],
                 opened_at=now, deal_id=row["deal_id"])
+            # ctx carries only current_price/now/session_close for exit_rule; the gap history lives on `pos` above
             ctx = MarketContext(epic=row["epic"], prev_close=0.0, today_open=row["entry"],
                                 current_price=mid, now=now,
                                 session_close=self._session_close(now))

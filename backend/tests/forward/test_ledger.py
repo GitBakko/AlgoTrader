@@ -40,8 +40,6 @@ def test_exists_true_after_open_open_or_closed(tmp_path):
 
 
 def test_record_open_persists_prev_close_and_today_open(tmp_path):
-    import sys, pathlib
-    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "scripts" / "ab"))
     from forward.ledger import ForwardLedger
     led = ForwardLedger(tmp_path / "pc.db")
     led.record_open(strategy="gap_fade", epic="AAPL", session_date="2026-06-03", deal_id="D1",
