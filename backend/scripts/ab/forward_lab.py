@@ -149,6 +149,42 @@ async def cmd_live_open() -> None:
         await client.close()
 
 
+async def cmd_run() -> None:
+    """Persistent autonomous loop: gap-fade entries at the US cash open
+    (13:30 UTC, Mon-Fri) + mark/exit management every 15 min + EOD flatten.
+    Launch once, detached (like the backend). Ctrl-C to stop.
+
+    NOTE: 13:30 UTC = US open in summer (EDT). In winter (EST) the open is
+    14:30 UTC — adjust the cron hour then.
+    """
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+    from apscheduler.triggers.cron import CronTrigger
+    from apscheduler.triggers.interval import IntervalTrigger
+
+    s = get_settings()
+    client = await _connected_client(experiment=True)
+    await client.switch_account(s.capital_experiment_account_id)
+    ex = _make_executor(client, dry_run=False)
+    sched = ExperimentScheduler(client=client, executor=ex, strategy=_strategy(),
+                                eod_flatten_utc=s.forward_lab_eod_flatten_utc)
+    scheduler = AsyncIOScheduler(timezone="UTC")
+    scheduler.add_job(sched.on_session_open,
+                      CronTrigger(day_of_week="mon-fri", hour=13, minute=30, timezone="UTC"),
+                      id="gap_fade_open", misfire_grace_time=300)
+    scheduler.add_job(sched.mark_pass, IntervalTrigger(minutes=15), id="mark")
+    scheduler.start()
+    logger.success("[forward-lab] RUN loop started — entries 13:30 UTC (Mon-Fri), "
+                   "mark every 15min, EOD flatten. Ctrl-C to stop.")
+    try:
+        while True:
+            await asyncio.sleep(3600)
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        logger.info("[forward-lab] RUN loop stopping...")
+    finally:
+        scheduler.shutdown(wait=False)
+        await client.close()
+
+
 def cmd_status() -> None:
     led = ForwardLedger(LEDGER_PATH)
     print("OPEN:", led.list_open())
@@ -172,6 +208,8 @@ def main() -> None:
         asyncio.run(cmd_mark())
     elif cmd == "live-open":
         asyncio.run(cmd_live_open())
+    elif cmd == "run":
+        asyncio.run(cmd_run())
     elif cmd == "status":
         cmd_status()
     elif cmd == "score":
