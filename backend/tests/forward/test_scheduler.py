@@ -62,29 +62,30 @@ async def test_mark_pass_closes_and_reconciles(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_prev_close_skips_stale_cache(tmp_path):
-    import polars as pl
+async def test_prev_close_from_broker_last_completed(tmp_path):
     from forward.scheduler import ExperimentScheduler
     from forward.strategy import GapFadeStrategy
     from forward.executor import ExperimentExecutor
     from forward.ledger import ForwardLedger
+    from src.broker.models import OHLCCandle
 
-    class FakeStore:
-        def __init__(self, df):
-            self._df = df
+    def _c(d, close):
+        return OHLCCandle.model_validate(
+            {"snapshotTime": d, "openPrice": close, "highPrice": close,
+             "lowPrice": close, "closePrice": close})
 
-        def read_candles(self, epic, res):
-            return self._df
-
+    client = AsyncMock()
     now = datetime(2026, 6, 3, 14, 0, tzinfo=timezone.utc)
-    fresh = pl.DataFrame({"timestamp": [datetime(2026, 6, 2)], "close": [100.0]})
-    stale = pl.DataFrame({"timestamp": [datetime(2026, 5, 20)], "close": [100.0]})
-
-    ex = ExperimentExecutor(client=AsyncMock(), experiment_account_id="X",
+    # ascending; last candle is "today" (still forming) -> prev_close = prior day 98.0
+    client.get_historical_prices.return_value = [
+        _c(datetime(2026, 6, 1, 2, tzinfo=timezone.utc), 92.0),
+        _c(datetime(2026, 6, 2, 2, tzinfo=timezone.utc), 98.0),
+        _c(datetime(2026, 6, 3, 2, tzinfo=timezone.utc), 100.0),
+    ]
+    ex = ExperimentExecutor(client=client, experiment_account_id="X",
                             ledger=ForwardLedger(tmp_path / "p.db"), dry_run=True)
-    sched = ExperimentScheduler(client=AsyncMock(), executor=ex,
+    sched = ExperimentScheduler(client=client, executor=ex,
                                 strategy=GapFadeStrategy(epics=["AMD"]))
-    sched._storage = FakeStore(fresh)
-    assert await sched._prev_close("AMD", now) == 100.0
-    sched._storage = FakeStore(stale)
+    assert await sched._prev_close("AMD", now) == 98.0
+    client.get_historical_prices.return_value = []
     assert await sched._prev_close("AMD", now) is None

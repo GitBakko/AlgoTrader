@@ -11,10 +11,9 @@ ROOT = Path(__file__).resolve().parents[3]  # backend/
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.data.storage import ParquetStorageManager  # noqa: E402
 from forward.executor import ExperimentExecutor  # noqa: E402
 from forward.strategy import ForwardStrategy, MarketContext, OpenPosition  # noqa: E402
-from src.broker.models import Direction  # noqa: E402
+from src.broker.models import Direction, Resolution  # noqa: E402
 
 
 @dataclass
@@ -23,30 +22,22 @@ class ExperimentScheduler:
     executor: ExperimentExecutor
     strategy: ForwardStrategy
     eod_flatten_utc: str = "20:45"
-    _storage: ParquetStorageManager | None = None
 
-    def __post_init__(self):
-        self._storage = self._storage or ParquetStorageManager()
-
-    async def _prev_close(self, epic: str, now: datetime,
-                          max_age_days: int = 5) -> float | None:
-        """Last cached daily close, or None if the cache is stale (guards against
-        a fake gap from an out-of-date prev_close — e.g. a 12-day-old candle)."""
-        df = self._storage.read_candles(epic, "1d")
-        if df.is_empty():
+    async def _prev_close(self, epic: str, now: datetime) -> float | None:
+        """Previous daily close, fetched LIVE from the broker (always fresh — no
+        dependency on the local daily cache). prev_close = the most recent
+        COMPLETED daily candle's close (excludes today's still-forming candle)."""
+        try:
+            candles = await self.client.get_historical_prices(
+                epic, Resolution.DAY, max_candles=5)
+        except Exception as e:  # noqa: BLE001 — any broker/parse error => skip epic
+            logger.warning(f"[forward-lab] {epic} daily history fetch failed: {e} — skip")
             return None
-        rows = df.select(["timestamp", "close"])
-        last_ts = rows.get_column("timestamp").to_list()[-1]
-        last_close = float(rows.get_column("close").to_list()[-1])
-        if last_ts is not None:
-            if getattr(last_ts, "tzinfo", None) is not None:
-                last_ts = last_ts.replace(tzinfo=None)
-            age_days = (now.replace(tzinfo=None) - last_ts).days
-            if age_days > max_age_days:
-                logger.warning(f"[forward-lab] {epic} daily cache stale "
-                               f"({age_days}d, last={last_ts.date()}) — skip")
-                return None
-        return last_close
+        if not candles:
+            return None
+        today = now.date()
+        completed = [c for c in candles if c.timestamp.date() < today] or candles
+        return float(completed[-1].close)
 
     async def _mid(self, epic: str) -> float | None:
         d = await self.client.get_market_details(epic)
