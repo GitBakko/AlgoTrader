@@ -29,11 +29,16 @@ from forward.executor import ExperimentExecutor  # noqa: E402
 from forward.ledger import ForwardLedger  # noqa: E402
 from forward.scheduler import ExperimentScheduler  # noqa: E402
 from forward.scorer import score  # noqa: E402
-from forward.strategy import GapFadeStrategy  # noqa: E402
+from forward.strategy import GapFadeStrategy, ORBStrategy  # noqa: E402,F401
 
 EXPERIMENT_ACCOUNT_NAME = "Account Demo"
 LEDGER_PATH = ROOT / "data" / "forward_lab" / "ledger.db"
 UNIVERSE = ["AAPL", "NVDA", "TSLA", "MSFT", "AMD"]  # liquid US stock CFDs (real gaps)
+ORB_UNIVERSE = [
+    "AAPL", "NVDA", "TSLA", "MSFT", "AMD", "AMZN", "META", "GOOGL", "NFLX", "AVGO",
+    "JPM", "V", "MA", "UNH", "XOM", "JNJ", "WMT", "PG", "HD", "COST",
+    "DIS", "BAC", "KO", "PEP", "CSCO", "ORCL", "CRM", "ADBE", "PFE", "INTC",
+]  # liquid US large-cap CFDs; skip-graceful on any epic/data miss
 
 
 async def discover_account(client, name: str = EXPERIMENT_ACCOUNT_NAME) -> str | None:
@@ -43,9 +48,31 @@ async def discover_account(client, name: str = EXPERIMENT_ACCOUNT_NAME) -> str |
     return None
 
 
-def _strategy() -> GapFadeStrategy:
+def _strategies() -> list:
+    from forward.strategy import GapFadeStrategy, ORBStrategy
     s = get_settings()
-    return GapFadeStrategy(epics=UNIVERSE, gap_threshold=s.forward_lab_gap_threshold)
+    return [
+        GapFadeStrategy(epics=UNIVERSE, gap_threshold=s.forward_lab_gap_threshold),
+        ORBStrategy(epics=ORB_UNIVERSE, rvol_min=s.forward_lab_orb_rvol_min,
+                    breakout_buffer=s.forward_lab_orb_breakout_buffer,
+                    stop_atr_mult=s.forward_lab_orb_stop_atr_mult),
+    ]
+
+
+def _screener():
+    from forward.screener import RvolScreener
+    s = get_settings()
+    return RvolScreener(rvol_min=s.forward_lab_orb_rvol_min, top_k=s.forward_lab_orb_top_k,
+                        or_window_min=s.forward_lab_orb_or_window_min)
+
+
+def _build_scheduler(client, executor):
+    s = get_settings()
+    return ExperimentScheduler(
+        client=client, executor=executor, strategies=_strategies(),
+        eod_flatten_utc=s.forward_lab_eod_flatten_utc, screener=_screener(),
+        or_window_min=s.forward_lab_orb_or_window_min,
+        watch_end_utc=s.forward_lab_orb_watch_end_utc)
 
 
 async def _connected_client(experiment: bool = False) -> CapitalComClient:
@@ -121,9 +148,8 @@ async def cmd_dry_run() -> None:
     client = await _connected_client(experiment=True)
     try:
         ex = _make_executor(client, dry_run=True)
-        sched = ExperimentScheduler(client=client, executor=ex, strategy=_strategy(),
-                                    eod_flatten_utc=get_settings().forward_lab_eod_flatten_utc)
-        await sched.on_session_open()
+        sched = _build_scheduler(client, ex)
+        await sched.entry_pass()
     finally:
         await client.close()
 
@@ -134,8 +160,7 @@ async def cmd_mark() -> None:
     try:
         await _ensure_account(client, s.capital_experiment_account_id)
         ex = _make_executor(client, dry_run=False)
-        sched = ExperimentScheduler(client=client, executor=ex, strategy=_strategy(),
-                                    eod_flatten_utc=s.forward_lab_eod_flatten_utc)
+        sched = _build_scheduler(client, ex)
         await sched.mark_pass()
     finally:
         await client.close()
@@ -149,39 +174,32 @@ async def cmd_live_open() -> None:
     try:
         await _ensure_account(client, s.capital_experiment_account_id)
         ex = _make_executor(client, dry_run=False)
-        sched = ExperimentScheduler(client=client, executor=ex, strategy=_strategy(),
-                                    eod_flatten_utc=s.forward_lab_eod_flatten_utc)
-        await sched.on_session_open()
+        sched = _build_scheduler(client, ex)
+        await sched.entry_pass()
     finally:
         await client.close()
 
 
 async def cmd_run() -> None:
-    """Persistent autonomous loop: gap-fade entries at the US cash open
-    (13:30 UTC, Mon-Fri) + mark/exit management every 15 min + EOD flatten.
+    """Persistent autonomous loop: entry_pass every 5 min (13:30-16:00 UTC window)
+    + mark/exit management every 15 min + EOD flatten.
     Launch once, detached (like the backend). Ctrl-C to stop.
-
-    NOTE: 13:30 UTC = US open in summer (EDT). In winter (EST) the open is
-    14:30 UTC — adjust the cron hour then.
     """
     from apscheduler.schedulers.asyncio import AsyncIOScheduler
-    from apscheduler.triggers.cron import CronTrigger
     from apscheduler.triggers.interval import IntervalTrigger
 
     s = get_settings()
     client = await _connected_client(experiment=True)
     await client.switch_account(s.capital_experiment_account_id)
     ex = _make_executor(client, dry_run=False)
-    sched = ExperimentScheduler(client=client, executor=ex, strategy=_strategy(),
-                                eod_flatten_utc=s.forward_lab_eod_flatten_utc)
+    sched = _build_scheduler(client, ex)
     scheduler = AsyncIOScheduler(timezone="UTC")
-    scheduler.add_job(sched.on_session_open,
-                      CronTrigger(day_of_week="mon-fri", hour=13, minute=30, timezone="UTC"),
-                      id="gap_fade_open", misfire_grace_time=300)
+    scheduler.add_job(sched.entry_pass, IntervalTrigger(minutes=5),
+                      id="entry_pass", misfire_grace_time=120)
     scheduler.add_job(sched.mark_pass, IntervalTrigger(minutes=15), id="mark")
     scheduler.start()
-    logger.success("[forward-lab] RUN loop started — entries 13:30 UTC (Mon-Fri), "
-                   "mark every 15min, EOD flatten. Ctrl-C to stop.")
+    logger.success("[forward-lab] RUN loop started — entry_pass every 5min "
+                   "(13:30-16:00 UTC window), mark every 15min, EOD flatten. Ctrl-C to stop.")
     try:
         while True:
             await asyncio.sleep(3600)
@@ -195,12 +213,14 @@ async def cmd_run() -> None:
 def cmd_status() -> None:
     led = ForwardLedger(LEDGER_PATH)
     print("OPEN:", led.list_open())
-    print("REALIZED:", led.realized("gap_fade"))
+    for name in ("gap_fade", "orb"):
+        print(f"REALIZED[{name}]:", led.realized(name))
 
 
 def cmd_score() -> None:
     led = ForwardLedger(LEDGER_PATH)
-    print(score(led.realized("gap_fade")))
+    for name in ("gap_fade", "orb"):
+        print(f"[{name}]", score(led.realized(name)))
 
 
 def main() -> None:

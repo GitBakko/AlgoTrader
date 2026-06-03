@@ -7,3 +7,14 @@ def test_experiment_account_settings_exist():
     assert hasattr(s, "forward_lab_notional_usd")
     assert hasattr(s, "forward_lab_daily_loss_limit_usd")
     assert s.forward_lab_notional_usd == 200.0
+
+
+def test_orb_settings_defaults():
+    import sys, pathlib
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
+    from src.utils.config import get_settings
+    s = get_settings()
+    assert s.forward_lab_orb_or_window_min == 30
+    assert s.forward_lab_orb_rvol_min == 1.5
+    assert s.forward_lab_orb_top_k == 5
+    assert s.forward_lab_orb_watch_end_utc == "16:00"
