@@ -48,6 +48,7 @@ class OpenPosition:
 
 class ForwardStrategy(ABC):
     name: str = "abstract"
+    needs_opening_range: bool = False
 
     @abstractmethod
     def universe(self) -> list[str]:
