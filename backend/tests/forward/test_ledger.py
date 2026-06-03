@@ -32,5 +32,8 @@ def test_exists_true_after_open_open_or_closed(tmp_path):
                     direction="BUY", entry=100.0, size=1.0, stop_level=98.0,
                     rationale="x", opened_at="2026-06-03T14:00:00+00:00")
     assert led.exists("orb", "AAPL", "2026-06-03") is True
+    led.record_close(deal_id="D1", exit_price=101.0, net_pnl=1.0,
+                     closed_at="2026-06-03T16:00:00+00:00", close_reason="TP")
+    assert led.exists("orb", "AAPL", "2026-06-03") is True   # still True after close
     assert led.exists("orb", "AAPL", "2026-06-04") is False    # different day
     assert led.exists("gap_fade", "AAPL", "2026-06-03") is False  # different strategy

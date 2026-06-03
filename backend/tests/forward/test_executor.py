@@ -101,8 +101,7 @@ async def test_size_uses_current_price_not_today_open(tmp_path):
     s = ORBStrategy(epics=["AAPL"], rvol_min=1.5)
     # today_open 100 (stale), current_price 200 (breakout) -> size 200/200 = 1.0, not 2.0
     await ex.try_enter(s, _orb_ctx(100.0, 200.0), "2026-06-03")
-    args, kwargs = client.create_position.call_args
-    assert kwargs.get("request", args[0]).size == 1.0
+    assert client.create_position.call_args.args[0].size == 1.0
 
 
 @pytest.mark.asyncio
