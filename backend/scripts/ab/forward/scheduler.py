@@ -28,11 +28,25 @@ class ExperimentScheduler:
     def __post_init__(self):
         self._storage = self._storage or ParquetStorageManager()
 
-    async def _prev_close(self, epic: str) -> float | None:
+    async def _prev_close(self, epic: str, now: datetime,
+                          max_age_days: int = 5) -> float | None:
+        """Last cached daily close, or None if the cache is stale (guards against
+        a fake gap from an out-of-date prev_close — e.g. a 12-day-old candle)."""
         df = self._storage.read_candles(epic, "1d")
         if df.is_empty():
             return None
-        return float(df.select("close").to_series().to_list()[-1])
+        rows = df.select(["timestamp", "close"])
+        last_ts = rows.get_column("timestamp").to_list()[-1]
+        last_close = float(rows.get_column("close").to_list()[-1])
+        if last_ts is not None:
+            if getattr(last_ts, "tzinfo", None) is not None:
+                last_ts = last_ts.replace(tzinfo=None)
+            age_days = (now.replace(tzinfo=None) - last_ts).days
+            if age_days > max_age_days:
+                logger.warning(f"[forward-lab] {epic} daily cache stale "
+                               f"({age_days}d, last={last_ts.date()}) — skip")
+                return None
+        return last_close
 
     async def _mid(self, epic: str) -> float | None:
         d = await self.client.get_market_details(epic)
@@ -50,7 +64,7 @@ class ExperimentScheduler:
         now = now or datetime.now(timezone.utc)
         session_date = now.date().isoformat()
         for epic in self.strategy.universe():
-            prev_close = await self._prev_close(epic)
+            prev_close = await self._prev_close(epic, now)
             mid = await self._mid(epic)
             if prev_close is None or mid is None:
                 logger.warning(f"[forward-lab] missing price for {epic} — skip")

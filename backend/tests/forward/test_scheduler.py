@@ -59,3 +59,32 @@ async def test_mark_pass_closes_and_reconciles(tmp_path):
     assert len(rz) == 1
     assert rz[0]["net_pnl"] == 2.91
     assert rz[0]["close_reason"] == "BROKER_TRADE"
+
+
+@pytest.mark.asyncio
+async def test_prev_close_skips_stale_cache(tmp_path):
+    import polars as pl
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import GapFadeStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+
+    class FakeStore:
+        def __init__(self, df):
+            self._df = df
+
+        def read_candles(self, epic, res):
+            return self._df
+
+    now = datetime(2026, 6, 3, 14, 0, tzinfo=timezone.utc)
+    fresh = pl.DataFrame({"timestamp": [datetime(2026, 6, 2)], "close": [100.0]})
+    stale = pl.DataFrame({"timestamp": [datetime(2026, 5, 20)], "close": [100.0]})
+
+    ex = ExperimentExecutor(client=AsyncMock(), experiment_account_id="X",
+                            ledger=ForwardLedger(tmp_path / "p.db"), dry_run=True)
+    sched = ExperimentScheduler(client=AsyncMock(), executor=ex,
+                                strategy=GapFadeStrategy(epics=["AMD"]))
+    sched._storage = FakeStore(fresh)
+    assert await sched._prev_close("AMD", now) == 100.0
+    sched._storage = FakeStore(stale)
+    assert await sched._prev_close("AMD", now) is None

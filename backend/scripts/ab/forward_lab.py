@@ -134,6 +134,21 @@ async def cmd_mark() -> None:
         await client.close()
 
 
+async def cmd_live_open() -> None:
+    """LIVE: place real gap-fade entries on the experiment account (switches to it
+    first; the executor's isolation guard re-checks before every order)."""
+    s = get_settings()
+    client = await _connected_client(experiment=True)
+    try:
+        await client.switch_account(s.capital_experiment_account_id)
+        ex = _make_executor(client, dry_run=False)
+        sched = ExperimentScheduler(client=client, executor=ex, strategy=_strategy(),
+                                    eod_flatten_utc=s.forward_lab_eod_flatten_utc)
+        await sched.on_session_open()
+    finally:
+        await client.close()
+
+
 def cmd_status() -> None:
     led = ForwardLedger(LEDGER_PATH)
     print("OPEN:", led.list_open())
@@ -155,6 +170,8 @@ def main() -> None:
         asyncio.run(cmd_dry_run())
     elif cmd == "mark":
         asyncio.run(cmd_mark())
+    elif cmd == "live-open":
+        asyncio.run(cmd_live_open())
     elif cmd == "status":
         cmd_status()
     elif cmd == "score":
