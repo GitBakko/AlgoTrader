@@ -181,7 +181,8 @@ async def cmd_live_open() -> None:
 
 
 async def cmd_run() -> None:
-    """Persistent autonomous loop: entry_pass every 5 min (13:30-16:00 UTC window)
+    """Persistent autonomous loop: entry_pass every 5 min
+    (09:30-12:00 ET window (13:30-16:00 UTC summer / 14:30-17:00 UTC winter))
     + mark/exit management every 15 min + EOD flatten.
     Launch once, detached (like the backend). Ctrl-C to stop.
     """
@@ -199,7 +200,8 @@ async def cmd_run() -> None:
     scheduler.add_job(sched.mark_pass, IntervalTrigger(minutes=15), id="mark")
     scheduler.start()
     logger.success("[forward-lab] RUN loop started — entry_pass every 5min "
-                   "(13:30-16:00 UTC window), mark every 15min, EOD flatten. Ctrl-C to stop.")
+                   "(09:30-12:00 ET window (13:30-16:00 UTC summer / 14:30-17:00 UTC winter)), "
+                   "mark every 15min, EOD flatten. Ctrl-C to stop.")
     try:
         while True:
             await asyncio.sleep(3600)

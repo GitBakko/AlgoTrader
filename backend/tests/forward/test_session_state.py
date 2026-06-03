@@ -47,6 +47,36 @@ async def test_opening_range_from_minute5_bars():
     assert hi == 102.0 and lo == 98.5
 
 
+@pytest.mark.asyncio
+async def test_opening_range_winter_est():
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import ORBStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+    from src.broker.models import OHLCCandle
+    import pathlib, tempfile
+
+    def _c(ts, hi, lo):
+        return OHLCCandle.model_validate(
+            {"snapshotTime": ts, "openPrice": (hi + lo) / 2, "highPrice": hi,
+             "lowPrice": lo, "closePrice": (hi + lo) / 2})
+
+    client = AsyncMock()
+    # Jan (EST): US open 09:30 ET = 14:30 UTC. OR window 14:30-15:00 UTC.
+    client.get_historical_prices.return_value = [
+        _c(datetime(2026, 1, 7, 13, 30, tzinfo=timezone.utc), 999.0, 998.0),  # 08:30 EST pre-mkt -> excluded
+        _c(datetime(2026, 1, 7, 14, 30, tzinfo=timezone.utc), 101.0, 99.0),
+        _c(datetime(2026, 1, 7, 14, 55, tzinfo=timezone.utc), 102.0, 98.5),
+    ]
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(pathlib.Path(tempfile.mkdtemp()) / "win.db"), dry_run=True)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[ORBStrategy(epics=["AAPL"])])
+    now = datetime(2026, 1, 7, 15, 0, tzinfo=timezone.utc)   # after winter OR window
+    hi, lo = await sched._opening_range("AAPL", now)
+    assert hi == 102.0 and lo == 98.5    # pre-market 999/998 excluded
+
+
 def test_in_window_guards_weekday_and_hours():
     from forward.scheduler import ExperimentScheduler
     from forward.strategy import GapFadeStrategy

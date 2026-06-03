@@ -11,6 +11,7 @@ from loguru import logger
 # (symbols, days) -> {symbol: DataFrame[Volume] with tz-aware UTC DatetimeIndex}
 Fetch5m = Callable[[list[str], int], dict[str, "pd.DataFrame"]]
 
+_ET = ZoneInfo("America/New_York")
 SESSION_OPEN_ET = time(9, 30)  # US regular cash open in ET wall-clock (DST-correct)
 
 
@@ -46,7 +47,7 @@ class RvolScreener:
 
     def _early_volume_by_day(self, df: pd.DataFrame) -> pd.Series:
         """Sum of Volume in [09:30, 09:30+or_window_min) ET, grouped by ET calendar date."""
-        et_idx = df.index.tz_convert(ZoneInfo("America/New_York"))
+        et_idx = df.index.tz_convert(_ET)
         et_minutes = et_idx.hour * 60 + et_idx.minute
         open_min = SESSION_OPEN_ET.hour * 60 + SESSION_OPEN_ET.minute
         mask = (et_minutes >= open_min) & (et_minutes < open_min + self.or_window_min)
@@ -60,7 +61,7 @@ class RvolScreener:
     def select(self, symbols: list[str], now: datetime) -> dict:
         data = (self.fetch_5m or _default_fetch_5m)(symbols, self.baseline_days)
         # today key = ET calendar date of now (tz-naive, matching groupby key above)
-        today = pd.Timestamp(now.astimezone(ZoneInfo("America/New_York")).date())
+        today = pd.Timestamp(now.astimezone(_ET).date())
         rvol: dict[str, float] = {}
         for s in symbols:
             df = data.get(s)
