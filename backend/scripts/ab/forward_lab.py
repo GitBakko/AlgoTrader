@@ -48,19 +48,31 @@ def _strategy() -> GapFadeStrategy:
     return GapFadeStrategy(epics=UNIVERSE, gap_threshold=s.forward_lab_gap_threshold)
 
 
-async def _connected_client() -> CapitalComClient:
-    client = CapitalComClient()  # demo creds from settings (use_demo=True)
+async def _connected_client(experiment: bool = False) -> CapitalComClient:
+    """Connected client. experiment=True uses the dedicated experiment API key
+    (separate session/CST from the soak); else the default soak creds."""
+    s = get_settings()
+    if experiment and s.capital_experiment_api_key:
+        client = CapitalComClient(api_key=s.capital_experiment_api_key,
+                                  email=s.capital_experiment_email,
+                                  password=s.capital_experiment_password)
+    else:
+        client = CapitalComClient()  # demo creds from settings (use_demo=True)
     await client.connect()
     return client
 
 
 async def cmd_discover() -> None:
-    client = await _connected_client()
+    client = await _connected_client(experiment=True)
     try:
-        acc = await discover_account(client)
-        print(f"experiment account '{EXPERIMENT_ACCOUNT_NAME}' -> accountId = {acc}")
-        print("Set CAPITAL_EXPERIMENT_ACCOUNT_ID in .env to this value." if acc
-              else "NOT FOUND — create/rename the demo account first.")
+        accts = await client.get_accounts()
+        active = await client.get_active_account_id()
+        print("Accounts visible to the experiment API key:")
+        for a in accts:
+            mark = "  <- ACTIVE" if a.account_id == active else ""
+            print(f"  id={a.account_id}  name={a.account_name!r}  bal={a.balance}{mark}")
+        print("Set CAPITAL_EXPERIMENT_ACCOUNT_ID to the idle account's id "
+              "(the one WITHOUT the soak's positions).")
     finally:
         await client.close()
 
@@ -72,7 +84,7 @@ async def cmd_validate_isolation() -> None:
     exp_id = s.capital_experiment_account_id
     assert exp_id, "set CAPITAL_EXPERIMENT_ACCOUNT_ID first (run discover-account)"
     soak = await _connected_client()
-    exp = await _connected_client()
+    exp = await _connected_client(experiment=True)
     try:
         soak_before = await soak.get_active_account_id()
         await exp.switch_account(exp_id)
@@ -99,7 +111,7 @@ def _make_executor(client, dry_run: bool) -> ExperimentExecutor:
 
 
 async def cmd_dry_run() -> None:
-    client = await _connected_client()
+    client = await _connected_client(experiment=True)
     try:
         ex = _make_executor(client, dry_run=True)
         sched = ExperimentScheduler(client=client, executor=ex, strategy=_strategy(),
@@ -111,7 +123,7 @@ async def cmd_dry_run() -> None:
 
 async def cmd_mark() -> None:
     s = get_settings()
-    client = await _connected_client()
+    client = await _connected_client(experiment=True)
     try:
         await client.switch_account(s.capital_experiment_account_id)
         ex = _make_executor(client, dry_run=False)

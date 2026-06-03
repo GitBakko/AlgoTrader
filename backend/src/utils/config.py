@@ -81,6 +81,12 @@ class Settings(BaseSettings):
     capital_live_password: str = Field(default="", alias="CAPITAL_LIVE_PASSWORD")
 
     # --- Forward Demo Lab (experiment account, isolated from soak) ---
+    # Dedicated Capital.com API key for the forward-lab — separate session/CST
+    # from the soak (which uses the default CAPITAL_DEMO_* creds). Same underlying
+    # Capital.com account; isolation is per-session and verified before any live order.
+    capital_experiment_api_key: str = Field(default="", alias="CAPITAL_EXPERIMENT_API_KEY")
+    capital_experiment_email: str = Field(default="", alias="CAPITAL_EXPERIMENT_EMAIL")
+    capital_experiment_password: str = Field(default="", alias="CAPITAL_EXPERIMENT_PASSWORD")
     capital_experiment_account_id: str | None = None
     forward_lab_notional_usd: float = 200.0
     forward_lab_max_concurrent: int = 5
