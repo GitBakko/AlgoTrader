@@ -60,7 +60,8 @@ class ExperimentExecutor:
             strategy=strat.name, epic=sig.epic, session_date=session_date,
             deal_id=conf.deal_id, direction=sig.direction.value, entry=conf.level,
             size=size, stop_level=sig.stop_level, rationale=sig.rationale,
-            opened_at=datetime.now(timezone.utc).isoformat())
+            opened_at=datetime.now(timezone.utc).isoformat(),
+            prev_close=ctx.prev_close, today_open=ctx.today_open)
         logger.success(f"[LIVE] opened {sig.epic} {sig.direction.value} "
                        f"dealId={conf.deal_id} @ {conf.level}")
         return conf

@@ -126,3 +126,36 @@ async def test_mark_pass_dispatches_exit_rule_by_owning_strategy(tmp_path):
     await sched.mark_pass(now=datetime(2026, 6, 3, 21, 0, tzinfo=timezone.utc))
     assert ex.ledger.realized("gap_fade")[0]["net_pnl"] == 1.50
     assert ex.ledger.realized("orb")[0]["net_pnl"] == -2.00
+
+
+@pytest.mark.asyncio
+async def test_mark_pass_gapfade_50pct_fill_exit(tmp_path):
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import GapFadeStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+    from src.broker.models import Transaction
+
+    client = AsyncMock()
+    # SELL gap-fade: prev_close=100, today_open=104 (gap +4) -> 50% target = 102.
+    # live mid 101.5 (<= 102) -> exit_rule fires the 50%-fill BEFORE EOD.
+    client.get_market_details.return_value = {"snapshot": {"bid": 101.4, "offer": 101.6}}
+    client.list_positions.return_value = [type("P", (), {"deal_id": "DG"})()]   # still open at broker
+    client.get_transaction_history.return_value = [
+        Transaction(date=datetime(2026, 6, 3, 16, 0, tzinfo=timezone.utc), reference="rg",
+                    dealId="DG", transactionType="TRADE", instrumentName="AAPL",
+                    size="2.50", currency="USD")]
+    client.close_position.return_value = None
+
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(tmp_path / "fill.db"), dry_run=False)
+    ex.ledger.record_open(strategy="gap_fade", epic="AAPL", session_date="2026-06-03",
+                          deal_id="DG", direction="SELL", entry=104.0, size=1.0,
+                          stop_level=106.0, rationale="x", opened_at="2026-06-03T14:00:00+00:00",
+                          prev_close=100.0, today_open=104.0)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[GapFadeStrategy(epics=["AAPL"], fill_fraction=0.5)])
+    # mid-session (well before EOD) -> only the 50%-fill arm can close it
+    await sched.mark_pass(now=datetime(2026, 6, 3, 17, 0, tzinfo=timezone.utc))
+    client.close_position.assert_awaited_once_with("DG")
+    assert ex.ledger.realized("gap_fade")[0]["net_pnl"] == 2.50

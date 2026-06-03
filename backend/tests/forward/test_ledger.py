@@ -37,3 +37,40 @@ def test_exists_true_after_open_open_or_closed(tmp_path):
     assert led.exists("orb", "AAPL", "2026-06-03") is True   # still True after close
     assert led.exists("orb", "AAPL", "2026-06-04") is False    # different day
     assert led.exists("gap_fade", "AAPL", "2026-06-03") is False  # different strategy
+
+
+def test_record_open_persists_prev_close_and_today_open(tmp_path):
+    import sys, pathlib
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "scripts" / "ab"))
+    from forward.ledger import ForwardLedger
+    led = ForwardLedger(tmp_path / "pc.db")
+    led.record_open(strategy="gap_fade", epic="AAPL", session_date="2026-06-03", deal_id="D1",
+                    direction="SELL", entry=104.0, size=1.0, stop_level=106.0,
+                    rationale="x", opened_at="2026-06-03T14:00:00+00:00",
+                    prev_close=100.0, today_open=104.0)
+    row = led.list_open()[0]
+    assert row["prev_close"] == 100.0 and row["today_open"] == 104.0
+
+
+def test_init_migrates_legacy_db_missing_columns(tmp_path):
+    import sys, pathlib, sqlite3
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "scripts" / "ab"))
+    db = tmp_path / "legacy.db"
+    # simulate an OLD ledger.db without prev_close/today_open
+    conn = sqlite3.connect(db)
+    conn.execute("""CREATE TABLE trades(
+        id INTEGER PRIMARY KEY AUTOINCREMENT, strategy TEXT NOT NULL, epic TEXT NOT NULL,
+        session_date TEXT NOT NULL, deal_id TEXT, direction TEXT, entry REAL, size REAL,
+        stop_level REAL, rationale TEXT, opened_at TEXT, exit_price REAL, net_pnl REAL,
+        closed_at TEXT, close_reason TEXT, UNIQUE(strategy, epic, session_date))""")
+    conn.commit(); conn.close()
+    from forward.ledger import ForwardLedger
+    led = ForwardLedger(db)   # _init must ALTER-ADD the missing columns
+    cols = {r[1] for r in sqlite3.connect(db).execute("PRAGMA table_info(trades)")}
+    assert "prev_close" in cols and "today_open" in cols
+    # and a record_open with the new fields works on the migrated db
+    led.record_open(strategy="orb", epic="NVDA", session_date="2026-06-03", deal_id="D2",
+                    direction="BUY", entry=500.0, size=1.0, stop_level=490.0,
+                    rationale="y", opened_at="2026-06-03T14:30:00+00:00",
+                    prev_close=495.0, today_open=500.0)
+    assert led.list_open()[0]["prev_close"] == 495.0

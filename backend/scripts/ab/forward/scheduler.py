@@ -209,7 +209,8 @@ class ExperimentScheduler:
             pos = OpenPosition(
                 epic=row["epic"], direction=Direction(row["direction"]),
                 entry=row["entry"], size=row["size"], stop_level=row["stop_level"],
-                prev_close=0.0, today_open=row["entry"],
+                prev_close=row["prev_close"] if row.get("prev_close") is not None else 0.0,
+                today_open=row["today_open"] if row.get("today_open") is not None else row["entry"],
                 opened_at=now, deal_id=row["deal_id"])
             ctx = MarketContext(epic=row["epic"], prev_close=0.0, today_open=row["entry"],
                                 current_price=mid, now=now,

@@ -27,21 +27,28 @@ class ForwardLedger:
                     session_date TEXT NOT NULL, deal_id TEXT,
                     direction TEXT, entry REAL, size REAL, stop_level REAL,
                     rationale TEXT, opened_at TEXT,
+                    prev_close REAL, today_open REAL,
                     exit_price REAL, net_pnl REAL, closed_at TEXT, close_reason TEXT,
                     UNIQUE(strategy, epic, session_date))"""
             )
+            # Idempotent migration: add columns missing from legacy DBs.
+            existing = {row[1] for row in c.execute("PRAGMA table_info(trades)")}
+            for col in ("prev_close", "today_open"):
+                if col not in existing:
+                    c.execute(f"ALTER TABLE trades ADD COLUMN {col} REAL")
 
     def record_open(self, *, strategy: str, epic: str, session_date: str, deal_id: str,
                     direction: str, entry: float, size: float, stop_level: float,
-                    rationale: str, opened_at: str) -> bool:
+                    rationale: str, opened_at: str,
+                    prev_close: float = 0.0, today_open: float = 0.0) -> bool:
         try:
             with self._conn() as c:
                 c.execute(
                     """INSERT INTO trades(strategy,epic,session_date,deal_id,direction,
-                       entry,size,stop_level,rationale,opened_at)
-                       VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                       entry,size,stop_level,rationale,opened_at,prev_close,today_open)
+                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (strategy, epic, session_date, deal_id, direction, entry, size,
-                     stop_level, rationale, opened_at),
+                     stop_level, rationale, opened_at, prev_close, today_open),
                 )
             return True
         except sqlite3.IntegrityError:
