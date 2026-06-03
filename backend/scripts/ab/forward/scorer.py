@@ -27,6 +27,10 @@ def score(realized_rows: list[dict], trial_sharpes_ann: list[float] | None = Non
     if not realized_rows:
         return {"n_trades": 0, "verdict": "NO DATA"}
     df = pd.DataFrame(realized_rows)
+    if "close_reason" in df.columns:
+        df = df[df["close_reason"] != "PENDING_RECONCILE"]
+    if df.empty:
+        return {"n_trades": 0, "verdict": "NO DATA"}
     df["closed_at"] = pd.to_datetime(df["closed_at"], utc=True)
     notional = (df["size"] * df["entry"]).replace(0, pd.NA)
     df["ret"] = df["net_pnl"] / notional

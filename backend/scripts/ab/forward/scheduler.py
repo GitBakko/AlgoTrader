@@ -222,18 +222,60 @@ class ExperimentScheduler:
                             f"net={net:+.2f} ({reason})")
 
     async def _realized(self, row: dict, fallback_px: float) -> tuple[float, float, str]:
-        """Realized P&L from the broker TRADE transaction matching this row's dealId
-        (broker truth). dealId is the deterministic match key for /history/transactions
-        TRADE rows; an unmatched id (e.g. broker SL/TP rotation) stays PENDING_RECONCILE
-        rather than guessing — no invented P&L."""
+        """Realized P&L from the broker (broker truth, no invented P&L).
+
+        Tier 1: TRADE row whose dealId == our position deal_id — the case for
+                OUR DELETE-initiated closes (EOD flatten).
+        Tier 2: broker-initiated SL/TP closes rotate the dealId, so link via
+                /history/activity: a close event (is_close_event) for this epic
+                whose details.openPrice == our entry (and date >= opened_at)
+                carries the close-side dealId, which matches the TRADE row for P&L.
+        Else:   PENDING_RECONCILE (no guess, no invented P&L)."""
         to_date = datetime.now(timezone.utc)
         from_date = to_date - timedelta(days=2)
         txns = await self.client.get_transaction_history(from_date, to_date)
-        for t in txns:
-            if (t.transaction_type or "").upper() != "TRADE":
-                continue
+        trades = [t for t in txns if (t.transaction_type or "").upper() == "TRADE"]
+
+        # Tier 1 — exact dealId (our own close)
+        for t in trades:
             if t.deal_id and t.deal_id == row["deal_id"]:
                 pnl = t.pl_value_in("USD")
                 if pnl is not None:
                     return float(pnl), fallback_px, "BROKER_TRADE"
+
+        # Tier 2 — broker-initiated close: link via activity (rotated dealId)
+        entry = row.get("entry")
+        opened_at = self._parse_dt(row.get("opened_at"))
+        if entry is not None:
+            try:
+                acts = await self.client.get_activity_history(from_date, to_date)
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"[forward-lab] activity fetch failed for {row['epic']}: {e}")
+                acts = []
+            tol = max(1e-6, abs(float(entry)) * 1e-4)
+            for a in acts:
+                if not a.is_close_event() or a.epic != row["epic"]:
+                    continue
+                op = a.details.open_price
+                if op is None or abs(float(op) - float(entry)) > tol:
+                    continue
+                if opened_at is not None:
+                    a_date = a.date if a.date.tzinfo else a.date.replace(tzinfo=timezone.utc)
+                    if a_date < opened_at:
+                        continue
+                for t in trades:
+                    if t.deal_id and t.deal_id == a.deal_id:
+                        pnl = t.pl_value_in("USD")
+                        if pnl is not None:
+                            return float(pnl), fallback_px, "BROKER_ACTIVITY"
         return 0.0, fallback_px, "PENDING_RECONCILE"
+
+    @staticmethod
+    def _parse_dt(s: object) -> datetime | None:
+        if not s or not isinstance(s, str):
+            return None
+        try:
+            dt = datetime.fromisoformat(s)
+            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        except ValueError:
+            return None
