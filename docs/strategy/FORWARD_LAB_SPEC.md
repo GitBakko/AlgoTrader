@@ -159,3 +159,7 @@ backend/scripts/ab/test_rsi2.py          # H1 screen (parallelo)
 backend/scripts/ab/test_overnight.py     # H5 screen (parallelo)
 data/forward_lab/                        # ledger per-trade (gitignored)
 ```
+
+## 14. Isolamento validato — 2026-06-03
+
+`validate-isolation` = **ISOLATION OK**. Setup finale: **stesso account Capital.com**, **API key dedicata** per l'esperimento (sessione/CST separata dalla soak; creds in `.env` `CAPITAL_EXPERIMENT_*`). Il conto-attivo Capital.com è **per-sessione**: lo switch della sessione esperimento a **'USDd'** (`16772336922734878`) NON sposta la sessione soak (resta su **'Account test'** `322643372115580062`). Soak e esperimento girano simultaneamente, isolati. Verde per ordini live sul conto 'USDd'. (Il piano prevedeva il login separato come fallback; non necessario — la key dedicata + per-session switch basta.)
