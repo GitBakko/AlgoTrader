@@ -103,6 +103,46 @@ async def test_entry_pass_orb_enters_only_eligible_on_breakout(tmp_path, monkeyp
     assert ex.ledger.realized("orb") == [] and len(ex.ledger.list_open()) == 1
 
 
+def test_in_window_dst_summer_vs_winter():
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import GapFadeStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+    import pathlib, tempfile
+    from unittest.mock import AsyncMock
+    from datetime import datetime, timezone
+    ex = ExperimentExecutor(client=AsyncMock(), experiment_account_id="EXP",
+                            ledger=ForwardLedger(pathlib.Path(tempfile.mkdtemp()) / "d.db"), dry_run=True)
+    sched = ExperimentScheduler(client=AsyncMock(), executor=ex,
+                                strategies=[GapFadeStrategy(epics=["AAPL"])])
+    # Summer (EDT): open 13:30 UTC. 13:45 UTC is in-window; 13:15 UTC is before open.
+    jun = datetime(2026, 6, 3, 13, 45, tzinfo=timezone.utc)   # Wed, EDT, after 13:30 open
+    assert sched._in_window(jun) is True
+    assert sched._in_window(jun.replace(hour=13, minute=15)) is False   # before 13:30 EDT open
+    # Winter (EST): open is 14:30 UTC. 13:45 UTC is BEFORE the open -> out; 14:45 UTC is in.
+    jan = datetime(2026, 1, 7, 13, 45, tzinfo=timezone.utc)   # Wed, EST
+    assert sched._in_window(jan) is False                      # 13:45 < 14:30 EST open
+    assert sched._in_window(jan.replace(hour=14, minute=45)) is True
+
+
+def test_session_close_dst_aware():
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import GapFadeStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+    import pathlib, tempfile
+    from unittest.mock import AsyncMock
+    from datetime import datetime, timezone
+    ex = ExperimentExecutor(client=AsyncMock(), experiment_account_id="EXP",
+                            ledger=ForwardLedger(pathlib.Path(tempfile.mkdtemp()) / "d2.db"), dry_run=True)
+    sched = ExperimentScheduler(client=AsyncMock(), executor=ex,
+                                strategies=[GapFadeStrategy(epics=["AAPL"])])
+    jun = sched._session_close(datetime(2026, 6, 3, 18, 0, tzinfo=timezone.utc))
+    assert jun.hour == 20 and jun.minute == 45                 # 16:45 EDT = 20:45 UTC
+    jan = sched._session_close(datetime(2026, 1, 7, 18, 0, tzinfo=timezone.utc))
+    assert jan.hour == 21 and jan.minute == 45                 # 16:45 EST = 21:45 UTC
+
+
 @pytest.mark.asyncio
 async def test_entry_pass_gapfade_enters_on_gap(tmp_path, monkeypatch):
     from forward.scheduler import ExperimentScheduler

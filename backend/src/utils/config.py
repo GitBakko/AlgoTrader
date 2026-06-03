@@ -92,9 +92,10 @@ class Settings(BaseSettings):
     forward_lab_max_concurrent: int = 5
     forward_lab_daily_loss_limit_usd: float = 100.0
     forward_lab_gap_threshold: float = 0.01
-    forward_lab_eod_flatten_utc: str = "20:45"  # HH:MM UTC cash-session flatten
+    forward_lab_session_open_et: str = "09:30"  # US cash open (America/New_York wall-clock)
+    forward_lab_eod_flatten_et: str = "16:45"  # EOD flatten (ET; ~45 min after 16:00 close)
     forward_lab_orb_or_window_min: int = 30  # opening-range minutes (Yahoo delay -> 30)
-    forward_lab_orb_watch_end_utc: str = "16:00"  # breakout watch cutoff (UTC)
+    forward_lab_orb_watch_end_et: str = "12:00"  # ORB entry-watch cutoff (ET)
     forward_lab_orb_rvol_min: float = 1.5  # min relative volume to be "in play"
     forward_lab_orb_top_k: int = 5  # max in-play names per day
     forward_lab_orb_breakout_buffer: float = 0.0  # fraction beyond OR required

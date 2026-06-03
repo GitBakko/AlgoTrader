@@ -76,3 +76,17 @@ def test_empty_or_missing_feed_skips_symbol():
     sc = RvolScreener(fetch_5m=_fake_fetch({}), rvol_min=1.5)   # no data for AAPL
     out = sc.select(["AAPL"], datetime(2026, 6, 3, 14, 0, tzinfo=timezone.utc))
     assert out["eligible"] == set() and "AAPL" not in out["rvol"]
+
+
+def test_screener_dst_winter_uses_et_open():
+    from forward.screener import RvolScreener
+    # January: 13:30 UTC = 8:30 EST (pre-market) -> excluded; 14:30 UTC = 9:30 EST -> counted
+    df = _frame([
+        ("2026-01-06T13:30:00Z", 9999),   # 8:30 EST pre-market -> excluded
+        ("2026-01-06T14:30:00Z", 100),    # 9:30 EST -> counted (baseline day)
+        ("2026-01-07T13:30:00Z", 9999),   # pre-market excluded
+        ("2026-01-07T14:30:00Z", 300),    # 9:30 EST today -> rvol 3
+    ])
+    sc = RvolScreener(fetch_5m=_fake_fetch({"AAPL": df}), rvol_min=1.5, or_window_min=30)
+    out = sc.select(["AAPL"], datetime(2026, 1, 7, 15, 0, tzinfo=timezone.utc))
+    assert round(out["rvol"]["AAPL"], 2) == 3.0

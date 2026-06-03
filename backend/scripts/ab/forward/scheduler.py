@@ -4,6 +4,9 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta, timezone, date as _date
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
 
 from loguru import logger
 
@@ -42,11 +45,11 @@ class ExperimentScheduler:
     client: object
     executor: ExperimentExecutor
     strategies: list[ForwardStrategy]
-    eod_flatten_utc: str = "20:45"
+    eod_flatten_et: str = "16:45"
     screener: object | None = None                 # RvolScreener (optional; needed for ORB)
-    session_open_utc: str = "13:30"
+    session_open_et: str = "09:30"
     or_window_min: int = 30
-    watch_end_utc: str = "16:00"
+    watch_end_et: str = "12:00"
     _state: SessionState = field(default_factory=SessionState, init=False, repr=False)
 
     @property
@@ -77,19 +80,20 @@ class ExperimentScheduler:
             return None
         return (float(bid) + float(offer)) / 2.0
 
-    def _session_close(self, now: datetime) -> datetime:
-        t = self._hhmm(self.eod_flatten_utc)
-        return datetime.combine(now.date(), t)
+    def _et_to_utc(self, d: _date, hhmm: str) -> datetime:
+        """An ET wall-clock HH:MM on calendar date d, as a tz-aware UTC datetime (DST-correct)."""
+        hh, mm = (int(x) for x in hhmm.split(":"))
+        return datetime(d.year, d.month, d.day, hh, mm, tzinfo=_ET).astimezone(timezone.utc)
 
-    def _hhmm(self, s: str) -> time:
-        hh, mm = (int(x) for x in s.split(":"))
-        return time(hh, mm, tzinfo=timezone.utc)
+    def _session_close(self, now: datetime) -> datetime:
+        return self._et_to_utc(now.date(), self.eod_flatten_et)
 
     def _in_window(self, now: datetime) -> bool:
         if now.weekday() >= 5:                       # Sat/Sun
             return False
-        o, e = self._hhmm(self.session_open_utc), self._hhmm(self.watch_end_utc)
-        return o <= now.timetz() < e
+        open_dt = self._et_to_utc(now.date(), self.session_open_et)
+        end_dt = self._et_to_utc(now.date(), self.watch_end_et)
+        return open_dt <= now < end_dt
 
     async def _opening_range(self, epic: str, now: datetime) -> tuple[float, float] | None:
         """OR high/low from Capital.com MINUTE_5 bars in [open, open+or_window_min)."""
@@ -99,13 +103,15 @@ class ExperimentScheduler:
         except Exception as e:  # noqa: BLE001
             logger.warning(f"[forward-lab] {epic} MINUTE_5 fetch failed: {e} — skip OR")
             return None
-        o = self._hhmm(self.session_open_utc)
-        open_min = o.hour * 60 + o.minute
-        today = now.date()
+        open_dt = self._et_to_utc(now.date(), self.session_open_et)
+        end_dt = open_dt + timedelta(minutes=self.or_window_min)
         # Capital.com MINUTE_5 snapshotTime is the bar-START (probe-confirmed), so the
-        # half-open [open, open+or_window_min) includes the 13:55 bar and excludes 14:00.
-        win = [c for c in candles if c.timestamp.date() == today
-               and open_min <= (c.timestamp.hour * 60 + c.timestamp.minute) < open_min + self.or_window_min]
+        # half-open [open_dt, end_dt) includes the last bar and excludes end_dt.
+        win = []
+        for c in candles:
+            ts = c.timestamp if c.timestamp.tzinfo else c.timestamp.replace(tzinfo=timezone.utc)
+            if open_dt <= ts < end_dt:
+                win.append(c)
         if not win:
             return None
         return max(c.high for c in win), min(c.low for c in win)
@@ -116,9 +122,8 @@ class ExperimentScheduler:
             return
         self._state.ensure_day(now.date())
         session_date = now.date().isoformat()
-        o = self._hhmm(self.session_open_utc)
-        open_min = o.hour * 60 + o.minute
-        or_ready = (now.hour * 60 + now.minute) >= (open_min + self.or_window_min)
+        open_dt = self._et_to_utc(now.date(), self.session_open_et)
+        or_ready = now >= open_dt + timedelta(minutes=self.or_window_min)
 
         for strat in self.strategies:
             for epic in strat.universe():

@@ -69,9 +69,10 @@ def _build_scheduler(client, executor):
     s = get_settings()
     return ExperimentScheduler(
         client=client, executor=executor, strategies=_strategies(),
-        eod_flatten_utc=s.forward_lab_eod_flatten_utc, screener=_screener(),
+        eod_flatten_et=s.forward_lab_eod_flatten_et, screener=_screener(),
         or_window_min=s.forward_lab_orb_or_window_min,
-        watch_end_utc=s.forward_lab_orb_watch_end_utc)
+        session_open_et=s.forward_lab_session_open_et,
+        watch_end_et=s.forward_lab_orb_watch_end_et)
 
 
 async def _connected_client(experiment: bool = False) -> CapitalComClient:

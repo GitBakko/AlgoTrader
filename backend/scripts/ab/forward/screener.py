@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, time, timezone
 from typing import Callable
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 from loguru import logger
@@ -10,7 +11,7 @@ from loguru import logger
 # (symbols, days) -> {symbol: DataFrame[Volume] with tz-aware UTC DatetimeIndex}
 Fetch5m = Callable[[list[str], int], dict[str, "pd.DataFrame"]]
 
-SESSION_OPEN_UTC = time(13, 30)  # US regular cash open (summer/EDT); winter shifts to 14:30
+SESSION_OPEN_ET = time(9, 30)  # US regular cash open in ET wall-clock (DST-correct)
 
 
 def _default_fetch_5m(symbols: list[str], days: int) -> dict[str, pd.DataFrame]:
@@ -44,19 +45,22 @@ class RvolScreener:
     baseline_days: int = 20
 
     def _early_volume_by_day(self, df: pd.DataFrame) -> pd.Series:
-        """Sum of Volume in [13:30, 13:30+or_window_min) UTC, grouped by calendar date."""
-        t = df.index
-        minutes = t.hour * 60 + t.minute
-        open_min = SESSION_OPEN_UTC.hour * 60 + SESSION_OPEN_UTC.minute
-        mask = (minutes >= open_min) & (minutes < open_min + self.or_window_min)
+        """Sum of Volume in [09:30, 09:30+or_window_min) ET, grouped by ET calendar date."""
+        et_idx = df.index.tz_convert(ZoneInfo("America/New_York"))
+        et_minutes = et_idx.hour * 60 + et_idx.minute
+        open_min = SESSION_OPEN_ET.hour * 60 + SESSION_OPEN_ET.minute
+        mask = (et_minutes >= open_min) & (et_minutes < open_min + self.or_window_min)
         early = df.loc[mask]
         if early.empty:
             return pd.Series(dtype="float64")
-        return early.groupby(early.index.normalize())["Volume"].sum()
+        # Group by ET calendar date (tz-naive date key)
+        et_dates = pd.DatetimeIndex(et_idx[mask]).normalize().tz_localize(None)
+        return early.groupby(et_dates)["Volume"].sum()
 
     def select(self, symbols: list[str], now: datetime) -> dict:
         data = (self.fetch_5m or _default_fetch_5m)(symbols, self.baseline_days)
-        today = pd.Timestamp(now.astimezone(timezone.utc).date(), tz="UTC")
+        # today key = ET calendar date of now (tz-naive, matching groupby key above)
+        today = pd.Timestamp(now.astimezone(ZoneInfo("America/New_York")).date())
         rvol: dict[str, float] = {}
         for s in symbols:
             df = data.get(s)
