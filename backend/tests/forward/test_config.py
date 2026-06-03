@@ -10,11 +10,11 @@ def test_experiment_account_settings_exist():
 
 
 def test_orb_settings_defaults():
-    import sys, pathlib
-    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
     from src.utils.config import get_settings
     s = get_settings()
     assert s.forward_lab_orb_or_window_min == 30
+    assert s.forward_lab_orb_watch_end_utc == "16:00"
     assert s.forward_lab_orb_rvol_min == 1.5
     assert s.forward_lab_orb_top_k == 5
-    assert s.forward_lab_orb_watch_end_utc == "16:00"
+    assert s.forward_lab_orb_breakout_buffer == 0.0
+    assert s.forward_lab_orb_stop_atr_mult == 1.0

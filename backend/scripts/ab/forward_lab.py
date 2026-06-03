@@ -29,7 +29,6 @@ from forward.executor import ExperimentExecutor  # noqa: E402
 from forward.ledger import ForwardLedger  # noqa: E402
 from forward.scheduler import ExperimentScheduler  # noqa: E402
 from forward.scorer import score  # noqa: E402
-from forward.strategy import GapFadeStrategy, ORBStrategy  # noqa: E402,F401
 
 EXPERIMENT_ACCOUNT_NAME = "Account Demo"
 LEDGER_PATH = ROOT / "data" / "forward_lab" / "ledger.db"
@@ -167,8 +166,8 @@ async def cmd_mark() -> None:
 
 
 async def cmd_live_open() -> None:
-    """LIVE: place real gap-fade entries on the experiment account (switches to it
-    first; the executor's isolation guard re-checks before every order)."""
+    """LIVE: run one entry_pass (gap-fade + ORB) on the experiment account (switches
+    to it first; the executor's isolation guard re-checks before every order)."""
     s = get_settings()
     client = await _connected_client(experiment=True)
     try:
