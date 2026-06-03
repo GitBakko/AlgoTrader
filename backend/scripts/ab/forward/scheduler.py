@@ -78,8 +78,8 @@ class ExperimentScheduler:
         return (float(bid) + float(offer)) / 2.0
 
     def _session_close(self, now: datetime) -> datetime:
-        hh, mm = (int(x) for x in self.eod_flatten_utc.split(":"))
-        return datetime.combine(now.date(), time(hh, mm, tzinfo=timezone.utc))
+        t = self._hhmm(self.eod_flatten_utc)
+        return datetime.combine(now.date(), t)
 
     def _hhmm(self, s: str) -> time:
         hh, mm = (int(x) for x in s.split(":"))
@@ -89,7 +89,7 @@ class ExperimentScheduler:
         if now.weekday() >= 5:                       # Sat/Sun
             return False
         o, e = self._hhmm(self.session_open_utc), self._hhmm(self.watch_end_utc)
-        return o <= now.timetz() <= e
+        return o <= now.timetz() < e
 
     async def _opening_range(self, epic: str, now: datetime) -> tuple[float, float] | None:
         """OR high/low from Capital.com MINUTE_5 bars in [open, open+or_window_min)."""
@@ -102,6 +102,8 @@ class ExperimentScheduler:
         o = self._hhmm(self.session_open_utc)
         open_min = o.hour * 60 + o.minute
         today = now.date()
+        # Capital.com MINUTE_5 snapshotTime is the bar-START (probe-confirmed), so the
+        # half-open [open, open+or_window_min) includes the 13:55 bar and excludes 14:00.
         win = [c for c in candles if c.timestamp.date() == today
                and open_min <= (c.timestamp.hour * 60 + c.timestamp.minute) < open_min + self.or_window_min]
         if not win:
@@ -134,13 +136,18 @@ class ExperimentScheduler:
                     if not or_ready:
                         continue
                     # screen once per day
-                    if not self._state.screened and self.screener is not None:
-                        pool = sorted({e for s in self.strategies
-                                       if s.needs_opening_range for e in s.universe()})
-                        res = self.screener.select(pool, now)
-                        self._state.rvol.update(res.get("rvol", {}))
-                        self._state.eligible = set(res.get("eligible", set()))
-                        self._state.screened = True
+                    if not self._state.screened:
+                        if self.screener is None:
+                            logger.warning("[forward-lab] ORB needs a screener but screener=None "
+                                           "— ORB entries disabled this session")
+                            self._state.screened = True
+                        else:
+                            pool = sorted({e for s in self.strategies
+                                           if s.needs_opening_range for e in s.universe()})
+                            res = self.screener.select(pool, now)
+                            self._state.rvol.update(res.get("rvol", {}))
+                            self._state.eligible = set(res.get("eligible", set()))
+                            self._state.screened = True
                     if epic not in self._state.eligible:
                         continue
                     if epic not in self._state.or_levels:

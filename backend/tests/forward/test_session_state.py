@@ -63,6 +63,8 @@ def test_in_window_guards_weekday_and_hours():
     assert sched._in_window(wed) is True
     assert sched._in_window(wed.replace(hour=12)) is False        # before 13:30
     assert sched._in_window(wed.replace(hour=17)) is False        # after 16:00
+    assert sched._in_window(wed.replace(hour=16, minute=0)) is False   # 16:00 exclusive end
+    assert sched._in_window(wed.replace(hour=13, minute=30)) is True    # 13:30 inclusive start
     sat = datetime(2026, 6, 6, 14, 0, tzinfo=timezone.utc)        # Saturday
     assert sched._in_window(sat) is False
 
@@ -99,3 +101,28 @@ async def test_entry_pass_orb_enters_only_eligible_on_breakout(tmp_path, monkeyp
     await sched.entry_pass(now=now)
     client.create_position.assert_awaited_once()
     assert ex.ledger.realized("orb") == [] and len(ex.ledger.list_open()) == 1
+
+
+@pytest.mark.asyncio
+async def test_entry_pass_gapfade_enters_on_gap(tmp_path, monkeypatch):
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import GapFadeStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+    from src.broker.models import DealConfirmation
+
+    client = AsyncMock()
+    client.get_active_account_id.return_value = "EXP"
+    client.get_market_details.return_value = {"snapshot": {"bid": 102.9, "offer": 103.1}}  # mid 103
+    client.create_position.return_value = DealConfirmation.model_validate({
+        "dealId": "DG", "dealReference": "RG", "dealStatus": "ACCEPTED", "epic": "AAPL",
+        "direction": "SELL", "size": 1.9, "level": 103.0, "status": "OPEN"})
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(tmp_path / "g.db"), dry_run=False)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[GapFadeStrategy(epics=["AAPL"], gap_threshold=0.01)])
+    monkeypatch.setattr(sched, "_prev_close", AsyncMock(return_value=100.0))  # +3% gap -> short
+    now = datetime(2026, 6, 3, 13, 35, tzinfo=timezone.utc)   # in window
+    await sched.entry_pass(now=now)
+    client.create_position.assert_awaited_once()
+    assert len(ex.ledger.list_open()) == 1
