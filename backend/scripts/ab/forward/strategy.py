@@ -107,7 +107,7 @@ class GapFadeStrategy(ForwardStrategy):
 class ORBStrategy(ForwardStrategy):
     epics: list[str]
     rvol_min: float = 1.5
-    breakout_buffer: float = 0.0          # fraction beyond OR required (0 = touch)
+    breakout_buffer: float = 0.0          # fraction beyond OR required (0 = strict break, no buffer)
     stop_atr_mult: float = 1.0
     stop_pct_fallback: float = 0.015      # used when atr is absent
     name: str = field(default="orb")
@@ -129,14 +129,15 @@ class ORBStrategy(ForwardStrategy):
         floor = self._stop_floor(ctx)
         up = ctx.or_high * (1.0 + self.breakout_buffer)
         dn = ctx.or_low * (1.0 - self.breakout_buffer)
+        rvol_str = f"{ctx.rvol:.2f}" if ctx.rvol is not None else "n/a"
         if ctx.current_price > up:                                   # break up -> long
             sl = min(ctx.or_low, ctx.current_price - floor)          # stop below, >= floor away
             return Signal(ctx.epic, Direction.BUY, sl,
-                          f"ORB long {ctx.current_price:.2f}>{ctx.or_high:.2f} rvol={ctx.rvol}")
+                          f"ORB long {ctx.current_price:.2f}>{ctx.or_high:.2f} rvol={rvol_str}")
         if ctx.current_price < dn:                                   # break down -> short
             sl = max(ctx.or_high, ctx.current_price + floor)         # stop above, >= floor away
             return Signal(ctx.epic, Direction.SELL, sl,
-                          f"ORB short {ctx.current_price:.2f}<{ctx.or_low:.2f} rvol={ctx.rvol}")
+                          f"ORB short {ctx.current_price:.2f}<{ctx.or_low:.2f} rvol={rvol_str}")
         return None
 
     def exit_rule(self, pos: OpenPosition, ctx: MarketContext) -> bool:

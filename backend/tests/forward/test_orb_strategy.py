@@ -83,3 +83,10 @@ def test_orb_exit_eod_only():
     late = _octx(102.0, 100.0, 110.0, now=datetime(2026, 6, 3, 21, 0, tzinfo=timezone.utc))
     assert s.exit_rule(pos, early) is False              # mid-session: hold (SL is broker-side)
     assert s.exit_rule(pos, late) is True                # past session_close: flatten
+
+def test_orb_atr_floor_widens_tight_range_stop_short():
+    from forward.strategy import ORBStrategy
+    s = ORBStrategy(epics=["AAPL"], rvol_min=1.5, stop_atr_mult=1.0)
+    # tight range (or_high 100.6 vs price 100.5) but atr=2.0 -> stop floored to 102.5
+    sig = s.should_enter(_octx(100.6, 100.55, 100.5, atr=2.0))
+    assert sig.stop_level == 102.5   # max(or_high, price + atr) = 100.5 + 2.0
