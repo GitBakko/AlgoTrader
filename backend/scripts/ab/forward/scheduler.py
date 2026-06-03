@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import sys
-from dataclasses import dataclass
-from datetime import datetime, time, timezone
+from dataclasses import dataclass, field
+from datetime import datetime, time, timedelta, timezone, date as _date
 from pathlib import Path
 
 from loguru import logger
@@ -17,11 +17,37 @@ from src.broker.models import Direction, Resolution  # noqa: E402
 
 
 @dataclass
+class SessionState:
+    day: _date | None = None
+    prev_close: dict[str, float] = field(default_factory=dict)  # epic -> prior daily close (cached/day)
+    open_px: dict[str, float] = field(default_factory=dict)
+    or_levels: dict[str, tuple[float, float]] = field(default_factory=dict)  # epic -> (hi, lo)
+    rvol: dict[str, float] = field(default_factory=dict)
+    eligible: set[str] = field(default_factory=set)
+    screened: bool = False
+
+    def ensure_day(self, d: _date) -> None:
+        if self.day != d:
+            self.day = d
+            self.prev_close.clear()
+            self.open_px.clear()
+            self.or_levels.clear()
+            self.rvol.clear()
+            self.eligible.clear()
+            self.screened = False
+
+
+@dataclass
 class ExperimentScheduler:
     client: object
     executor: ExperimentExecutor
     strategies: list[ForwardStrategy]
     eod_flatten_utc: str = "20:45"
+    screener: object | None = None                 # RvolScreener (optional; needed for ORB)
+    session_open_utc: str = "13:30"
+    or_window_min: int = 30
+    watch_end_utc: str = "16:00"
+    _state: SessionState = field(default_factory=SessionState, init=False, repr=False)
 
     @property
     def _registry(self) -> dict[str, ForwardStrategy]:
@@ -54,6 +80,85 @@ class ExperimentScheduler:
     def _session_close(self, now: datetime) -> datetime:
         hh, mm = (int(x) for x in self.eod_flatten_utc.split(":"))
         return datetime.combine(now.date(), time(hh, mm, tzinfo=timezone.utc))
+
+    def _hhmm(self, s: str) -> time:
+        hh, mm = (int(x) for x in s.split(":"))
+        return time(hh, mm, tzinfo=timezone.utc)
+
+    def _in_window(self, now: datetime) -> bool:
+        if now.weekday() >= 5:                       # Sat/Sun
+            return False
+        o, e = self._hhmm(self.session_open_utc), self._hhmm(self.watch_end_utc)
+        return o <= now.timetz() <= e
+
+    async def _opening_range(self, epic: str, now: datetime) -> tuple[float, float] | None:
+        """OR high/low from Capital.com MINUTE_5 bars in [open, open+or_window_min)."""
+        try:
+            candles = await self.client.get_historical_prices(
+                epic, Resolution.MINUTE_5, max_candles=20)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[forward-lab] {epic} MINUTE_5 fetch failed: {e} — skip OR")
+            return None
+        o = self._hhmm(self.session_open_utc)
+        open_min = o.hour * 60 + o.minute
+        today = now.date()
+        win = [c for c in candles if c.timestamp.date() == today
+               and open_min <= (c.timestamp.hour * 60 + c.timestamp.minute) < open_min + self.or_window_min]
+        if not win:
+            return None
+        return max(c.high for c in win), min(c.low for c in win)
+
+    async def entry_pass(self, now: datetime | None = None) -> None:
+        now = now or datetime.now(timezone.utc)
+        if not self._in_window(now):
+            return
+        self._state.ensure_day(now.date())
+        session_date = now.date().isoformat()
+        o = self._hhmm(self.session_open_utc)
+        open_min = o.hour * 60 + o.minute
+        or_ready = (now.hour * 60 + now.minute) >= (open_min + self.or_window_min)
+
+        for strat in self.strategies:
+            for epic in strat.universe():
+                if epic not in self._state.prev_close:        # cache prev_close once/day/epic
+                    pc = await self._prev_close(epic, now)
+                    if pc is None:
+                        continue
+                    self._state.prev_close[epic] = pc
+                prev_close = self._state.prev_close[epic]
+                mid = await self._mid(epic)
+                if mid is None:
+                    continue
+                self._state.open_px.setdefault(epic, mid)     # first in-window pass = open
+                if strat.needs_opening_range:
+                    if not or_ready:
+                        continue
+                    # screen once per day
+                    if not self._state.screened and self.screener is not None:
+                        pool = sorted({e for s in self.strategies
+                                       if s.needs_opening_range for e in s.universe()})
+                        res = self.screener.select(pool, now)
+                        self._state.rvol.update(res.get("rvol", {}))
+                        self._state.eligible = set(res.get("eligible", set()))
+                        self._state.screened = True
+                    if epic not in self._state.eligible:
+                        continue
+                    if epic not in self._state.or_levels:
+                        orng = await self._opening_range(epic, now)
+                        if orng is None:
+                            continue
+                        self._state.or_levels[epic] = orng
+                    hi, lo = self._state.or_levels[epic]
+                    ctx = MarketContext(epic=epic, prev_close=prev_close,
+                                        today_open=self._state.open_px[epic], current_price=mid,
+                                        now=now, session_close=self._session_close(now),
+                                        or_high=hi, or_low=lo,
+                                        rvol=self._state.rvol.get(epic))
+                else:
+                    ctx = MarketContext(epic=epic, prev_close=prev_close,
+                                        today_open=self._state.open_px[epic], current_price=mid,
+                                        now=now, session_close=self._session_close(now))
+                await self.executor.try_enter(strat, ctx, session_date)
 
     async def on_session_open(self, now: datetime | None = None) -> None:
         now = now or datetime.now(timezone.utc)
@@ -114,7 +219,6 @@ class ExperimentScheduler:
         (broker truth). dealId is the deterministic match key for /history/transactions
         TRADE rows; an unmatched id (e.g. broker SL/TP rotation) stays PENDING_RECONCILE
         rather than guessing — no invented P&L."""
-        from datetime import timedelta
         to_date = datetime.now(timezone.utc)
         from_date = to_date - timedelta(days=2)
         txns = await self.client.get_transaction_history(from_date, to_date)
