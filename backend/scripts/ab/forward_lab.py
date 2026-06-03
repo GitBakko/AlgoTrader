@@ -62,6 +62,13 @@ async def _connected_client(experiment: bool = False) -> CapitalComClient:
     return client
 
 
+async def _ensure_account(client, account_id: str | None) -> None:
+    """Switch the client to account_id only if not already active (Capital.com
+    rejects switching to the already-active account: error.not-different.accountId)."""
+    if account_id and await client.get_active_account_id() != account_id:
+        await client.switch_account(account_id)
+
+
 async def cmd_discover() -> None:
     client = await _connected_client(experiment=True)
     try:
@@ -125,7 +132,7 @@ async def cmd_mark() -> None:
     s = get_settings()
     client = await _connected_client(experiment=True)
     try:
-        await client.switch_account(s.capital_experiment_account_id)
+        await _ensure_account(client, s.capital_experiment_account_id)
         ex = _make_executor(client, dry_run=False)
         sched = ExperimentScheduler(client=client, executor=ex, strategy=_strategy(),
                                     eod_flatten_utc=s.forward_lab_eod_flatten_utc)
@@ -140,7 +147,7 @@ async def cmd_live_open() -> None:
     s = get_settings()
     client = await _connected_client(experiment=True)
     try:
-        await client.switch_account(s.capital_experiment_account_id)
+        await _ensure_account(client, s.capital_experiment_account_id)
         ex = _make_executor(client, dry_run=False)
         sched = ExperimentScheduler(client=client, executor=ex, strategy=_strategy(),
                                     eod_flatten_utc=s.forward_lab_eod_flatten_utc)
