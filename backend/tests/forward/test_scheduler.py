@@ -4,6 +4,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "scripts" /
 import pytest
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock
+from src.broker.models import Direction
 
 
 @pytest.mark.asyncio
@@ -140,7 +141,11 @@ async def test_mark_pass_gapfade_50pct_fill_exit(tmp_path):
     # SELL gap-fade: prev_close=100, today_open=104 (gap +4) -> 50% target = 102.
     # live mid 101.5 (<= 102) -> exit_rule fires the 50%-fill BEFORE EOD.
     client.get_market_details.return_value = {"snapshot": {"bid": 101.4, "offer": 101.6}}
-    client.list_positions.return_value = [type("P", (), {"deal_id": "DG"})()]   # still open at broker
+    # stub includes epic/direction/level so the new _match_broker_position can find it
+    client.list_positions.return_value = [
+        type("P", (), {"deal_id": "DG", "epic": "AAPL",
+                       "direction": Direction.SELL, "level": 104.0})()
+    ]   # still open at broker
     client.get_transaction_history.return_value = [
         Transaction(date=datetime(2026, 6, 3, 16, 0, tzinfo=timezone.utc), reference="rg",
                     dealId="DG", transactionType="TRADE", instrumentName="AAPL",
@@ -159,3 +164,78 @@ async def test_mark_pass_gapfade_50pct_fill_exit(tmp_path):
     await sched.mark_pass(now=datetime(2026, 6, 3, 17, 0, tzinfo=timezone.utc))
     client.close_position.assert_awaited_once_with("DG")
     assert ex.ledger.realized("gap_fade")[0]["net_pnl"] == 2.50
+
+
+@pytest.mark.asyncio
+async def test_mark_pass_still_open_via_epic_dir_level_not_dealid(tmp_path):
+    # broker rotated the open-position dealId (+1) vs what we stored -> exact dealId match
+    # would FALSE-close it. Matcher must keep it OPEN via epic+direction+level, and NOT realize it.
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import GapFadeStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+
+    class _P:
+        def __init__(self, epic, direction, level, deal_id):
+            self.epic = epic; self.direction = direction; self.level = level; self.deal_id = deal_id
+
+    client = AsyncMock()
+    client.get_market_details.return_value = {"snapshot": {"bid": 219.0, "offer": 219.1}}
+    # broker position dealId ends ...095a; ledger stored ...0959 (rotated)
+    client.list_positions.return_value = [_P("NVDA", Direction.BUY, 219.29,
+                                             "00396101-0055-311e-0000-000080c8095a")]
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(tmp_path / "rot.db"), dry_run=False)
+    ex.ledger.record_open(strategy="gap_fade", epic="NVDA", session_date="2026-06-03",
+                          deal_id="00396101-0055-311e-0000-000080c80959", direction="BUY",
+                          entry=219.29, size=0.9, stop_level=215.94, rationale="gap fade long",
+                          opened_at="2026-06-03T13:36:00+00:00", prev_close=221.79, today_open=219.23)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[GapFadeStrategy(epics=["NVDA"], fill_fraction=0.5)])
+    # mid-session (well before EOD), price not at target -> should NOT exit, must stay OPEN
+    await sched.mark_pass(now=datetime(2026, 6, 3, 17, 0, tzinfo=timezone.utc))
+    client.close_position.assert_not_awaited()
+    assert ex.ledger.realized("gap_fade") == []          # NOT falsely closed
+    assert len(ex.ledger.list_open()) == 1               # still open
+
+
+@pytest.mark.asyncio
+async def test_mark_pass_eod_closes_using_broker_dealid(tmp_path):
+    # at EOD the matched broker position must be closed using the BROKER's (rotated) dealId
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import GapFadeStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+    from src.broker.models import Transaction, ActivityEvent
+
+    class _P:
+        def __init__(self, epic, direction, level, deal_id):
+            self.epic = epic; self.direction = direction; self.level = level; self.deal_id = deal_id
+
+    client = AsyncMock()
+    client.get_market_details.return_value = {"snapshot": {"bid": 219.0, "offer": 219.1}}
+    client.list_positions.return_value = [_P("NVDA", Direction.BUY, 219.29,
+                                             "00396101-0055-311e-0000-000080c8095a")]
+    # realized P&L via Tier-2 activity linkage (rotated dealId on close TRADE)
+    client.get_transaction_history.return_value = [
+        Transaction(date=datetime(2026, 6, 3, 21, 0, tzinfo=timezone.utc), reference="r",
+                    dealId="00396101-0055-311e-0000-000080c8095a", transactionType="TRADE",
+                    instrumentName="NVDA", size="3.10", currency="USD")]
+    client.get_activity_history.return_value = [ActivityEvent.model_validate({
+        "date": "2026-06-03T21:00:00", "epic": "NVDA", "source": "USER", "type": "POSITION",
+        "status": "ACCEPTED", "dealId": "00396101-0055-311e-0000-000080c8095a",
+        "details": {"openPrice": 219.29, "direction": "SELL"}})]
+    client.close_position.return_value = None
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(tmp_path / "eod.db"), dry_run=False)
+    ex.ledger.record_open(strategy="gap_fade", epic="NVDA", session_date="2026-06-03",
+                          deal_id="00396101-0055-311e-0000-000080c80959", direction="BUY",
+                          entry=219.29, size=0.9, stop_level=215.94, rationale="x",
+                          opened_at="2026-06-03T13:36:00+00:00", prev_close=221.79, today_open=219.23)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[GapFadeStrategy(epics=["NVDA"])])
+    # 21:00 UTC is past EOD (16:45 ET = 20:45 UTC summer) -> exit_rule True -> close
+    await sched.mark_pass(now=datetime(2026, 6, 3, 21, 0, tzinfo=timezone.utc))
+    client.close_position.assert_awaited_once_with("00396101-0055-311e-0000-000080c8095a")  # broker id
+    rz = ex.ledger.realized("gap_fade")
+    assert len(rz) == 1 and rz[0]["net_pnl"] == 3.10

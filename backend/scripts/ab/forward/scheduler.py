@@ -187,6 +187,21 @@ class ExperimentScheduler:
                                     session_close=self._session_close(now))
                 await self.executor.try_enter(strat, ctx, session_date)
 
+    def _match_broker_position(self, row: dict, positions: list):
+        """Find the live broker position for a ledger row WITHOUT relying on exact
+        dealId equality (Capital.com rotates the open-position dealId vs the
+        create-confirmation dealId we stored). Match on epic + direction + entry≈level."""
+        entry = float(row["entry"])
+        tol = max(1e-6, abs(entry) * 1e-3)   # 0.1% of entry price
+        for p in positions:
+            if p.epic != row["epic"]:
+                continue
+            if p.direction.value != row["direction"]:   # p.direction is a Direction enum; row["direction"] is "BUY"/"SELL"
+                continue
+            if abs(float(p.level) - entry) <= tol:
+                return p
+        return None
+
     async def mark_pass(self, now: datetime | None = None) -> None:
         """Close positions whose exit_rule fires, then reconcile realized P&L
         from broker transaction history (no invented P&L)."""
@@ -197,7 +212,7 @@ class ExperimentScheduler:
         if not open_rows:
             return
         registry = self._registry
-        positions = {p.deal_id: p for p in await self.client.list_positions()}
+        broker_positions = await self.client.list_positions()
         for row in open_rows:
             strat = registry.get(row["strategy"])
             if strat is None:
@@ -206,6 +221,8 @@ class ExperimentScheduler:
             mid = await self._mid(row["epic"])
             if mid is None:
                 continue
+            matched = self._match_broker_position(row, broker_positions)
+            still_open = matched is not None
             pos = OpenPosition(
                 epic=row["epic"], direction=Direction(row["direction"]),
                 entry=row["entry"], size=row["size"], stop_level=row["stop_level"],
@@ -216,10 +233,9 @@ class ExperimentScheduler:
             ctx = MarketContext(epic=row["epic"], prev_close=0.0, today_open=row["entry"],
                                 current_price=mid, now=now,
                                 session_close=self._session_close(now))
-            still_open = row["deal_id"] in positions
             should_exit = strat.exit_rule(pos, ctx)
             if still_open and should_exit:
-                await self.client.close_position(row["deal_id"])
+                await self.client.close_position(matched.deal_id)   # broker's CURRENT dealId, not the stored one
             if not still_open or should_exit:
                 net, exitpx, reason = await self._realized(row, mid)
                 self.executor.ledger.record_close(
