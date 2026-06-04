@@ -67,7 +67,7 @@ class ExperimentScheduler:
             if await self.client.get_active_account_id() != acct:
                 await self.client.switch_account(acct)
         except Exception as e:  # noqa: BLE001 — never let an account-check hiccup kill the pass
-            logger.warning(f"[forward-lab] account re-assert failed: {e}")
+            logger.error(f"[forward-lab] account re-assert failed: {e}")
 
     async def _prev_close(self, epic: str, now: datetime) -> float | None:
         """Previous daily close, fetched LIVE from the broker (always fresh — no
@@ -251,13 +251,28 @@ class ExperimentScheduler:
             should_exit = strat.exit_rule(pos, ctx)
             if still_open and should_exit:
                 await self.client.close_position(matched.deal_id)   # broker's CURRENT dealId, not the stored one
-            if not still_open or should_exit:
+                logger.info(f"[forward-lab] close sent for {row['epic']} ({row['strategy']}) "
+                            "— reconcile deferred to next pass (broker history lag)")
+                continue
+            if not still_open:
                 net, exitpx, reason = await self._realized(row, mid)
+                if reason == "PENDING_RECONCILE" and self._row_age_hours(row, now) < 24:
+                    logger.info(f"[forward-lab] {row['epic']} close not in broker history yet "
+                                "— retrying next pass")
+                    continue
                 self.executor.ledger.record_close(
                     deal_id=row["deal_id"], exit_price=exitpx, net_pnl=net,
                     closed_at=now.isoformat(), close_reason=reason)
                 logger.info(f"[forward-lab] closed {row['epic']} ({row['strategy']}) "
                             f"net={net:+.2f} ({reason})")
+
+    def _row_age_hours(self, row: dict, now: datetime) -> float:
+        """Hours since the row was opened; +inf when opened_at is unparseable so
+        an unparseable row can still be finalized (zombie guard, not a retry loop)."""
+        opened = self._parse_dt(row.get("opened_at"))
+        if opened is None:
+            return float("inf")
+        return (now - opened).total_seconds() / 3600.0
 
     async def _realized(self, row: dict, fallback_px: float) -> tuple[float, float, str]:
         """Realized P&L from the broker (broker truth, no invented P&L).

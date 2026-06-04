@@ -4,7 +4,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "scripts" /
 import pytest
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock
-from src.broker.models import Direction
+from src.broker.models import Direction, Transaction
 
 
 @pytest.mark.asyncio
@@ -221,8 +221,13 @@ async def test_mark_pass_gapfade_50pct_fill_exit(tmp_path):
     sched = ExperimentScheduler(client=client, executor=ex,
                                 strategies=[GapFadeStrategy(epics=["AAPL"], fill_fraction=0.5)])
     # mid-session (well before EOD) -> only the 50%-fill arm can close it
+    # pass 1: close sent, reconcile DEFERRED -> row still open
     await sched.mark_pass(now=datetime(2026, 6, 3, 17, 0, tzinfo=timezone.utc))
     client.close_position.assert_awaited_once_with("DG")
+    assert len(ex.ledger.list_open()) == 1                    # deferred, not finalized yet
+    # pass 2: broker confirms gone + TRADE history posted -> finalize with real P&L
+    client.list_positions.return_value = []
+    await sched.mark_pass(now=datetime(2026, 6, 3, 17, 15, tzinfo=timezone.utc))
     assert ex.ledger.realized("gap_fade")[0]["net_pnl"] == 2.50
 
 
@@ -294,8 +299,108 @@ async def test_mark_pass_eod_closes_using_broker_dealid(tmp_path):
                           opened_at="2026-06-03T13:36:00+00:00", prev_close=221.79, today_open=219.23)
     sched = ExperimentScheduler(client=client, executor=ex,
                                 strategies=[GapFadeStrategy(epics=["NVDA"])])
-    # 21:00 UTC is past EOD (16:45 ET = 20:45 UTC summer) -> exit_rule True -> close
+    # 21:00 UTC is past EOD (16:45 ET = 20:45 UTC summer) -> exit_rule True -> close deferred
     await sched.mark_pass(now=datetime(2026, 6, 3, 21, 0, tzinfo=timezone.utc))
     client.close_position.assert_awaited_once_with("00396101-0055-311e-0000-000080c8095a")  # broker id
+    # pass 1: close sent, reconcile DEFERRED (position still in ledger as open)
+    assert len(ex.ledger.list_open()) == 1
+    # pass 2: broker confirms gone + TRADE history posted -> finalize
+    client.list_positions.return_value = []
+    await sched.mark_pass(now=datetime(2026, 6, 3, 21, 15, tzinfo=timezone.utc))
     rz = ex.ledger.realized("gap_fade")
     assert len(rz) == 1 and rz[0]["net_pnl"] == 3.10
+
+
+@pytest.mark.asyncio
+async def test_mark_pass_our_close_defers_reconcile(tmp_path):
+    # when mark_pass itself closes (EOD/fill), it must NOT reconcile in the same pass
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import GapFadeStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+    from src.broker.models import Direction
+
+    class _P:
+        def __init__(self, epic, direction, level, deal_id):
+            self.epic = epic; self.direction = direction; self.level = level; self.deal_id = deal_id
+
+    client = AsyncMock()
+    client.get_active_account_id.return_value = "EXP"
+    client.get_market_details.return_value = {"snapshot": {"bid": 100.0, "offer": 100.0}}
+    client.list_positions.return_value = [_P("AAPL", Direction.SELL, 104.0, "BROKER_ID")]
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(tmp_path / "defer.db"), dry_run=False)
+    ex.ledger.record_open(strategy="gap_fade", epic="AAPL", session_date="2026-06-03",
+                          deal_id="LEDGER_ID", direction="SELL", entry=104.0, size=1.0,
+                          stop_level=106.0, rationale="x", opened_at="2026-06-03T14:00:00+00:00",
+                          prev_close=100.0, today_open=104.0)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[GapFadeStrategy(epics=["AAPL"])])
+    # past EOD -> exit_rule True -> our close
+    await sched.mark_pass(now=datetime(2026, 6, 3, 21, 0, tzinfo=timezone.utc))
+    client.close_position.assert_awaited_once_with("BROKER_ID")
+    client.get_transaction_history.assert_not_called()        # no same-pass reconcile
+    assert len(ex.ledger.list_open()) == 1                    # row still open for next pass
+    assert ex.ledger.realized("gap_fade") == []
+
+
+@pytest.mark.asyncio
+async def test_mark_pass_pending_retries_until_history_posts(tmp_path):
+    # broker-closed but history not posted yet -> retry (row stays open), then finalize when posted
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import GapFadeStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+    from src.broker.models import Transaction
+
+    client = AsyncMock()
+    client.get_active_account_id.return_value = "EXP"
+    client.get_market_details.return_value = {"snapshot": {"bid": 100.0, "offer": 100.0}}
+    client.list_positions.return_value = []                   # broker already closed it
+    client.get_transaction_history.return_value = []          # history NOT posted yet
+    client.get_activity_history.return_value = []
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(tmp_path / "retry.db"), dry_run=False)
+    ex.ledger.record_open(strategy="gap_fade", epic="AAPL", session_date="2026-06-03",
+                          deal_id="D1", direction="SELL", entry=104.0, size=1.0,
+                          stop_level=106.0, rationale="x", opened_at="2026-06-03T14:00:00+00:00",
+                          prev_close=100.0, today_open=104.0)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[GapFadeStrategy(epics=["AAPL"])])
+    await sched.mark_pass(now=datetime(2026, 6, 3, 15, 0, tzinfo=timezone.utc))
+    assert len(ex.ledger.list_open()) == 1                    # retried, not finalized
+    # now the TRADE posts -> next pass finalizes with real P&L
+    client.get_transaction_history.return_value = [
+        Transaction(date=datetime(2026, 6, 3, 15, 0, tzinfo=timezone.utc), reference="r",
+                    dealId="D1", transactionType="TRADE", instrumentName="AAPL",
+                    size="2.50", currency="USD")]
+    await sched.mark_pass(now=datetime(2026, 6, 3, 15, 15, tzinfo=timezone.utc))
+    rz = ex.ledger.realized("gap_fade")
+    assert len(rz) == 1 and rz[0]["net_pnl"] == 2.50 and rz[0]["close_reason"] == "BROKER_TRADE"
+
+
+@pytest.mark.asyncio
+async def test_mark_pass_pending_finalizes_after_24h(tmp_path):
+    # zombie guard: row older than 24h with still-missing history -> finalize PENDING $0
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import GapFadeStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+
+    client = AsyncMock()
+    client.get_active_account_id.return_value = "EXP"
+    client.get_market_details.return_value = {"snapshot": {"bid": 100.0, "offer": 100.0}}
+    client.list_positions.return_value = []
+    client.get_transaction_history.return_value = []
+    client.get_activity_history.return_value = []
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(tmp_path / "zombie.db"), dry_run=False)
+    ex.ledger.record_open(strategy="gap_fade", epic="AAPL", session_date="2026-06-01",
+                          deal_id="D1", direction="SELL", entry=104.0, size=1.0,
+                          stop_level=106.0, rationale="x", opened_at="2026-06-01T14:00:00+00:00",
+                          prev_close=100.0, today_open=104.0)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[GapFadeStrategy(epics=["AAPL"])])
+    await sched.mark_pass(now=datetime(2026, 6, 3, 15, 0, tzinfo=timezone.utc))   # 2 days later
+    rz = ex.ledger.realized("gap_fade")
+    assert len(rz) == 1 and rz[0]["close_reason"] == "PENDING_RECONCILE"
