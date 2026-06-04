@@ -160,7 +160,9 @@ class TestSessionManager:
             cst="new_cst", security_token="new_token", created_at=datetime.now(timezone.utc)
         )
 
-        with patch.object(manager, "_authenticate_inner", return_value=expected_tokens) as mock_auth:
+        with patch.object(
+            manager, "_authenticate_inner", return_value=expected_tokens
+        ) as mock_auth:
             tokens = await manager.get_tokens()
 
         assert tokens == expected_tokens
@@ -349,6 +351,37 @@ class TestSessionManager:
             await second_task
         except asyncio.CancelledError:
             pass
+
+    @pytest.mark.asyncio
+    async def test_start_ping_task_reentrant_from_ping_loop_no_duplicate(self):
+        """Re-auth INSIDE the ping task must not cancel-self nor spawn a duplicate.
+
+        Real flow: _ping_loop -> ping() -> get_tokens() (tokens expired) ->
+        _authenticate_inner() -> _start_ping_task() while current_task IS the
+        ping task. The old code cancelled itself (cancel swallowed at the
+        self-await) and spawned a second loop: +1 ping task per in-loop
+        re-auth, accumulating forever on long-lived sessions.
+        """
+        manager = SessionManager(
+            api_url="https://demo-api.example.com",
+            api_key="test_key",
+            email="test@example.com",
+            password="test_pass",
+        )
+
+        results = {}
+
+        async def fake_ping_loop():
+            # what the token-refresh path does from inside the loop
+            await manager._start_ping_task()
+            results["task_after"] = manager._ping_task
+
+        task = asyncio.create_task(fake_ping_loop())
+        manager._ping_task = task  # registered as THE ping task, as in authenticate()
+        await task
+
+        assert results["task_after"] is task  # no replacement spawned
+        assert not task.cancelled()  # and we did not cancel ourselves
 
     @pytest.mark.asyncio
     async def test_close(self):

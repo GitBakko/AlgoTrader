@@ -213,6 +213,16 @@ class SessionManager:
 
     async def _start_ping_task(self) -> None:
         """Start background keep-alive ping task."""
+        # Re-entrancy guard: ping() -> get_tokens() -> _authenticate_inner()
+        # lands here from INSIDE the ping task itself (token refresh during a
+        # ping). Cancelling ourselves was swallowed at the await below — the
+        # pending cancel is delivered AT that await and eaten by the except —
+        # so the old loop survived AND a duplicate got spawned: one extra
+        # ping task per in-loop re-auth (observed 1x->3x in 30 min). The
+        # loop is alive by definition here: nothing to restart.
+        if self._ping_task is not None and self._ping_task is asyncio.current_task():
+            return
+
         # Cancel existing task if any
         if self._ping_task is not None and not self._ping_task.done():
             self._ping_task.cancel()
