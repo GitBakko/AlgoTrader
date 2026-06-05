@@ -109,20 +109,28 @@ class ExperimentScheduler:
         return open_dt <= now < end_dt
 
     async def _opening_range(self, epic: str, now: datetime) -> tuple[float, float] | None:
-        """OR high/low from Capital.com MINUTE_5 bars in [open, open+or_window_min)."""
+        """OR high/low from Capital.com MINUTE_5 bars in [open, open+or_window_min).
+
+        max_candles=60 (5h lookback) so the OR window is still covered when the
+        first fetch happens late in the watch window (e.g. watchdog restart
+        mid-session; 20 bars = 100min lost the window after ~open+70min)."""
         try:
             candles = await self.client.get_historical_prices(
-                epic, Resolution.MINUTE_5, max_candles=20)
+                epic, Resolution.MINUTE_5, max_candles=60)
         except Exception as e:  # noqa: BLE001
             logger.warning(f"[forward-lab] {epic} MINUTE_5 fetch failed: {e} — skip OR")
             return None
         open_dt = self._et_to_utc(now.date(), self.session_open_et)
         end_dt = open_dt + timedelta(minutes=self.or_window_min)
-        # Capital.com MINUTE_5 snapshotTime is the bar-START (probe-confirmed), so the
-        # half-open [open_dt, end_dt) includes the last bar and excludes end_dt.
+        # Bar timestamps are the bar-START (probe-confirmed); half-open
+        # [open_dt, end_dt) includes the last OR bar and excludes end_dt.
+        # MUST filter on snapshotTimeUTC: snapshotTime is SERVER-LOCAL (UTC+2
+        # in summer) and shifted every bar out of the UTC window -> OR never
+        # formed, ORB never armed (live bug 2026-06-05, 3 days N=0).
         win = []
         for c in candles:
-            ts = c.timestamp if c.timestamp.tzinfo else c.timestamp.replace(tzinfo=timezone.utc)
+            raw = c.timestamp_utc or c.timestamp
+            ts = raw if raw.tzinfo else raw.replace(tzinfo=timezone.utc)
             if open_dt <= ts < end_dt:
                 win.append(c)
         if not win:

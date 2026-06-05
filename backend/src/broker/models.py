@@ -154,6 +154,10 @@ class OHLCCandle(BaseModel):
     """OHLC candlestick data."""
 
     timestamp: datetime = Field(alias="snapshotTime")
+    # snapshotTime is SERVER-LOCAL wall-clock (UTC+2 in summer); snapshotTimeUTC
+    # is the true UTC bar-start. Any intraday window filter MUST use this field
+    # (naive == UTC). Optional: defensive vs responses that omit it.
+    timestamp_utc: datetime | None = Field(None, alias="snapshotTimeUTC")
     open: float = Field(alias="openPrice")
     high: float = Field(alias="highPrice")
     low: float = Field(alias="lowPrice")

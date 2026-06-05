@@ -77,6 +77,46 @@ async def test_opening_range_winter_est():
     assert hi == 102.0 and lo == 98.5    # pre-market 999/998 excluded
 
 
+@pytest.mark.asyncio
+async def test_opening_range_uses_snapshot_time_utc_not_server_local():
+    """Regression — live broker bars carry snapshotTime in SERVER-LOCAL time
+    (UTC+2 in summer) and snapshotTimeUTC in true UTC. Filtering the OR window
+    on snapshotTime shifted every bar +2h out of [13:30,14:00) UTC, so
+    _opening_range returned None on every pass and ORB never armed (3 days
+    N=0 live, missed AVGO breakout 2026-06-05)."""
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import ORBStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+    from src.broker.models import OHLCCandle
+    import pathlib, tempfile
+
+    def _c(local, utc, hi, lo):
+        return OHLCCandle.model_validate(
+            {"snapshotTime": local, "snapshotTimeUTC": utc,
+             "openPrice": (hi + lo) / 2, "highPrice": hi,
+             "lowPrice": lo, "closePrice": (hi + lo) / 2})
+
+    client = AsyncMock()
+    # exact live shape: naive strings, snapshotTime = UTC+2 (CEST server)
+    client.get_historical_prices.return_value = [
+        _c("2026-06-05T15:25:00", "2026-06-05T13:25:00", 999.0, 998.0),  # pre-open -> excluded
+        _c("2026-06-05T15:30:00", "2026-06-05T13:30:00", 101.0, 99.0),
+        _c("2026-06-05T15:55:00", "2026-06-05T13:55:00", 102.0, 98.5),
+        _c("2026-06-05T16:00:00", "2026-06-05T14:00:00", 103.0, 97.0),   # post-OR -> excluded
+    ]
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(pathlib.Path(tempfile.mkdtemp()) / "utc.db"),
+                            dry_run=True)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[ORBStrategy(epics=["AVGO"])])
+    now = datetime(2026, 6, 5, 14, 5, tzinfo=timezone.utc)
+    rng = await sched._opening_range("AVGO", now)
+    assert rng is not None, "OR must form from snapshotTimeUTC despite local snapshotTime"
+    hi, lo = rng
+    assert hi == 102.0 and lo == 98.5
+
+
 def test_in_window_guards_weekday_and_hours():
     from forward.scheduler import ExperimentScheduler
     from forward.strategy import GapFadeStrategy
