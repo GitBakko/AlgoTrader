@@ -137,6 +137,39 @@ class ExperimentScheduler:
             return None
         return max(c.high for c in win), min(c.low for c in win)
 
+    async def _session_open_price(self, epic: str, now: datetime) -> float | None:
+        """Today's cash-session OPEN = open of the first MINUTE_5 bar at/after the
+        session open (09:30 ET), from a HISTORICAL bar. Fixed once that bar exists,
+        so a mid-session restart reconstructs the TRUE open instead of
+        re-snapshotting the current live mid into a false gap (the restart wart:
+        gap = today_open/prev_close, and the 50%-fill exit target both derive from
+        today_open).
+
+        MUST filter on snapshotTimeUTC: snapshotTime is SERVER-LOCAL (UTC+2 in
+        summer), so a local-time filter would let a pre-open bar pass the
+        `>= open_dt` test and become the spurious 'earliest' bar. max_candles=60
+        (5h) always covers back to the 09:30 open from anywhere in the entry
+        window (mirrors _opening_range)."""
+        try:
+            candles = await self.client.get_historical_prices(
+                epic, Resolution.MINUTE_5, max_candles=60)
+        except Exception as e:  # noqa: BLE001 — any broker/parse error => caller falls back to mid
+            logger.warning(f"[forward-lab] {epic} MINUTE_5 fetch failed (session-open): {e} — skip")
+            return None
+        if not candles:
+            return None
+        open_dt = self._et_to_utc(now.date(), self.session_open_et)
+        best_ts: datetime | None = None
+        best_open: float | None = None
+        for c in candles:
+            raw = c.timestamp_utc or c.timestamp
+            ts = raw if raw.tzinfo else raw.replace(tzinfo=timezone.utc)
+            if ts < open_dt:
+                continue
+            if best_ts is None or ts < best_ts:
+                best_ts, best_open = ts, float(c.open)
+        return best_open
+
     async def entry_pass(self, now: datetime | None = None) -> None:
         now = now or datetime.now(timezone.utc)
         if not self._in_window(now):
@@ -158,7 +191,15 @@ class ExperimentScheduler:
                 mid = await self._mid(epic)
                 if mid is None:
                     continue
-                self._state.open_px.setdefault(epic, mid)     # first in-window pass = open
+                # today_open = the TRUE 09:30 cash-session open (historical M5 bar),
+                # not the live mid — so a mid-session restart can't re-snapshot a
+                # false gap. Only strategies that consume today_open pay the fetch
+                # (ORB ignores it). Falls back to mid until the open bar exists.
+                if epic not in self._state.open_px and strat.uses_today_open:
+                    sop = await self._session_open_price(epic, now)
+                    if sop is not None:
+                        self._state.open_px[epic] = sop
+                today_open = self._state.open_px.get(epic, mid)
                 if strat.needs_opening_range:
                     if not or_ready:
                         continue
@@ -184,13 +225,13 @@ class ExperimentScheduler:
                         self._state.or_levels[epic] = orng
                     hi, lo = self._state.or_levels[epic]
                     ctx = MarketContext(epic=epic, prev_close=prev_close,
-                                        today_open=self._state.open_px[epic], current_price=mid,
+                                        today_open=today_open, current_price=mid,
                                         now=now, session_close=self._session_close(now),
                                         or_high=hi, or_low=lo,
                                         rvol=self._state.rvol.get(epic))
                 else:
                     ctx = MarketContext(epic=epic, prev_close=prev_close,
-                                        today_open=self._state.open_px[epic], current_price=mid,
+                                        today_open=today_open, current_price=mid,
                                         now=now, session_close=self._session_close(now))
                 await self.executor.try_enter(strat, ctx, session_date)
 

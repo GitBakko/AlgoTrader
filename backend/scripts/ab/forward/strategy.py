@@ -49,6 +49,7 @@ class OpenPosition:
 class ForwardStrategy(ABC):
     name: str = "abstract"
     needs_opening_range: bool = False
+    uses_today_open: bool = True   # True => scheduler sources the true 09:30 session open (ORB overrides to False)
 
     @abstractmethod
     def universe(self) -> list[str]:
@@ -112,6 +113,7 @@ class ORBStrategy(ForwardStrategy):
     stop_pct_fallback: float = 0.015      # used when atr is absent
     name: str = field(default="orb")
     needs_opening_range: bool = field(default=True)
+    uses_today_open: bool = field(default=False)   # ORB ignores today_open (uses OR levels) — skip the session-open fetch
 
     def universe(self) -> list[str]:
         return list(self.epics)

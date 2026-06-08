@@ -214,16 +214,153 @@ def test_session_close_dst_aware():
 
 
 @pytest.mark.asyncio
+async def test_session_open_price_from_minute5_bars():
+    """today_open = open of the first MINUTE_5 bar at/after session open (09:30 ET),
+    sourced from a historical bar. Pre-open bars excluded."""
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import GapFadeStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+    from src.broker.models import OHLCCandle
+    import pathlib, tempfile
+
+    def _c(ts, op):
+        return OHLCCandle.model_validate(
+            {"snapshotTime": ts, "openPrice": op, "highPrice": op + 1,
+             "lowPrice": op - 1, "closePrice": op})
+
+    client = AsyncMock()
+    client.get_historical_prices.return_value = [
+        _c(datetime(2026, 6, 3, 13, 25, tzinfo=timezone.utc), 999.0),   # pre-open -> excluded
+        _c(datetime(2026, 6, 3, 13, 30, tzinfo=timezone.utc), 103.0),   # cash open
+        _c(datetime(2026, 6, 3, 13, 35, tzinfo=timezone.utc), 104.0),
+    ]
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(pathlib.Path(tempfile.mkdtemp()) / "so.db"), dry_run=True)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[GapFadeStrategy(epics=["AAPL"])])
+    now = datetime(2026, 6, 3, 13, 45, tzinfo=timezone.utc)
+    assert await sched._session_open_price("AAPL", now) == 103.0
+
+
+@pytest.mark.asyncio
+async def test_session_open_price_stable_across_restart():
+    """THE restart-wart fix: the session-open price is the SAME no matter when it
+    is computed (early first pass vs a mid-session restart at 15:00), because it
+    comes from a fixed historical bar — not the live mid that a restart would
+    re-snapshot into a false gap."""
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import GapFadeStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+    from src.broker.models import OHLCCandle
+    import pathlib, tempfile
+
+    def _c(ts, op):
+        return OHLCCandle.model_validate(
+            {"snapshotTime": ts, "openPrice": op, "highPrice": op + 1,
+             "lowPrice": op - 1, "closePrice": op})
+
+    client = AsyncMock()
+    client.get_historical_prices.return_value = [
+        _c(datetime(2026, 6, 3, 13, 30, tzinfo=timezone.utc), 103.0),   # cash open
+        _c(datetime(2026, 6, 3, 14, 55, tzinfo=timezone.utc), 117.0),   # later bar (where a restart's mid would sit)
+    ]
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(pathlib.Path(tempfile.mkdtemp()) / "sr.db"), dry_run=True)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[GapFadeStrategy(epics=["AAPL"])])
+    early = await sched._session_open_price("AAPL", datetime(2026, 6, 3, 13, 35, tzinfo=timezone.utc))
+    after_restart = await sched._session_open_price("AAPL", datetime(2026, 6, 3, 15, 0, tzinfo=timezone.utc))
+    assert early == 103.0 and after_restart == 103.0
+
+
+@pytest.mark.asyncio
+async def test_session_open_price_uses_snapshot_time_utc_not_server_local():
+    """Regression — bars carry snapshotTime in SERVER-LOCAL (UTC+2 summer) and
+    snapshotTimeUTC in true UTC. Filtering on snapshotTime would let a pre-open
+    bar (UTC 13:25 / local 15:25) pass the >=open_dt filter and become the
+    'earliest', returning the wrong (pre-open) price."""
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import GapFadeStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+    from src.broker.models import OHLCCandle
+    import pathlib, tempfile
+
+    def _c(local, utc, op):
+        return OHLCCandle.model_validate(
+            {"snapshotTime": local, "snapshotTimeUTC": utc, "openPrice": op,
+             "highPrice": op + 1, "lowPrice": op - 1, "closePrice": op})
+
+    client = AsyncMock()
+    client.get_historical_prices.return_value = [
+        _c("2026-06-05T15:25:00", "2026-06-05T13:25:00", 999.0),   # pre-open (UTC) -> must be excluded
+        _c("2026-06-05T15:30:00", "2026-06-05T13:30:00", 103.0),   # cash open (UTC)
+    ]
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(pathlib.Path(tempfile.mkdtemp()) / "su.db"), dry_run=True)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[GapFadeStrategy(epics=["AAPL"])])
+    now = datetime(2026, 6, 5, 14, 5, tzinfo=timezone.utc)
+    assert await sched._session_open_price("AAPL", now) == 103.0
+
+
+@pytest.mark.asyncio
+async def test_entry_pass_gapfade_uses_session_open_not_live_mid(tmp_path, monkeypatch):
+    """End-to-end restart-wart fix: a mid-session restart sees a live mid far from
+    the true open. entry_pass must persist today_open = the real 09:30 session
+    open (from the historical M5 bar), NOT the live mid — else the gap (and the
+    50%-fill exit target derived from today_open) is corrupted."""
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import GapFadeStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+    from src.broker.models import OHLCCandle, DealConfirmation
+
+    def _c(ts, op):
+        return OHLCCandle.model_validate(
+            {"snapshotTime": ts, "openPrice": op, "highPrice": op + 1,
+             "lowPrice": op - 1, "closePrice": op})
+
+    client = AsyncMock()
+    client.get_active_account_id.return_value = "EXP"
+    client.get_market_details.return_value = {"snapshot": {"bid": 109.9, "offer": 110.1}}  # post-restart mid 110
+    client.get_historical_prices.return_value = [
+        _c(datetime(2026, 6, 3, 13, 30, tzinfo=timezone.utc), 103.0),   # true cash open
+        _c(datetime(2026, 6, 3, 14, 55, tzinfo=timezone.utc), 110.0),
+    ]
+    client.create_position.return_value = DealConfirmation.model_validate({
+        "dealId": "DR", "dealReference": "RR", "dealStatus": "ACCEPTED", "epic": "AAPL",
+        "direction": "SELL", "size": 1.8, "level": 110.0, "status": "OPEN"})
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(tmp_path / "rwart.db"), dry_run=False)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[GapFadeStrategy(epics=["AAPL"], gap_threshold=0.01)])
+    monkeypatch.setattr(sched, "_prev_close", AsyncMock(return_value=100.0))  # open 103 vs prev 100 = +3% gap
+    now = datetime(2026, 6, 3, 15, 0, tzinfo=timezone.utc)   # restart well after the 13:30 open
+    await sched.entry_pass(now=now)
+    client.create_position.assert_awaited_once()
+    rows = ex.ledger.list_open()
+    assert len(rows) == 1
+    assert rows[0]["today_open"] == 103.0   # session open, NOT the live mid 110
+
+
+@pytest.mark.asyncio
 async def test_entry_pass_gapfade_enters_on_gap(tmp_path, monkeypatch):
     from forward.scheduler import ExperimentScheduler
     from forward.strategy import GapFadeStrategy
     from forward.executor import ExperimentExecutor
     from forward.ledger import ForwardLedger
-    from src.broker.models import DealConfirmation
+    from src.broker.models import DealConfirmation, OHLCCandle
 
     client = AsyncMock()
     client.get_active_account_id.return_value = "EXP"
     client.get_market_details.return_value = {"snapshot": {"bid": 102.9, "offer": 103.1}}  # mid 103
+    client.get_historical_prices.return_value = [   # session-open M5 bar (open 103 -> +3% gap vs prev 100)
+        OHLCCandle.model_validate({"snapshotTime": datetime(2026, 6, 3, 13, 30, tzinfo=timezone.utc),
+                                   "openPrice": 103.0, "highPrice": 104.0, "lowPrice": 102.0,
+                                   "closePrice": 103.0})]
     client.create_position.return_value = DealConfirmation.model_validate({
         "dealId": "DG", "dealReference": "RG", "dealStatus": "ACCEPTED", "epic": "AAPL",
         "direction": "SELL", "size": 1.9, "level": 103.0, "status": "OPEN"})
