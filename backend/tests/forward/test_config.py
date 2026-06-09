@@ -15,7 +15,7 @@ def test_orb_settings_defaults():
     assert s.forward_lab_orb_or_window_min == 30
     assert s.forward_lab_orb_watch_end_et == "12:00"
     assert s.forward_lab_session_open_et == "09:30"
-    assert s.forward_lab_eod_flatten_et == "16:45"
+    assert s.forward_lab_eod_flatten_et == "15:45"  # before 16:00 ET close (DELETE rejected on closed market)
     assert s.forward_lab_orb_rvol_min == 1.5
     assert s.forward_lab_orb_top_k == 5
     assert s.forward_lab_orb_breakout_buffer == 0.0

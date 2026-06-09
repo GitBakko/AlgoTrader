@@ -46,7 +46,7 @@ class ExperimentScheduler:
     client: object
     executor: ExperimentExecutor
     strategies: list[ForwardStrategy]
-    eod_flatten_et: str = "16:45"
+    eod_flatten_et: str = "15:45"   # BEFORE 16:00 ET cash close (broker rejects DELETE on a closed market)
     screener: object | None = None                 # RvolScreener (optional; needed for ORB)
     session_open_et: str = "09:30"
     or_window_min: int = 30
@@ -317,9 +317,16 @@ class ExperimentScheduler:
                                 session_close=self._session_close(now))
             should_exit = strat.exit_rule(pos, ctx)
             if still_open and should_exit:
-                await self.client.close_position(matched.deal_id)   # broker's CURRENT dealId, not the stored one
-                logger.info(f"[forward-lab] close sent for {row['epic']} ({row['strategy']}) "
-                            "— reconcile deferred to next pass (broker history lag)")
+                try:
+                    await self.client.close_position(matched.deal_id)   # broker's CURRENT dealId, not the stored one
+                    logger.info(f"[forward-lab] close sent for {row['epic']} ({row['strategy']}) "
+                                "— reconcile deferred to next pass (broker history lag)")
+                except Exception as e:  # noqa: BLE001 — a per-position close failure (e.g. MarketClosedError when
+                    # EOD-flatten lands after a cash-only instrument's 20:00 UTC close) must NOT abort the whole
+                    # pass and strand every other position + the reconcile. The position carries (broker SL still
+                    # protects it) and retries next pass / next session when the market reopens.
+                    logger.warning(f"[forward-lab] close failed for {row['epic']} ({row['strategy']}): {e} "
+                                   "— position carries, retry next pass")
                 continue
             if not still_open:
                 net, exitpx, reason = await self._realized(row, mid)

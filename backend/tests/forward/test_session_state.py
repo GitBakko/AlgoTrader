@@ -117,6 +117,42 @@ async def test_opening_range_uses_snapshot_time_utc_not_server_local():
     assert hi == 102.0 and lo == 98.5
 
 
+@pytest.mark.asyncio
+async def test_mark_pass_close_error_does_not_abort_other_positions(tmp_path, monkeypatch):
+    """A close_position failure (e.g. MarketClosedError when EOD-flatten lands after a
+    cash-only instrument's 20:00 UTC close) must NOT crash mark_pass and strand every
+    other open position + the whole reconcile. The failing one carries (retry next
+    pass); the rest are still processed."""
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import ORBStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+    from src.broker.exceptions import MarketClosedError
+    from types import SimpleNamespace
+
+    client = AsyncMock()
+    client.get_active_account_id.return_value = "EXP"
+    client.list_positions.return_value = []
+    client.close_position = AsyncMock(side_effect=[MarketClosedError("CB closed"), None])
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(tmp_path / "mc.db"), dry_run=False)
+    for epic, dealid in (("CB", "D-CB"), ("KLAC", "D-KLAC")):
+        ex.ledger.record_open(strategy="orb", epic=epic, session_date="2026-06-09",
+                              deal_id=dealid, direction="BUY", entry=100.0, size=2.0,
+                              stop_level=95.0, rationale="ORB",
+                              opened_at="2026-06-09T14:05:00+00:00", prev_close=0.0,
+                              today_open=100.0)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[ORBStrategy(epics=["CB", "KLAC"])])
+    monkeypatch.setattr(sched, "_mid", AsyncMock(return_value=100.0))
+    monkeypatch.setattr(sched, "_match_broker_position",
+                        lambda row, positions: SimpleNamespace(deal_id="BROKER-" + row["epic"]))
+    now = datetime(2026, 6, 9, 21, 0, tzinfo=timezone.utc)   # past EOD session_close -> ORB exit True
+    await sched.mark_pass(now=now)                           # must NOT raise
+    assert client.close_position.await_count == 2           # both reached despite first raising
+    assert len(ex.ledger.list_open()) == 2                  # both carry (not falsely closed)
+
+
 def test_in_window_guards_weekday_and_hours():
     from forward.scheduler import ExperimentScheduler
     from forward.strategy import GapFadeStrategy
@@ -246,9 +282,9 @@ def test_session_close_dst_aware():
     sched = ExperimentScheduler(client=AsyncMock(), executor=ex,
                                 strategies=[GapFadeStrategy(epics=["AAPL"])])
     jun = sched._session_close(datetime(2026, 6, 3, 18, 0, tzinfo=timezone.utc))
-    assert jun.hour == 20 and jun.minute == 45                 # 16:45 EDT = 20:45 UTC
+    assert jun.hour == 19 and jun.minute == 45                 # 15:45 EDT = 19:45 UTC (before 20:00 close)
     jan = sched._session_close(datetime(2026, 1, 7, 18, 0, tzinfo=timezone.utc))
-    assert jan.hour == 21 and jan.minute == 45                 # 16:45 EST = 21:45 UTC
+    assert jan.hour == 20 and jan.minute == 45                 # 15:45 EST = 20:45 UTC
 
 
 @pytest.mark.asyncio
