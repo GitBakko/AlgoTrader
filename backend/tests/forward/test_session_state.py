@@ -173,6 +173,44 @@ async def test_entry_pass_orb_enters_only_eligible_on_breakout(tmp_path, monkeyp
     assert ex.ledger.realized("orb") == [] and len(ex.ledger.list_open()) == 1
 
 
+@pytest.mark.asyncio
+async def test_entry_pass_orb_enters_without_prev_close(tmp_path, monkeypatch):
+    """ORB ignores prev_close (uses OR levels), so the scheduler must NOT gate ORB
+    entries on a successful prev_close fetch. A wide ORB universe means most names
+    never need a daily-close GET — and a failed/absent daily close must not skip an
+    otherwise-valid breakout. _prev_close returning None must NOT block the entry."""
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import ORBStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+    from src.broker.models import DealConfirmation
+
+    client = AsyncMock()
+    client.get_active_account_id.return_value = "EXP"
+    client.get_market_details.return_value = {"snapshot": {"bid": 104.9, "offer": 105.1}}  # mid 105 > OR high 102
+    client.create_position.return_value = DealConfirmation.model_validate({
+        "dealId": "DN", "dealReference": "RN", "dealStatus": "ACCEPTED", "epic": "AAPL",
+        "direction": "BUY", "size": 1.9, "level": 105.0, "status": "OPEN"})
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(tmp_path / "np.db"), dry_run=False)
+
+    class _Screener:
+        def select(self, symbols, now):
+            return {"rvol": {"AAPL": 3.0}, "eligible": {"AAPL"}}
+
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[ORBStrategy(epics=["AAPL"], rvol_min=1.5)],
+                                screener=_Screener())
+    monkeypatch.setattr(sched, "_opening_range", AsyncMock(return_value=(102.0, 100.0)))
+    pc = AsyncMock(return_value=None)                       # daily-close fetch FAILS
+    monkeypatch.setattr(sched, "_prev_close", pc)
+    now = datetime(2026, 6, 3, 14, 5, tzinfo=timezone.utc)
+    await sched.entry_pass(now=now)
+    client.create_position.assert_awaited_once()           # entered despite no prev_close
+    pc.assert_not_awaited()                                 # ORB never even fetched the daily close
+    assert len(ex.ledger.list_open()) == 1
+
+
 def test_in_window_dst_summer_vs_winter():
     from forward.scheduler import ExperimentScheduler
     from forward.strategy import GapFadeStrategy

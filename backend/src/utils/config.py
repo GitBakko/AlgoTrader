@@ -89,8 +89,9 @@ class Settings(BaseSettings):
     capital_experiment_password: str = Field(default="", alias="CAPITAL_EXPERIMENT_PASSWORD")
     capital_experiment_account_id: str | None = None
     forward_lab_notional_usd: float = 200.0
-    forward_lab_max_concurrent: int = 5
+    forward_lab_max_concurrent: int = 10  # shared gap_fade+ORB cap (raised 5->10, wider ORB)
     forward_lab_daily_loss_limit_usd: float = 100.0
+    forward_lab_scan_pacing_s: float = 0.12  # per-epic broker GET pacing (10 req/s limit)
     forward_lab_gap_threshold: float = 0.01
     forward_lab_session_open_et: str = "09:30"  # US cash open (America/New_York wall-clock)
     forward_lab_eod_flatten_et: str = "16:45"  # EOD flatten (ET; ~45 min after 16:00 close)

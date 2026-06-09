@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta, timezone, date as _date
@@ -50,6 +51,7 @@ class ExperimentScheduler:
     session_open_et: str = "09:30"
     or_window_min: int = 30
     watch_end_et: str = "12:00"
+    scan_pacing_s: float = 0.0   # sleep between per-epic broker GETs (10 req/s limit; wide universe)
     _state: SessionState = field(default_factory=SessionState, init=False, repr=False)
 
     @property
@@ -182,29 +184,14 @@ class ExperimentScheduler:
 
         for strat in self.strategies:
             for epic in strat.universe():
-                if epic not in self._state.prev_close:        # cache prev_close once/day/epic
-                    pc = await self._prev_close(epic, now)
-                    if pc is None:
-                        continue
-                    self._state.prev_close[epic] = pc
-                prev_close = self._state.prev_close[epic]
-                mid = await self._mid(epic)
-                if mid is None:
-                    continue
-                # today_open = the TRUE 09:30 cash-session open (historical M5 bar),
-                # not the live mid — so a mid-session restart can't re-snapshot a
-                # false gap. Only strategies that consume today_open pay the fetch
-                # (ORB ignores it). Falls back to mid until the open bar exists.
-                if epic not in self._state.open_px and strat.uses_today_open:
-                    sop = await self._session_open_price(epic, now)
-                    if sop is not None:
-                        self._state.open_px[epic] = sop
-                today_open = self._state.open_px.get(epic, mid)
+                # ORB: gate on window + RVOL eligibility BEFORE any per-epic broker
+                # GET — a wide universe must NOT fetch mid/OR for the ~95% of names
+                # that aren't "in play" today (the screen is one cheap yfinance call,
+                # not per-epic broker calls).
                 if strat.needs_opening_range:
                     if not or_ready:
                         continue
-                    # screen once per day
-                    if not self._state.screened:
+                    if not self._state.screened:                 # screen once per day
                         if self.screener is None:
                             logger.warning("[forward-lab] ORB needs a screener but screener=None "
                                            "— ORB entries disabled this session")
@@ -218,6 +205,37 @@ class ExperimentScheduler:
                             self._state.screened = True
                     if epic not in self._state.eligible:
                         continue
+
+                # prev_close — only strategies that use it (gap_fade), cached once/day.
+                # ORB ignores it: skip the daily-close GET AND never gate the entry on
+                # a failed/absent daily close.
+                if strat.needs_prev_close:
+                    if epic not in self._state.prev_close:
+                        pc = await self._prev_close(epic, now)
+                        if pc is None:
+                            continue
+                        self._state.prev_close[epic] = pc
+                    prev_close = self._state.prev_close[epic]
+                else:
+                    prev_close = 0.0
+
+                mid = await self._mid(epic)
+                if mid is None:
+                    continue
+                if self.scan_pacing_s:                           # pace per-epic GETs (10 req/s limit)
+                    await asyncio.sleep(self.scan_pacing_s)
+
+                # today_open = the TRUE 09:30 cash-session open (historical M5 bar),
+                # not the live mid — so a mid-session restart can't re-snapshot a
+                # false gap. Only strategies that consume today_open pay the fetch
+                # (ORB ignores it). Falls back to mid until the open bar exists.
+                if epic not in self._state.open_px and strat.uses_today_open:
+                    sop = await self._session_open_price(epic, now)
+                    if sop is not None:
+                        self._state.open_px[epic] = sop
+                today_open = self._state.open_px.get(epic, mid)
+
+                if strat.needs_opening_range:
                     if epic not in self._state.or_levels:
                         orng = await self._opening_range(epic, now)
                         if orng is None:

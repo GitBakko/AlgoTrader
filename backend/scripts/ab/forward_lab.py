@@ -34,10 +34,22 @@ EXPERIMENT_ACCOUNT_NAME = "Account Demo"
 LEDGER_PATH = ROOT / "data" / "forward_lab" / "ledger.db"
 UNIVERSE = ["AAPL", "NVDA", "TSLA", "MSFT", "AMD"]  # liquid US stock CFDs (real gaps)
 ORB_UNIVERSE = [
-    "AAPL", "NVDA", "TSLA", "MSFT", "AMD", "AMZN", "META", "GOOGL", "NFLX", "AVGO",
-    "JPM", "V", "MA", "UNH", "XOM", "JNJ", "WMT", "PG", "HD", "COST",
-    "DIS", "BAC", "KO", "PEP", "CSCO", "ORCL", "CRM", "ADBE", "PFE", "INTC",
-]  # liquid US large-cap CFDs; skip-graceful on any epic/data miss
+    # 97 Capital.com-demo-tradeable US large/mid-caps (probe_epic_availability.py
+    # 2026-06-09: 97/98, only EMR not-found). Wider pool keeps >=5 RVOL>=1.5 names
+    # eligible every day (probe_orb_ratecheck: eligible/day 2.98 @30 -> 4.95 @99,
+    # N=100 ~8wk -> ~5wk). Non-eligible names cost no broker GET (eligibility-gated
+    # before any per-epic fetch). skip-graceful on any epic/data miss.
+    "AAPL", "ABBV", "ABNB", "ABT", "ADBE", "ADI", "AMAT", "AMD", "AMGN", "AMZN",
+    "AVGO", "AXP", "BA", "BAC", "BKNG", "BLK", "BMY", "C", "CAT", "CB",
+    "CMG", "COIN", "COP", "COST", "CRM", "CSCO", "CVS", "CVX", "DE", "DHR",
+    "DIS", "EOG", "F", "GE", "GILD", "GM", "GOOGL", "GS", "HD", "HON",
+    "INTC", "JNJ", "JPM", "KLAC", "KMI", "KO", "LLY", "LMT", "LOW", "LRCX",
+    "MA", "MAR", "MCD", "META", "MMM", "MPC", "MRK", "MRVL", "MS", "MSFT",
+    "MU", "NFLX", "NKE", "NOW", "NVDA", "NXPI", "ORCL", "OXY", "PANW", "PEP",
+    "PFE", "PG", "PLTR", "PSX", "PYPL", "QCOM", "RTX", "SBUX", "SCHW", "SHOP",
+    "SLB", "SNOW", "SNPS", "SPGI", "TGT", "TMO", "TSLA", "TXN", "UBER", "UNH",
+    "UPS", "V", "VLO", "WFC", "WMB", "WMT", "XOM",
+]
 
 
 async def discover_account(client, name: str = EXPERIMENT_ACCOUNT_NAME) -> str | None:
@@ -72,7 +84,8 @@ def _build_scheduler(client, executor):
         eod_flatten_et=s.forward_lab_eod_flatten_et, screener=_screener(),
         or_window_min=s.forward_lab_orb_or_window_min,
         session_open_et=s.forward_lab_session_open_et,
-        watch_end_et=s.forward_lab_orb_watch_end_et)
+        watch_end_et=s.forward_lab_orb_watch_end_et,
+        scan_pacing_s=s.forward_lab_scan_pacing_s)
 
 
 async def _connected_client(experiment: bool = False) -> CapitalComClient:
