@@ -306,28 +306,6 @@ class Settings(BaseSettings):
     #     BTCUSD/SOLUSD/NVDA/COPPER → 0.5
     #   - Proven winners: TSLA (+$2.2k) / USDJPY (+$1.1k, 75% WR) → 1.5
     epic_risk_multipliers_str: str = Field(default="", alias="EPIC_RISK_MULTIPLIERS")
-    # ===== LLM Provider (Phase 14: local Ollama, 2026-05-08) =====
-    # Backend abstraction for text gen + vision + embeddings. Default
-    # routes everything to the GX10 NVIDIA AI box on the LAN — zero
-    # token cost, sub-second warm latency on qwen3.6:35b. The Anthropic
-    # Claude API path is preserved as a future backend (not implemented
-    # in Phase 14a) for cloud deployments where the GX10 is not
-    # reachable.
-    llm_backend: str = Field(default="ollama", alias="LLM_BACKEND")
-    ollama_base_url: str = Field(default="http://192.168.3.191:11434", alias="OLLAMA_BASE_URL")
-    ollama_generation_model: str = Field(default="qwen3.6:35b", alias="OLLAMA_GENERATION_MODEL")
-    ollama_vision_model: str = Field(default="qwen2.5vl:7b", alias="OLLAMA_VISION_MODEL")
-    ollama_embedding_model: str = Field(default="bge-m3:latest", alias="OLLAMA_EMBEDDING_MODEL")
-    ollama_embedding_dim: int = Field(default=1024, alias="OLLAMA_EMBEDDING_DIM")
-    # `keep_alive=-1` pins the generation model in VRAM forever so
-    # qwen3.6 doesn't get evicted by other tenants. Vision model
-    # tolerates eviction since cold start is ~25s and we run at most
-    # 90 inferences/day (15 epics × 6 four-hour bars).
-    ollama_keep_alive_generation: str | int = Field(
-        default=-1, alias="OLLAMA_KEEP_ALIVE_GENERATION"
-    )
-    ollama_keep_alive_vision: str = Field(default="1h", alias="OLLAMA_KEEP_ALIVE_VISION")
-    ollama_timeout_seconds: float = Field(default=60.0, alias="OLLAMA_TIMEOUT_SECONDS")
 
     @property
     def epic_risk_multipliers(self) -> dict[str, float]:
@@ -573,66 +551,6 @@ class Settings(BaseSettings):
         default="log_only", alias="CALENDAR_GATE_MODE", pattern="^(off|log_only|block)$"
     )
     nasdaq_data_link_api_key: str = Field(default="", alias="NASDAQ_DATA_LINK_API_KEY")
-
-    # ===== Multi-Agent System (Sprint 1) =====
-    agents_enabled: bool = Field(default=False, alias="AGENTS_ENABLED")
-    agents_llm_model: str = Field(default="claude-sonnet-4-20250514", alias="AGENTS_LLM_MODEL")
-    agents_temperature: float = Field(default=0.2, alias="AGENTS_TEMPERATURE")
-    agents_max_tokens: int = Field(default=2000, alias="AGENTS_MAX_TOKENS")
-    agents_technical_weight: float = Field(default=0.4, alias="AGENTS_TECHNICAL_WEIGHT")
-    agents_sentiment_weight: float = Field(default=0.2, alias="AGENTS_SENTIMENT_WEIGHT")
-    agents_risk_weight: float = Field(default=0.4, alias="AGENTS_RISK_WEIGHT")
-    agents_risk_block_threshold: float = Field(default=0.8, alias="AGENTS_RISK_BLOCK_THRESHOLD")
-    agents_debate_enabled: bool = Field(default=True, alias="AGENTS_DEBATE_ENABLED")
-    anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
-
-    # ===== Reinforcement Learning (Sprint 2) =====
-    rl_enabled: bool = Field(default=False, alias="RL_ENABLED")
-    rl_algorithm: str = Field(default="PPO", alias="RL_ALGORITHM")
-    rl_reward_function: str = Field(default="composite", alias="RL_REWARD_FUNCTION")
-    rl_sliding_window_size: int = Field(default=500, alias="RL_SLIDING_WINDOW_SIZE")
-    rl_retrain_interval_minutes: int = Field(default=60, alias="RL_RETRAIN_INTERVAL")
-    rl_max_trades_per_session: int = Field(default=20, alias="RL_MAX_TRADES_PER_SESSION")
-    rl_target_hold_candles: int = Field(default=10, alias="RL_TARGET_HOLD_CANDLES")
-    rl_max_drawdown_pct: float = Field(default=0.01, alias="RL_MAX_DRAWDOWN_PCT")
-    rl_learning_rate: float = Field(default=3e-4, alias="RL_LEARNING_RATE")
-    rl_total_timesteps: int = Field(default=50000, alias="RL_TOTAL_TIMESTEPS")
-
-    # ===== Memory System (Sprint 3) =====
-    memory_enabled: bool = Field(default=False, alias="MEMORY_ENABLED")
-    memory_stm_max_signals: int = Field(default=50, alias="MEMORY_STM_MAX_SIGNALS")
-    memory_stm_max_trades: int = Field(default=20, alias="MEMORY_STM_MAX_TRADES")
-    memory_decay_lambda: float = Field(default=0.1, alias="MEMORY_DECAY_LAMBDA")
-    memory_consolidation_hours: int = Field(default=24, alias="MEMORY_CONSOLIDATION_HOURS")
-    memory_episodic_threshold: float = Field(default=0.8, alias="MEMORY_EPISODIC_THRESHOLD")
-    memory_db_path: str = Field(default="data/memory/mantis_memory.db", alias="MEMORY_DB_PATH")
-
-    # ===== Vision AI (Sprint 4) =====
-    vision_enabled: bool = Field(default=False, alias="VISION_ENABLED")
-    vision_llm_model: str = Field(default="claude-sonnet-4-20250514", alias="VISION_LLM_MODEL")
-    vision_chart_width: int = Field(default=1200, alias="VISION_CHART_WIDTH")
-    vision_chart_height: int = Field(default=600, alias="VISION_CHART_HEIGHT")
-
-    # ===== RAG Pipeline (Sprint 4) =====
-    rag_enabled: bool = Field(default=False, alias="RAG_ENABLED")
-    rag_max_context_tokens: int = Field(default=2000, alias="RAG_MAX_CONTEXT_TOKENS")
-    rag_news_lookback_hours: int = Field(default=4, alias="RAG_NEWS_LOOKBACK_HOURS")
-    rag_vector_store_path: str = Field(
-        default="data/rag/vector_store", alias="RAG_VECTOR_STORE_PATH"
-    )
-
-    # ===== DRL Ensemble (Sprint 5) =====
-    drl_enabled: bool = Field(default=False, alias="DRL_ENABLED")
-    drl_algorithms: str = Field(default="PPO,SAC,A2C,TD3", alias="DRL_ALGORITHMS")
-    drl_voting_mode: str = Field(default="REGIME_ROUTING", alias="DRL_VOTING_MODE")
-    drl_confidence_threshold: float = Field(default=0.6, alias="DRL_CONFIDENCE_THRESHOLD")
-    drl_ensemble_weight: float = Field(default=0.25, alias="DRL_ENSEMBLE_WEIGHT")
-    drl_total_timesteps: int = Field(default=50000, alias="DRL_TOTAL_TIMESTEPS")
-    drl_retrain_interval_days: int = Field(default=7, alias="DRL_RETRAIN_INTERVAL_DAYS")
-    drl_train_test_split: float = Field(default=0.8, alias="DRL_TRAIN_TEST_SPLIT")
-    drl_sliding_window_candles: int = Field(default=2000, alias="DRL_SLIDING_WINDOW_CANDLES")
-    drl_min_sharpe_for_deploy: float = Field(default=0.5, alias="DRL_MIN_SHARPE_DEPLOY")
-    drl_max_drawdown_for_deploy: float = Field(default=0.15, alias="DRL_MAX_DD_DEPLOY")
 
     # ===== Security =====
     secret_key: str = Field(default="dev_secret_key_change_in_production", alias="SECRET_KEY")

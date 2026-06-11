@@ -20,12 +20,10 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from src.api.routers import (
-    agents,
     analytics,
     auth,
     backtest,
     dashboard,
-    drl,
     export,
     markets,
     models,
@@ -38,7 +36,6 @@ from src.api.routers import (
     strategy,
     system,
     trading,
-    vision,
 )
 from src.api.websocket import (
     markets_endpoint,
@@ -856,15 +853,9 @@ async def root():
 # guard (lifespan) refuses to boot in non-DEMO mode without auth.
 from src.auth.dependencies import get_current_user as _gcu
 
-_auth_deps = (
-    [Depends(_gcu)]
-    if getattr(settings, "auth_required", False)
-    else None
-)
+_auth_deps = [Depends(_gcu)] if getattr(settings, "auth_required", False) else None
 if _auth_deps:
-    logger.warning(
-        "🔒 AUTH_REQUIRED=true — all non-/auth endpoints require Bearer token"
-    )
+    logger.warning("🔒 AUTH_REQUIRED=true — all non-/auth endpoints require Bearer token")
 else:
     logger.warning(
         "⚠️  AUTH_REQUIRED=false — API endpoints accept anonymous requests "
@@ -872,24 +863,36 @@ else:
     )
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
-app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"], dependencies=_auth_deps)
-app.include_router(positions.router, prefix="/api/positions", tags=["Positions"], dependencies=_auth_deps)
+app.include_router(
+    dashboard.router, prefix="/api/dashboard", tags=["Dashboard"], dependencies=_auth_deps
+)
+app.include_router(
+    positions.router, prefix="/api/positions", tags=["Positions"], dependencies=_auth_deps
+)
 app.include_router(signals.router, prefix="/api/signals", tags=["Signals"], dependencies=_auth_deps)
 app.include_router(markets.router, prefix="/api/markets", tags=["Markets"], dependencies=_auth_deps)
 app.include_router(news.router, prefix="/api/news", tags=["News"], dependencies=_auth_deps)
-app.include_router(backtest.router, prefix="/api/backtest", tags=["Backtest"], dependencies=_auth_deps)
-app.include_router(strategy.router, prefix="/api/strategy", tags=["Strategy"], dependencies=_auth_deps)
+app.include_router(
+    backtest.router, prefix="/api/backtest", tags=["Backtest"], dependencies=_auth_deps
+)
+app.include_router(
+    strategy.router, prefix="/api/strategy", tags=["Strategy"], dependencies=_auth_deps
+)
 app.include_router(models.router, prefix="/api/models", tags=["Models"], dependencies=_auth_deps)
 app.include_router(system.router, prefix="/api/system", tags=["System"], dependencies=_auth_deps)
 app.include_router(trading.router, prefix="/api/trading", tags=["Trading"], dependencies=_auth_deps)
 app.include_router(export.router, prefix="/api/export", tags=["Export"], dependencies=_auth_deps)
 app.include_router(monitoring.router, prefix="/api", tags=["Monitoring"], dependencies=_auth_deps)
-app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"], dependencies=_auth_deps)
-app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"], dependencies=_auth_deps)
+app.include_router(
+    notifications.router,
+    prefix="/api/notifications",
+    tags=["Notifications"],
+    dependencies=_auth_deps,
+)
+app.include_router(
+    analytics.router, prefix="/api/analytics", tags=["Analytics"], dependencies=_auth_deps
+)
 app.include_router(sil.router, prefix="/api/sil", tags=["SIL"], dependencies=_auth_deps)
-app.include_router(vision.router, prefix="/api/vision", tags=["Vision AI"], dependencies=_auth_deps)
-app.include_router(drl.router, prefix="/api/drl", tags=["DRL Ensemble"], dependencies=_auth_deps)
-app.include_router(agents.router, prefix="/api/agents", tags=["Agents"], dependencies=_auth_deps)
 
 # ===== WebSocket Endpoints =====
 app.websocket("/ws/prices")(prices_endpoint)

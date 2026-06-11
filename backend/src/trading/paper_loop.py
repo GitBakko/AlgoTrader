@@ -351,22 +351,6 @@ class PaperTradingLoop:
             except Exception as e:
                 logger.warning(f"[CalendarGate] Standalone init failed: {e}")
 
-        # MANTIS-EVOLUTION: Multi-agent orchestrator (optional, feature-flag gated)
-        self._agents_enabled = _init_settings.agents_enabled
-        self._orchestrator = None
-        if self._agents_enabled:
-            try:
-                from src.agents.orchestrator import MantisAgentOrchestrator
-
-                self._orchestrator = MantisAgentOrchestrator(
-                    vision_enabled=_init_settings.vision_enabled,
-                    drl_enabled=_init_settings.drl_enabled,
-                )
-                logger.info("Multi-agent orchestrator initialized")
-            except Exception as e:
-                logger.warning(f"Orchestrator init failed: {e!r} — agents disabled")
-                self._agents_enabled = False
-
         # Dedicated reconciler sub-loop (flag-gated, default off — see plan
         # docs/handoff/reconciler_split_PLAN.md). When enabled, broker-position
         # reconciliation runs in a separate task at reconciler_interval_seconds
@@ -3415,35 +3399,6 @@ class PaperTradingLoop:
                     except Exception as e:
                         logger.warning(f"[{epic}] Signal-position link failed: {e}")
 
-            # MANTIS-EVOLUTION: Run multi-agent analysis (non-blocking enrichment)
-            if self._agents_enabled and self._orchestrator:
-                try:
-                    from src.agents.schemas import MarketContext
-
-                    agent_ctx = MarketContext(
-                        epic=epic,
-                        current_price=signal.entry_price,
-                        atr=market_data.get("atr", 1.0),
-                        features=market_data,
-                        regime=market_data.get("regime"),
-                        open_positions=len(open_positions),
-                        equity=equity,
-                    )
-                    agent_decision = await self._orchestrator.run(agent_ctx)
-                    signal_info["agent_decision"] = {
-                        "action": agent_decision.action,
-                        "approved": agent_decision.approved,
-                        "confidence": agent_decision.confidence,
-                        "override_reason": agent_decision.override_reason,
-                        "audit_trail": agent_decision.agent_audit_trail[:5],  # first 5 entries
-                    }
-                    logger.info(
-                        f"[{epic}] Agent decision: {agent_decision.action} "
-                        f"(approved={agent_decision.approved}, conf={agent_decision.confidence:.2f})"
-                    )
-                except Exception as e:
-                    logger.debug(f"[{epic}] Agent enrichment failed: {e!r}")
-
         elif exec_result.error_detail and exec_result.error_detail.get("error_type") == "min_size":
             # Broker rejected for minimum size — retry with min_deal_size from broker
             broker_min = None
@@ -4446,12 +4401,6 @@ class PaperTradingLoop:
                 "fetch_errors": self._sil_data.fetch_errors if self._sil_data else [],
                 "fear_greed_value": self._sil_data.fear_greed.value if self._sil_data else None,
                 "composite_score": None,  # Populated from features
-            },
-            "agents": {
-                "enabled": self._agents_enabled,
-                "orchestrator_active": self._orchestrator is not None,
-                "vision_enabled": _settings.vision_enabled,
-                "drl_enabled": _settings.drl_enabled,
             },
         }
 
