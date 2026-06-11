@@ -320,6 +320,38 @@ class RiskManager:
             take_profit = signal.suggested_tp
             adjustments.append("Using signal suggested take-profit")
 
+        # 4-quater. Side validation (audit M1.7). A side-inverted pair —
+        # BUY with SL>=entry or TP<=entry; SELL mirrored — passed every
+        # gate because the R:R floor below uses abs() distances. This is
+        # the 2026-04-28 inversion class: reject, never silently repair.
+        _is_buy = signal.direction.value == "BUY"
+        _sl_wrong = (
+            (stop_loss >= signal.entry_price) if _is_buy else (stop_loss <= signal.entry_price)
+        )
+        _tp_wrong = (
+            (take_profit <= signal.entry_price) if _is_buy else (take_profit >= signal.entry_price)
+        )
+        if _sl_wrong or _tp_wrong:
+            reason = (
+                f"SL/TP on wrong side of entry for {signal.direction.value}: "
+                f"entry={signal.entry_price:.5f} SL={stop_loss:.5f} "
+                f"TP={take_profit:.5f}"
+            )
+            logger.warning(f"[{signal.epic}] Trade rejected: {reason}")
+            audit["side_validation"] = {
+                "passed": False,
+                "sl_wrong": _sl_wrong,
+                "tp_wrong": _tp_wrong,
+                "stop_loss": round(stop_loss, 5),
+                "take_profit": round(take_profit, 5),
+            }
+            return RiskCheckResult(
+                approved=False,
+                rejection_reason=reason,
+                audit=audit,
+            )
+        audit["side_validation"] = {"passed": True}
+
         # 4-ter. Backstop R:R floor on the final pair (post §4-bis).
         # Rule 6 trusts the strategy's calibrated SL/TP pair as-is, but
         # stale-snapshot bugs can still produce degenerate R:R (e.g.
