@@ -15,6 +15,9 @@ function unwrap<T>(): OperatorFunction<ApiResponse<T>, T> {
     if (res && res.success === false) {
       // Surface envelope failures arriving at HTTP 200 — silently returning
       // res.data fed `undefined as T` into signals (audit M1.10).
+      // Log before throwing: this throw bypasses the interceptor's logging,
+      // so without it the backend error string leaves no trace.
+      console.error('[API Envelope] success:false:', res.error);
       throw new Error(res.error || 'API returned success:false');
     }
     return res.data;

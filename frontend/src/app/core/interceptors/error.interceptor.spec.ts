@@ -32,8 +32,14 @@ describe('errorInterceptor', () => {
   });
 
   afterEach(() => {
-    ctrl.verify();
-    vi.useRealTimers();
+    // verify() can throw (stray pending retry — exactly what this suite
+    // exists to catch); restore real timers regardless so a single failure
+    // doesn't cascade fake timers into subsequent tests.
+    try {
+      ctrl.verify();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('does NOT retry a POST on retryable status', () => {
