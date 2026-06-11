@@ -1,8 +1,25 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, map } from 'rxjs';
+import { Observable, map, OperatorFunction } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models';
+
+/**
+ * Unwraps the standard envelope `{success, data, error?}` returned by every
+ * backend route.  When `success === false` at HTTP 200 the error string was
+ * previously swallowed and callers received `undefined as T` into their
+ * signals — the error message simply vanished (audit M1.10).
+ */
+function unwrap<T>(): OperatorFunction<ApiResponse<T>, T> {
+  return map((res: ApiResponse<T>) => {
+    if (res && res.success === false) {
+      // Surface envelope failures arriving at HTTP 200 — silently returning
+      // res.data fed `undefined as T` into signals (audit M1.10).
+      throw new Error(res.error || 'API returned success:false');
+    }
+    return res.data;
+  });
+}
 
 /**
  * ApiService — single entry point for all backend HTTP traffic.
@@ -39,19 +56,19 @@ export class ApiService {
   get<T>(path: string, params?: Params): Observable<T> {
     return this.http
       .get<ApiResponse<T>>(`${this.baseUrl}${path}`, { params: buildParams(params) })
-      .pipe(map(res => res.data));
+      .pipe(unwrap<T>());
   }
 
   post<T>(path: string, body?: unknown): Observable<T> {
     return this.http
       .post<ApiResponse<T>>(`${this.baseUrl}${path}`, body)
-      .pipe(map(res => res.data));
+      .pipe(unwrap<T>());
   }
 
   put<T>(path: string, body?: unknown): Observable<T> {
     return this.http
       .put<ApiResponse<T>>(`${this.baseUrl}${path}`, body)
-      .pipe(map(res => res.data));
+      .pipe(unwrap<T>());
   }
 
   /** H4-FE-AUDIT: added so notification-center and similar services can
@@ -59,7 +76,7 @@ export class ApiService {
   delete<T>(path: string, params?: Params): Observable<T> {
     return this.http
       .delete<ApiResponse<T>>(`${this.baseUrl}${path}`, { params: buildParams(params) })
-      .pipe(map(res => res.data));
+      .pipe(unwrap<T>());
   }
 
   getBlob(path: string, params?: Params): Observable<Blob> {

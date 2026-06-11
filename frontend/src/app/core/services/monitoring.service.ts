@@ -148,14 +148,12 @@ export class MonitoringService {
     this.error.set(null);
     try {
       const data = await firstValueFrom(this.api.get<T>(path, params));
-      if (data) {
-        setter(data);
-      } else {
-        throw new Error(failureMessage);
-      }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-      this.error.set(errorMsg);
+      setter(data);
+    } catch {
+      // Surface the curated domain message regardless of whether the failure
+      // came from a network error, HTTP error, or an envelope success:false
+      // (audit M1.10 — unwrap() now throws on success:false at HTTP 200).
+      this.error.set(failureMessage);
     } finally {
       this.loading.set(false);
     }

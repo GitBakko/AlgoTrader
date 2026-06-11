@@ -7,6 +7,11 @@ const AUTH_ENDPOINTS = ['/api/auth/login', '/api/auth/register', '/api/auth/refr
 const RETRYABLE_STATUSES = new Set([0, 502, 503]);
 const MAX_RETRIES = 3;
 
+// Only idempotent reads are safe to replay: status 0 covers "request sent
+// but response lost" — re-sending a POST can duplicate an order/backtest
+// (audit M1.10).
+const RETRYABLE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
 function shouldSkipToast(url: string, status: number): boolean {
   if (status === 401) return true;
   if (AUTH_ENDPOINTS.some(ep => url.includes(ep))) return true;
@@ -39,7 +44,11 @@ function withRetry(
       const status = error.status ?? 0;
       const detail: string = error?.error?.error || error?.message || '';
 
-      if (RETRYABLE_STATUSES.has(status) && attempt < MAX_RETRIES) {
+      if (
+        RETRYABLE_METHODS.has(req.method) &&
+        RETRYABLE_STATUSES.has(status) &&
+        attempt < MAX_RETRIES
+      ) {
         const delay = Math.pow(2, attempt) * 1000;
         return timer(delay).pipe(
           switchMap(() => withRetry(req, next, attempt + 1, toast))
