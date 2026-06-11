@@ -178,6 +178,9 @@ class PaperTradingLoop:
     5. ExecutionEngine.execute_signal() (paper mode) -> ExecutionResult
     """
 
+    # Kelly trade-history capacity — single source for __init__ + seed_trade_history
+    _TRADE_HISTORY_MAXLEN = 200
+
     def __init__(
         self,
         prediction_service: PredictionService,
@@ -217,7 +220,7 @@ class PaperTradingLoop:
             trailing_stop_config
         )
         # In-memory trade history for Kelly sizing (last 200 trades, auto-discards old entries)
-        self._trade_history: deque[dict] = deque(maxlen=200)
+        self._trade_history: deque[dict] = deque(maxlen=self._TRADE_HISTORY_MAXLEN)
         # Phase 14: database session factory for state persistence
         self._db_session_factory = db_session_factory
         # Decision audit trail: signal persistence factory
@@ -380,8 +383,11 @@ class PaperTradingLoop:
         contract that direct assignment of a plain list silently dropped
         (the maxlen loss + deque/list type-swap was the root cause of the
         Kelly TypeError class — audit M1.1).
+
+        ``history`` must be chronological (oldest-first); the deque keeps
+        the most recent ``maxlen`` entries.
         """
-        self._trade_history = deque(history, maxlen=200)
+        self._trade_history = deque(history, maxlen=self._TRADE_HISTORY_MAXLEN)
 
     @property
     def is_running(self) -> bool:
