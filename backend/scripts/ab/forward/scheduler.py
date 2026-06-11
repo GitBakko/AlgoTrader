@@ -23,7 +23,9 @@ from src.broker.models import Direction, Resolution  # noqa: E402
 @dataclass
 class SessionState:
     day: _date | None = None
-    prev_close: dict[str, float] = field(default_factory=dict)  # epic -> prior daily close (cached/day)
+    prev_close: dict[str, float] = field(
+        default_factory=dict
+    )  # epic -> prior daily close (cached/day)
     open_px: dict[str, float] = field(default_factory=dict)
     or_levels: dict[str, tuple[float, float]] = field(default_factory=dict)  # epic -> (hi, lo)
     rvol: dict[str, float] = field(default_factory=dict)
@@ -46,12 +48,14 @@ class ExperimentScheduler:
     client: object
     executor: ExperimentExecutor
     strategies: list[ForwardStrategy]
-    eod_flatten_et: str = "15:45"   # BEFORE 16:00 ET cash close (broker rejects DELETE on a closed market)
-    screener: object | None = None                 # RvolScreener (optional; needed for ORB)
+    eod_flatten_et: str = (
+        "15:45"  # BEFORE 16:00 ET cash close (broker rejects DELETE on a closed market)
+    )
+    screener: object | None = None  # RvolScreener (optional; needed for ORB)
     session_open_et: str = "09:30"
     or_window_min: int = 30
     watch_end_et: str = "12:00"
-    scan_pacing_s: float = 0.0   # sleep between per-epic broker GETs (10 req/s limit; wide universe)
+    scan_pacing_s: float = 0.0  # sleep between per-epic broker GETs (10 req/s limit; wide universe)
     _state: SessionState = field(default_factory=SessionState, init=False, repr=False)
 
     @property
@@ -76,8 +80,7 @@ class ExperimentScheduler:
         dependency on the local daily cache). prev_close = the most recent
         COMPLETED daily candle's close (excludes today's still-forming candle)."""
         try:
-            candles = await self.client.get_historical_prices(
-                epic, Resolution.DAY, max_candles=5)
+            candles = await self.client.get_historical_prices(epic, Resolution.DAY, max_candles=5)
         except Exception as e:  # noqa: BLE001 — any broker/parse error => skip epic
             logger.warning(f"[forward-lab] {epic} daily history fetch failed: {e} — skip")
             return None
@@ -104,7 +107,7 @@ class ExperimentScheduler:
         return self._et_to_utc(now.date(), self.eod_flatten_et)
 
     def _in_window(self, now: datetime) -> bool:
-        if now.weekday() >= 5:                       # Sat/Sun
+        if now.weekday() >= 5:  # Sat/Sun
             return False
         open_dt = self._et_to_utc(now.date(), self.session_open_et)
         end_dt = self._et_to_utc(now.date(), self.watch_end_et)
@@ -118,7 +121,8 @@ class ExperimentScheduler:
         mid-session; 20 bars = 100min lost the window after ~open+70min)."""
         try:
             candles = await self.client.get_historical_prices(
-                epic, Resolution.MINUTE_5, max_candles=60)
+                epic, Resolution.MINUTE_5, max_candles=60
+            )
         except Exception as e:  # noqa: BLE001
             logger.warning(f"[forward-lab] {epic} MINUTE_5 fetch failed: {e} — skip OR")
             return None
@@ -154,7 +158,8 @@ class ExperimentScheduler:
         window (mirrors _opening_range)."""
         try:
             candles = await self.client.get_historical_prices(
-                epic, Resolution.MINUTE_5, max_candles=60)
+                epic, Resolution.MINUTE_5, max_candles=60
+            )
         except Exception as e:  # noqa: BLE001 — any broker/parse error => caller falls back to mid
             logger.warning(f"[forward-lab] {epic} MINUTE_5 fetch failed (session-open): {e} — skip")
             return None
@@ -191,14 +196,22 @@ class ExperimentScheduler:
                 if strat.needs_opening_range:
                     if not or_ready:
                         continue
-                    if not self._state.screened:                 # screen once per day
+                    if not self._state.screened:  # screen once per day
                         if self.screener is None:
-                            logger.warning("[forward-lab] ORB needs a screener but screener=None "
-                                           "— ORB entries disabled this session")
+                            logger.warning(
+                                "[forward-lab] ORB needs a screener but screener=None "
+                                "— ORB entries disabled this session"
+                            )
                             self._state.screened = True
                         else:
-                            pool = sorted({e for s in self.strategies
-                                           if s.needs_opening_range for e in s.universe()})
+                            pool = sorted(
+                                {
+                                    e
+                                    for s in self.strategies
+                                    if s.needs_opening_range
+                                    for e in s.universe()
+                                }
+                            )
                             res = self.screener.select(pool, now)
                             self._state.rvol.update(res.get("rvol", {}))
                             self._state.eligible = set(res.get("eligible", set()))
@@ -222,7 +235,7 @@ class ExperimentScheduler:
                 mid = await self._mid(epic)
                 if mid is None:
                     continue
-                if self.scan_pacing_s:                           # pace per-epic GETs (10 req/s limit)
+                if self.scan_pacing_s:  # pace per-epic GETs (10 req/s limit)
                     await asyncio.sleep(self.scan_pacing_s)
 
                 # today_open = the TRUE 09:30 cash-session open (historical M5 bar),
@@ -242,15 +255,26 @@ class ExperimentScheduler:
                             continue
                         self._state.or_levels[epic] = orng
                     hi, lo = self._state.or_levels[epic]
-                    ctx = MarketContext(epic=epic, prev_close=prev_close,
-                                        today_open=today_open, current_price=mid,
-                                        now=now, session_close=self._session_close(now),
-                                        or_high=hi, or_low=lo,
-                                        rvol=self._state.rvol.get(epic))
+                    ctx = MarketContext(
+                        epic=epic,
+                        prev_close=prev_close,
+                        today_open=today_open,
+                        current_price=mid,
+                        now=now,
+                        session_close=self._session_close(now),
+                        or_high=hi,
+                        or_low=lo,
+                        rvol=self._state.rvol.get(epic),
+                    )
                 else:
-                    ctx = MarketContext(epic=epic, prev_close=prev_close,
-                                        today_open=today_open, current_price=mid,
-                                        now=now, session_close=self._session_close(now))
+                    ctx = MarketContext(
+                        epic=epic,
+                        prev_close=prev_close,
+                        today_open=today_open,
+                        current_price=mid,
+                        now=now,
+                        session_close=self._session_close(now),
+                    )
                 await self.executor.try_enter(strat, ctx, session_date)
 
     async def on_session_open(self, now: datetime | None = None) -> None:
@@ -263,9 +287,14 @@ class ExperimentScheduler:
                 if prev_close is None or mid is None:
                     logger.warning(f"[forward-lab] missing price for {epic} — skip")
                     continue
-                ctx = MarketContext(epic=epic, prev_close=prev_close, today_open=mid,
-                                    current_price=mid, now=now,
-                                    session_close=self._session_close(now))
+                ctx = MarketContext(
+                    epic=epic,
+                    prev_close=prev_close,
+                    today_open=mid,
+                    current_price=mid,
+                    now=now,
+                    session_close=self._session_close(now),
+                )
                 await self.executor.try_enter(strat, ctx, session_date)
 
     def _match_broker_position(self, row: dict, positions: list):
@@ -273,11 +302,13 @@ class ExperimentScheduler:
         dealId equality (Capital.com rotates the open-position dealId vs the
         create-confirmation dealId we stored). Match on epic + direction + entry≈level."""
         entry = float(row["entry"])
-        tol = max(1e-6, abs(entry) * 1e-3)   # 0.1% of entry price
+        tol = max(1e-6, abs(entry) * 1e-3)  # 0.1% of entry price
         for p in positions:
             if p.epic != row["epic"]:
                 continue
-            if p.direction.value != row["direction"]:   # p.direction is a Direction enum; row["direction"] is "BUY"/"SELL"
+            if (
+                p.direction.value != row["direction"]
+            ):  # p.direction is a Direction enum; row["direction"] is "BUY"/"SELL"
                 continue
             if abs(float(p.level) - entry) <= tol:
                 return p
@@ -306,39 +337,65 @@ class ExperimentScheduler:
             matched = self._match_broker_position(row, broker_positions)
             still_open = matched is not None
             pos = OpenPosition(
-                epic=row["epic"], direction=Direction(row["direction"]),
-                entry=row["entry"], size=row["size"], stop_level=row["stop_level"],
+                epic=row["epic"],
+                direction=Direction(row["direction"]),
+                entry=row["entry"],
+                size=row["size"],
+                stop_level=row["stop_level"],
                 prev_close=row["prev_close"] if row.get("prev_close") is not None else 0.0,
                 today_open=row["today_open"] if row.get("today_open") is not None else row["entry"],
-                opened_at=now, deal_id=row["deal_id"])
+                opened_at=now,
+                deal_id=row["deal_id"],
+            )
             # ctx carries only current_price/now/session_close for exit_rule; the gap history lives on `pos` above
-            ctx = MarketContext(epic=row["epic"], prev_close=0.0, today_open=row["entry"],
-                                current_price=mid, now=now,
-                                session_close=self._session_close(now))
+            ctx = MarketContext(
+                epic=row["epic"],
+                prev_close=0.0,
+                today_open=row["entry"],
+                current_price=mid,
+                now=now,
+                session_close=self._session_close(now),
+            )
             should_exit = strat.exit_rule(pos, ctx)
             if still_open and should_exit:
                 try:
-                    await self.client.close_position(matched.deal_id)   # broker's CURRENT dealId, not the stored one
-                    logger.info(f"[forward-lab] close sent for {row['epic']} ({row['strategy']}) "
-                                "— reconcile deferred to next pass (broker history lag)")
-                except Exception as e:  # noqa: BLE001 — a per-position close failure (e.g. MarketClosedError when
+                    await self.client.close_position(
+                        matched.deal_id
+                    )  # broker's CURRENT dealId, not the stored one
+                    logger.info(
+                        f"[forward-lab] close sent for {row['epic']} ({row['strategy']}) "
+                        "— reconcile deferred to next pass (broker history lag)"
+                    )
+                except (
+                    Exception
+                ) as e:  # noqa: BLE001 — a per-position close failure (e.g. MarketClosedError when
                     # EOD-flatten lands after a cash-only instrument's 20:00 UTC close) must NOT abort the whole
                     # pass and strand every other position + the reconcile. The position carries (broker SL still
                     # protects it) and retries next pass / next session when the market reopens.
-                    logger.warning(f"[forward-lab] close failed for {row['epic']} ({row['strategy']}): {e} "
-                                   "— position carries, retry next pass")
+                    logger.warning(
+                        f"[forward-lab] close failed for {row['epic']} ({row['strategy']}): {e} "
+                        "— position carries, retry next pass"
+                    )
                 continue
             if not still_open:
                 net, exitpx, reason = await self._realized(row, mid)
                 if reason == "PENDING_RECONCILE" and self._row_age_hours(row, now) < 24:
-                    logger.info(f"[forward-lab] {row['epic']} close not in broker history yet "
-                                "— retrying next pass")
+                    logger.info(
+                        f"[forward-lab] {row['epic']} close not in broker history yet "
+                        "— retrying next pass"
+                    )
                     continue
                 self.executor.ledger.record_close(
-                    deal_id=row["deal_id"], exit_price=exitpx, net_pnl=net,
-                    closed_at=now.isoformat(), close_reason=reason)
-                logger.info(f"[forward-lab] closed {row['epic']} ({row['strategy']}) "
-                            f"net={net:+.2f} ({reason})")
+                    deal_id=row["deal_id"],
+                    exit_price=exitpx,
+                    net_pnl=net,
+                    closed_at=now.isoformat(),
+                    close_reason=reason,
+                )
+                logger.info(
+                    f"[forward-lab] closed {row['epic']} ({row['strategy']}) "
+                    f"net={net:+.2f} ({reason})"
+                )
 
     def _row_age_hours(self, row: dict, now: datetime) -> float:
         """Hours since the row was opened; +inf when opened_at is unparseable so
@@ -359,7 +416,9 @@ class ExperimentScheduler:
                 carries the close-side dealId, which matches the TRADE row for P&L.
         Else:   PENDING_RECONCILE (no guess, no invented P&L)."""
         now = datetime.now(timezone.utc)
-        to_date = now - timedelta(seconds=60)   # broker rejects future `to` (error.invalid.daterange); clamp for clock drift
+        to_date = now - timedelta(
+            seconds=60
+        )  # broker rejects future `to` (error.invalid.daterange); clamp for clock drift
         opened = self._parse_dt(row.get("opened_at"))
         from_date = (opened - timedelta(hours=1)) if opened else (to_date - timedelta(days=1))
         txns = await self.client.get_transaction_history(from_date, to_date)
@@ -376,8 +435,17 @@ class ExperimentScheduler:
         entry = row.get("entry")
         opened_at = self._parse_dt(row.get("opened_at"))
         if entry is not None:
+            # `/history/activity` caps the date range at <24h (error.invalid.daterange
+            # on wider spans — unlike `/history/transactions`, which accepts the wide
+            # window used for `trades` above). An overnight-carry position has
+            # from_date = opened-1h, which is >24h behind to_date and is rejected,
+            # stranding the close in PENDING_RECONCILE (e.g. CB carried 06-09->06-10).
+            # The close event is recent (we reconcile right after the close), so a 23h
+            # lookback from to_date always covers it; the `a_date >= opened_at` guard
+            # below still bounds matches to this position's lifetime.
+            act_from = max(from_date, to_date - timedelta(hours=23))
             try:
-                acts = await self.client.get_activity_history(from_date, to_date)
+                acts = await self.client.get_activity_history(act_from, to_date)
             except Exception as e:  # noqa: BLE001
                 logger.warning(f"[forward-lab] activity fetch failed for {row['epic']}: {e}")
                 acts = []
