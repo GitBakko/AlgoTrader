@@ -1,0 +1,156 @@
+"""
+Tests for _live_fill() retry behavior after a confirm timeout (audit M1.3).
+
+Capital.com position creates are TWO-PHASE (POST then confirm): a 10s confirm
+timeout does NOT mean the broker rejected the create — it may have FILLED
+server-side. These tests pin that the corrected-SL/TP retry path only falls
+through to the no-stops re-submit when the broker CONFIRMED a rejection, and
+that after a timeout the order manager checks for (and adopts) an actual fill
+instead of blindly re-submitting a duplicate position.
+"""
+
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from src.broker.exceptions import CapitalComError
+from src.broker.models import Direction, Position
+from src.execution.order_manager import OrderManager
+from src.execution.schemas import ExecutionMode, ExecutionOrder
+
+# Exact error shape the production corrected-SL/TP branch matches on:
+# "stoploss" substring + "stoploss.minvalue" + a ": <number>" broker limit.
+SLTP_ERROR = "error.invalid.stoploss.minvalue: 498.0"
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def mock_broker():
+    """Create a mock broker client with async methods."""
+    broker = MagicMock()
+    broker.create_position = AsyncMock()
+    broker.close_position = AsyncMock()
+    broker.modify_position = AsyncMock()
+    broker.list_positions = AsyncMock(return_value=[])
+    return broker
+
+
+@pytest.fixture
+def live_order_manager(mock_broker):
+    """OrderManager in LIVE mode with a mocked broker."""
+    return OrderManager(broker=mock_broker, mode=ExecutionMode.LIVE)
+
+
+@pytest.fixture
+def sample_order():
+    """A sample ExecutionOrder whose SL the broker will reject."""
+    return ExecutionOrder(
+        epic="TSLA",
+        direction="BUY",
+        size=1.0,
+        entry_price=500.0,
+        stop_loss=499.0,
+        take_profit=506.0,
+    )
+
+
+def _filled_position(deal_id="DEAL-FILLED-1", level=500.1):
+    """Broker position matching sample_order epic/direction/size."""
+    return Position(
+        deal_id=deal_id,
+        epic="TSLA",
+        direction=Direction.BUY,
+        size=1.0,
+        level=level,
+        currency="USD",
+        created_date=datetime.now(UTC),
+    )
+
+
+def _open_confirmation(deal_id, level=500.3):
+    """A successful (non-REJECTED) deal confirmation mock."""
+    return MagicMock(
+        deal_status="OPEN",
+        deal_id=deal_id,
+        deal_reference=f"REF-{deal_id}",
+        level=level,
+        status="OPEN",
+        reason=None,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.execution
+class TestLiveFillRetryConfirmation:
+    """Corrected-SL/TP retry must require a broker-confirmed rejection
+    before falling through to the no-stops re-submit."""
+
+    async def test_timeout_after_fill_does_not_duplicate_position(
+        self, live_order_manager, sample_order, mock_broker
+    ):
+        """Corrected retry times out but actually FILLED server-side:
+        adopt the fill, do NOT send a third (duplicate) create."""
+        mock_broker.create_position.side_effect = [
+            CapitalComError(SLTP_ERROR),  # first create: SL/TP rejected
+            TimeoutError(),  # corrected retry: confirm timeout
+            # If the (buggy) no-stops re-submit fires anyway, it "succeeds"
+            # with a different deal — making the duplicate visible.
+            _open_confirmation("DEAL-DUP-2"),
+        ]
+        # The timed-out corrected create actually filled on the broker.
+        mock_broker.list_positions.return_value = [
+            _filled_position(deal_id="DEAL-FILLED-1", level=500.1)
+        ]
+
+        result = await live_order_manager.submit_order(sample_order)
+
+        assert result.success is True
+        assert result.deal_id == "DEAL-FILLED-1"
+        assert mock_broker.create_position.await_count == 2  # NOT 3
+
+    async def test_timeout_with_no_fill_still_retries_no_stops(
+        self, live_order_manager, sample_order, mock_broker
+    ):
+        """Corrected retry times out and NO fill exists on the broker:
+        the no-stops re-submit must still proceed."""
+        mock_broker.create_position.side_effect = [
+            CapitalComError(SLTP_ERROR),  # first create: SL/TP rejected
+            TimeoutError(),  # corrected retry: confirm timeout
+            _open_confirmation("DEAL-3RD"),  # no-stops retry succeeds
+        ]
+        mock_broker.list_positions.return_value = []  # nothing filled
+
+        result = await live_order_manager.submit_order(sample_order)
+
+        assert result.success is True
+        assert result.deal_id == "DEAL-3RD"
+        assert mock_broker.create_position.await_count == 3
+
+    async def test_confirmed_rejection_still_falls_through(
+        self, live_order_manager, sample_order, mock_broker
+    ):
+        """Corrected retry raises CapitalComError again (broker-CONFIRMED
+        rejection, not a timeout): no fill-check needed, the no-stops
+        re-submit proceeds as before."""
+        mock_broker.create_position.side_effect = [
+            CapitalComError(SLTP_ERROR),  # first create: SL/TP rejected
+            CapitalComError(SLTP_ERROR),  # corrected retry: rejected again
+            _open_confirmation("DEAL-NOSTOPS"),  # no-stops retry succeeds
+        ]
+        mock_broker.list_positions.return_value = []
+
+        result = await live_order_manager.submit_order(sample_order)
+
+        assert result.success is True
+        assert result.deal_id == "DEAL-NOSTOPS"
+        assert mock_broker.create_position.await_count == 3

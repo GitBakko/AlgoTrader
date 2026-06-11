@@ -7,6 +7,7 @@ import time
 from uuid import uuid4
 
 from loguru import logger
+from pydantic import ValidationError
 
 from src.broker.client import CapitalComClient
 from src.broker.exceptions import (
@@ -374,8 +375,60 @@ class OrderManager:
                                 actual_stop_loss=final_sl,
                                 actual_take_profit=final_tp,
                             )
-                    except Exception:
-                        pass  # Fall through to no-stops retry
+                        if confirmation is None:
+                            # Confirm TIMEOUT, not a broker rejection (audit
+                            # M1.3): the two-phase create may have filled
+                            # server-side. Check before re-submitting — a
+                            # blind no-stops retry opened duplicate positions.
+                            filled = await self._find_recent_fill(
+                                order.epic, order.direction, order.size
+                            )
+                            if filled is not None:
+                                logger.warning(
+                                    f"[{order.epic}] Timed-out create actually FILLED "
+                                    f"(deal {filled.deal_id}) — adopting, no re-submit"
+                                )
+                                fill_price = float(filled.level)
+                                applied_sl = None
+                                applied_tp = None
+                                try:
+                                    applied_sl, applied_tp = await self._set_stops_after_fill(
+                                        deal_id=filled.deal_id,
+                                        epic=order.epic,
+                                        direction=order.direction,
+                                        fill_price=fill_price,
+                                        original_sl=order.stop_loss,
+                                        original_tp=order.take_profit,
+                                        original_entry=order.entry_price,
+                                    )
+                                    # Read back authoritative values from broker
+                                    try:
+                                        applied_sl, applied_tp = await self._read_actual_stops(
+                                            filled.deal_id,
+                                            fallback_sl=applied_sl,
+                                            fallback_tp=applied_tp,
+                                        )
+                                    except Exception as ex:
+                                        logger.debug(f"Could not read actual stops: {ex}")
+                                except Exception as ex:
+                                    logger.warning(
+                                        f"[{order.epic}] Failed to set stops on adopted "
+                                        f"position {filled.deal_id}: {ex}"
+                                    )
+                                return ExecutionResult(
+                                    success=True,
+                                    deal_id=filled.deal_id,
+                                    fill_price=fill_price,
+                                    slippage=abs(fill_price - order.entry_price),
+                                    actual_stop_loss=applied_sl,
+                                    actual_take_profit=applied_tp,
+                                )
+                    except CapitalComError as e2:
+                        # Broker-CONFIRMED rejection of the corrected levels —
+                        # safe to fall through to the no-stops retry.
+                        logger.warning(f"[{order.epic}] Corrected SL/TP create rejected: {e2}")
+                    except ValidationError as e2:
+                        logger.warning(f"[{order.epic}] Corrected SL/TP request invalid: {e2}")
 
                 # Second attempt: retry without SL/TP entirely, set after fill
                 logger.warning(
@@ -449,6 +502,30 @@ class OrderManager:
         except TimeoutError:
             logger.error(f"Broker API timeout (10s) for {order.epic} {order.direction}")
             return None
+
+    async def _find_recent_fill(self, epic: str, direction: str, size: float):
+        """After a create timeout, check whether the order actually filled.
+
+        A 10s confirm timeout does NOT mean the broker rejected the create
+        (two-phase POST+confirm). Re-submitting blindly opened duplicate
+        positions (audit M1.3). Match on epic+direction+size — the position
+        opened by the timed-out request, if any. Returns the broker
+        Position or None.
+        """
+        try:
+            positions = await asyncio.wait_for(self._broker.list_positions(), timeout=10.0)
+        except Exception as e:
+            logger.warning(f"[{epic}] Post-timeout fill check failed: {e}")
+            return None
+        for pos in positions or []:
+            pos_dir = getattr(pos.direction, "value", pos.direction)
+            if (
+                pos.epic == epic
+                and str(pos_dir) == direction
+                and abs(float(pos.size) - float(size)) < 1e-9
+            ):
+                return pos
+        return None
 
     async def _set_stops_after_fill(
         self,
