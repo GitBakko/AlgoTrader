@@ -4094,6 +4094,20 @@ class PaperTradingLoop:
                             # with real P&L and drop the trailing state.
                         else:
                             logger.warning(f"[{epic}] Partial close failed: {result.error}")
+                        # Persist a TP1_SKIP audit row so the drawer History
+                        # explains WHY there is no TP1_HIT after the
+                        # BREAKEVEN transition (absence-as-signal blind
+                        # spot: the phase-transition row persists BEFORE
+                        # this attempt).
+                        await self._persist_trailing_event(
+                            deal_id=deal_id,
+                            epic=epic,
+                            direction=position.get("direction", "BUY"),
+                            size=float(position.get("size", 0) or 0),
+                            price=current_price,
+                            trade_type="TP1_SKIP",
+                            notes=result.error or "TP1 partial close failed",
+                        )
                 except Exception as e:
                     logger.warning(f"[{epic}] TP1 partial close failed: {e}")
 

@@ -316,6 +316,93 @@ class TestTP1PartialClose:
 
         mock_execution_engine.partial_close.assert_not_awaited()
 
+    @staticmethod
+    def _arm_tp1(loop, mock_execution_engine, partial_result):
+        """Arm a position at TP1 with a stubbed partial_close result and spies."""
+        loop.trailing_stop_manager.register_position(
+            deal_id="DEAL-TP1",
+            epic="XAUUSD",
+            direction="BUY",
+            entry_price=2000.0,
+            stop_loss=1980.0,
+            atr=20.0,
+        )
+        loop.broker = MagicMock()
+        loop.broker.get_market_details = AsyncMock(
+            return_value={"snapshot": {"bid": 2025.0, "offer": 2025.0}}
+        )
+        loop._persist_trailing_event = AsyncMock()
+        loop.trailing_stop_manager.register_migration = MagicMock()
+        mock_execution_engine.partial_close = AsyncMock(return_value=partial_result)
+        return [
+            {
+                "deal_id": "DEAL-TP1",
+                "epic": "XAUUSD",
+                "direction": "BUY",
+                "level": 2025.0,
+                "size": 1.0,
+            }
+        ]
+
+    @pytest.mark.asyncio
+    async def test_degenerate_full_close_no_false_audit(self, loop, mock_execution_engine):
+        """Audit M1.6: degenerate full close -> no TP1_HIT row, no migration, one TP1_SKIP."""
+        positions = self._arm_tp1(
+            loop,
+            mock_execution_engine,
+            ExecutionResult(
+                success=False,
+                deal_id="DEAL-TP1",
+                fill_price=2010.0,
+                error="Degenerate full close: reopen of remaining 0.5000 failed: MinimumDealSize",
+                error_detail={"degenerate_full_close": True},
+            ),
+        )
+
+        await loop._update_trailing_stops(positions)
+
+        mock_execution_engine.partial_close.assert_awaited_once()
+        types = [c.kwargs.get("trade_type") for c in loop._persist_trailing_event.await_args_list]
+        assert "TP1_HIT" not in types  # no false "partial close" audit row
+        assert types.count("TP1_SKIP") == 1  # exactly one explanation row
+        skip_call = next(
+            c
+            for c in loop._persist_trailing_event.await_args_list
+            if c.kwargs.get("trade_type") == "TP1_SKIP"
+        )
+        assert "Degenerate full close" in skip_call.kwargs["notes"]
+        loop.trailing_stop_manager.register_migration.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_refused_partial_close_no_false_audit(self, loop, mock_execution_engine):
+        """Audit M1.6: sub-minimum refusal -> no TP1_HIT row, no migration, one TP1_SKIP."""
+        positions = self._arm_tp1(
+            loop,
+            mock_execution_engine,
+            ExecutionResult(
+                success=False,
+                deal_id="DEAL-TP1",
+                error=(
+                    "Partial close refused: remainder 0.5000 < broker minimum 0.6 "
+                    "— scale-out would degenerate to a full close (audit M1.6)"
+                ),
+            ),
+        )
+
+        await loop._update_trailing_stops(positions)
+
+        mock_execution_engine.partial_close.assert_awaited_once()
+        types = [c.kwargs.get("trade_type") for c in loop._persist_trailing_event.await_args_list]
+        assert "TP1_HIT" not in types
+        assert types.count("TP1_SKIP") == 1
+        skip_call = next(
+            c
+            for c in loop._persist_trailing_event.await_args_list
+            if c.kwargs.get("trade_type") == "TP1_SKIP"
+        )
+        assert "refused" in skip_call.kwargs["notes"].lower()
+        loop.trailing_stop_manager.register_migration.assert_not_called()
+
 
 @pytest.mark.trading
 class TestCircuitBreakerHeartbeat:
