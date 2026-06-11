@@ -44,7 +44,10 @@ def _make_loop_stub(epics: list[str], candle_count: int = 200):
         data_access=data_access,
         risk_manager=risk_manager,
         _candle_resolution="4h",
-        _correlation_matrix_ts=0.0,
+        # -inf mirrors production __init__ ("never refreshed"). 0.0 broke on
+        # CI runners where time.monotonic() < 1800s and the first refresh
+        # got silently throttled.
+        _correlation_matrix_ts=float("-inf"),
     )
     return loop, correlation_guard
 
@@ -147,7 +150,7 @@ async def test_matrix_refresh_flag_off_does_not_bump_throttle() -> None:
         mock_settings.return_value.dynamic_correlation_enabled = False
         mock_settings.return_value.dynamic_correlation_bootstrap_min_assets = 5
         await PaperTradingLoop._refresh_correlation_matrix(loop)
-        assert loop._correlation_matrix_ts == 0.0, (
+        assert loop._correlation_matrix_ts == float("-inf"), (
             "flag-off path must not bump throttle (would silently delay "
             "first refresh by 30 min after a runtime flag flip)"
         )
@@ -171,5 +174,5 @@ async def test_matrix_refresh_below_min_does_not_bump_throttle() -> None:
         mock_settings.return_value.dynamic_correlation_bootstrap_min_assets = 5
         await PaperTradingLoop._refresh_correlation_matrix(loop)
 
-    assert loop._correlation_matrix_ts == 0.0
+    assert loop._correlation_matrix_ts == float("-inf")
     assert not guard.update_matrix.called

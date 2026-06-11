@@ -317,7 +317,10 @@ class PaperTradingLoop:
         self._last_spread_refresh: float = 0.0  # timestamp of last hourly spread check
         self._correlation_regime: str = "normal"
         self._correlation_regime_ts: float = 0.0
-        self._correlation_matrix_ts: float = 0.0
+        # -inf = "never refreshed". 0.0 would silently throttle the first
+        # non-forced refresh for up to 30 min on hosts with monotonic
+        # uptime < 1800s (fresh reboot, CI runners).
+        self._correlation_matrix_ts: float = float("-inf")
 
         # Regime Gate (Phase 2)
         self._regime_gate: object | None = None
