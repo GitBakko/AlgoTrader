@@ -20,6 +20,19 @@ def setup_logger() -> None:
     # Remove default handler
     logger.remove()
 
+    # Windows consoles default to a legacy code page (cp1252 on Italian
+    # systems): any log message containing chars like the em-dash gets
+    # encoded to bytes such as 0x97 on the stderr FD. Besides rendering
+    # as garbage, those bytes poison pytest's FD-level capture tempfile
+    # (read back as strict UTF-8 -> UnicodeDecodeError cascading over the
+    # whole suite). Force UTF-8 on the stream loguru is about to capture.
+    for _stream in (sys.stderr, sys.stdout):
+        if hasattr(_stream, "reconfigure"):
+            try:
+                _stream.reconfigure(encoding="utf-8", errors="backslashreplace")
+            except (ValueError, OSError):
+                pass  # stream already closed/replaced (e.g. under capture)
+
     # Console handler with colored output
     logger.add(
         sys.stderr,
