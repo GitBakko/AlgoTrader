@@ -878,11 +878,25 @@ class PaperTradingLoop:
                 )
                 existing_close = (await session.execute(existing_close_q)).scalar_one_or_none()
                 if existing_close is not None:
+                    # Audit M1.9: locally-initiated closes insert this row
+                    # with profit_loss=NULL (engine path, broker P&L not yet
+                    # known). Backfill once reconciliation has real values —
+                    # never clobber a non-NULL value with NULL. The incoming
+                    # exit_price on the reconciler path is broker-resolved,
+                    # more authoritative than the locally-estimated value
+                    # inserted earlier.
+                    backfilled = False
+                    if pnl_decimal is not None and existing_close.profit_loss is None:
+                        existing_close.profit_loss = pnl_decimal
+                        backfilled = True
+                    if exit_price and existing_close.price != Decimal(str(exit_price)):
+                        existing_close.price = Decimal(str(exit_price))
+                        backfilled = True
                     await session.commit()
                     logger.info(
-                        f"Skip duplicate CLOSE Trade row for {deal_id} — "
-                        f"position {pos.id} already has trade {existing_close.id} "
-                        f"(idempotency guard)"
+                        f"{'Backfilled' if backfilled else 'Skip duplicate'} "
+                        f"CLOSE Trade row for {deal_id} — position {pos.id} "
+                        f"trade {existing_close.id} (idempotency guard)"
                     )
                 else:
                     # Create CLOSE trade record

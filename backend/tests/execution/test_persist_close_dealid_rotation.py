@@ -54,6 +54,12 @@ class TestPersistCloseDealIdRotation:
         session.flush = AsyncMock()
         session.commit = AsyncMock()
         session.add = MagicMock()
+        # Idempotency-guard SELECT (Invariant #10 + audit M1.9 backfill)
+        # must return a real result object, not an auto-AsyncMock whose
+        # scalar_one_or_none() yields an unawaited coroutine.
+        session.execute = AsyncMock(
+            return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None))
+        )
 
         @asynccontextmanager
         async def factory():
@@ -105,6 +111,9 @@ class TestPersistCloseDealIdRotation:
         session.flush = AsyncMock()
         session.commit = AsyncMock()
         session.add = MagicMock()
+        session.execute = AsyncMock(
+            return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None))
+        )
 
         @asynccontextmanager
         async def factory():
@@ -144,6 +153,9 @@ class TestPersistCloseDealIdRotation:
         session.flush = AsyncMock()
         session.commit = AsyncMock()
         session.add = MagicMock()
+        session.execute = AsyncMock(
+            return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None))
+        )
 
         @asynccontextmanager
         async def factory():
