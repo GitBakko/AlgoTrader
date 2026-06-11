@@ -33,6 +33,7 @@ class TestSignalRepositoryAuditMethods:
             epic="XAUUSD", direction="BUY", confidence=0.67,
             entry_price=2047.5, stop_loss=2035.0, take_profit=2060.0,
             status="EXECUTED", features=features,
+            model_version="scalp_score_v1",
         )
 
         assert signal_id == 42
@@ -41,6 +42,9 @@ class TestSignalRepositoryAuditMethods:
         assert isinstance(added_signal, Signal)
         assert added_signal.epic == "XAUUSD"
         assert added_signal.features == features
+        # model_version is a pass-through of the producing strategy since the
+        # hardcoded "scalp_score_v1" mislabel was fixed; callers omitting it
+        # get "unknown".
         assert added_signal.model_version == "scalp_score_v1"
 
     @pytest.mark.asyncio

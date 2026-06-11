@@ -186,6 +186,11 @@ class TestTimeStopNoSyntheticPnl:
         )
         mock_paper_loop._persist_position_close = AsyncMock()
         mock_paper_loop._on_position_closed = MagicMock()
+        # MT5 2026-05-19 (93806ab): the time-stop compares accumulated
+        # TRADEABLE seconds, not wall-clock age — a fresh loop seeds the
+        # accumulator at 0 regardless of opened_at. Seed it past the 12h
+        # scalp_max_hold_hours cap so the stop fires.
+        mock_paper_loop._position_trading_seconds = {"POS-TIME-1": 48 * 3600.0}
 
         await mock_paper_loop._check_stop_losses([position])
 

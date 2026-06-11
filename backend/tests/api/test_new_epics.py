@@ -89,18 +89,18 @@ class TestPortfolioExpansion:
             assert len(config.features) > 0
 
     def test_active_epics_count(self):
-        """PredictionService.ACTIVE_EPICS should have 21.
+        """PredictionService.ACTIVE_EPICS should have 18 (paper-soak basket).
 
-        Composition: 13 surviving Phase 0/Phase 12 + 2 Phase 14 forex
-        Wave 1 (USDCHF/USDCAD) + 6 Phase 14 stocks (AAPL/MSFT/GOOGL/
-        AMZN/META/AMD).
-        Phase 14 forex Wave 2 (AUDUSD/NZDUSD/EURJPY) all EXCLUDED on
-        2026-05-09 — walk-forward exposed AUDUSD WR 0.0% / EURJPY
-        Sharpe -11.91 despite decent f1.
+        Composition history: 13 surviving Phase 0/Phase 12 + 2 Phase 14
+        forex Wave 1 (USDCHF/USDCAD) + 6 Phase 14 stocks = 21; then
+        Phase 14 forex Wave 2 (AUDUSD/NZDUSD/EURJPY) EXCLUDED 2026-05-09
+        (walk-forward: AUDUSD WR 0.0% / EURJPY Sharpe -11.91), and
+        AMD + META + AMZN dropped 2026-05-23 (`4fdb612`, AMZN Optuna
+        Sharpe -1.07 / MC p=0.91) -> 18-asset soak basket.
         """
         assert (
-            len(PredictionService.ACTIVE_EPICS) == 21
-        ), f"Expected 21 active EPICs, got {len(PredictionService.ACTIVE_EPICS)}"
+            len(PredictionService.ACTIVE_EPICS) == 18
+        ), f"Expected 18 active EPICs, got {len(PredictionService.ACTIVE_EPICS)}"
 
     def test_new_active_epics_present(self):
         """Surviving new EPICs should be in PredictionService.ACTIVE_EPICS."""
