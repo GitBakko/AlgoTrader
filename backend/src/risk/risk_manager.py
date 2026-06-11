@@ -12,7 +12,7 @@ from src.risk.correlation_guard import CorrelationGuard
 from src.risk.drawdown_monitor import DrawdownMonitor
 from src.risk.equity_curve_filter import EquityCurveConfig, EquityCurveFilter
 from src.risk.kelly_sizer import AdaptiveKellySizer
-from src.risk.position_sizer import PositionSizer
+from src.risk.position_sizer import PositionSizer, _max_position_pct_for_epic
 from src.risk.schemas import DrawdownState, RiskCheckResult, RiskLimits
 from src.risk.stop_manager import StopManager
 from src.strategy.schemas import TradingSignal
@@ -484,10 +484,24 @@ class RiskManager:
             position_size *= eq_multiplier
             adjustments.append(f"Equity curve filter: size reduced {eq_multiplier:.0%}")
 
+        # Audit M1.5a: expose the per-trade exposure cap (the same bound
+        # PositionSizer/KellySizer enforce) so downstream consumers
+        # (paper_loop broker min-size lift) can bound lifts without
+        # re-deriving it.
+        _exposure_cap_pct = _max_position_pct_for_epic(
+            signal.epic,
+            self.limits.max_position_pct,
+            _risk_settings.forex_usd_base_size_multiplier,
+        )
         audit["sizing"] = {
             "method": sizing_method,
             "raw_size": round(position_size, 6),
             "corr_multiplier": round(corr_multiplier, 4),
+            "max_size_by_exposure": (
+                round((equity * _exposure_cap_pct) / signal.entry_price, 6)
+                if signal.entry_price
+                else 0.0
+            ),
         }
 
         if position_size <= 0:

@@ -430,6 +430,24 @@ class PaperTradingLoop:
             }
         )
 
+    @staticmethod
+    def _bounded_min_size_lift(
+        *, approved_size: float, min_deal_size: float, max_size_by_exposure: float | None
+    ) -> tuple[float, bool]:
+        """Lift an approved size to the broker minimum WITHOUT exceeding the
+        exposure cap (audit M1.5a — mirrors RiskManager step 7-bis bounding).
+
+        Returns (final_size, ok). ok=False means even the broker minimum
+        violates the cap: reject the trade, never lift silently.
+        max_size_by_exposure=None (cap unknown — older audit payloads)
+        preserves the legacy lift behavior.
+        """
+        if approved_size >= min_deal_size:
+            return approved_size, True
+        if max_size_by_exposure is not None and min_deal_size > max_size_by_exposure:
+            return approved_size, False
+        return min_deal_size, True
+
     @property
     def is_running(self) -> bool:
         return self._running
@@ -3257,16 +3275,29 @@ class PaperTradingLoop:
         )
 
         # Step 4b: Validate against broker minDealSize (DEMO/LIVE only)
-        # If size is close to minimum (>=80%), round up instead of rejecting
+        # Lift to broker minimum, bounded by the exposure cap (audit M1.5a).
         min_deal_size = self._get_min_deal_size(epic)
         if min_deal_size is not None and risk_result.position_size < min_deal_size:
-            # Always round up to broker minimum — risk already approved the trade,
-            # the size difference is marginal and blocking it wastes valid signals.
+            _exposure_cap = (risk_result.audit.get("sizing") or {}).get("max_size_by_exposure")
+            _lifted_size, _lift_ok = self._bounded_min_size_lift(
+                approved_size=risk_result.position_size,
+                min_deal_size=min_deal_size,
+                max_size_by_exposure=_exposure_cap,
+            )
+            if not _lift_ok:
+                signal_info["status"] = "rejected"
+                signal_info["rejection_reason"] = "broker minimum exceeds exposure cap"
+                logger.warning(
+                    f"[{epic}] Min-size lift BLOCKED: approved "
+                    f"{risk_result.position_size:.4f} < min_deal_size {min_deal_size} "
+                    f"but min exceeds exposure cap {_exposure_cap} — trade rejected"
+                )
+                return
             logger.info(
                 f"[{epic}] Size {risk_result.position_size:.4f} rounded up "
                 f"to min_deal_size {min_deal_size}"
             )
-            risk_result.position_size = min_deal_size
+            risk_result.position_size = _lifted_size
 
         # Correlation regime adjustment: reduce size during panic
         if self._correlation_regime == "panic" and get_settings().correlation_regime_enabled:
@@ -3303,272 +3334,19 @@ class PaperTradingLoop:
         exec_duration = _time.monotonic() - exec_start
 
         if exec_result.success:
-            self._trade_count += 1
-            signal_info["status"] = "executed"
-            # Audit M1.2: make this open visible to risk checks of the
-            # remaining epics in the SAME iteration.
-            self._register_intra_tick_open(
-                open_positions,
+            await self._finalize_entry(
                 epic=epic,
-                direction=signal.direction.value,
-                size=risk_result.position_size,
-                entry_price=exec_result.fill_price or signal.entry_price,
+                signal=signal,
+                signal_info=signal_info,
+                risk_result=risk_result,
+                exec_result=exec_result,
+                market_data=market_data,
+                open_positions=open_positions,
+                equity=equity,
+                audit_features=audit_features,
+                signal_type=_signal_type,
+                exec_duration=exec_duration,
             )
-            logger.info(
-                f"[{epic}] EXECUTED: deal_id={exec_result.deal_id}, "
-                f"fill={exec_result.fill_price:.2f}"
-            )
-            MetricsCollector.record_trade_execution(
-                epic=epic,
-                direction=signal.direction.value,
-                outcome="success",
-                duration_seconds=exec_duration,
-            )
-
-            # Adjust strategy SL/TP for fill drift and round to broker precision.
-            # The strategy (MR) already computed correct SL/TP with TP_MAX_ATR cap;
-            # we only shift them proportionally if fill drifted from signal price.
-            actual_entry = exec_result.fill_price or signal.entry_price
-            from src.utils.price_rounding import round_price
-
-            # Shift SL/TP by the fill drift (preserves strategy's R:R / ATR ratios)
-            fill_drift = actual_entry - signal.entry_price
-            new_sl = risk_result.stop_loss + fill_drift if risk_result.stop_loss else None
-            new_tp = risk_result.take_profit + fill_drift if risk_result.take_profit else None
-
-            # Round to broker tick precision (1 decimal for indices, etc.)
-            new_sl = round_price(epic, new_sl)
-            new_tp = round_price(epic, new_tp)
-
-            _risk_dist = abs(actual_entry - new_sl) if new_sl else 0
-            _reward_dist = abs(actual_entry - new_tp) if new_tp else 0
-            _actual_rr = _reward_dist / _risk_dist if _risk_dist > 0 else 0
-            logger.info(
-                f"[{epic}] Post-fill SL/TP: fill={actual_entry} drift={fill_drift:.4f} "
-                f"SL={new_sl} TP={new_tp} R:R={_actual_rr:.2f}"
-            )
-            risk_result.stop_loss = new_sl
-            risk_result.take_profit = new_tp
-
-            # Push the rounded MR levels to the broker (modify_stops on the
-            # already-open position). Capital.com tends to accept narrower
-            # stops on a modify than on a create.
-            #
-            # CRITICAL: Capital.com returns DIFFERENT dealIds for create vs list.
-            # The exec_result.deal_id is from creation; modify requires the
-            # list_positions() dealId. We look it up by epic with retries to
-            # allow broker propagation.
-            if exec_result.deal_id and new_sl and new_tp and self.broker:
-                actual_deal_id = exec_result.deal_id
-                for attempt_delay in (1.5, 2.5, 4.0):
-                    try:
-                        await asyncio.sleep(attempt_delay)
-                        positions = await self.broker.list_positions()
-                        for p in positions:
-                            if p.epic == epic:
-                                actual_deal_id = p.deal_id
-                                break
-                        if actual_deal_id != exec_result.deal_id:
-                            logger.debug(
-                                f"[{epic}] Resolved modify dealId: "
-                                f"{exec_result.deal_id[:16]} -> {actual_deal_id[:16]}"
-                            )
-                            break
-                    except Exception as e:
-                        logger.debug(f"[{epic}] Position lookup attempt failed: {e}")
-                        continue
-
-                try:
-                    update_result = await self.execution_engine.update_stops(
-                        deal_id=actual_deal_id,
-                        stop_level=new_sl,
-                        profit_level=new_tp,
-                    )
-                    if update_result.success:
-                        logger.info(
-                            f"[{epic}] Broker SL/TP modified to MR values: "
-                            f"SL={new_sl} TP={new_tp}"
-                        )
-                        # Re-read to capture any further broker adjustments
-                        try:
-                            actual_sl, actual_tp = await self._read_broker_stops(
-                                actual_deal_id, epic
-                            )
-                            if actual_sl is not None:
-                                exec_result.actual_stop_loss = actual_sl
-                            if actual_tp is not None:
-                                exec_result.actual_take_profit = actual_tp
-                            if (
-                                actual_sl
-                                and actual_tp
-                                and (actual_sl != new_sl or actual_tp != new_tp)
-                            ):
-                                logger.warning(
-                                    f"[{epic}] Broker post-modify deviation: "
-                                    f"sent SL={new_sl} TP={new_tp}, "
-                                    f"broker has SL={actual_sl} TP={actual_tp}"
-                                )
-                        except Exception as e:
-                            logger.debug(f"[{epic}] Could not re-read stops: {e}")
-                    else:
-                        # FULL error logging — this is the diagnostic data we need
-                        logger.error(
-                            f"[{epic}] BROKER REJECTED MODIFY: error={update_result.error} "
-                            f"detail={update_result.error_detail} | "
-                            f"sent SL={new_sl} TP={new_tp} fill={actual_entry} "
-                            f"direction={signal.direction.value}"
-                        )
-                except Exception as e:
-                    logger.warning(f"[{epic}] Exception modifying broker stops: {e}")
-
-            # CRITICAL: Use the broker's ACTUAL SL/TP as authoritative source.
-            # The broker may have adjusted our requested levels (min-distance
-            # constraints, etc.). Trailing stop and DB must match what the
-            # broker actually has, not what we asked for.
-            _entry = exec_result.fill_price or signal.entry_price
-            _requested_sl = risk_result.stop_loss
-            _requested_tp = risk_result.take_profit
-            _broker_sl = exec_result.actual_stop_loss
-            _broker_tp = exec_result.actual_take_profit
-            _sl = _broker_sl if _broker_sl is not None else _requested_sl
-            _tp = _broker_tp if _broker_tp is not None else _requested_tp
-
-            _sl_deviation = (_sl - _requested_sl) if (_sl and _requested_sl) else 0.0
-            _tp_deviation = (_tp - _requested_tp) if (_tp and _requested_tp) else 0.0
-
-            if _broker_sl is not None and abs(_sl_deviation) > 1e-6:
-                logger.warning(
-                    f"[{epic}] Broker adjusted SL: {_requested_sl:.4f} -> {_broker_sl:.4f} "
-                    f"(deviation {_sl_deviation:+.4f})"
-                )
-            if _broker_tp is not None and abs(_tp_deviation) > 1e-6:
-                logger.warning(
-                    f"[{epic}] Broker adjusted TP: {_requested_tp:.4f} -> {_broker_tp:.4f} "
-                    f"(deviation {_tp_deviation:+.4f})"
-                )
-
-            # Track deviation for API exposure
-            if exec_result.deal_id:
-                self._level_deviations[exec_result.deal_id] = {
-                    "requested_sl": _requested_sl,
-                    "requested_tp": _requested_tp,
-                    "actual_sl": _sl,
-                    "actual_tp": _tp,
-                    "sl_deviation": round(_sl_deviation, 6),
-                    "tp_deviation": round(_tp_deviation, 6),
-                    "sl_deviation_pct": round(
-                        (_sl_deviation / _entry * 100) if _entry > 0 else 0, 4
-                    ),
-                    "tp_deviation_pct": round(
-                        (_tp_deviation / _entry * 100) if _entry > 0 else 0, 4
-                    ),
-                }
-
-            # Phase 8: register position for trailing stop management.
-            # _sl is the broker-confirmed SL (post-fill modify aligned to MR levels).
-            # _tp is the strategy-calibrated TP — pass it through so the trailing
-            # ladder anchors to the strategy's actual target rather than the
-            # generic risk_multiple (matters when strategy R:R < 2× risk_multiple).
-            if exec_result.deal_id:
-                self.trailing_stop_manager.register_position(
-                    deal_id=exec_result.deal_id,
-                    epic=epic,
-                    direction=signal.direction.value,
-                    entry_price=actual_entry,
-                    stop_loss=_sl,
-                    atr=market_data["atr"],
-                    take_profit=_tp,
-                )
-                # Phase 14: persist trailing stop state
-                await self._persist_trailing_stop_state(exec_result.deal_id)
-
-            # Sanity check: validate R:R is in a sane range (using broker values)
-            if _sl and _tp and _entry > 0:
-                _risk = abs(_entry - _sl)
-                _reward = abs(_entry - _tp)
-                _rr = _reward / _risk if _risk > 0 else 0
-                _sl_dist_pct = _risk / _entry * 100
-                if _rr < 0.5 or _rr > 5.0 or _sl_dist_pct < 0.05:
-                    logger.warning(
-                        f"[{epic}] SUSPICIOUS LEVELS: R:R={_rr:.2f}, "
-                        f"SL_dist={_sl_dist_pct:.3f}%, "
-                        f"entry={_entry:.4f} SL={_sl:.4f} TP={_tp:.4f} "
-                        f"({signal.direction.value})"
-                    )
-                else:
-                    logger.info(
-                        f"[{epic}] Levels OK (broker confirmed): R:R={_rr:.2f}, "
-                        f"SL_dist={_sl_dist_pct:.2f}%, "
-                        f"entry={_entry:.4f} SL={_sl:.4f} TP={_tp:.4f}"
-                    )
-
-            # Persist position to database with broker-confirmed levels
-            await self._persist_position_open(
-                deal_id=exec_result.deal_id or "",
-                epic=epic,
-                direction=signal.direction.value,
-                size=risk_result.position_size,
-                entry_price=_entry,
-                stop_loss=_sl,
-                take_profit=_tp,
-                deal_reference=exec_result.deal_reference,
-            )
-
-            # Log executed signal + execution
-            try:
-                tl = get_trade_logger()
-                await tl.log_signal(
-                    epic=epic,
-                    direction=_signal_type,
-                    confidence=signal.confidence,
-                    strategy=signal.strategy_name or "unknown",
-                    execution_status=ExecutionStatus.EXECUTED,
-                    source=self._log_source,
-                )
-                await tl.log_execution(
-                    epic=epic,
-                    direction=signal.direction.value,
-                    size=risk_result.position_size,
-                    entry_price=exec_result.fill_price or signal.entry_price,
-                    status=ExecutionStatus.EXECUTED,
-                    deal_id=exec_result.deal_id,
-                    stop_loss=_sl,
-                    take_profit=_tp,
-                    equity_at_entry=equity,
-                    source=self._log_source,
-                )
-            except Exception:
-                pass
-
-            # Persist EXECUTED signal audit trail + link to position
-            if audit_features is not None:
-                signal_id = await self._persist_signal_audit(
-                    epic=epic,
-                    direction=signal.direction.value,
-                    confidence=signal.confidence,
-                    entry_price=exec_result.fill_price or signal.entry_price,
-                    stop_loss=_sl,
-                    take_profit=_tp,
-                    status="EXECUTED",
-                    features=audit_features,
-                )
-                # Link signal to position via deal_id
-                if signal_id and exec_result.deal_id and self._signal_repo_factory:
-                    try:
-                        async with self._signal_repo_factory() as session:
-                            from src.database.repositories.position_repository import (
-                                PositionRepository,
-                            )
-                            from src.database.repositories.signal_repository import SignalRepository
-
-                            pos_repo = PositionRepository(session)
-                            position = await pos_repo.get_by_deal_id(exec_result.deal_id)
-                            if position:
-                                sig_repo = SignalRepository(session)
-                                await sig_repo.mark_as_executed(signal_id, position.id)
-                                await session.commit()
-                    except Exception as e:
-                        logger.warning(f"[{epic}] Signal-position link failed: {e}")
 
         elif exec_result.error_detail and exec_result.error_detail.get("error_type") == "min_size":
             # Broker rejected for minimum size — retry with min_deal_size from broker
@@ -3583,31 +3361,35 @@ class PaperTradingLoop:
                 pass
 
             if broker_min is not None and broker_min > risk_result.position_size:
+                # Lift to broker minimum, bounded by the exposure cap (audit M1.5a).
+                _exposure_cap = (risk_result.audit.get("sizing") or {}).get("max_size_by_exposure")
+                _lifted_size, _lift_ok = self._bounded_min_size_lift(
+                    approved_size=risk_result.position_size,
+                    min_deal_size=broker_min,
+                    max_size_by_exposure=_exposure_cap,
+                )
+                if not _lift_ok:
+                    signal_info["status"] = "rejected"
+                    signal_info["rejection_reason"] = "broker minimum exceeds exposure cap"
+                    logger.warning(
+                        f"[{epic}] Min-size retry lift BLOCKED: approved "
+                        f"{risk_result.position_size:.4f} < broker min {broker_min} "
+                        f"but min exceeds exposure cap {_exposure_cap} — trade rejected"
+                    )
+                    return
                 logger.info(
                     f"[{epic}] Retrying with broker min_deal_size: "
                     f"{risk_result.position_size:.4f} -> {broker_min}"
                 )
-                risk_result.position_size = broker_min
+                risk_result.position_size = _lifted_size
                 exec_result = await self.execution_engine.execute_signal(signal, risk_result)
 
             if exec_result.success:
-                # Retry succeeded — fall through to success handling below
-                self._trade_count += 1
-                signal_info["status"] = "executed"
-                # Audit M1.2: make this open visible to risk checks of the
-                # remaining epics in the SAME iteration.
-                self._register_intra_tick_open(
-                    open_positions,
-                    epic=epic,
-                    direction=signal.direction.value,
-                    size=risk_result.position_size,
-                    entry_price=exec_result.fill_price or signal.entry_price,
-                )
-                logger.info(
-                    f"[{epic}] EXECUTED (retry): deal_id={exec_result.deal_id}, "
-                    f"fill={exec_result.fill_price:.2f}"
-                )
-                # Adjust strategy SL/TP for fill drift (retry path)
+                # Retry succeeded. Keep the retry-specific SL/TP pre-adjust
+                # (fill drift + side validation: a min-size retry can fill
+                # far from the signal price, so a blind shift may invert
+                # sides), then delegate to the shared post-fill finalizer
+                # (audit M1.5b).
                 actual_entry = exec_result.fill_price or signal.entry_price
                 fill_drift = actual_entry - signal.entry_price
                 from src.utils.price_rounding import round_price as _rp
@@ -3629,41 +3411,19 @@ class PaperTradingLoop:
                 if _sl_valid and _tp_valid:
                     risk_result.stop_loss = _adj_sl
                     risk_result.take_profit = _adj_tp
-                # Use broker-confirmed values when available
-                _r_broker_sl = exec_result.actual_stop_loss
-                _r_broker_tp = exec_result.actual_take_profit
-                _r_sl = _r_broker_sl if _r_broker_sl is not None else risk_result.stop_loss
-                _r_tp = _r_broker_tp if _r_broker_tp is not None else risk_result.take_profit
-                if _r_broker_sl is not None and _r_broker_sl != risk_result.stop_loss:
-                    logger.warning(
-                        f"[{epic}] Broker adjusted SL (retry path): "
-                        f"{risk_result.stop_loss:.4f} -> {_r_broker_sl:.4f}"
-                    )
-                if _r_broker_tp is not None and _r_broker_tp != risk_result.take_profit:
-                    logger.warning(
-                        f"[{epic}] Broker adjusted TP (retry path): "
-                        f"{risk_result.take_profit:.4f} -> {_r_broker_tp:.4f}"
-                    )
-                if exec_result.deal_id:
-                    self.trailing_stop_manager.register_position(
-                        deal_id=exec_result.deal_id,
-                        epic=epic,
-                        direction=signal.direction.value,
-                        entry_price=actual_entry,
-                        stop_loss=_r_sl,
-                        atr=market_data["atr"],
-                        take_profit=_r_tp,
-                    )
-                    await self._persist_trailing_stop_state(exec_result.deal_id)
-                await self._persist_position_open(
-                    deal_id=exec_result.deal_id or "",
+                await self._finalize_entry(
                     epic=epic,
-                    direction=signal.direction.value,
-                    size=risk_result.position_size,
-                    entry_price=actual_entry,
-                    stop_loss=_r_sl,
-                    take_profit=_r_tp,
-                    deal_reference=exec_result.deal_reference,
+                    signal=signal,
+                    signal_info=signal_info,
+                    risk_result=risk_result,
+                    exec_result=exec_result,
+                    market_data=market_data,
+                    open_positions=open_positions,
+                    equity=equity,
+                    audit_features=audit_features,
+                    signal_type=_signal_type,
+                    exec_duration=exec_duration,
+                    retry=True,
                 )
             else:
                 signal_info["status"] = "exec_failed"
@@ -3718,6 +3478,302 @@ class PaperTradingLoop:
                     status="REJECTED",
                     features=audit_features,
                 )
+
+    async def _finalize_entry(
+        self,
+        *,
+        epic: str,
+        signal,
+        signal_info: dict,
+        risk_result,
+        exec_result,
+        market_data: dict,
+        open_positions: list[dict],
+        equity: float,
+        audit_features: dict | None,
+        signal_type,
+        exec_duration: float,
+        retry: bool = False,
+    ) -> None:
+        """Shared post-fill finalization for BOTH entry paths (audit M1.5b).
+
+        Every side effect that must run after a successful fill lives here,
+        whether the position filled on the primary ``execute_signal`` call
+        or on the min-size retry: intra-tick open registration, fill-drift
+        SL/TP adjustment, broker stop alignment (``update_stops``),
+        level-deviation tracking, trailing-stop registration, the
+        SUSPICIOUS-LEVELS R:R sanity check, position persistence, EXECUTED
+        trade-log rows and the EXECUTED signal-audit + position link.
+
+        ``retry=True`` (min-size retry path) skips the unconditional
+        fill-drift re-shift: the retry call site pre-adjusts SL/TP with
+        side validation (``_validate_sl_side``/``_validate_tp_side``)
+        BEFORE delegating, because a retry can fill far from the signal
+        price and a blind shift may invert sides. Everything else is
+        identical between the two paths.
+        """
+        self._trade_count += 1
+        signal_info["status"] = "executed"
+        # Audit M1.2: make this open visible to risk checks of the
+        # remaining epics in the SAME iteration.
+        self._register_intra_tick_open(
+            open_positions,
+            epic=epic,
+            direction=signal.direction.value,
+            size=risk_result.position_size,
+            entry_price=exec_result.fill_price or signal.entry_price,
+        )
+        logger.info(
+            f"[{epic}] {'EXECUTED (retry)' if retry else 'EXECUTED'}: "
+            f"deal_id={exec_result.deal_id}, "
+            f"fill={exec_result.fill_price:.2f}"
+        )
+        MetricsCollector.record_trade_execution(
+            epic=epic,
+            direction=signal.direction.value,
+            outcome="success",
+            duration_seconds=exec_duration,
+        )
+
+        actual_entry = exec_result.fill_price or signal.entry_price
+        if not retry:
+            # Adjust strategy SL/TP for fill drift and round to broker precision.
+            # The strategy (MR) already computed correct SL/TP with TP_MAX_ATR cap;
+            # we only shift them proportionally if fill drifted from signal price.
+            from src.utils.price_rounding import round_price
+
+            # Shift SL/TP by the fill drift (preserves strategy's R:R / ATR ratios)
+            fill_drift = actual_entry - signal.entry_price
+            new_sl = risk_result.stop_loss + fill_drift if risk_result.stop_loss else None
+            new_tp = risk_result.take_profit + fill_drift if risk_result.take_profit else None
+
+            # Round to broker tick precision (1 decimal for indices, etc.)
+            new_sl = round_price(epic, new_sl)
+            new_tp = round_price(epic, new_tp)
+
+            _risk_dist = abs(actual_entry - new_sl) if new_sl else 0
+            _reward_dist = abs(actual_entry - new_tp) if new_tp else 0
+            _actual_rr = _reward_dist / _risk_dist if _risk_dist > 0 else 0
+            logger.info(
+                f"[{epic}] Post-fill SL/TP: fill={actual_entry} drift={fill_drift:.4f} "
+                f"SL={new_sl} TP={new_tp} R:R={_actual_rr:.2f}"
+            )
+            risk_result.stop_loss = new_sl
+            risk_result.take_profit = new_tp
+        else:
+            # Retry path: SL/TP were pre-adjusted (fill drift + side
+            # validation) at the call site -- do NOT re-shift them.
+            new_sl = risk_result.stop_loss
+            new_tp = risk_result.take_profit
+
+        # Push the rounded MR levels to the broker (modify_stops on the
+        # already-open position). Capital.com tends to accept narrower
+        # stops on a modify than on a create.
+        #
+        # CRITICAL: Capital.com returns DIFFERENT dealIds for create vs list.
+        # The exec_result.deal_id is from creation; modify requires the
+        # list_positions() dealId. We look it up by epic with retries to
+        # allow broker propagation.
+        if exec_result.deal_id and new_sl and new_tp and self.broker:
+            actual_deal_id = exec_result.deal_id
+            for attempt_delay in (1.5, 2.5, 4.0):
+                try:
+                    await asyncio.sleep(attempt_delay)
+                    positions = await self.broker.list_positions()
+                    for p in positions:
+                        if p.epic == epic:
+                            actual_deal_id = p.deal_id
+                            break
+                    if actual_deal_id != exec_result.deal_id:
+                        logger.debug(
+                            f"[{epic}] Resolved modify dealId: "
+                            f"{exec_result.deal_id[:16]} -> {actual_deal_id[:16]}"
+                        )
+                        break
+                except Exception as e:
+                    logger.debug(f"[{epic}] Position lookup attempt failed: {e}")
+                    continue
+
+            try:
+                update_result = await self.execution_engine.update_stops(
+                    deal_id=actual_deal_id,
+                    stop_level=new_sl,
+                    profit_level=new_tp,
+                )
+                if update_result.success:
+                    logger.info(
+                        f"[{epic}] Broker SL/TP modified to MR values: " f"SL={new_sl} TP={new_tp}"
+                    )
+                    # Re-read to capture any further broker adjustments
+                    try:
+                        actual_sl, actual_tp = await self._read_broker_stops(actual_deal_id, epic)
+                        if actual_sl is not None:
+                            exec_result.actual_stop_loss = actual_sl
+                        if actual_tp is not None:
+                            exec_result.actual_take_profit = actual_tp
+                        if actual_sl and actual_tp and (actual_sl != new_sl or actual_tp != new_tp):
+                            logger.warning(
+                                f"[{epic}] Broker post-modify deviation: "
+                                f"sent SL={new_sl} TP={new_tp}, "
+                                f"broker has SL={actual_sl} TP={actual_tp}"
+                            )
+                    except Exception as e:
+                        logger.debug(f"[{epic}] Could not re-read stops: {e}")
+                else:
+                    # FULL error logging — this is the diagnostic data we need
+                    logger.error(
+                        f"[{epic}] BROKER REJECTED MODIFY: error={update_result.error} "
+                        f"detail={update_result.error_detail} | "
+                        f"sent SL={new_sl} TP={new_tp} fill={actual_entry} "
+                        f"direction={signal.direction.value}"
+                    )
+            except Exception as e:
+                logger.warning(f"[{epic}] Exception modifying broker stops: {e}")
+
+        # CRITICAL: Use the broker's ACTUAL SL/TP as authoritative source.
+        # The broker may have adjusted our requested levels (min-distance
+        # constraints, etc.). Trailing stop and DB must match what the
+        # broker actually has, not what we asked for.
+        _entry = exec_result.fill_price or signal.entry_price
+        _requested_sl = risk_result.stop_loss
+        _requested_tp = risk_result.take_profit
+        _broker_sl = exec_result.actual_stop_loss
+        _broker_tp = exec_result.actual_take_profit
+        _sl = _broker_sl if _broker_sl is not None else _requested_sl
+        _tp = _broker_tp if _broker_tp is not None else _requested_tp
+
+        _sl_deviation = (_sl - _requested_sl) if (_sl and _requested_sl) else 0.0
+        _tp_deviation = (_tp - _requested_tp) if (_tp and _requested_tp) else 0.0
+
+        if _broker_sl is not None and abs(_sl_deviation) > 1e-6:
+            logger.warning(
+                f"[{epic}] Broker adjusted SL: {_requested_sl:.4f} -> {_broker_sl:.4f} "
+                f"(deviation {_sl_deviation:+.4f})"
+            )
+        if _broker_tp is not None and abs(_tp_deviation) > 1e-6:
+            logger.warning(
+                f"[{epic}] Broker adjusted TP: {_requested_tp:.4f} -> {_broker_tp:.4f} "
+                f"(deviation {_tp_deviation:+.4f})"
+            )
+
+        # Track deviation for API exposure
+        if exec_result.deal_id:
+            self._level_deviations[exec_result.deal_id] = {
+                "requested_sl": _requested_sl,
+                "requested_tp": _requested_tp,
+                "actual_sl": _sl,
+                "actual_tp": _tp,
+                "sl_deviation": round(_sl_deviation, 6),
+                "tp_deviation": round(_tp_deviation, 6),
+                "sl_deviation_pct": round((_sl_deviation / _entry * 100) if _entry > 0 else 0, 4),
+                "tp_deviation_pct": round((_tp_deviation / _entry * 100) if _entry > 0 else 0, 4),
+            }
+
+        # Phase 8: register position for trailing stop management.
+        # _sl is the broker-confirmed SL (post-fill modify aligned to MR levels).
+        # _tp is the strategy-calibrated TP — pass it through so the trailing
+        # ladder anchors to the strategy's actual target rather than the
+        # generic risk_multiple (matters when strategy R:R < 2× risk_multiple).
+        if exec_result.deal_id:
+            self.trailing_stop_manager.register_position(
+                deal_id=exec_result.deal_id,
+                epic=epic,
+                direction=signal.direction.value,
+                entry_price=actual_entry,
+                stop_loss=_sl,
+                atr=market_data["atr"],
+                take_profit=_tp,
+            )
+            # Phase 14: persist trailing stop state
+            await self._persist_trailing_stop_state(exec_result.deal_id)
+
+        # Sanity check: validate R:R is in a sane range (using broker values)
+        if _sl and _tp and _entry > 0:
+            _risk = abs(_entry - _sl)
+            _reward = abs(_entry - _tp)
+            _rr = _reward / _risk if _risk > 0 else 0
+            _sl_dist_pct = _risk / _entry * 100
+            if _rr < 0.5 or _rr > 5.0 or _sl_dist_pct < 0.05:
+                logger.warning(
+                    f"[{epic}] SUSPICIOUS LEVELS: R:R={_rr:.2f}, "
+                    f"SL_dist={_sl_dist_pct:.3f}%, "
+                    f"entry={_entry:.4f} SL={_sl:.4f} TP={_tp:.4f} "
+                    f"({signal.direction.value})"
+                )
+            else:
+                logger.info(
+                    f"[{epic}] Levels OK (broker confirmed): R:R={_rr:.2f}, "
+                    f"SL_dist={_sl_dist_pct:.2f}%, "
+                    f"entry={_entry:.4f} SL={_sl:.4f} TP={_tp:.4f}"
+                )
+
+        # Persist position to database with broker-confirmed levels
+        await self._persist_position_open(
+            deal_id=exec_result.deal_id or "",
+            epic=epic,
+            direction=signal.direction.value,
+            size=risk_result.position_size,
+            entry_price=_entry,
+            stop_loss=_sl,
+            take_profit=_tp,
+            deal_reference=exec_result.deal_reference,
+        )
+
+        # Log executed signal + execution
+        try:
+            tl = get_trade_logger()
+            await tl.log_signal(
+                epic=epic,
+                direction=signal_type,
+                confidence=signal.confidence,
+                strategy=signal.strategy_name or "unknown",
+                execution_status=ExecutionStatus.EXECUTED,
+                source=self._log_source,
+            )
+            await tl.log_execution(
+                epic=epic,
+                direction=signal.direction.value,
+                size=risk_result.position_size,
+                entry_price=exec_result.fill_price or signal.entry_price,
+                status=ExecutionStatus.EXECUTED,
+                deal_id=exec_result.deal_id,
+                stop_loss=_sl,
+                take_profit=_tp,
+                equity_at_entry=equity,
+                source=self._log_source,
+            )
+        except Exception:
+            pass
+
+        # Persist EXECUTED signal audit trail + link to position
+        if audit_features is not None:
+            signal_id = await self._persist_signal_audit(
+                epic=epic,
+                direction=signal.direction.value,
+                confidence=signal.confidence,
+                entry_price=exec_result.fill_price or signal.entry_price,
+                stop_loss=_sl,
+                take_profit=_tp,
+                status="EXECUTED",
+                features=audit_features,
+            )
+            # Link signal to position via deal_id
+            if signal_id and exec_result.deal_id and self._signal_repo_factory:
+                try:
+                    async with self._signal_repo_factory() as session:
+                        from src.database.repositories.position_repository import (
+                            PositionRepository,
+                        )
+                        from src.database.repositories.signal_repository import SignalRepository
+
+                        pos_repo = PositionRepository(session)
+                        position = await pos_repo.get_by_deal_id(exec_result.deal_id)
+                        if position:
+                            sig_repo = SignalRepository(session)
+                            await sig_repo.mark_as_executed(signal_id, position.id)
+                            await session.commit()
+                except Exception as e:
+                    logger.warning(f"[{epic}] Signal-position link failed: {e}")
 
     async def _persist_signal_audit(
         self,
