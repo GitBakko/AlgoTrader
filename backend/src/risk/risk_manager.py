@@ -651,6 +651,14 @@ class RiskManager:
                     "approved": True,
                     "lift_bounded_by_cap": lift_bounded_by_cap,
                 }
+                # Audit M1.5a review follow-up: ``audit["sizing"]`` exposed the
+                # BASE exposure cap (computed before this branch), but 7-bis-A
+                # may have just elevated it (up to forex_max_leverage_multiplier)
+                # for USD-base forex. Refresh so downstream consumers (paper_loop
+                # broker min-size lift) bound against the cap RiskManager itself
+                # actually enforced — otherwise the lift could reject a broker
+                # minimum that 7-bis-A would have allowed.
+                audit["sizing"]["max_size_by_exposure"] = round(max_size_by_exposure, 6)
             else:
                 audit["min_risk_floor"] = {
                     "computed_risk_usd": round(risk_amount_usd, 4),

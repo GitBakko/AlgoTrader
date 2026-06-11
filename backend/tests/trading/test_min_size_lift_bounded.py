@@ -32,3 +32,19 @@ class TestBoundedMinSizeLift:
             approved_size=0.2, min_deal_size=1.0, max_size_by_exposure=None
         )
         assert ok is True and final == 1.0
+
+    def test_min_exactly_at_cap_allows_lift(self):
+        # Boundary: the guard is strict (>), so a broker minimum that lands
+        # EXACTLY on the exposure cap is still liftable.
+        final, ok = PaperTradingLoop._bounded_min_size_lift(
+            approved_size=0.2, min_deal_size=1.0, max_size_by_exposure=1.0
+        )
+        assert ok is True and final == 1.0
+
+    def test_zero_cap_blocks_lift(self):
+        # cap=0.0 is a real value (zero/negative equity sentinel from the
+        # risk audit), NOT "unknown" — it must block, not fall back.
+        final, ok = PaperTradingLoop._bounded_min_size_lift(
+            approved_size=0.2, min_deal_size=1.0, max_size_by_exposure=0.0
+        )
+        assert ok is False

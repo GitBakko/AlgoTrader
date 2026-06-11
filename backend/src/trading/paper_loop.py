@@ -3292,6 +3292,21 @@ class PaperTradingLoop:
                     f"{risk_result.position_size:.4f} < min_deal_size {min_deal_size} "
                     f"but min exceeds exposure cap {_exposure_cap} — trade rejected"
                 )
+                # A risk-APPROVED trade must not die invisibly — persist the
+                # REJECTED audit row (same pattern as the drift-REJECT bail).
+                if audit_features is not None:
+                    audit_features["risk"] = risk_result.audit
+                    audit_features["rejection_reason"] = "broker minimum exceeds exposure cap"
+                    await self._persist_signal_audit(
+                        epic=epic,
+                        direction=signal.direction.value,
+                        confidence=signal.confidence,
+                        entry_price=signal.entry_price,
+                        stop_loss=signal.suggested_stop,
+                        take_profit=signal.suggested_tp,
+                        status="REJECTED",
+                        features=audit_features,
+                    )
                 return
             logger.info(
                 f"[{epic}] Size {risk_result.position_size:.4f} rounded up "
@@ -3376,13 +3391,34 @@ class PaperTradingLoop:
                         f"{risk_result.position_size:.4f} < broker min {broker_min} "
                         f"but min exceeds exposure cap {_exposure_cap} — trade rejected"
                     )
+                    # A risk-APPROVED trade must not die invisibly — persist the
+                    # REJECTED audit row (same pattern as the drift-REJECT bail).
+                    # Especially important here: a broker order attempt already
+                    # happened (the min-size-rejected create).
+                    if audit_features is not None:
+                        audit_features["risk"] = risk_result.audit
+                        audit_features["rejection_reason"] = "broker minimum exceeds exposure cap"
+                        await self._persist_signal_audit(
+                            epic=epic,
+                            direction=signal.direction.value,
+                            confidence=signal.confidence,
+                            entry_price=signal.entry_price,
+                            stop_loss=signal.suggested_stop,
+                            take_profit=signal.suggested_tp,
+                            status="REJECTED",
+                            features=audit_features,
+                        )
                     return
                 logger.info(
                     f"[{epic}] Retrying with broker min_deal_size: "
                     f"{risk_result.position_size:.4f} -> {broker_min}"
                 )
                 risk_result.position_size = _lifted_size
+                _retry_exec_start = _time.monotonic()
                 exec_result = await self.execution_engine.execute_signal(signal, risk_result)
+                # Re-stamp so the metrics row records the retry's true latency,
+                # not the failed first attempt's.
+                exec_duration = _time.monotonic() - _retry_exec_start
 
             if exec_result.success:
                 # Retry succeeded. Keep the retry-specific SL/TP pre-adjust
