@@ -18,7 +18,7 @@ from src.broker.exceptions import (
     OrderRejectedError,
     RateLimitError,
 )
-from src.broker.models import CreatePositionRequest, Direction, ModifyPositionRequest
+from src.broker.models import CreatePositionRequest, Direction, ModifyPositionRequest, Position
 from src.execution.schemas import ExecutionMode, ExecutionOrder, ExecutionResult
 from src.utils.broker_error_parser import parse_broker_error
 
@@ -388,7 +388,7 @@ class OrderManager:
                             # M1.3): the two-phase create may have filled
                             # server-side. Check before re-submitting — a
                             # blind no-stops retry opened duplicate positions.
-                            filled = await self._find_recent_fill(
+                            filled, verified = await self._find_recent_fill(
                                 order.epic, order.direction, order.size
                             )
                             if filled is not None:
@@ -431,6 +431,33 @@ class OrderManager:
                                     actual_stop_loss=applied_sl,
                                     actual_take_profit=applied_tp,
                                 )
+                            if not verified:
+                                # FAIL CLOSED: the position list could not be
+                                # read, so the fill state is UNKNOWN. The same
+                                # broker degradation that timed out the confirm
+                                # likely broke the check — re-submitting here is
+                                # exactly when duplicates are most likely. An
+                                # orphan fill is picked up by state recovery /
+                                # the reconciler.
+                                logger.error(
+                                    f"[{order.epic}] Fill state UNKNOWN after confirm "
+                                    f"timeout (position list unavailable) — failing "
+                                    f"closed, no re-submit"
+                                )
+                                return ExecutionResult(
+                                    success=False,
+                                    error=(
+                                        "fill state unknown after confirm timeout — "
+                                        "no re-submit (duplicate guard)"
+                                    ),
+                                    error_detail={
+                                        "epic": order.epic,
+                                        "reason": "fill_check_unavailable",
+                                        "timeout_seconds": 10.0,
+                                    },
+                                )
+                            # verified absent → safe to fall through to the
+                            # no-stops re-submit below
                     except CapitalComError as e2:
                         # Broker-CONFIRMED rejection of the corrected levels —
                         # safe to fall through to the no-stops retry.
@@ -511,7 +538,9 @@ class OrderManager:
             logger.error(f"Broker API timeout (10s) for {order.epic} {order.direction}")
             return None
 
-    async def _find_recent_fill(self, epic: str, direction: str, size: float):
+    async def _find_recent_fill(
+        self, epic: str, direction: str, size: float
+    ) -> tuple[Position | None, bool]:
         """After a create timeout, check whether the order actually filled.
 
         A 10s confirm timeout does NOT mean the broker rejected the create
@@ -520,19 +549,32 @@ class OrderManager:
         recency (<= _RECENT_FILL_MAX_AGE_SECONDS): a pre-existing position
         that merely matches epic/direction/size must NOT be adopted — the
         adoption path would overwrite ITS stops with the new order's levels.
-        Returns the broker Position or None.
+
+        Returns:
+            ``(position, verified)``. ``position`` is the freshly created
+            broker Position matching the timed-out create, or None.
+            ``verified`` is False when the broker position list could not be
+            read: the fill state is UNKNOWN and the caller must FAIL CLOSED
+            (no re-submit). Confirm-timeout and list failure are correlated
+            (same broker degradation), so "couldn't check" must never be
+            treated as "verified no fill".
         """
+        # The broker holds the SUBMITTED size: CreatePositionRequest.
+        # validate_size rounds to 4dp, so a raw sizer output like
+        # 14.367823456 never equals the broker's 14.3678 at 1e-9 tolerance.
+        # Compare against the rounded (submitted) value instead.
+        submitted_size = round(float(size), 4)
         try:
             positions = await asyncio.wait_for(self._broker.list_positions(), timeout=10.0)
         except Exception as e:
             logger.warning(f"[{epic}] Post-timeout fill check failed: {e}")
-            return None
+            return None, False
         for pos in positions or []:
             pos_dir = getattr(pos.direction, "value", pos.direction)
             if (
                 pos.epic != epic
                 or str(pos_dir) != direction
-                or abs(float(pos.size) - float(size)) >= 1e-9
+                or abs(float(pos.size) - submitted_size) > 1e-6
             ):
                 continue
             age = self._position_age_seconds(pos)
@@ -548,8 +590,8 @@ class OrderManager:
                     f"({age:.0f}s) — not the timed-out create, skipping"
                 )
                 continue
-            return pos
-        return None
+            return pos, True
+        return None, True
 
     @staticmethod
     def _position_age_seconds(pos) -> float | None:
