@@ -4008,7 +4008,12 @@ class PaperTradingLoop:
             # Phase 8: partial close at TP1 (INITIAL → BREAKEVEN transition)
             if phase == TrailingPhase.BREAKEVEN and phase_before == TrailingPhase.INITIAL:
                 try:
-                    result = await self.execution_engine.partial_close(deal_id, 0.5, "TP1_HIT")
+                    result = await self.execution_engine.partial_close(
+                        deal_id,
+                        0.5,
+                        "TP1_HIT",
+                        min_deal_size=self._get_min_deal_size(epic),
+                    )
                     if result.success:
                         logger.info(f"[{epic}] TP1 hit: closed 50% of position")
                         # Audit: persist the TP1 partial close as its own
@@ -4071,6 +4076,24 @@ class PaperTradingLoop:
                                         f"{new_entry:.4f}, cycle "
                                         f"{migrated.migration_count}/{cap})"
                                     )
+                    else:
+                        # Audit M1.6: no TP1_HIT audit row, no deal_id
+                        # migration — the scale-out did NOT happen as a
+                        # partial. Phase already advanced to BREAKEVEN
+                        # before this call, so the refusal is one-shot
+                        # (no retry spam) and the full position rides the
+                        # ladder with the breakeven SL.
+                        detail = result.error_detail or {}
+                        if detail.get("degenerate_full_close"):
+                            logger.error(
+                                f"🚨 [{epic}] TP1 scale-out degenerated to FULL close "
+                                f"({deal_id}): runner is gone — {result.error}"
+                            )
+                            # Position no longer exists at the broker: the
+                            # reconciler's close detection will finalize it
+                            # with real P&L and drop the trailing state.
+                        else:
+                            logger.warning(f"[{epic}] Partial close failed: {result.error}")
                 except Exception as e:
                     logger.warning(f"[{epic}] TP1 partial close failed: {e}")
 

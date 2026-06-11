@@ -8,7 +8,7 @@ Verifies that PaperTradingLoop correctly integrates:
 - Kelly sizing: pass trade_history to risk_manager.check_trade()
 """
 
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -18,10 +18,10 @@ from src.risk.trailing_stop_manager import TrailingPhase, TrailingStopConfig, Tr
 from src.strategy.schemas import SignalDirection, TradingSignal
 from src.trading.paper_loop import PaperTradingLoop
 
-
 # ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------
+
 
 def _make_signal(epic: str = "XAUUSD", direction: str = "BUY") -> TradingSignal:
     """Helper to build a TradingSignal with sensible defaults."""
@@ -139,6 +139,7 @@ def loop(mock_prediction_service, mock_strategy_manager, mock_risk_manager, mock
 # Tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.trading
 class TestTrailingStopManagerInit:
     """Test 1: TrailingStopManager is created in __init__."""
@@ -196,9 +197,7 @@ class TestTrailingStopRegistration:
             )
 
     @pytest.mark.asyncio
-    async def test_register_not_called_on_failed_execution(
-        self, loop, mock_execution_engine
-    ):
+    async def test_register_not_called_on_failed_execution(self, loop, mock_execution_engine):
         """Failed execution does not register the position."""
         mock_execution_engine.execute_signal.return_value = _make_exec_result(
             success=False, deal_id=None
@@ -214,9 +213,7 @@ class TestTrailingStopUpdateIteration:
     """Test 3: _update_trailing_stops calls update_price for tracked positions."""
 
     @pytest.mark.asyncio
-    async def test_update_price_called_for_tracked_positions(
-        self, loop, mock_prediction_service
-    ):
+    async def test_update_price_called_for_tracked_positions(self, loop, mock_prediction_service):
         """Each iteration calls update_price for every tracked position."""
         # Pre-register a position so it appears in tracked_positions
         loop.trailing_stop_manager.register_position(
@@ -235,9 +232,7 @@ class TestTrailingStopUpdateIteration:
         loop.broker.get_market_details = AsyncMock(
             return_value={"snapshot": {"bid": 2010.0, "offer": 2010.0}}
         )
-        positions = [
-            {"deal_id": "DEAL-100", "epic": "XAUUSD", "direction": "BUY", "level": 2010.0}
-        ]
+        positions = [{"deal_id": "DEAL-100", "epic": "XAUUSD", "direction": "BUY", "level": 2010.0}]
 
         with patch.object(
             loop.trailing_stop_manager, "update_price", return_value=(None, TrailingPhase.INITIAL)
@@ -292,15 +287,14 @@ class TestTP1PartialClose:
         loop.broker.get_market_details = AsyncMock(
             return_value={"snapshot": {"bid": 2025.0, "offer": 2025.0}}
         )
-        positions = [
-            {"deal_id": "DEAL-TP1", "epic": "XAUUSD", "direction": "BUY", "level": 2025.0}
-        ]
+        positions = [{"deal_id": "DEAL-TP1", "epic": "XAUUSD", "direction": "BUY", "level": 2025.0}]
 
         await loop._update_trailing_stops(positions)
 
-        # Verify partial_close was called with 50% and reason
+        # Verify partial_close was called with 50%, reason, and the broker
+        # minimum (None here: no market info cached in this test fixture).
         mock_execution_engine.partial_close.assert_awaited_once_with(
-            "DEAL-TP1", 0.5, "TP1_HIT"
+            "DEAL-TP1", 0.5, "TP1_HIT", min_deal_size=None
         )
 
     @pytest.mark.asyncio
@@ -355,9 +349,7 @@ class TestOnPositionClosed:
         """Winning trade (pnl > 0) records is_win=True and appends to history."""
         loop._on_position_closed("DEAL-WIN", pnl=150.0)
 
-        mock_risk_manager.circuit_breakers.record_trade_result.assert_called_once_with(
-            is_win=True
-        )
+        mock_risk_manager.circuit_breakers.record_trade_result.assert_called_once_with(is_win=True)
         mock_risk_manager.equity_curve_filter.record_trade_close.assert_called_once_with(
             10000.0  # current_equity from mock
         )
@@ -368,9 +360,7 @@ class TestOnPositionClosed:
         """Losing trade (pnl < 0) records is_win=False."""
         loop._on_position_closed("DEAL-LOSE", pnl=-80.0)
 
-        mock_risk_manager.circuit_breakers.record_trade_result.assert_called_once_with(
-            is_win=False
-        )
+        mock_risk_manager.circuit_breakers.record_trade_result.assert_called_once_with(is_win=False)
         assert loop._trade_history[-1] == {"pnl": -80.0}
 
     def test_trailing_stop_unregistered(self, loop):
@@ -404,9 +394,7 @@ class TestKellyTradeHistory:
     """Test 7: check_trade receives trade_history kwarg."""
 
     @pytest.mark.asyncio
-    async def test_trade_history_passed_to_check_trade(
-        self, loop, mock_risk_manager
-    ):
+    async def test_trade_history_passed_to_check_trade(self, loop, mock_risk_manager):
         """risk_manager.check_trade() receives trade_history from _trade_history."""
         # Seed some trade history
         loop._trade_history = [{"pnl": 50.0}, {"pnl": -20.0}]
@@ -416,9 +404,7 @@ class TestKellyTradeHistory:
         # Inspect the kwargs passed to check_trade
         call_kwargs = mock_risk_manager.check_trade.call_args
         assert call_kwargs is not None
-        assert "trade_history" in call_kwargs.kwargs or (
-            len(call_kwargs.args) > 4
-        )
+        assert "trade_history" in call_kwargs.kwargs or (len(call_kwargs.args) > 4)
         # Extract trade_history from the call
         if "trade_history" in (call_kwargs.kwargs or {}):
             th = call_kwargs.kwargs["trade_history"]
@@ -460,12 +446,20 @@ class TestGetStatusPhase8Fields:
     def test_status_trailing_stops_tracked_reflects_registered(self, loop):
         """trailing_stops_tracked reflects actual registered positions."""
         loop.trailing_stop_manager.register_position(
-            deal_id="D1", epic="XAUUSD", direction="BUY",
-            entry_price=2000.0, stop_loss=1980.0, atr=20.0,
+            deal_id="D1",
+            epic="XAUUSD",
+            direction="BUY",
+            entry_price=2000.0,
+            stop_loss=1980.0,
+            atr=20.0,
         )
         loop.trailing_stop_manager.register_position(
-            deal_id="D2", epic="BTCUSD", direction="SELL",
-            entry_price=50000.0, stop_loss=51000.0, atr=500.0,
+            deal_id="D2",
+            epic="BTCUSD",
+            direction="SELL",
+            entry_price=50000.0,
+            stop_loss=51000.0,
+            atr=500.0,
         )
 
         status = loop.get_status()

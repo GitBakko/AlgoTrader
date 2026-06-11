@@ -1,7 +1,8 @@
 """Tests for partial close functionality in ExecutionEngine and PositionTracker."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from src.execution.execution_engine import ExecutionEngine
 from src.execution.position_tracker import PositionTracker
@@ -233,22 +234,22 @@ class TestExecutionEnginePartialCloseDemo:
         """DEMO partial close: closes full position, reopens with reduced size."""
         # Pre-inject a position into the tracker
         order = ExecutionOrder(
-            epic="XAUUSD", direction="BUY", size=1.0,
-            entry_price=2000.0, stop_loss=1960.0, take_profit=2080.0,
+            epic="XAUUSD",
+            direction="BUY",
+            size=1.0,
+            entry_price=2000.0,
+            stop_loss=1960.0,
+            take_profit=2080.0,
         )
         demo_engine._position_tracker.open_paper_position(order, 2000.0, "DEAL-001")
 
         # Mock close_order → success
         demo_engine._order_manager.close_order = AsyncMock(
-            return_value=ExecutionResult(
-                success=True, deal_id="DEAL-001", fill_price=2005.0
-            )
+            return_value=ExecutionResult(success=True, deal_id="DEAL-001", fill_price=2005.0)
         )
         # Mock submit_order → success with new deal_id
         demo_engine._order_manager.submit_order = AsyncMock(
-            return_value=ExecutionResult(
-                success=True, deal_id="REOPEN-001", fill_price=2005.0
-            )
+            return_value=ExecutionResult(success=True, deal_id="REOPEN-001", fill_price=2005.0)
         )
 
         result = await demo_engine.partial_close("DEAL-001", 0.5, "TP1_HIT")
@@ -273,29 +274,31 @@ class TestExecutionEnginePartialCloseDemo:
 
     @pytest.mark.asyncio
     async def test_demo_partial_close_reopen_failure(self, demo_engine):
-        """If reopen fails, returns success=True (close happened) with error note."""
+        """If reopen fails, reports honest failure: degenerate full close (M1.6)."""
         order = ExecutionOrder(
-            epic="XAUUSD", direction="BUY", size=1.0,
+            epic="XAUUSD",
+            direction="BUY",
+            size=1.0,
             entry_price=2000.0,
         )
         demo_engine._position_tracker.open_paper_position(order, 2000.0, "DEAL-002")
 
         # Mock close → success
         demo_engine._order_manager.close_order = AsyncMock(
-            return_value=ExecutionResult(
-                success=True, deal_id="DEAL-002", fill_price=2005.0
-            )
+            return_value=ExecutionResult(success=True, deal_id="DEAL-002", fill_price=2005.0)
         )
         # Mock reopen → failure
         demo_engine._order_manager.submit_order = AsyncMock(
-            return_value=ExecutionResult(
-                success=False, deal_id=None, error="InsufficientFunds"
-            )
+            return_value=ExecutionResult(success=False, deal_id=None, error="InsufficientFunds")
         )
 
         result = await demo_engine.partial_close("DEAL-002", 0.5, "TP1_HIT")
 
-        assert result.success is True  # close succeeded
+        # Audit M1.6: the position is GONE (full close, reopen rejected) —
+        # the engine must NOT report success, or the caller books a partial
+        # close against a flat position.
+        assert result.success is False
+        assert (result.error_detail or {}).get("degenerate_full_close") is True
         assert result.error is not None  # reopen failure noted
         assert "failed" in result.error.lower()
 
@@ -303,16 +306,16 @@ class TestExecutionEnginePartialCloseDemo:
     async def test_demo_partial_close_broker_close_fails(self, demo_engine):
         """If broker close fails, returns the failure immediately."""
         order = ExecutionOrder(
-            epic="BTCUSD", direction="SELL", size=0.5,
+            epic="BTCUSD",
+            direction="SELL",
+            size=0.5,
             entry_price=68000.0,
         )
         demo_engine._position_tracker.open_paper_position(order, 68000.0, "DEAL-003")
 
         # Mock close → failure
         demo_engine._order_manager.close_order = AsyncMock(
-            return_value=ExecutionResult(
-                success=False, deal_id="DEAL-003", error="BrokerRejected"
-            )
+            return_value=ExecutionResult(success=False, deal_id="DEAL-003", error="BrokerRejected")
         )
 
         result = await demo_engine.partial_close("DEAL-003", 0.5)

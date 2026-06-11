@@ -517,6 +517,7 @@ class ExecutionEngine:
         deal_id: str,
         close_pct: float,
         reason: str = "TP1_PARTIAL",
+        min_deal_size: float | None = None,
     ) -> ExecutionResult:
         """
         Partially close a position (reduce size by close_pct).
@@ -525,6 +526,12 @@ class ExecutionEngine:
             deal_id: Deal ID to partially close
             close_pct: Fraction to close (0.0 to 1.0)
             reason: Close reason
+            min_deal_size: Broker minimum deal size for the epic. When
+                provided (DEMO/LIVE close-then-reopen path), a remainder
+                below this minimum REFUSES the scale-out before any order
+                is sent — otherwise the reopen leg is guaranteed rejected
+                and the scale-out degenerates to a full close (audit M1.6).
+                None skips the pre-check (legacy callers).
 
         Returns:
             ExecutionResult
@@ -577,6 +584,18 @@ class ExecutionEngine:
         profit_level = position.get("profit_level")
         entry_price = position.get("level", 0.0)
 
+        # Audit M1.6: refuse scale-outs whose remainder the broker would
+        # reject on reopen. Must fire BEFORE the close leg — once the close
+        # fires, a rejected reopen leaves us flat with books saying partial.
+        if min_deal_size is not None and remaining_size < float(min_deal_size):
+            msg = (
+                f"Partial close refused: remainder {remaining_size:.4f} < "
+                f"broker minimum {min_deal_size} — scale-out would degenerate "
+                f"to a full close (audit M1.6)"
+            )
+            logger.warning(f"[{deal_id}] {msg}")
+            return ExecutionResult(success=False, deal_id=deal_id, error=msg)
+
         # Step 2: Close full position via broker
         close_result = await self._order_manager.close_order(deal_id)
         if not close_result.success:
@@ -615,16 +634,25 @@ class ExecutionEngine:
                 fill_price=reopen_result.fill_price,
             )
 
-        # Position was closed but reopen failed — report with error note
+        # Position was closed but reopen failed — the scale-out degenerated
+        # to a FULL close. Report honestly (audit M1.6): success=False so the
+        # caller never records a "partial close" against a flat book. The
+        # close fill is preserved; the reconciler finalizes the disappeared
+        # position with real P&L.
         logger.error(
             f"Partial close (DEMO): closed {deal_id} but failed to reopen "
-            f"remaining {remaining_size:.4f}: {reopen_result.error}"
+            f"remaining {remaining_size:.4f}: {reopen_result.error} "
+            f"— DEGENERATE FULL CLOSE, position is flat"
         )
         return ExecutionResult(
-            success=True,
+            success=False,
             deal_id=deal_id,
             fill_price=close_result.fill_price,
-            error=f"Reopen of remaining {remaining_size:.4f} failed: {reopen_result.error}",
+            error=(
+                f"Degenerate full close: reopen of remaining "
+                f"{remaining_size:.4f} failed: {reopen_result.error}"
+            ),
+            error_detail={"degenerate_full_close": True},
         )
 
     async def get_open_positions(self, epic: str | None = None) -> list[dict]:
