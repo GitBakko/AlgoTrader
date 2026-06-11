@@ -581,9 +581,7 @@ class SwapDailySnapshot(SQLModel, table=True):
     """
 
     __tablename__ = "swap_daily_snapshots"
-    __table_args__ = (
-        UniqueConstraint("epic", "snapshot_date", name="uq_swap_daily_epic_date"),
-    )
+    __table_args__ = (UniqueConstraint("epic", "snapshot_date", name="uq_swap_daily_epic_date"),)
 
     id: int | None = Field(default=None, primary_key=True)
     epic: str = Field(max_length=32, nullable=False, index=True)

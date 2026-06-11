@@ -214,8 +214,7 @@ async def get_equity_curve(
                                 date=today,
                                 equity=round(terminal, 2),
                                 drawdown_pct=round(
-                                    risk_mgr.drawdown_monitor.state.current_drawdown_pct
-                                    * 100,
+                                    risk_mgr.drawdown_monitor.state.current_drawdown_pct * 100,
                                     2,
                                 ),
                             ).model_dump()

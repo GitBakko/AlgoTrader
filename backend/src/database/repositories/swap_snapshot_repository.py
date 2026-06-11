@@ -34,9 +34,7 @@ class SwapSnapshotRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_recent(
-        self, epic: str, days: int
-    ) -> list[SwapDailySnapshot]:
+    async def get_recent(self, epic: str, days: int) -> list[SwapDailySnapshot]:
         """Return rows for ``epic`` within the last ``days`` calendar days
         (inclusive of today), ordered by snapshot_date ascending.
         """

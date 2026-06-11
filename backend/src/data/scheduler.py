@@ -228,9 +228,7 @@ class DataScheduler:
         404s on 4h).
         """
         logger.info(f"Running scalp candle refresh ({self._scalp_timeframe})...")
-        lookback = self._SCALP_REFRESH_LOOKBACK.get(
-            self._scalp_timeframe, timedelta(hours=3)
-        )
+        lookback = self._SCALP_REFRESH_LOOKBACK.get(self._scalp_timeframe, timedelta(hours=3))
         start_date = datetime.now(UTC) - lookback
         downloaded = 0
 
@@ -505,8 +503,7 @@ class DataScheduler:
                     from src.api.websocket import broadcast_swap_update
 
                     rate_for_dir = (
-                        short_rate_pct if direction in ("SHORT", "SELL")
-                        else long_rate_pct
+                        short_rate_pct if direction in ("SHORT", "SELL") else long_rate_pct
                     )
                     await broadcast_swap_update(
                         epic=epic_upper,

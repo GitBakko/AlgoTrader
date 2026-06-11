@@ -164,8 +164,7 @@ async def trading_events(
     # 1. Signals — emit + reject (include strategy + reason from JSONB features)
     try:
         result = await session.execute(
-            sql_text(
-                """
+            sql_text("""
                 SELECT id, epic, direction, confidence, status, generated_at,
                        predicted_price, stop_loss_price, take_profit_price,
                        features
@@ -174,8 +173,7 @@ async def trading_events(
                    AND status IN ('EXECUTED', 'REJECTED', 'PENDING')
                  ORDER BY generated_at DESC
                  LIMIT :limit
-                """
-            ),
+                """),
             {"cutoff": cutoff, "limit": limit * 2},
         )
         for row in result.mappings():
@@ -190,9 +188,7 @@ async def trading_events(
             kind = (
                 "signal-emit"
                 if status == "EXECUTED"
-                else "signal-reject"
-                if status == "REJECTED"
-                else "signal-pending"
+                else "signal-reject" if status == "REJECTED" else "signal-pending"
             )
             detail = (
                 features.get("rejection_reason")
@@ -211,9 +207,7 @@ async def trading_events(
                     "strategy": strategy,
                     "detail": detail,
                     "title": f"{direction} {row['epic']}",
-                    "meta": (
-                        f"conf {confidence}%" if confidence is not None else strategy
-                    ),
+                    "meta": (f"conf {confidence}%" if confidence is not None else strategy),
                     "severity": "info" if status == "EXECUTED" else "warning",
                 }
             )
@@ -225,8 +219,7 @@ async def trading_events(
     # firing a second roundtrip per row.
     try:
         result = await session.execute(
-            sql_text(
-                """
+            sql_text("""
                 SELECT p.id, p.deal_id, p.epic, p.direction, p.opened_at, p.closed_at,
                        p.entry_price, p.close_reason, p.profit_loss,
                        s.confidence  AS sig_confidence,
@@ -236,8 +229,7 @@ async def trading_events(
                  WHERE p.opened_at > :cutoff OR (p.closed_at IS NOT NULL AND p.closed_at > :cutoff)
                  ORDER BY GREATEST(p.opened_at, COALESCE(p.closed_at, p.opened_at)) DESC
                  LIMIT :limit
-                """
-            ),
+                """),
             {"cutoff": cutoff, "limit": limit * 2},
         )
         for row in result.mappings():
@@ -274,9 +266,7 @@ async def trading_events(
             if closed_at and closed_at > cutoff:
                 pnl = row["profit_loss"]
                 pnl_str = f"{float(pnl):+.2f}" if pnl is not None else "—"
-                kind_severity = (
-                    "info" if pnl is not None and float(pnl) >= 0 else "warning"
-                )
+                kind_severity = "info" if pnl is not None and float(pnl) >= 0 else "warning"
                 close_reason = row["close_reason"] or "manual"
                 events.append(
                     {
@@ -305,15 +295,13 @@ async def trading_events(
     # 3. Notifications — errors, model lifecycle, circuit breakers, etc.
     try:
         result = await session.execute(
-            sql_text(
-                """
+            sql_text("""
                 SELECT id, alert_type, severity, title, message, epic, created_at
                   FROM notifications
                  WHERE created_at > :cutoff
                  ORDER BY created_at DESC
                  LIMIT :limit
-                """
-            ),
+                """),
             {"cutoff": cutoff, "limit": limit * 2},
         )
         # Skip TRADE_OPENED / TRADE_CLOSED / SIGNAL_GENERATED — already covered by
@@ -326,9 +314,9 @@ async def trading_events(
             kind = (
                 "model-load"
                 if alert_type.startswith("TRAINING_")
-                else "error"
-                if (row["severity"] or "").upper() in ("ERROR", "CRITICAL")
-                else "alert"
+                else (
+                    "error" if (row["severity"] or "").upper() in ("ERROR", "CRITICAL") else "alert"
+                )
             )
             events.append(
                 {
@@ -473,7 +461,11 @@ async def performance_breakdown(
             return error_response("Invalid date format (expected YYYY-MM-DD)", 400)
     else:
         tf_days = {
-            "1D": 1, "7D": 7, "30D": 30, "90D": 90, "ALL": 3650,
+            "1D": 1,
+            "7D": 7,
+            "30D": 30,
+            "90D": 90,
+            "ALL": 3650,
         }
         if tf_upper == "YTD":
             d_from = datetime(now.year, 1, 1, tzinfo=UTC)
@@ -487,11 +479,13 @@ async def performance_breakdown(
             )
 
     if position_repo is None:
-        return success_response({
-            "timeframe": tf_upper,
-            "days": [],
-            "source": "none",
-        })
+        return success_response(
+            {
+                "timeframe": tf_upper,
+                "days": [],
+                "source": "none",
+            }
+        )
 
     try:
         days = await position_repo.get_breakdown_by_day(d_from, d_to)
@@ -499,13 +493,15 @@ async def performance_breakdown(
         logger.error(f"breakdown query failed: {e}")
         return error_response(f"breakdown query failed: {e}", 500)
 
-    return success_response({
-        "timeframe": tf_upper,
-        "from": d_from.strftime("%Y-%m-%d"),
-        "to": d_to.strftime("%Y-%m-%d"),
-        "days": days,
-        "source": "database",
-    })
+    return success_response(
+        {
+            "timeframe": tf_upper,
+            "from": d_from.strftime("%Y-%m-%d"),
+            "to": d_to.strftime("%Y-%m-%d"),
+            "days": days,
+            "source": "database",
+        }
+    )
 
 
 @router.get("/performance/delta")
@@ -580,12 +576,8 @@ async def performance_delta(
         return success_response(empty_payload)
 
     try:
-        cur_stats = await position_repo.get_performance_stats(
-            date_from=d_from, date_to=d_to
-        )
-        prev_stats = await position_repo.get_performance_stats(
-            date_from=prev_from, date_to=prev_to
-        )
+        cur_stats = await position_repo.get_performance_stats(date_from=d_from, date_to=d_to)
+        prev_stats = await position_repo.get_performance_stats(date_from=prev_from, date_to=prev_to)
     except Exception as e:
         logger.error(f"performance/delta query failed: {e}")
         return error_response(f"performance/delta query failed: {e}", 500)
@@ -596,26 +588,26 @@ async def performance_delta(
     wr_cur = cur_stats.get("win_rate") if n_cur > 0 else None
     wr_prev = prev_stats.get("win_rate") if n_prev > 0 else None
     delta_pp = (
-        round((wr_cur - wr_prev) * 100, 2)
-        if wr_cur is not None and wr_prev is not None
-        else None
+        round((wr_cur - wr_prev) * 100, 2) if wr_cur is not None and wr_prev is not None else None
     )
 
-    return success_response({
-        "timeframe": tf_upper,
-        "date_from": d_from.strftime("%Y-%m-%d"),
-        "date_to": d_to.strftime("%Y-%m-%d"),
-        "prev_from": prev_from.strftime("%Y-%m-%d"),
-        "prev_to": prev_to.strftime("%Y-%m-%d"),
-        "win_rate_current": round(wr_cur, 4) if wr_cur is not None else None,
-        "win_rate_previous": round(wr_prev, 4) if wr_prev is not None else None,
-        "delta_pp": delta_pp,
-        "n_current": n_cur,
-        "n_previous": n_prev,
-        "wins_current": int(cur_stats.get("win_count", 0)),
-        "losses_current": int(cur_stats.get("loss_count", 0)),
-        "source": "database",
-    })
+    return success_response(
+        {
+            "timeframe": tf_upper,
+            "date_from": d_from.strftime("%Y-%m-%d"),
+            "date_to": d_to.strftime("%Y-%m-%d"),
+            "prev_from": prev_from.strftime("%Y-%m-%d"),
+            "prev_to": prev_to.strftime("%Y-%m-%d"),
+            "win_rate_current": round(wr_cur, 4) if wr_cur is not None else None,
+            "win_rate_previous": round(wr_prev, 4) if wr_prev is not None else None,
+            "delta_pp": delta_pp,
+            "n_current": n_cur,
+            "n_previous": n_prev,
+            "wins_current": int(cur_stats.get("win_count", 0)),
+            "losses_current": int(cur_stats.get("loss_count", 0)),
+            "source": "database",
+        }
+    )
 
 
 @router.post("/emergency-stop")
@@ -867,9 +859,7 @@ async def get_pnl_history(
     )
 
 
-async def _auto_heal_broker_only_position(
-    *, request: Request, deal_id: str, session
-):
+async def _auto_heal_broker_only_position(*, request: Request, deal_id: str, session):
     """Persist a broker-reported position that is missing from our `positions`
     table. Returns the freshly-created Position row, or None when the broker
     does not have the deal either (genuinely unknown).

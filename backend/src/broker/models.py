@@ -8,7 +8,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-
 # ===== Timezone helpers =====
 # Capital.com ``/positions`` returns ``createdDate`` as a naive wall-clock
 # string in Europe/Berlin (verified live 2026-04-22: a position opened at

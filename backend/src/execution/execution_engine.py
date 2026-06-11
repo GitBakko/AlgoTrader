@@ -362,6 +362,7 @@ class ExecutionEngine:
                     # wins. Prevents duplicate audit rows when reconciler tick
                     # also calls _finalize_close for the same deal.
                     from sqlalchemy import select as _select
+
                     existing_close = await session.execute(
                         _select(Trade)
                         .where(Trade.position_id == position_db.id)
@@ -376,7 +377,9 @@ class ExecutionEngine:
                             epic=position_db.epic,
                             direction=position_db.direction,
                             size=position_db.size,
-                            price=Decimal(str(fill_price)) if fill_price else position_db.entry_price,
+                            price=(
+                                Decimal(str(fill_price)) if fill_price else position_db.entry_price
+                            ),
                             profit_loss=position_db.profit_loss,
                             executed_at=now,
                         )
@@ -420,9 +423,7 @@ class ExecutionEngine:
                     if fill_price:
                         update_values["current_price"] = Decimal(str(fill_price))
                     try:
-                        await self._position_repository.update(
-                            position_db.id, update_values
-                        )
+                        await self._position_repository.update(position_db.id, update_values)
                     except TypeError:
                         # Older mocks / repos with single-arg signature —
                         # accept silently to keep test compatibility.
@@ -432,9 +433,7 @@ class ExecutionEngine:
 
                     # Idempotent CLOSE Trade row guard via attribute probe.
                     existing_close = None
-                    finder = getattr(
-                        self._trade_repository, "find_close_for_position", None
-                    )
+                    finder = getattr(self._trade_repository, "find_close_for_position", None)
                     if finder is not None:
                         try:
                             existing_close = await finder(position_db.id)
@@ -449,7 +448,9 @@ class ExecutionEngine:
                             epic=position_db.epic,
                             direction=position_db.direction,
                             size=position_db.size,
-                            price=Decimal(str(fill_price)) if fill_price else position_db.entry_price,
+                            price=(
+                                Decimal(str(fill_price)) if fill_price else position_db.entry_price
+                            ),
                             profit_loss=position_db.profit_loss,
                             executed_at=now_naive,
                         )

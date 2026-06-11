@@ -132,9 +132,7 @@ class TrailingStopManager:
         """
         risk_distance = abs(entry_price - stop_loss)
 
-        tp1, tp2 = self._derive_tp_levels(
-            direction, entry_price, risk_distance, take_profit
-        )
+        tp1, tp2 = self._derive_tp_levels(direction, entry_price, risk_distance, take_profit)
 
         state = PositionStopState(
             deal_id=deal_id,

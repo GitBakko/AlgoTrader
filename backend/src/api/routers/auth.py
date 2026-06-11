@@ -195,8 +195,7 @@ async def register(
                 )
         except Exception:
             logger.warning(
-                f"Register: role downgrade {requested_role}→VIEWER "
-                f"(unauthenticated request)"
+                f"Register: role downgrade {requested_role}→VIEWER " f"(unauthenticated request)"
             )
 
     # Check if username already exists
@@ -551,23 +550,20 @@ async def get_avatar(
     # Path-traversal containment: resolve symlinks + verify the file is
     # under AVATAR_STORAGE_DIR. Refuse to serve anything outside.
     import mimetypes  # noqa: PLC0415
+
     from src.utils.avatar_handler import AVATAR_STORAGE_DIR  # noqa: PLC0415
 
     try:
         resolved = Path(file_path).resolve()
         avatar_root = AVATAR_STORAGE_DIR.resolve()
         if not resolved.is_relative_to(avatar_root):
-            logger.warning(
-                f"avatar serve refused — path {resolved} outside {avatar_root}"
-            )
+            logger.warning(f"avatar serve refused — path {resolved} outside {avatar_root}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="File avatar non trovato",
             )
     except (RuntimeError, ValueError):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="File avatar non trovato"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File avatar non trovato")
 
     media_type, _ = mimetypes.guess_type(str(resolved))
     if media_type is None:

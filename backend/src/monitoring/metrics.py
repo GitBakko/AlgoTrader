@@ -417,9 +417,7 @@ class MetricsCollector:
             asset_class: 'crypto' | 'precious' | 'default'
         """
         try:
-            mantis_spread_filter_blocked_total.labels(
-                epic=epic, asset_class=asset_class
-            ).inc()
+            mantis_spread_filter_blocked_total.labels(epic=epic, asset_class=asset_class).inc()
         except Exception:
             pass
 
@@ -444,9 +442,7 @@ class MetricsCollector:
             pass
 
     @classmethod
-    def update_live_wr(
-        cls, *, epic: str, live_wr: float, oos_delta: float | None
-    ) -> None:
+    def update_live_wr(cls, *, epic: str, live_wr: float, oos_delta: float | None) -> None:
         """Push the latest live WR gauge for an epic (QW5)."""
         try:
             mantis_live_wr_gauge.labels(epic=epic).set(live_wr)

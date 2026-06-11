@@ -103,7 +103,8 @@ class BrokerClientProtocol(Protocol):
     # --- working orders -----------------------------------------------
 
     async def create_working_order(
-        self, request: CreateWorkingOrderRequest,
+        self,
+        request: CreateWorkingOrderRequest,
     ) -> DealConfirmation:
         """Create a pending limit / stop entry order."""
         ...

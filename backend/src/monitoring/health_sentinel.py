@@ -99,8 +99,7 @@ class BackendHealthSentinel:
             return
         self._task = asyncio.create_task(self._run_loop())
         logger.info(
-            "🩺 Backend health sentinel started "
-            f"(check every {self.check_interval_seconds}s)"
+            "🩺 Backend health sentinel started " f"(check every {self.check_interval_seconds}s)"
         )
 
     async def stop(self) -> None:
@@ -192,10 +191,7 @@ class BackendHealthSentinel:
             return
 
         # Detect a fresh tick: timestamp moved forward since we last looked.
-        moved = (
-            self._state.last_hourly_at_seen is None
-            or last_at > self._state.last_hourly_at_seen
-        )
+        moved = self._state.last_hourly_at_seen is None or last_at > self._state.last_hourly_at_seen
         if not moved:
             return  # No new run since last sentinel tick — nothing to record.
 
@@ -231,9 +227,7 @@ class BackendHealthSentinel:
         if session_manager is None:
             return
 
-        last_ping: datetime | None = getattr(
-            session_manager, "last_successful_ping_at", None
-        )
+        last_ping: datetime | None = getattr(session_manager, "last_successful_ping_at", None)
         if last_ping is None:
             # No ping ever — still in warm-up window.
             return

@@ -70,7 +70,7 @@ def compute_ou_halflife_bars(
     # ``arr[lookback-1:]`` so both series are of equal length.
     kernel = np.ones(lookback_bars) / lookback_bars
     sma = np.convolve(arr, kernel, mode="valid")
-    aligned = arr[lookback_bars - 1:]
+    aligned = arr[lookback_bars - 1 :]
     residual = aligned - sma
 
     if residual.size < 30:

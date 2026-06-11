@@ -14,7 +14,7 @@ a code path drifts onto an un-mocked surface.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -32,7 +32,7 @@ from src.broker.models import (
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 class MockBrokerClient:
@@ -49,7 +49,7 @@ class MockBrokerClient:
             "ETHUSD": {"bid": 2270.0, "offer": 2272.0},
             "SOLUSD": {"bid": 83.0, "offer": 83.5},
             "BNBUSD": {"bid": 620.0, "offer": 624.0},
-            "GOLD":   {"bid": 4577.0, "offer": 4577.5},
+            "GOLD": {"bid": 4577.0, "offer": 4577.5},
         }
         self._positions: dict[str, Position] = {}
         self._working_orders: dict[str, WorkingOrder] = {}
@@ -93,10 +93,12 @@ class MockBrokerClient:
         return []
 
     async def get_client_sentiment(self, epic: str) -> ClientSentiment:
-        return ClientSentiment.model_validate({
-            "longPositionPercentage": 50.0,
-            "shortPositionPercentage": 50.0,
-        })
+        return ClientSentiment.model_validate(
+            {
+                "longPositionPercentage": 50.0,
+                "shortPositionPercentage": 50.0,
+            }
+        )
 
     # ------------------------------------------------------------------
     # Positions
@@ -110,39 +112,54 @@ class MockBrokerClient:
         deal_ref = f"MOCK-{deal_id[:8]}"
         snap = self._snapshot.get(request.epic, {"bid": 0.0, "offer": 0.0})
         level = snap["offer"] if request.direction == "BUY" else snap["bid"]
-        now = datetime.now(timezone.utc)
-        pos = Position.model_validate({
-            "dealId": deal_id,
-            "epic": request.epic,
-            "direction": request.direction,
-            "size": request.size,
-            "level": level,
-            "currency": "USD",
-            "createdDate": now,
-            "stopLevel": request.stop_level,
-            "profitLevel": request.profit_level,
-            "upl": 0.0,
-            "market_status": "TRADEABLE",
-        })
+        now = datetime.now(UTC)
+        pos = Position.model_validate(
+            {
+                "dealId": deal_id,
+                "epic": request.epic,
+                "direction": request.direction,
+                "size": request.size,
+                "level": level,
+                "currency": "USD",
+                "createdDate": now,
+                "stopLevel": request.stop_level,
+                "profitLevel": request.profit_level,
+                "upl": 0.0,
+                "market_status": "TRADEABLE",
+            }
+        )
         self._positions[deal_id] = pos
-        return DealConfirmation.model_validate({
-            "dealId": deal_id, "dealReference": deal_ref,
-            "dealStatus": "OPEN", "status": "OPEN",
-            "epic": request.epic, "direction": request.direction,
-            "size": request.size, "level": level,
-        })
+        return DealConfirmation.model_validate(
+            {
+                "dealId": deal_id,
+                "dealReference": deal_ref,
+                "dealStatus": "OPEN",
+                "status": "OPEN",
+                "epic": request.epic,
+                "direction": request.direction,
+                "size": request.size,
+                "level": level,
+            }
+        )
 
     async def close_position(self, deal_id: str) -> DealConfirmation:
         pos = self._positions.pop(deal_id, None)
         if pos is None:
             from src.broker.exceptions import BrokerError
+
             raise BrokerError(f"Position {deal_id} not found")
-        return DealConfirmation.model_validate({
-            "dealId": deal_id, "dealReference": f"MOCK-{deal_id[:8]}",
-            "dealStatus": "CLOSED", "status": "CLOSED",
-            "epic": pos.epic, "direction": pos.direction,
-            "size": pos.size, "level": pos.level,
-        })
+        return DealConfirmation.model_validate(
+            {
+                "dealId": deal_id,
+                "dealReference": f"MOCK-{deal_id[:8]}",
+                "dealStatus": "CLOSED",
+                "status": "CLOSED",
+                "epic": pos.epic,
+                "direction": pos.direction,
+                "size": pos.size,
+                "level": pos.level,
+            }
+        )
 
     async def modify_position(
         self,
@@ -155,56 +172,79 @@ class MockBrokerClient:
         pos = self._positions.get(deal_id)
         if pos is None:
             from src.broker.exceptions import BrokerError
+
             raise BrokerError(f"Position {deal_id} not found")
         if stop_level is not None:
             pos.stop_level = stop_level
         if profit_level is not None:
             pos.profit_level = profit_level
-        return DealConfirmation.model_validate({
-            "dealId": deal_id, "dealReference": f"MOCK-{deal_id[:8]}",
-            "dealStatus": "AMENDED", "status": "AMENDED",
-            "epic": pos.epic, "direction": pos.direction,
-            "size": pos.size, "level": pos.level,
-        })
+        return DealConfirmation.model_validate(
+            {
+                "dealId": deal_id,
+                "dealReference": f"MOCK-{deal_id[:8]}",
+                "dealStatus": "AMENDED",
+                "status": "AMENDED",
+                "epic": pos.epic,
+                "direction": pos.direction,
+                "size": pos.size,
+                "level": pos.level,
+            }
+        )
 
     # ------------------------------------------------------------------
     # Working orders
     # ------------------------------------------------------------------
 
     async def create_working_order(
-        self, request: CreateWorkingOrderRequest,
+        self,
+        request: CreateWorkingOrderRequest,
     ) -> DealConfirmation:
         deal_id = uuid4().hex
         deal_ref = f"MOCK-WO-{deal_id[:8]}"
-        now = datetime.now(timezone.utc)
-        order = WorkingOrder.model_validate({
-            "dealId": deal_id,
-            "epic": request.epic,
-            "direction": request.direction,
-            "size": request.size,
-            "level": request.level,
-            "type": request.type,
-            "createdDate": now,
-        })
+        now = datetime.now(UTC)
+        order = WorkingOrder.model_validate(
+            {
+                "dealId": deal_id,
+                "epic": request.epic,
+                "direction": request.direction,
+                "size": request.size,
+                "level": request.level,
+                "type": request.type,
+                "createdDate": now,
+            }
+        )
         self._working_orders[deal_id] = order
-        return DealConfirmation.model_validate({
-            "dealId": deal_id, "dealReference": deal_ref,
-            "dealStatus": "OPEN", "status": "OPEN",
-            "epic": request.epic, "direction": request.direction,
-            "size": request.size, "level": request.level,
-        })
+        return DealConfirmation.model_validate(
+            {
+                "dealId": deal_id,
+                "dealReference": deal_ref,
+                "dealStatus": "OPEN",
+                "status": "OPEN",
+                "epic": request.epic,
+                "direction": request.direction,
+                "size": request.size,
+                "level": request.level,
+            }
+        )
 
     async def cancel_working_order(self, deal_id: str) -> DealConfirmation:
         order = self._working_orders.pop(deal_id, None)
         if order is None:
             from src.broker.exceptions import BrokerError
+
             raise BrokerError(f"Working order {deal_id} not found")
-        return DealConfirmation.model_validate({
-            "dealId": deal_id, "dealReference": f"MOCK-WO-{deal_id[:8]}",
-            "dealStatus": "DELETED", "status": "DELETED",
-            "epic": order.epic, "direction": order.direction,
-            "size": order.size, "level": order.level,
-        })
+        return DealConfirmation.model_validate(
+            {
+                "dealId": deal_id,
+                "dealReference": f"MOCK-WO-{deal_id[:8]}",
+                "dealStatus": "DELETED",
+                "status": "DELETED",
+                "epic": order.epic,
+                "direction": order.direction,
+                "size": order.size,
+                "level": order.level,
+            }
+        )
 
     async def list_working_orders(self) -> list[WorkingOrder]:
         return list(self._working_orders.values())
@@ -215,16 +255,18 @@ class MockBrokerClient:
 
     async def get_accounts(self) -> list[Account]:
         return [
-            Account.model_validate({
-                "accountId": "MOCK-001",
-                "accountName": "Mock Demo",
-                "accountType": "CFD",
-                "currency": "USD",
-                "balance": 10_000.0,
-                "deposit": 10_000.0,
-                "profitLoss": 0.0,
-                "available": 10_000.0,
-            }),
+            Account.model_validate(
+                {
+                    "accountId": "MOCK-001",
+                    "accountName": "Mock Demo",
+                    "accountType": "CFD",
+                    "currency": "USD",
+                    "balance": 10_000.0,
+                    "deposit": 10_000.0,
+                    "profitLoss": 0.0,
+                    "available": 10_000.0,
+                }
+            ),
         ]
 
     async def get_transaction_history(
@@ -245,6 +287,7 @@ class MockBrokerClient:
 
     async def get_deal_confirmation(self, deal_reference: str) -> DealConfirmation:
         from src.broker.exceptions import BrokerError
+
         raise BrokerError(f"deal_reference {deal_reference} not tracked by mock")
 
     # ------------------------------------------------------------------

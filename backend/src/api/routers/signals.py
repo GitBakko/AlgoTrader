@@ -246,9 +246,7 @@ async def predict_and_execute(
 # ── Decision Audit Trail Endpoints ──
 
 
-async def _resolve_position_state(
-    position_id: int | None, session
-) -> dict:
+async def _resolve_position_state(position_id: int | None, session) -> dict:
     """Look up state fields the audit drawer needs but the signals row
     does not carry: deal_id, status (OPEN/CLOSED), close_reason, profit_loss.
     Returned as a dict with keys defaulting to None so callers can spread

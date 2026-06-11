@@ -431,13 +431,15 @@ class ScalpScoreStrategy(BaseStrategy):
             zone = (
                 "kill_zone"
                 if session_mult >= 1.0
-                else "chop_zone"
-                if (
-                    _strat_settings.scalp_chop_zone_start
-                    <= utc_hour
-                    < _strat_settings.scalp_chop_zone_end
+                else (
+                    "chop_zone"
+                    if (
+                        _strat_settings.scalp_chop_zone_start
+                        <= utc_hour
+                        < _strat_settings.scalp_chop_zone_end
+                    )
+                    else "default"
                 )
-                else "default"
             )
             base_gates: dict = {
                 "session": {

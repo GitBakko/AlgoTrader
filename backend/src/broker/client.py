@@ -207,7 +207,7 @@ class CapitalComClient:
                 # window hit doesn't immediately drop the order.
                 if response.status_code == 429:
                     if attempt < self._retry_attempts - 1:
-                        retry_delay = self._retry_base_delay * (2 ** attempt) + 1.0
+                        retry_delay = self._retry_base_delay * (2**attempt) + 1.0
                         logger.warning(
                             f"429 rate-limit on {method} {endpoint} — "
                             f"retry {attempt + 1}/{self._retry_attempts} "

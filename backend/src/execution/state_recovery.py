@@ -44,13 +44,9 @@ def _position_to_dict(p) -> dict:
         "direction": direction_val,
         "size": float(getattr(p, "size", 0) or 0),
         "level": float(getattr(p, "level", 0) or 0),
-        "stop_level": (
-            float(p.stop_level) if getattr(p, "stop_level", None) is not None else None
-        ),
+        "stop_level": (float(p.stop_level) if getattr(p, "stop_level", None) is not None else None),
         "profit_level": (
-            float(p.profit_level)
-            if getattr(p, "profit_level", None) is not None
-            else None
+            float(p.profit_level) if getattr(p, "profit_level", None) is not None else None
         ),
         "upl": float(p.upl) if getattr(p, "upl", None) is not None else 0.0,
         "deal_reference": getattr(p, "deal_reference", None),
@@ -310,12 +306,8 @@ class StateRecoveryService:
                             "direction": pos.direction,
                             "size": float(pos.size),
                             "level": float(pos.entry_price),
-                            "stop_level": (
-                                float(pos.stop_loss) if pos.stop_loss else None
-                            ),
-                            "profit_level": (
-                                float(pos.take_profit) if pos.take_profit else None
-                            ),
+                            "stop_level": (float(pos.stop_loss) if pos.stop_loss else None),
+                            "profit_level": (float(pos.take_profit) if pos.take_profit else None),
                             "upl": float(pos.profit_loss) if pos.profit_loss else 0.0,
                             "deal_reference": getattr(pos, "deal_reference", None),
                             "created_date": pos.opened_at.isoformat(),
@@ -461,11 +453,7 @@ class StateRecoveryService:
                     p["deal_id"]: (
                         float(p["profit_level"])
                         if p.get("profit_level") is not None
-                        else (
-                            float(p["take_profit"])
-                            if p.get("take_profit") is not None
-                            else None
-                        )
+                        else (float(p["take_profit"]) if p.get("take_profit") is not None else None)
                     )
                     for p in positions
                 }

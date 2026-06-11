@@ -149,8 +149,14 @@ COMMODITY_ASSETS: set[str] = {
 
 # Forex assets
 FOREX_ASSETS: set[str] = {
-    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD",
-    "AUDUSD", "NZDUSD", "EURJPY",
+    "EURUSD",
+    "GBPUSD",
+    "USDJPY",
+    "USDCHF",
+    "USDCAD",
+    "AUDUSD",
+    "NZDUSD",
+    "EURJPY",
 }
 
 # Index assets
@@ -158,7 +164,14 @@ INDEX_ASSETS: set[str] = {"US500", "DE40", "NAS100"}
 
 # Stock assets
 STOCK_ASSETS: set[str] = {
-    "NVDA", "TSLA", "AAPL", "MSFT", "GOOGL", "AMZN", "META", "AMD",
+    "NVDA",
+    "TSLA",
+    "AAPL",
+    "MSFT",
+    "GOOGL",
+    "AMZN",
+    "META",
+    "AMD",
 }
 
 # Cross-asset correlation clusters

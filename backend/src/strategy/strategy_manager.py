@@ -219,14 +219,17 @@ class StrategyManager:
                 "sentiment_composite": round(sil_composite, 3),
             }
 
-            def _mr_gates(*, trending_pass: bool, z_pass: bool, quality_pass: bool, ml_agrees: bool | None) -> dict:
+            def _mr_gates(
+                *, trending_pass: bool, z_pass: bool, quality_pass: bool, ml_agrees: bool | None
+            ) -> dict:
                 return {
                     "trending_filter": {
                         "passed": trending_pass,
                         "adx": round(adx_val, 1),
                         "adx_max": _settings.mr_adx_max,
                         "reason": (
-                            None if trending_pass
+                            None
+                            if trending_pass
                             else f"ADX {adx_val:.1f} > {_settings.mr_adx_max:.0f} (trending)"
                         ),
                     },
@@ -235,7 +238,8 @@ class StrategyManager:
                         "z": round(mr_signal.z_score, 3),
                         "z_entry": _settings.mr_z_entry,
                         "reason": (
-                            None if z_pass
+                            None
+                            if z_pass
                             else f"|z| {abs(mr_signal.z_score):.2f} < entry {_settings.mr_z_entry:.2f}"
                         ),
                     },
@@ -243,7 +247,8 @@ class StrategyManager:
                         "passed": quality_pass,
                         "min_quality": _settings.mr_min_quality,
                         "reason": (
-                            None if quality_pass
+                            None
+                            if quality_pass
                             else f"Quality below {_settings.mr_min_quality:.2f}"
                         ),
                     },
@@ -356,9 +361,7 @@ class StrategyManager:
                         "rejection_reason": (
                             f"Quality {quality:.2f} < {_settings.mr_min_quality:.2f}"
                         ),
-                        "mr_reason": (
-                            f"Quality {quality:.2f} < {_settings.mr_min_quality:.2f}"
-                        ),
+                        "mr_reason": (f"Quality {quality:.2f} < {_settings.mr_min_quality:.2f}"),
                         "mr_z": mr_signal.z_score,
                         "mr_quality": quality,
                         "ml_direction": ml_direction,

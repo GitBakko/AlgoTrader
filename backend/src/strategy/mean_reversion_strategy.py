@@ -61,11 +61,7 @@ def _enforce_min_tp(
         return sl_dist, tp_dist
     settings = get_settings()
     try:
-        raw_pct = (
-            settings.mr_min_tp_pct_forex
-            if epic in FOREX_ASSETS
-            else settings.mr_min_tp_pct
-        )
+        raw_pct = settings.mr_min_tp_pct_forex if epic in FOREX_ASSETS else settings.mr_min_tp_pct
         min_pct = float(raw_pct)
     except (TypeError, ValueError):
         # Mocked settings (e.g. unit tests) — leave the trade untouched
@@ -177,9 +173,7 @@ class MeanReversionStrategy:
             # Enforce min TP distance (forex micro-target guard).
             sl_dist = (sl - current_price) if sl and sl > current_price else None
             tp_dist = current_price - tp
-            new_sl_dist, new_tp_dist = _enforce_min_tp(
-                epic, current_price, sl_dist, tp_dist
-            )
+            new_sl_dist, new_tp_dist = _enforce_min_tp(epic, current_price, sl_dist, tp_dist)
             if new_tp_dist != tp_dist:
                 tp = current_price - new_tp_dist
                 if new_sl_dist is not None:
@@ -223,9 +217,7 @@ class MeanReversionStrategy:
             # Enforce min TP distance (forex micro-target guard).
             sl_dist = (current_price - sl) if sl and sl < current_price else None
             tp_dist = tp - current_price
-            new_sl_dist, new_tp_dist = _enforce_min_tp(
-                epic, current_price, sl_dist, tp_dist
-            )
+            new_sl_dist, new_tp_dist = _enforce_min_tp(epic, current_price, sl_dist, tp_dist)
             if new_tp_dist != tp_dist:
                 tp = current_price + new_tp_dist
                 if new_sl_dist is not None:

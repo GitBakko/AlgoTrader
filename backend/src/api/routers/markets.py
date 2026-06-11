@@ -266,9 +266,7 @@ async def get_overnight_swap(
 
     # Fallback: static table backed by the backtest cost model.
     if long_rate is None or short_rate is None:
-        static = OVERNIGHT_RATES.get(
-            epic_upper, {"long": -0.000015, "short": -0.000010}
-        )
+        static = OVERNIGHT_RATES.get(epic_upper, {"long": -0.000015, "short": -0.000010})
         # Static values are stored as fractions; convert to percent to match broker.
         long_rate = long_rate if long_rate is not None else static["long"] * 100
         short_rate = short_rate if short_rate is not None else static["short"] * 100
@@ -284,19 +282,21 @@ async def get_overnight_swap(
 
     # `long_rate` / `short_rate` are already in percent (per swapChargeInterval).
     # `*_daily` fields express the fraction equivalent (pct / 100).
-    return success_response({
-        "epic": epic_upper,
-        "currency": currency or "USD",
-        "long_rate_daily": round(long_rate / 100, 8),
-        "short_rate_daily": round(short_rate / 100, 8),
-        "long_rate_pct": round(long_rate, 6),
-        "short_rate_pct": round(short_rate, 6),
-        "swap_interval_minutes": swap_interval_min or 1440,
-        "weekend_multiplier": 3,
-        "next_charge_utc": next_charge.isoformat(),
-        "source": source,
-        "instrument_raw": raw_instrument if source == "broker" else None,
-    })
+    return success_response(
+        {
+            "epic": epic_upper,
+            "currency": currency or "USD",
+            "long_rate_daily": round(long_rate / 100, 8),
+            "short_rate_daily": round(short_rate / 100, 8),
+            "long_rate_pct": round(long_rate, 6),
+            "short_rate_pct": round(short_rate, 6),
+            "swap_interval_minutes": swap_interval_min or 1440,
+            "weekend_multiplier": 3,
+            "next_charge_utc": next_charge.isoformat(),
+            "source": source,
+            "instrument_raw": raw_instrument if source == "broker" else None,
+        }
+    )
 
 
 @router.get("/{epic}/swap-accum")
@@ -410,10 +410,7 @@ async def get_swap_accum(
                 rows = await snap_repo.get_recent(epic_upper, days)
                 for r in rows:
                     r_dir = (r.direction or "").upper()
-                    snap_rate = (
-                        r.short_rate_pct if r_dir in ("SHORT", "SELL")
-                        else r.long_rate_pct
-                    )
+                    snap_rate = r.short_rate_pct if r_dir in ("SHORT", "SELL") else r.long_rate_pct
                     if snap_rate is None:
                         snap_rate = rate_pct
                     snapshot_by_date[r.snapshot_date.isoformat()] = {
@@ -448,14 +445,16 @@ async def get_swap_accum(
 
         day_swap = (day_rate / 100.0) * day_notional * multiplier
         total += day_swap
-        per_day.append({
-            "date": day_key,
-            "rate_pct": round(day_rate, 6),
-            "notional": round(day_notional, 2),
-            "swap": round(day_swap, 4),
-            "multiplier": multiplier,
-            "source": day_source,
-        })
+        per_day.append(
+            {
+                "date": day_key,
+                "rate_pct": round(day_rate, 6),
+                "notional": round(day_notional, 2),
+                "swap": round(day_swap, 4),
+                "multiplier": multiplier,
+                "source": day_source,
+            }
+        )
 
     # Response-level source: "historical" when at least one day came from
     # a stored snapshot; otherwise echo the fallback source.
@@ -466,15 +465,17 @@ async def get_swap_accum(
     else:
         response_source = "historical"
 
-    return success_response({
-        "epic": epic_upper,
-        "currency": currency or "USD",
-        "period_days": days,
-        "total_accum": round(total, 2),
-        "direction": direction if notional > 0 else None,
-        "per_day": per_day,
-        "source": response_source,
-    })
+    return success_response(
+        {
+            "epic": epic_upper,
+            "currency": currency or "USD",
+            "period_days": days,
+            "total_accum": round(total, 2),
+            "direction": direction if notional > 0 else None,
+            "per_day": per_day,
+            "source": response_source,
+        }
+    )
 
 
 @router.get("/status/{epic}")

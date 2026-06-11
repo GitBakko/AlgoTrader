@@ -300,7 +300,6 @@ class PositionRepository(BaseRepository[Position]):
         UNRECONCILED / STALE_CLEANUP rows are excluded from tp/sl/pnl AND
         from `going` (they are spurious data, fully filtered out).
         """
-        from collections import defaultdict
 
         # Normalize range: strip tz for asyncpg TIMESTAMP WITHOUT TIME ZONE.
         naive_from = date_from.replace(tzinfo=None) if date_from.tzinfo else date_from
@@ -310,10 +309,7 @@ class PositionRepository(BaseRepository[Position]):
         stmt = (
             select(Position)
             .where(Position.opened_at <= naive_to)
-            .where(
-                (Position.closed_at.is_(None))
-                | (Position.closed_at >= naive_from)
-            )
+            .where((Position.closed_at.is_(None)) | (Position.closed_at >= naive_from))
         )
         positions = list((await self.session.execute(stmt)).scalars().all())
 
@@ -328,7 +324,7 @@ class PositionRepository(BaseRepository[Position]):
             bucket_keys.append(key)
             buckets[key] = {
                 "date": key,
-                "buy":  {"tp": 0, "sl": 0, "going": 0, "pnl": 0.0},
+                "buy": {"tp": 0, "sl": 0, "going": 0, "pnl": 0.0},
                 "sell": {"tp": 0, "sl": 0, "going": 0, "pnl": 0.0},
             }
             day_cursor = day_cursor + timedelta(days=1)
@@ -426,20 +422,18 @@ class PositionRepository(BaseRepository[Position]):
         win_avg = (sum(wins_durations) / len(wins_durations)) if wins_durations else 0.0
         loss_avg = (sum(losses_durations) / len(losses_durations)) if losses_durations else 0.0
         late_exit_bias = (
-            len(wins_durations) > 0 and len(losses_durations) > 0
-            and loss_avg > win_avg * 1.3
+            len(wins_durations) > 0 and len(losses_durations) > 0 and loss_avg > win_avg * 1.3
         )
         bias_pct_over = (
-            ((loss_avg - win_avg) / win_avg * 100.0)
-            if win_avg > 0 and loss_avg > 0 else 0.0
+            ((loss_avg - win_avg) / win_avg * 100.0) if win_avg > 0 and loss_avg > 0 else 0.0
         )
         return {
-            "win_avg_min":    round(win_avg, 2),
-            "loss_avg_min":   round(loss_avg, 2),
-            "win_count":      len(wins_durations),
-            "loss_count":     len(losses_durations),
+            "win_avg_min": round(win_avg, 2),
+            "loss_avg_min": round(loss_avg, 2),
+            "win_count": len(wins_durations),
+            "loss_count": len(losses_durations),
             "late_exit_bias": late_exit_bias,
-            "bias_pct_over":  round(bias_pct_over, 2),
+            "bias_pct_over": round(bias_pct_over, 2),
         }
 
     async def get_opened_today_count(self, now: datetime | None = None) -> int:
@@ -452,9 +446,7 @@ class PositionRepository(BaseRepository[Position]):
         # Strip tz for asyncpg on TIMESTAMP WITHOUT TIME ZONE columns.
         naive_start = start_of_day.replace(tzinfo=None)
         result = await self.session.execute(
-            select(func.count())
-            .select_from(Position)
-            .where(Position.opened_at >= naive_start)
+            select(func.count()).select_from(Position).where(Position.opened_at >= naive_start)
         )
         return int(result.scalar() or 0)
 

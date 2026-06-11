@@ -111,17 +111,18 @@ async def list_closed_positions(
     # of pulling up to 10000 rows per page-load. Old path was a DoS vector
     # against Postgres on every dashboard refresh.
     from sqlalchemy import case, func, select  # noqa: PLC0415
+
     from src.database.models import Position  # noqa: PLC0415
 
     agg_stmt = (
         select(
             func.coalesce(func.sum(Position.profit_loss), 0).label("total_pnl"),
-            func.coalesce(
-                func.sum(case((Position.profit_loss > 0, 1), else_=0)), 0
-            ).label("win_count"),
-            func.coalesce(
-                func.sum(case((Position.profit_loss <= 0, 1), else_=0)), 0
-            ).label("loss_count"),
+            func.coalesce(func.sum(case((Position.profit_loss > 0, 1), else_=0)), 0).label(
+                "win_count"
+            ),
+            func.coalesce(func.sum(case((Position.profit_loss <= 0, 1), else_=0)), 0).label(
+                "loss_count"
+            ),
             func.coalesce(
                 func.avg(case((Position.profit_loss > 0, Position.profit_loss))), 0
             ).label("avg_win"),

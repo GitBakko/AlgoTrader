@@ -107,9 +107,7 @@ def get_window_spec(epic: str) -> AssetWindowSpec:
     return _ASSET_CLASS_SPECS.get(get_asset_class(epic), _DEFAULT_SPEC)
 
 
-def compute_walk_forward_windows(
-    epic: str, timeframe: str = "1h"
-) -> dict[str, int]:
+def compute_walk_forward_windows(epic: str, timeframe: str = "1h") -> dict[str, int]:
     """Compute walk-forward window sizes in bars for ``epic`` + ``timeframe``.
 
     Anchored on calendar days × `bars_per_calendar_day`, so the
@@ -127,8 +125,7 @@ def compute_walk_forward_windows(
     factor = _TIMEFRAME_FACTOR.get(timeframe.strip().lower())
     if factor is None:
         raise ValueError(
-            f"Unknown timeframe '{timeframe}'. Supported: "
-            f"{sorted(_TIMEFRAME_FACTOR)}"
+            f"Unknown timeframe '{timeframe}'. Supported: " f"{sorted(_TIMEFRAME_FACTOR)}"
         )
 
     bpd = spec.bars_per_calendar_day * factor

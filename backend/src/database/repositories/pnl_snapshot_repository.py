@@ -13,7 +13,7 @@ See migration ``c3d8e9f0a1b2``.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import and_, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +28,7 @@ def _utc_naive(dt: datetime) -> datetime:
     """
     if dt.tzinfo is None:
         return dt
-    return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt.astimezone(UTC).replace(tzinfo=None)
 
 
 class PaperPnlSnapshotRepository:
@@ -58,15 +58,11 @@ class PaperPnlSnapshotRepository:
         self.session.add(row)
         await self.session.flush()
 
-    async def list_recent(
-        self, *, minutes: int
-    ) -> list[PaperPnlSnapshot]:
+    async def list_recent(self, *, minutes: int) -> list[PaperPnlSnapshot]:
         """Return rows captured within the last ``minutes`` minutes,
         ordered ascending by ``captured_at`` (oldest first) — chart-ready.
         """
-        cutoff = datetime.now(timezone.utc) - timedelta(
-            minutes=max(minutes, 1)
-        )
+        cutoff = datetime.now(UTC) - timedelta(minutes=max(minutes, 1))
         stmt = (
             select(PaperPnlSnapshot)
             .where(PaperPnlSnapshot.captured_at >= _utc_naive(cutoff))
@@ -77,10 +73,8 @@ class PaperPnlSnapshotRepository:
 
     async def prune_older_than(self, *, days: int) -> int:
         """Delete rows older than ``days`` days. Returns row count."""
-        cutoff = datetime.now(timezone.utc) - timedelta(days=max(days, 1))
-        stmt = delete(PaperPnlSnapshot).where(
-            PaperPnlSnapshot.captured_at < _utc_naive(cutoff)
-        )
+        cutoff = datetime.now(UTC) - timedelta(days=max(days, 1))
+        stmt = delete(PaperPnlSnapshot).where(PaperPnlSnapshot.captured_at < _utc_naive(cutoff))
         result = await self.session.execute(stmt)
         return result.rowcount or 0
 
@@ -106,9 +100,7 @@ class PositionPnlSnapshotRepository:
         minutes: int,
     ) -> list[PositionPnlSnapshot]:
         """Rows for a single deal within the last ``minutes``, oldest first."""
-        cutoff = datetime.now(timezone.utc) - timedelta(
-            minutes=max(minutes, 1)
-        )
+        cutoff = datetime.now(UTC) - timedelta(minutes=max(minutes, 1))
         stmt = (
             select(PositionPnlSnapshot)
             .where(
@@ -123,7 +115,7 @@ class PositionPnlSnapshotRepository:
         return list(result.scalars().all())
 
     async def prune_older_than(self, *, days: int) -> int:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=max(days, 1))
+        cutoff = datetime.now(UTC) - timedelta(days=max(days, 1))
         stmt = delete(PositionPnlSnapshot).where(
             PositionPnlSnapshot.captured_at < _utc_naive(cutoff)
         )

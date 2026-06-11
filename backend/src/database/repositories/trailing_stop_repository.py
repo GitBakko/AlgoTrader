@@ -143,10 +143,7 @@ class TrailingStopRepository:
         """
         if not deal_ids:
             return 0
-        stmt = (
-            delete(TrailingStopState)
-            .where(TrailingStopState.deal_id.in_(deal_ids))
-        )
+        stmt = delete(TrailingStopState).where(TrailingStopState.deal_id.in_(deal_ids))
         result = await self.session.execute(stmt)
         await self.session.flush()
         return int(result.rowcount or 0)

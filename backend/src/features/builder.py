@@ -46,7 +46,6 @@ async def fetch_sentiment_data(
         (None/empty for unavailable data)
     """
     import asyncio
-    from datetime import timedelta
 
     from src.external.finnhub_client import FinnhubClient
     from src.external.marketaux_client import MarketauxClient

@@ -16,8 +16,9 @@ without taking down the rest of the scheduler. Errors are logged.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
-from typing import Any, Awaitable, Callable
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import Any
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -63,9 +64,7 @@ class PnlSnapshotScheduler:
 
     def start(self) -> None:
         if self._db_session_factory is None:
-            logger.warning(
-                "PnlSnapshotScheduler skipped: no db_session_factory available"
-            )
+            logger.warning("PnlSnapshotScheduler skipped: no db_session_factory available")
             return
         self._scheduler.add_job(
             self._safe_take_snapshot,
@@ -161,9 +160,7 @@ class PnlSnapshotScheduler:
             logger.warning(f"P&L snapshot tick failed: {exc}")
             MetricsCollector.record_paper_pnl_snapshot(outcome="error")
             return
-        MetricsCollector.record_paper_pnl_snapshot(
-            outcome="success" if wrote_row else "empty"
-        )
+        MetricsCollector.record_paper_pnl_snapshot(outcome="success" if wrote_row else "empty")
 
     async def _take_snapshot(self) -> bool:
         """Capture one tick. Returns True when a row was persisted, False
@@ -195,9 +192,7 @@ class PnlSnapshotScheduler:
         currency = self._extract_currency(broker_client)
 
         async with self._db_session_factory() as session:
-            today_start = captured_at.replace(
-                hour=0, minute=0, second=0, microsecond=0
-            )
+            today_start = captured_at.replace(hour=0, minute=0, second=0, microsecond=0)
             position_repo = PositionRepository(session)
             try:
                 closed_today = await position_repo.get_closed_in_period(
@@ -205,9 +200,7 @@ class PnlSnapshotScheduler:
                     captured_at,
                 )
                 pnl_today = sum(
-                    float(p.profit_loss)
-                    for p in closed_today
-                    if p.profit_loss is not None
+                    float(p.profit_loss) for p in closed_today if p.profit_loss is not None
                 )
             except Exception as exc:
                 logger.debug(f"today realized lookup failed: {exc}")
@@ -283,16 +276,11 @@ class PnlSnapshotScheduler:
         async with self._db_session_factory() as session:
             paper_repo = PaperPnlSnapshotRepository(session)
             position_repo = PositionPnlSnapshotRepository(session)
-            removed_paper = await paper_repo.prune_older_than(
-                days=self.PRUNE_RETENTION_DAYS
-            )
-            removed_position = await position_repo.prune_older_than(
-                days=self.PRUNE_RETENTION_DAYS
-            )
+            removed_paper = await paper_repo.prune_older_than(days=self.PRUNE_RETENTION_DAYS)
+            removed_position = await position_repo.prune_older_than(days=self.PRUNE_RETENTION_DAYS)
             await session.commit()
             logger.info(
-                "P&L snapshot prune: "
-                f"paper={removed_paper} positions={removed_position}"
+                "P&L snapshot prune: " f"paper={removed_paper} positions={removed_position}"
             )
 
     # ── Position field accessors (broker model OR dict) ──────────────
@@ -338,14 +326,14 @@ class PnlSnapshotScheduler:
         broker_client: Any | None,
     ) -> float | None:
         """Best-effort live mid-price. Resolution chain:
-          1. WS quote cache (mid of bid/offer received via broker WS).
-          2. ``broker_client.get_market_details(epic)`` snapshot bid/offer.
-          3. Reconstructed price from broker UPL: for forex-like instruments
-             ``current ≈ entry + sign * upl/size``. Approximate (ignores
-             fees/conversion) but always non-flat while UPL drifts.
-          4. ``entry`` as last resort. The chart treats this as flat — we
-             prefer to leave the row out, but consistency with old data
-             is acceptable.
+        1. WS quote cache (mid of bid/offer received via broker WS).
+        2. ``broker_client.get_market_details(epic)`` snapshot bid/offer.
+        3. Reconstructed price from broker UPL: for forex-like instruments
+           ``current ≈ entry + sign * upl/size``. Approximate (ignores
+           fees/conversion) but always non-flat while UPL drifts.
+        4. ``entry`` as last resort. The chart treats this as flat — we
+           prefer to leave the row out, but consistency with old data
+           is acceptable.
         """
         if not epic:
             return entry
@@ -403,9 +391,7 @@ class PnlSnapshotScheduler:
     # ── Side helpers ─────────────────────────────────────────────────
 
     @staticmethod
-    async def _fetch_positions(
-        paper_loop: Any | None, broker_client: Any | None
-    ) -> list[Any]:
+    async def _fetch_positions(paper_loop: Any | None, broker_client: Any | None) -> list[Any]:
         """Try broker first (authoritative UPL) then paper_loop fallback."""
         if broker_client is not None:
             try:
@@ -423,9 +409,7 @@ class PnlSnapshotScheduler:
         return []
 
     @staticmethod
-    def _extract_equity(
-        broker_client: Any | None, paper_loop: Any | None
-    ) -> float | None:
+    def _extract_equity(broker_client: Any | None, paper_loop: Any | None) -> float | None:
         if paper_loop is not None:
             try:
                 rm = getattr(paper_loop, "risk_manager", None)

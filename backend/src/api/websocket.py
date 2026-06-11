@@ -171,13 +171,15 @@ async def _ping_broadcaster(websocket: WebSocket) -> None:
             await asyncio.sleep(0.5)  # let client reply before broadcasting status
             latency = ws_latency_state.get(conn_id)
             try:
-                await websocket.send_json({
-                    "type": "ws_status",
-                    "price_source": ws_price_status.get("source", "unknown"),
-                    "reconnect_attempts": ws_price_status.get("reconnect_attempts", 0),
-                    "max_reconnect_attempts": ws_price_status.get("max_reconnect_attempts", 12),
-                    "latency_ms": latency,
-                })
+                await websocket.send_json(
+                    {
+                        "type": "ws_status",
+                        "price_source": ws_price_status.get("source", "unknown"),
+                        "reconnect_attempts": ws_price_status.get("reconnect_attempts", 0),
+                        "max_reconnect_attempts": ws_price_status.get("max_reconnect_attempts", 12),
+                        "latency_ms": latency,
+                    }
+                )
             except Exception:
                 return
             await asyncio.sleep(_WS_PING_INTERVAL_SECONDS - 0.5)

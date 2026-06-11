@@ -114,9 +114,7 @@ class BaseRepository(Generic[ModelType]):
         Returns:
             Total record count
         """
-        result = await self.session.execute(
-            select(func.count()).select_from(self.model)
-        )
+        result = await self.session.execute(select(func.count()).select_from(self.model))
         return int(result.scalar_one() or 0)
 
     async def exists(self, id: int) -> bool:

@@ -49,7 +49,6 @@ from src.broker.models import (
     WorkingOrder,
 )
 
-
 # Bybit V5 symbol mapping for the top-5 KEEP basket epics that have
 # linear-perpetual equivalents.  Phase 4 starts with BTC only.
 EPIC_TO_BYBIT_SYMBOL: dict[str, str] = {
@@ -159,7 +158,8 @@ class BybitClient:
     # ------------------------------------------------------------------
 
     async def create_working_order(
-        self, request: CreateWorkingOrderRequest,
+        self,
+        request: CreateWorkingOrderRequest,
     ) -> DealConfirmation:
         raise BybitNotImplementedError(
             "create_working_order — Phase 4 not yet implemented",
@@ -242,7 +242,6 @@ class BybitClient:
         symbol = EPIC_TO_BYBIT_SYMBOL.get(epic)
         if symbol is None:
             raise BrokerError(
-                f"No Bybit symbol mapping for epic {epic}; "
-                "extend EPIC_TO_BYBIT_SYMBOL.",
+                f"No Bybit symbol mapping for epic {epic}; " "extend EPIC_TO_BYBIT_SYMBOL.",
             )
         return symbol
