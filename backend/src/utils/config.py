@@ -574,16 +574,24 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _enforce_secret_key_outside_demo(self) -> "Settings":
-        """Hard-fail on default SECRET_KEY when not in demo mode (audit M1.8).
+        """Hard-fail on default or weak SECRET_KEY when not in demo mode (audit M1.8).
 
         In demo mode a warning is sufficient; outside demo every JWT
-        (kill-switch, order endpoints) would be forgeable with the default key.
+        (kill-switch, order endpoints) would be forgeable with the default key,
+        and an empty/short key is brute-forceable.
         """
-        if not self.use_demo and self.secret_key == "dev_secret_key_change_in_production":
+        if self.use_demo:
+            return self
+        if self.secret_key == "dev_secret_key_change_in_production":
             raise ValueError(
                 "SECRET_KEY is still the default in a non-demo configuration. "
                 "Every JWT (kill-switch, order endpoints) would be forgeable. "
                 "Set SECRET_KEY before any LIVE deploy (audit M1.8)."
+            )
+        if len(self.secret_key.strip()) < 32:
+            raise ValueError(
+                "SECRET_KEY missing or too short (<32 chars) for non-demo. "
+                "Set a strong key before any LIVE deploy (audit M1.8)."
             )
         return self
 
