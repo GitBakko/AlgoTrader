@@ -389,6 +389,36 @@ class PaperTradingLoop:
         """
         self._trade_history = deque(history, maxlen=self._TRADE_HISTORY_MAXLEN)
 
+    @staticmethod
+    def _register_intra_tick_open(
+        open_positions: list[dict],
+        *,
+        epic: str,
+        direction: str,
+        size: float,
+        entry_price: float,
+    ) -> None:
+        """Append a just-opened position stub to the SHARED tick list.
+
+        _run_iteration fetches positions once per tick and hands the same
+        list to every _process_epic; without this, N simultaneous signals
+        all see the tick-start count and can blow through
+        max_total_open_positions / max_total_exposure together (audit M1.2).
+        Keys mirror what RiskManager reads: len() for the count cap and
+        size/level/currency/epic for _position_notional_account_ccy.
+        """
+        open_positions.append(
+            {
+                "epic": epic,
+                "direction": direction,
+                "size": float(size),
+                "level": float(entry_price),
+                "entry_price": float(entry_price),
+                "currency": "USD",
+                "_intra_tick_stub": True,
+            }
+        )
+
     @property
     def is_running(self) -> bool:
         return self._running
@@ -2471,6 +2501,12 @@ class PaperTradingLoop:
                 self._sil_data = SILData()
 
         for epic in epics_to_process:
+            if len(current_positions) >= max_positions:
+                logger.info(
+                    f"Intra-tick max positions reached "
+                    f"({len(current_positions)}/{max_positions}) — stopping epic scan"
+                )
+                break
             try:
                 # Refresh heartbeat per-epic so the 30s timeout measures
                 # "loop alive" not "total iteration duration" (21 epics can exceed 30s)
@@ -3162,6 +3198,15 @@ class PaperTradingLoop:
         if exec_result.success:
             self._trade_count += 1
             signal_info["status"] = "executed"
+            # Audit M1.2: make this open visible to risk checks of the
+            # remaining epics in the SAME iteration.
+            self._register_intra_tick_open(
+                open_positions,
+                epic=epic,
+                direction=signal.direction.value,
+                size=risk_result.position_size,
+                entry_price=exec_result.fill_price or signal.entry_price,
+            )
             logger.info(
                 f"[{epic}] EXECUTED: deal_id={exec_result.deal_id}, "
                 f"fill={exec_result.fill_price:.2f}"
@@ -3442,6 +3487,15 @@ class PaperTradingLoop:
                 # Retry succeeded — fall through to success handling below
                 self._trade_count += 1
                 signal_info["status"] = "executed"
+                # Audit M1.2: make this open visible to risk checks of the
+                # remaining epics in the SAME iteration.
+                self._register_intra_tick_open(
+                    open_positions,
+                    epic=epic,
+                    direction=signal.direction.value,
+                    size=risk_result.position_size,
+                    entry_price=exec_result.fill_price or signal.entry_price,
+                )
                 logger.info(
                     f"[{epic}] EXECUTED (retry): deal_id={exec_result.deal_id}, "
                     f"fill={exec_result.fill_price:.2f}"
