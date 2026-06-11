@@ -373,6 +373,16 @@ class PaperTradingLoop:
         self._signal_loop_align: bool = _init_settings.signal_loop_align_to_bar
         self._signal_post_bar_offset: int = _init_settings.signal_loop_post_bar_offset_seconds
 
+    def seed_trade_history(self, history: list[dict]) -> None:
+        """Replace the in-memory trade history (state recovery injection).
+
+        Public API for the composition root: preserves the deque(maxlen=200)
+        contract that direct assignment of a plain list silently dropped
+        (the maxlen loss + deque/list type-swap was the root cause of the
+        Kelly TypeError class — audit M1.1).
+        """
+        self._trade_history = deque(history, maxlen=200)
+
     @property
     def is_running(self) -> bool:
         return self._running

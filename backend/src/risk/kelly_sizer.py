@@ -64,8 +64,10 @@ class AdaptiveKellySizer:
         if len(trade_history) < self.min_trades:
             return None
 
-        # Use only recent trades
-        recent = trade_history[-self.lookback_trades :]
+        # Use only recent trades. list() first: paper_loop supplies a
+        # deque(maxlen=200) and deques do not support slice indexing
+        # (TypeError after the min_trades-th in-session trade — audit M1.1).
+        recent = list(trade_history)[-self.lookback_trades :]
         pnls = [t.get("pnl", t.get("net_pnl", 0.0)) for t in recent]
 
         wins = [p for p in pnls if p > 0]

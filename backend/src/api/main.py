@@ -392,7 +392,7 @@ async def lifespan(app: FastAPI):
     # Phase 14: Inject recovered trade history for Kelly sizing + circuit breaker
     if recovery_report.trade_history_count > 0:
         trade_history = await recovery_service._restore_trade_history_list()
-        app.state.paper_loop._trade_history = trade_history
+        app.state.paper_loop.seed_trade_history(trade_history)
         from src.risk.circuit_breakers import CircuitBreakerType
 
         cb = app.state.paper_loop.risk_manager.circuit_breakers
