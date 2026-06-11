@@ -93,24 +93,13 @@
           }
         },
         "test": {
-          "builder": "@angular/build:karma",
+          "builder": "@angular/build:unit-test",
           "options": {
-            "polyfills": [
-              "zone.js",
-              "zone.js/testing",
-              "@angular/localize/init"
-            ],
             "tsConfig": "tsconfig.spec.json",
-            "karmaConfig": "karma.conf.js",
-            "inlineStyleLanguage": "scss",
-            "assets": [
-              "src/favicon.ico",
-              "src/assets"
-            ],
-            "styles": [
-              "src/scss/styles.scss"
-            ],
-            "scripts": []
+            "runner": "vitest",
+            "buildTarget": "coreui-free-angular-admin-template:build:development",
+            "setupFiles": ["src/test-setup.ts"],
+            "coverageReporters": ["html", "text-summary"]
           }
         }
       }

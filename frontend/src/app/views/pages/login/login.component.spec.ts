@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ReactiveFormsModule } from '@angular/forms';
-import { Router, ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, provideRouter } from '@angular/router';
 import { ButtonModule, CardModule, FormModule, GridModule } from '@coreui/angular';
 import { IconModule, IconSetService } from '@coreui/icons-angular';
 import { iconSubset } from '../../../icons/icon-subset';
@@ -15,9 +15,11 @@ describe('LoginComponent', () => {
   let fixture: ComponentFixture<LoginComponent>;
 
   beforeEach(async () => {
-    const authSpy = jasmine.createSpyObj('AuthService', ['login', 'isAuthenticated']);
-    const routerSpy = jasmine.createSpyObj('Router', ['navigate']);
-    authSpy.isAuthenticated.and.returnValue(false);
+    const authSpy = {
+      login: vi.fn().mockName('AuthService.login'),
+      isAuthenticated: vi.fn().mockName('AuthService.isAuthenticated')
+    };
+    authSpy.isAuthenticated.mockReturnValue(false);
 
     await TestBed.configureTestingModule({
       imports: [
@@ -31,8 +33,8 @@ describe('LoginComponent', () => {
       ],
       providers: [
         IconSetService,
+        provideRouter([]),
         { provide: AuthService, useValue: authSpy },
-        { provide: Router, useValue: routerSpy },
         { provide: ActivatedRoute, useValue: { snapshot: { queryParams: {} } } },
       ],
     }).compileComponents();

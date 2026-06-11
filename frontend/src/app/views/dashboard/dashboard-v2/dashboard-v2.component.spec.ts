@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
@@ -36,20 +36,20 @@ describe('DashboardV2Component', () => {
       swapAccum: signal<Record<string, any>>({}),
       allocationData: signal<any>(null),
       performanceDelta: signal<any>(null),
-      loadOverview: jasmine.createSpy('loadOverview'),
-      loadEquityCurve: jasmine.createSpy('loadEquityCurve'),
-      loadRiskStatus: jasmine.createSpy('loadRiskStatus'),
-      loadPaperStatus: jasmine.createSpy('loadPaperStatus'),
-      loadPaperPositions: jasmine.createSpy('loadPaperPositions'),
-      loadClosedPositions: jasmine.createSpy('loadClosedPositions'),
-      loadPerformance: jasmine.createSpy('loadPerformance'),
-      loadPerformanceBreakdown: jasmine.createSpy('loadPerformanceBreakdown'),
-      loadPerformanceDelta: jasmine.createSpy('loadPerformanceDelta'),
-      loadCurrentModels: jasmine.createSpy('loadCurrentModels'),
-      loadOvernightSwap: jasmine.createSpy('loadOvernightSwap'),
-      loadSwapAccum: jasmine.createSpy('loadSwapAccum'),
-      loadAllocationData: jasmine.createSpy('loadAllocationData'),
-      emergencyStop: jasmine.createSpy('emergencyStop').and.returnValue(of({ message: 'ok', loop_stopped: true, positions_closed: [], errors: [] })),
+      loadOverview: vi.fn(),
+      loadEquityCurve: vi.fn(),
+      loadRiskStatus: vi.fn(),
+      loadPaperStatus: vi.fn(),
+      loadPaperPositions: vi.fn(),
+      loadClosedPositions: vi.fn(),
+      loadPerformance: vi.fn(),
+      loadPerformanceBreakdown: vi.fn(),
+      loadPerformanceDelta: vi.fn(),
+      loadCurrentModels: vi.fn(),
+      loadOvernightSwap: vi.fn(),
+      loadSwapAccum: vi.fn(),
+      loadAllocationData: vi.fn(),
+      emergencyStop: vi.fn().mockReturnValue(of({ message: 'ok', loop_stopped: true, positions_closed: [], errors: [] })),
     };
 
     wsStub = {
@@ -59,26 +59,26 @@ describe('DashboardV2Component', () => {
       latencyMs: signal<number | null>(null),
       prices: signal({}),
       lastSwapUpdate: signal<any>(null),
-      connectPrices: jasmine.createSpy('connectPrices'),
-      connectMarkets: jasmine.createSpy('connectMarkets'),
+      connectPrices: vi.fn(),
+      connectMarkets: vi.fn(),
     };
 
     confirmStub = {
-      confirm: jasmine.createSpy('confirm').and.resolveTo(true),
+      confirm: vi.fn().mockResolvedValue(true),
     };
 
     toastStub = {
-      success: jasmine.createSpy('success'),
-      error: jasmine.createSpy('error'),
+      success: vi.fn(),
+      error: vi.fn(),
     };
 
     const newsStub = {
       news: signal([]),
-      getNews: jasmine.createSpy('getNews'),
+      getNews: vi.fn(),
     };
 
     const marketStatusStub = {
-      getMarketStatus: jasmine.createSpy('getMarketStatus').and.resolveTo({
+      getMarketStatus: vi.fn().mockResolvedValue({
         epic: 'XAUUSD', is_open: true, status: 'TRADEABLE', next_open: null,
         session: { open: '00:00', close: '23:59', timezone: 'UTC' },
       }),
@@ -103,10 +103,6 @@ describe('DashboardV2Component', () => {
     component = fixture.componentInstance;
   });
 
-  afterEach(() => {
-    component.ngOnDestroy();
-  });
-
   it('creates', () => {
     fixture.detectChanges();
     expect(component).toBeTruthy();
@@ -122,32 +118,32 @@ describe('DashboardV2Component', () => {
   // TODO(spec-cleanup): the dashboard no longer forces a 90-day floor on the
   // equity curve for the heatmap — it now follows the active timeframe. Skipped
   // until the desired contract is re-confirmed with product.
-  xit('forces equity curve to at least 90 days for heatmap', () => {
+  it.skip('forces equity curve to at least 90 days for heatmap', () => {
     fixture.detectChanges();
     TestBed.inject(TimeframeService).set('7D');
     fixture.detectChanges();
-    const calls = tradingStub.loadEquityCurve.calls.allArgs() as number[][];
+    const calls = vi.mocked(tradingStub.loadEquityCurve).mock.calls as number[][];
     for (const args of calls) {
       expect(args[0]).toBeGreaterThanOrEqual(90);
     }
   });
 
-  it('kill switch asks confirmation then calls emergencyStop', fakeAsync(() => {
+  it('kill switch asks confirmation then calls emergencyStop', async () => {
     fixture.detectChanges();
     component.killSwitch();
-    tick();
+    await fixture.whenStable();
     expect(confirmStub.confirm).toHaveBeenCalled();
     expect(tradingStub.emergencyStop).toHaveBeenCalled();
     expect(toastStub.success).toHaveBeenCalled();
-  }));
+  });
 
-  it('kill switch aborts when user cancels', fakeAsync(() => {
-    confirmStub.confirm.and.resolveTo(false);
+  it('kill switch aborts when user cancels', async () => {
+    confirmStub.confirm.mockResolvedValue(false);
     fixture.detectChanges();
     component.killSwitch();
-    tick();
+    await fixture.whenStable();
     expect(tradingStub.emergencyStop).not.toHaveBeenCalled();
-  }));
+  });
 
   it('custom range switches timeframe to CUSTOM', () => {
     fixture.detectChanges();
@@ -156,6 +152,6 @@ describe('DashboardV2Component', () => {
     component.applyCustomRange();
     const tf = TestBed.inject(TimeframeService);
     expect(tf.current()).toBe('CUSTOM');
-    expect(component.customOpen()).toBeFalse();
+    expect(component.customOpen()).toBe(false);
   });
 });

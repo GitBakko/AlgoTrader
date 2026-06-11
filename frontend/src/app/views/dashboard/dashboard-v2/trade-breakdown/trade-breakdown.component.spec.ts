@@ -7,7 +7,7 @@ import { TimeframeService } from '../../../../core/services/timeframe.service';
 function day(date: string, buyTp = 0, buySl = 0, buyGo = 0, sellTp = 0, sellSl = 0, sellGo = 0, pnlB = 0, pnlS = 0): TradeBreakdownDay {
   return {
     date,
-    buy:  { tp: buyTp, sl: buySl, going: buyGo, pnl: pnlB },
+    buy: { tp: buyTp, sl: buySl, going: buyGo, pnl: pnlB },
     sell: { tp: sellTp, sl: sellSl, going: sellGo, pnl: pnlS },
   };
 }
@@ -35,8 +35,8 @@ describe('TradeBreakdownComponent', () => {
 
   it('flags backend missing when days input is null', () => {
     fixture.detectChanges();
-    expect(component.isBackendMissing()).toBeTrue();
-    expect(component.hasData()).toBeFalse();
+    expect(component.isBackendMissing()).toBe(true);
+    expect(component.hasData()).toBe(false);
     const banner = fixture.nativeElement.querySelector('.tb-todo');
     expect(banner).toBeTruthy();
     expect(banner.textContent).toContain('Backend endpoint pending');
@@ -49,8 +49,8 @@ describe('TradeBreakdownComponent', () => {
     ];
     fixture.componentRef.setInput('days', data);
     fixture.detectChanges();
-    expect(component.hasData()).toBeTrue();
-    expect(component.isBackendMissing()).toBeFalse();
+    expect(component.hasData()).toBe(true);
+    expect(component.isBackendMissing()).toBe(false);
     expect(fixture.nativeElement.querySelectorAll('.tb-col').length).toBe(4);
   });
 

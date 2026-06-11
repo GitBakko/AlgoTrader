@@ -115,7 +115,7 @@ describe('LiveFeedTimelineComponent', () => {
   it('emits eventClicked with the source row', () => {
     fixture.componentRef.setInput('events', sampleEvents);
     fixture.detectChanges();
-    const spy = jasmine.createSpy('eventClicked');
+    const spy = vi.fn();
     component.eventClicked.subscribe(spy);
     const row = fixture.debugElement.query(By.css('.pv-feed__row:not(.pv-feed__row--skeleton)'))
       .nativeElement as HTMLElement;

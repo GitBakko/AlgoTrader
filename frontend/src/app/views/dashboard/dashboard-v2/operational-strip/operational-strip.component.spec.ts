@@ -38,7 +38,7 @@ describe('OperationalStripComponent', () => {
   };
 
   const marketStatusStub = {
-    getMarketStatus: jasmine.createSpy('getMarketStatus').and.resolveTo({
+    getMarketStatus: vi.fn().mockResolvedValue({
       epic: 'XAUUSD',
       is_open: true,
       status: 'TRADEABLE',

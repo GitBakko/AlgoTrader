@@ -1,3 +1,4 @@
+import type { MockedObject } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
@@ -9,7 +10,7 @@ import { signal } from '@angular/core';
 describe('SystemLogsComponent', () => {
   let component: SystemLogsComponent;
   let fixture: ComponentFixture<SystemLogsComponent>;
-  let monitoringService: jasmine.SpyObj<MonitoringService>;
+  let monitoringService: MockedObject<MonitoringService>;
 
   const mockPerformance = {
     period: {
@@ -104,24 +105,23 @@ describe('SystemLogsComponent', () => {
   };
 
   beforeEach(async () => {
-    const monitoringServiceSpy = jasmine.createSpyObj('MonitoringService', [
-      'refreshAll',
-      'getSignalLogs',
-      'getExecutionLogs',
-      'getRiskEventLogs',
-      'getPerformanceOverview'
-    ]);
-
-    // Setup signal properties
-    monitoringServiceSpy.loading = signal(false);
-    monitoringServiceSpy.error = signal(null);
-    monitoringServiceSpy.performance = signal(mockPerformance);
-    monitoringServiceSpy.signalLogs = signal(mockSignalLogs);
-    monitoringServiceSpy.executionLogs = signal(mockExecutionLogs);
-    monitoringServiceSpy.riskEventLogs = signal(mockRiskEventLogs);
+    const monitoringServiceSpy = {
+      refreshAll: vi.fn().mockName('MonitoringService.refreshAll'),
+      getSignalLogs: vi.fn().mockName('MonitoringService.getSignalLogs'),
+      getExecutionLogs: vi.fn().mockName('MonitoringService.getExecutionLogs'),
+      getRiskEventLogs: vi.fn().mockName('MonitoringService.getRiskEventLogs'),
+      getPerformanceOverview: vi.fn().mockName('MonitoringService.getPerformanceOverview'),
+      // Signal properties
+      loading: signal(false),
+      error: signal<string | null>(null),
+      performance: signal(mockPerformance),
+      signalLogs: signal(mockSignalLogs),
+      executionLogs: signal(mockExecutionLogs),
+      riskEventLogs: signal(mockRiskEventLogs)
+    };
 
     // Setup spy return values
-    monitoringServiceSpy.refreshAll.and.returnValue(Promise.resolve());
+    monitoringServiceSpy.refreshAll.mockReturnValue(Promise.resolve());
 
     await TestBed.configureTestingModule({
       imports: [SystemLogsComponent],
@@ -133,7 +133,7 @@ describe('SystemLogsComponent', () => {
       ]
     }).compileComponents();
 
-    monitoringService = TestBed.inject(MonitoringService) as jasmine.SpyObj<MonitoringService>;
+    monitoringService = TestBed.inject(MonitoringService) as MockedObject<MonitoringService>;
     fixture = TestBed.createComponent(SystemLogsComponent);
     component = fixture.componentInstance;
   });
@@ -194,17 +194,17 @@ describe('SystemLogsComponent', () => {
     const breakdown = component.strategyBreakdown();
 
     expect(breakdown.length).toBe(2);
-    expect(breakdown).toContain({ strategy: 'ml_strategy', count: 90 });
-    expect(breakdown).toContain({ strategy: 'vwap_strategy', count: 60 });
+    expect(breakdown).toContainEqual({ strategy: 'ml_strategy', count: 90 });
+    expect(breakdown).toContainEqual({ strategy: 'vwap_strategy', count: 60 });
   });
 
   it('should compute risk events breakdown correctly', () => {
     const breakdown = component.riskEventsBreakdown();
 
     expect(breakdown.length).toBe(3);
-    expect(breakdown).toContain({ type: 'Circuit Breaker', count: 2 });
-    expect(breakdown).toContain({ type: 'Position Limit', count: 2 });
-    expect(breakdown).toContain({ type: 'Drawdown Limit', count: 1 });
+    expect(breakdown).toContainEqual({ type: 'Circuit Breaker', count: 2 });
+    expect(breakdown).toContainEqual({ type: 'Position Limit', count: 2 });
+    expect(breakdown).toContainEqual({ type: 'Drawdown Limit', count: 1 });
   });
 
   it('should change date range', async () => {

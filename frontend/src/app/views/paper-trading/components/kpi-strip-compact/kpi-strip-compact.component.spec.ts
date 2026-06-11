@@ -73,6 +73,6 @@ describe('KpiStripCompactComponent', () => {
 
   it('draws sparkline path for non-empty data', () => {
     expect(component.pnlOpenPath().length).toBeGreaterThan(0);
-    expect(component.pnlOpenPath().startsWith('M')).toBeTrue();
+    expect(component.pnlOpenPath().startsWith('M')).toBe(true);
   });
 });

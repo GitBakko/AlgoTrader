@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
 import { ButtonModule, CardModule, FormModule, GridModule } from '@coreui/angular';
@@ -18,7 +18,7 @@ describe('RegisterComponent', () => {
       imports: [CardModule, FormModule, GridModule, ButtonModule, IconModule, RegisterComponent],
       providers: [
         IconSetService,
-        { provide: Router, useValue: jasmine.createSpyObj('Router', ['navigate']) },
+        provideRouter([]),
         { provide: ActivatedRoute, useValue: { snapshot: { queryParams: {} }, queryParams: of({}) } },
       ],
     }).compileComponents();

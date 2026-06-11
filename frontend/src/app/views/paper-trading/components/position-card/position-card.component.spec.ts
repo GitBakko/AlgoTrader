@@ -63,8 +63,8 @@ describe('PositionCardComponent', () => {
   });
 
   it('emits closeClicked on CLOSE NOW button without bubbling card click', () => {
-    const closeSpy = jasmine.createSpy('close');
-    const detailsSpy = jasmine.createSpy('details');
+    const closeSpy = vi.fn();
+    const detailsSpy = vi.fn();
     component.closeClicked.subscribe(closeSpy);
     component.detailsClicked.subscribe(detailsSpy);
     const btn = fixture.debugElement.query(By.css('.pv-pc__close')).nativeElement as HTMLButtonElement;
@@ -74,7 +74,7 @@ describe('PositionCardComponent', () => {
   });
 
   it('emits detailsClicked on card click', () => {
-    const spy = jasmine.createSpy('details');
+    const spy = vi.fn();
     component.detailsClicked.subscribe(spy);
     const card = fixture.debugElement.query(By.css('.pv-pc')).nativeElement as HTMLElement;
     card.click();
@@ -82,7 +82,7 @@ describe('PositionCardComponent', () => {
   });
 
   it('detects trend agreement when last > first and direction is BUY', () => {
-    expect(component.trendAgrees()).toBeTrue();
+    expect(component.trendAgrees()).toBe(true);
   });
 
   it('marks card as loss when pnlEur < 0', () => {

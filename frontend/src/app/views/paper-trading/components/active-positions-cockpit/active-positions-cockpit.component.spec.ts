@@ -68,7 +68,7 @@ describe('ActivePositionsCockpitComponent', () => {
     fixture.componentRef.setInput('positions', [pos]);
     fixture.componentRef.setInput('signalsTotal', 0);
     fixture.detectChanges();
-    const spy = jasmine.createSpy('close');
+    const spy = vi.fn();
     component.closeRequested.subscribe(spy);
     const cardEl = fixture.debugElement.query(By.css('app-position-card'));
     cardEl.componentInstance.closeClicked.emit(pos);

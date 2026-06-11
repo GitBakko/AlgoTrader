@@ -12,7 +12,9 @@ describe('AuthService', () => {
   let service: AuthService;
 
   beforeEach(() => {
-    const routerSpy = jasmine.createSpyObj('Router', ['navigate']);
+    const routerSpy = {
+      navigate: vi.fn().mockName('Router.navigate')
+    };
 
     TestBed.configureTestingModule({
       providers: [

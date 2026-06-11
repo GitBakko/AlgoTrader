@@ -1,3 +1,4 @@
+import type { MockedObject } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { PositionDetailDrawerComponent } from './position-detail-drawer.component';
@@ -7,7 +8,7 @@ import type { PaperTradingPosition } from '../../../../core/models/paper-trading
 describe('PositionDetailDrawerComponent', () => {
   let fixture: ComponentFixture<PositionDetailDrawerComponent>;
   let component: PositionDetailDrawerComponent;
-  let auditServiceSpy: jasmine.SpyObj<SignalAuditService>;
+  let auditServiceSpy: MockedObject<SignalAuditService>;
 
   const baseProfitPosition: PaperTradingPosition = {
     id: '0001-deal-id',
@@ -27,10 +28,13 @@ describe('PositionDetailDrawerComponent', () => {
   };
 
   beforeEach(async () => {
-    auditServiceSpy = jasmine.createSpyObj<SignalAuditService>(
-      'SignalAuditService',
-      ['openByDealId', 'open', 'close', 'navigateToSignal', 'openLatestByEpic']
-    );
+    auditServiceSpy = {
+      openByDealId: vi.fn().mockName('SignalAuditService.openByDealId'),
+      open: vi.fn().mockName('SignalAuditService.open'),
+      close: vi.fn().mockName('SignalAuditService.close'),
+      navigateToSignal: vi.fn().mockName('SignalAuditService.navigateToSignal'),
+      openLatestByEpic: vi.fn().mockName('SignalAuditService.openLatestByEpic')
+    } as unknown as MockedObject<SignalAuditService>;
 
     await TestBed.configureTestingModule({
       imports: [PositionDetailDrawerComponent],
@@ -46,14 +50,14 @@ describe('PositionDetailDrawerComponent', () => {
   it('renders nothing when no position is bound', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.pdd-drawer')).toBeNull();
-    expect(component.isOpen()).toBeFalse();
+    expect(component.isOpen()).toBe(false);
   });
 
   it('renders the drawer once a position is bound', () => {
     fixture.componentRef.setInput('position', baseProfitPosition);
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.pdd-drawer')).not.toBeNull();
-    expect(component.isOpen()).toBeTrue();
+    expect(component.isOpen()).toBe(true);
   });
 
   it('switches active tab on click', () => {
@@ -71,7 +75,7 @@ describe('PositionDetailDrawerComponent', () => {
   it('emits closed when the close button is clicked', () => {
     fixture.componentRef.setInput('position', baseProfitPosition);
     fixture.detectChanges();
-    const spy = jasmine.createSpy('closed');
+    const spy = vi.fn();
     component.closed.subscribe(spy);
 
     const closeBtn = fixture.debugElement.query(By.css('.pdd-close'))
@@ -86,7 +90,7 @@ describe('PositionDetailDrawerComponent', () => {
     component.setTab('audit');
     fixture.detectChanges();
 
-    const closedSpy = jasmine.createSpy('closed');
+    const closedSpy = vi.fn();
     component.closed.subscribe(closedSpy);
 
     const cta = fixture.debugElement.query(By.css('.pdd-btn--primary'))
@@ -100,11 +104,11 @@ describe('PositionDetailDrawerComponent', () => {
   it('marks profit/loss state from pnlEur sign', () => {
     fixture.componentRef.setInput('position', baseProfitPosition);
     fixture.detectChanges();
-    expect(component.inProfit()).toBeTrue();
+    expect(component.inProfit()).toBe(true);
 
     fixture.componentRef.setInput('position', { ...baseProfitPosition, pnlEur: -12.3 });
     fixture.detectChanges();
-    expect(component.inProfit()).toBeFalse();
+    expect(component.inProfit()).toBe(false);
   });
 
   it('formats age depending on duration', () => {

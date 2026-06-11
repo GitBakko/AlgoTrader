@@ -6,8 +6,7 @@ describe('CockpitHeaderComponent', () => {
   let fixture: ComponentFixture<CockpitHeaderComponent>;
   let component: CockpitHeaderComponent;
 
-  const toggleBtn = (): HTMLButtonElement =>
-    fixture.debugElement.query(By.css('button[data-action]')).nativeElement as HTMLButtonElement;
+  const toggleBtn = (): HTMLButtonElement => fixture.debugElement.query(By.css('button[data-action]')).nativeElement as HTMLButtonElement;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({ imports: [CockpitHeaderComponent] }).compileComponents();
@@ -56,8 +55,8 @@ describe('CockpitHeaderComponent', () => {
     const btn = toggleBtn();
     expect(btn.textContent?.trim()).toBe('START');
     expect(btn.getAttribute('data-action')).toBe('start');
-    expect(btn.classList.contains('cockpit-header__btn--primary')).toBeTrue();
-    expect(btn.classList.contains('cockpit-header__btn--warning')).toBeFalse();
+    expect(btn.classList.contains('cockpit-header__btn--primary')).toBe(true);
+    expect(btn.classList.contains('cockpit-header__btn--warning')).toBe(false);
     expect(btn.getAttribute('aria-label')).toBe('Start paper trading loop');
   });
 
@@ -67,13 +66,13 @@ describe('CockpitHeaderComponent', () => {
     const btn = toggleBtn();
     expect(btn.textContent?.trim()).toBe('STOP');
     expect(btn.getAttribute('data-action')).toBe('stop');
-    expect(btn.classList.contains('cockpit-header__btn--warning')).toBeTrue();
-    expect(btn.classList.contains('cockpit-header__btn--primary')).toBeFalse();
+    expect(btn.classList.contains('cockpit-header__btn--warning')).toBe(true);
+    expect(btn.classList.contains('cockpit-header__btn--primary')).toBe(false);
     expect(btn.getAttribute('aria-label')).toBe('Stop paper trading loop');
   });
 
   it('emits stopClicked on toggle button click in IDLE state', () => {
-    const spy = jasmine.createSpy('toggle');
+    const spy = vi.fn();
     component.stopClicked.subscribe(spy);
     toggleBtn().click();
     expect(spy).toHaveBeenCalledTimes(1);
@@ -82,14 +81,14 @@ describe('CockpitHeaderComponent', () => {
   it('emits stopClicked on toggle button click in RUNNING state', () => {
     fixture.componentRef.setInput('state', 'RUNNING');
     fixture.detectChanges();
-    const spy = jasmine.createSpy('toggle');
+    const spy = vi.fn();
     component.stopClicked.subscribe(spy);
     toggleBtn().click();
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
   it('emits emergencyClicked on KILL SWITCH button click', () => {
-    const spy = jasmine.createSpy('emergency');
+    const spy = vi.fn();
     component.emergencyClicked.subscribe(spy);
     const btn = fixture.debugElement.query(By.css('.cockpit-header__btn--kill')).nativeElement as HTMLButtonElement;
     expect(btn.textContent?.trim()).toBe('KILL SWITCH');
@@ -102,17 +101,17 @@ describe('CockpitHeaderComponent', () => {
     fixture.detectChanges();
     const btn = fixture.debugElement.query(By.css('.cockpit-header__btn--kill')).nativeElement as HTMLButtonElement;
     expect(btn.textContent?.trim()).toBe('Stopping…');
-    expect(btn.disabled).toBeTrue();
+    expect(btn.disabled).toBe(true);
   });
 
   it('does not emit toggle when stopBusy is true', () => {
-    const spy = jasmine.createSpy('toggle');
+    const spy = vi.fn();
     component.stopClicked.subscribe(spy);
     fixture.componentRef.setInput('stopBusy', true);
     fixture.detectChanges();
     const btn = toggleBtn();
     btn.click();
     expect(spy).not.toHaveBeenCalled();
-    expect(btn.disabled).toBeTrue();
+    expect(btn.disabled).toBe(true);
   });
 });

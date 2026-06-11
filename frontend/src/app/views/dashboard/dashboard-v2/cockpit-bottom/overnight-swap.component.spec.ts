@@ -10,8 +10,8 @@ describe('OvernightSwapComponent', () => {
     swapAccum: signal<Record<string, any>>({}),
     paperPositions: signal<any[]>([]),
     overview: signal<any>(null),
-    loadOvernightSwap: jasmine.createSpy('loadOvernightSwap'),
-    loadSwapAccum: jasmine.createSpy('loadSwapAccum'),
+    loadOvernightSwap: vi.fn(),
+    loadSwapAccum: vi.fn(),
   };
 
   beforeEach(async () => {
@@ -19,8 +19,8 @@ describe('OvernightSwapComponent', () => {
     tradingStub.swapAccum.set({});
     tradingStub.paperPositions.set([]);
     tradingStub.overview.set(null);
-    tradingStub.loadOvernightSwap.calls.reset();
-    tradingStub.loadSwapAccum.calls.reset();
+    tradingStub.loadOvernightSwap.mockClear();
+    tradingStub.loadSwapAccum.mockClear();
     await TestBed.configureTestingModule({
       imports: [OvernightSwapComponent],
       providers: [
@@ -49,7 +49,7 @@ describe('OvernightSwapComponent', () => {
         long_rate_pct: -0.0015,
         short_rate_pct: -0.001,
         weekend_multiplier: 3,
-        next_charge_utc: new Date(Date.now() + 3600_000).toISOString(),
+        next_charge_utc: new Date(Date.now() + 3600000).toISOString(),
         source: 'broker',
       },
     });

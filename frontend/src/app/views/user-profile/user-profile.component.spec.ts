@@ -1,3 +1,4 @@
+import type { MockedObject } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, ActivatedRoute } from '@angular/router';
 import { of, throwError } from 'rxjs';
@@ -12,8 +13,8 @@ import { signal } from '@angular/core';
 describe('UserProfileComponent', () => {
   let component: UserProfileComponent;
   let fixture: ComponentFixture<UserProfileComponent>;
-  let authServiceSpy: jasmine.SpyObj<AuthService>;
-  let routerSpy: jasmine.SpyObj<Router>;
+  let authServiceSpy: MockedObject<AuthService>;
+  let routerSpy: MockedObject<Router>;
 
   const mockUser: User = {
     id: 1,
@@ -32,10 +33,21 @@ describe('UserProfileComponent', () => {
   const mockUserResponse: ApiResponse<User> = { success: true, data: mockUser };
 
   beforeEach(async () => {
-    const authSpy = jasmine.createSpyObj('AuthService', ['getCurrentUser', 'logout', 'deleteAvatar']);
-    const routerSpyObj = jasmine.createSpyObj('Router', ['navigate']);
-    const confirmSpy = jasmine.createSpyObj('ConfirmDialogService', ['confirm']);
-    const toastSpy = jasmine.createSpyObj('ToastService', ['success', 'error']);
+    const authSpy = {
+      getCurrentUser: vi.fn().mockName('AuthService.getCurrentUser'),
+      logout: vi.fn().mockName('AuthService.logout'),
+      deleteAvatar: vi.fn().mockName('AuthService.deleteAvatar')
+    };
+    const routerSpyObj = {
+      navigate: vi.fn().mockName('Router.navigate')
+    };
+    const confirmSpy = {
+      confirm: vi.fn().mockName('ConfirmDialogService.confirm')
+    };
+    const toastSpy = {
+      success: vi.fn().mockName('ToastService.success'),
+      error: vi.fn().mockName('ToastService.error')
+    };
 
     // Create a signal for currentUser
     (authSpy as any).currentUser = signal(mockUser);
@@ -51,10 +63,10 @@ describe('UserProfileComponent', () => {
       ]
     }).compileComponents();
 
-    authServiceSpy = TestBed.inject(AuthService) as jasmine.SpyObj<AuthService>;
-    routerSpy = TestBed.inject(Router) as jasmine.SpyObj<Router>;
+    authServiceSpy = TestBed.inject(AuthService) as MockedObject<AuthService>;
+    routerSpy = TestBed.inject(Router) as MockedObject<Router>;
     // ngOnInit calls refreshProfile() — spy must return an observable by default.
-    authServiceSpy.getCurrentUser.and.returnValue(of(mockUserResponse));
+    authServiceSpy.getCurrentUser.mockReturnValue(of(mockUserResponse));
 
     fixture = TestBed.createComponent(UserProfileComponent);
     component = fixture.componentInstance;
@@ -72,7 +84,7 @@ describe('UserProfileComponent', () => {
   });
 
   it('should refresh profile on init', () => {
-    authServiceSpy.getCurrentUser.and.returnValue(of(mockUserResponse));
+    authServiceSpy.getCurrentUser.mockReturnValue(of(mockUserResponse));
 
     component.ngOnInit();
 
@@ -80,7 +92,7 @@ describe('UserProfileComponent', () => {
   });
 
   it('should handle refresh profile success', () => {
-    authServiceSpy.getCurrentUser.and.returnValue(of(mockUserResponse));
+    authServiceSpy.getCurrentUser.mockReturnValue(of(mockUserResponse));
 
     component.refreshProfile();
 
@@ -90,7 +102,7 @@ describe('UserProfileComponent', () => {
 
   it('should handle refresh profile error', () => {
     const mockError = { error: { error: 'Failed to fetch user' } };
-    authServiceSpy.getCurrentUser.and.returnValue(throwError(() => mockError));
+    authServiceSpy.getCurrentUser.mockReturnValue(throwError(() => mockError));
 
     component.refreshProfile();
 

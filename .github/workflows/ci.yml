@@ -175,6 +175,10 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Unit tests (Vitest)
+        working-directory: frontend
+        run: npx ng test --watch=false
+
       - name: Build
         working-directory: frontend
         run: npx ng build --configuration=production

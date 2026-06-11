@@ -22,11 +22,11 @@ describe('WebSocketService', () => {
   });
 
   it('should not be connected initially', () => {
-    expect(service.connected()).toBeFalse();
+    expect(service.connected()).toBe(false);
   });
 
   it('should set connected to false on disconnect', () => {
     service.disconnect();
-    expect(service.connected()).toBeFalse();
+    expect(service.connected()).toBe(false);
   });
 });

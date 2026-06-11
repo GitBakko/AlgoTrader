@@ -130,12 +130,12 @@ describe('SignalsHeatmapComponent', () => {
       makeSignal('BTCUSD', '2026-01-01T10:00:00Z', 'BUY', 'EXECUTED'),
     ]);
     fixture.detectChanges();
-    const spy = jasmine.createSpy('cellClicked');
+    const spy = vi.fn();
     component.cellClicked.subscribe(spy);
     const cells = fixture.debugElement.queryAll(By.css('.pv-heatmap__cell'));
     const btcCell = cells.find((c) => c.nativeElement.getAttribute('aria-label')?.startsWith('BTCUSD'))!;
     btcCell.nativeElement.click();
-    const arg = spy.calls.mostRecent().args[0];
+    const arg = vi.mocked(spy).mock.lastCall![0];
     expect(arg.epic).toBe('BTCUSD');
     expect(arg.direction).toBe('BUY');
   });
