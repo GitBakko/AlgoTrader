@@ -367,6 +367,7 @@ class PaperTradingLoop:
         self._reconciler_interval: int = _init_settings.reconciler_interval_seconds
         self._reconciler_task: asyncio.Task | None = None
         self._reconciler_lock: asyncio.Lock = asyncio.Lock()
+        self._reconciler_skip_count: int = 0
 
         # Strategy loop bar-alignment. When active, _run_loop sleeps until
         # the next UTC-aligned bar-close slot (+ offset) instead of a fixed
@@ -2180,8 +2181,22 @@ class PaperTradingLoop:
         try:
             current_positions = await asyncio.wait_for(self.get_positions_async(), timeout=10.0)
         except (TimeoutError, Exception) as e:
-            logger.warning(f"Reconciler position fetch failed ({e}), using local cache")
-            current_positions = self.get_paper_positions()
+            if self.execution_engine.mode == ExecutionMode.PAPER:
+                # PAPER keeps a genuine local book — safe fallback.
+                logger.warning(f"Reconciler position fetch failed ({e}), using local cache")
+                current_positions = self.get_paper_positions()
+            else:
+                # DEMO/LIVE: get_paper_positions() returns [] here. Running
+                # the tick against an empty book unregisters every trailing
+                # state and arms false UNRECONCILED closes (audit M1.4).
+                # Skip the tick; the next one (15s) retries.
+                self._reconciler_skip_count += 1
+                logger.warning(
+                    f"Reconciler position fetch failed ({e}) — skipping tick "
+                    f"#{self._reconciler_skip_count} (no local book in "
+                    f"{self.execution_engine.mode.value} mode)"
+                )
+                return
 
         await self._detect_broker_closed(current_positions)
         await self._update_trailing_stops(current_positions)
