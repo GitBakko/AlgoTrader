@@ -63,6 +63,12 @@ _CRYPTO_EPICS: frozenset[str] = frozenset(
 )
 _PRECIOUS_EPICS: frozenset[str] = frozenset({"XAUUSD", "XAGUSD", "PLATINUM"})
 
+# Audit M1.4 follow-up: after this many CONSECUTIVE reconciler tick skips
+# (broker position fetch failing in DEMO/LIVE — ~5 min at the 15s default
+# cadence) escalate to ERROR log + CRITICAL alert. Compared with `==` (not
+# `>=`) so the alert fires once per outage and re-arms after recovery.
+_RECONCILER_SKIP_ESCALATION_THRESHOLD: int = 20
+
 
 def get_spread_limit(epic: str) -> tuple[float, str]:
     """Return (limit, asset_class) for QW3 spread filter.
@@ -367,7 +373,8 @@ class PaperTradingLoop:
         self._reconciler_interval: int = _init_settings.reconciler_interval_seconds
         self._reconciler_task: asyncio.Task | None = None
         self._reconciler_lock: asyncio.Lock = asyncio.Lock()
-        self._reconciler_skip_count: int = 0
+        self._reconciler_skip_count: int = 0  # lifetime, never reset
+        self._reconciler_consecutive_skips: int = 0  # reset on successful fetch
 
         # Strategy loop bar-alignment. When active, _run_loop sleeps until
         # the next UTC-aligned bar-close slot (+ offset) instead of a fixed
@@ -2180,6 +2187,7 @@ class PaperTradingLoop:
         """
         try:
             current_positions = await asyncio.wait_for(self.get_positions_async(), timeout=10.0)
+            self._reconciler_consecutive_skips = 0
         except (TimeoutError, Exception) as e:
             if self.execution_engine.mode == ExecutionMode.PAPER:
                 # PAPER keeps a genuine local book — safe fallback.
@@ -2191,16 +2199,69 @@ class PaperTradingLoop:
                 # state and arms false UNRECONCILED closes (audit M1.4).
                 # Skip the tick; the next one (15s) retries.
                 self._reconciler_skip_count += 1
+                self._reconciler_consecutive_skips += 1
                 logger.warning(
-                    f"Reconciler position fetch failed ({e}) — skipping tick "
-                    f"#{self._reconciler_skip_count} (no local book in "
-                    f"{self.execution_engine.mode.value} mode)"
+                    f"Reconciler position fetch failed ({e}) — skipping tick: "
+                    f"consecutive skip #{self._reconciler_consecutive_skips} "
+                    f"(lifetime {self._reconciler_skip_count}, no local book "
+                    f"in {self.execution_engine.mode.value} mode)"
                 )
+                if self._reconciler_consecutive_skips == _RECONCILER_SKIP_ESCALATION_THRESHOLD:
+                    await self._escalate_reconciler_outage(e)
                 return
 
         await self._detect_broker_closed(current_positions)
         await self._update_trailing_stops(current_positions)
         await self._check_stop_losses(current_positions)
+
+    async def _escalate_reconciler_outage(self, last_error: BaseException) -> None:
+        """Escalate a sustained reconciler outage (audit M1.4 follow-up).
+
+        Called once per outage, when `_reconciler_consecutive_skips` reaches
+        `_RECONCILER_SKIP_ESCALATION_THRESHOLD`. The per-tick skip is logged
+        at WARNING and resets `_run_reconciler_loop`'s consecutive_errors
+        (the tick returns cleanly), so without this a deterministic fetch
+        failure would silently disable close detection, trailing and local
+        SL/TP enforcement forever.
+        """
+        n = self._reconciler_consecutive_skips
+        offline_seconds = n * self._reconciler_interval
+        logger.error(
+            f"🚨 Reconciler has skipped {n} consecutive ticks (~{offline_seconds}s) — "
+            f"close detection, trailing and local SL/TP enforcement are OFFLINE "
+            f"in {self.execution_engine.mode.value} mode until the broker "
+            f"position fetch recovers. Last error: {last_error}"
+        )
+        try:
+            from src.monitoring.alerting.alert_manager import get_alert_manager
+            from src.monitoring.alerting.schemas import Alert, AlertSeverity, AlertType
+            from src.utils.config import get_settings
+
+            if getattr(get_settings(), "alerts_enabled", False):
+                am = get_alert_manager()
+                alert = Alert(
+                    alert_type=AlertType.BROKER_DISCONNECTED,
+                    severity=AlertSeverity.CRITICAL,
+                    title="RECONCILER OFFLINE: broker position fetch failing",
+                    message=(
+                        f"Reconciler skipped {n} consecutive ticks "
+                        f"(~{offline_seconds}s) in "
+                        f"{self.execution_engine.mode.value} mode. Close "
+                        f"detection, trailing stops and local SL/TP "
+                        f"enforcement are OFFLINE until the broker position "
+                        f"fetch recovers. Last error: {last_error}"
+                    ),
+                    details={
+                        "consecutive_skips": n,
+                        "lifetime_skips": self._reconciler_skip_count,
+                        "interval_seconds": self._reconciler_interval,
+                        "mode": self.execution_engine.mode.value,
+                        "last_error": str(last_error),
+                    },
+                )
+                await am.send_alert(alert)
+        except Exception as alert_err:
+            logger.warning(f"Reconciler outage alert failed: {alert_err}")
 
     def _on_reconciler_done(self, task: asyncio.Task) -> None:
         """Done callback. Crash in reconciler must NOT kill strategy loop."""
