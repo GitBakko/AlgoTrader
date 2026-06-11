@@ -47,6 +47,7 @@ def loop_factory():
         risk_manager.circuit_breakers.heartbeat = MagicMock()
         risk_manager.circuit_breakers.tripped_breakers = {}
         risk_manager.circuit_breakers.config.max_open_positions = 6
+        risk_manager.limits.max_total_open_positions = 6
         risk_manager.equity_curve_filter = MagicMock()
         risk_manager.drawdown_monitor = MagicMock()
         risk_manager.drawdown_monitor.state = MagicMock()

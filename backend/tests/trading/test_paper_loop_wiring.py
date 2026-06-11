@@ -90,6 +90,7 @@ def mock_risk_manager():
     mgr.circuit_breakers.record_trade_result = MagicMock()
     mgr.circuit_breakers.tripped_breakers = {}
     mgr.circuit_breakers.config.max_open_positions = 6
+    mgr.limits.max_total_open_positions = 6
 
     mgr.equity_curve_filter = MagicMock()
     mgr.equity_curve_filter.record_trade_close = MagicMock()

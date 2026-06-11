@@ -33,3 +33,14 @@ class TestIntraTickRiskCaps:
             stub_holder, epic="NVDA", direction="BUY", size=2.0, entry_price=500.0
         )
         assert _position_notional_account_ccy(stub_holder[0]) == 1000.0
+
+    def test_usd_base_fx_stub_notional_is_size(self):
+        """USDJPY stub must route to the epic-prefix branch (notional=size),
+        not the currency branch (size*level phantom)."""
+        from src.risk.risk_manager import _position_notional_account_ccy
+
+        holder: list[dict] = []
+        PaperTradingLoop._register_intra_tick_open(
+            holder, epic="USDJPY", direction="BUY", size=430.0, entry_price=155.0
+        )
+        assert _position_notional_account_ccy(holder[0]) == 430.0

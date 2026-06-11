@@ -405,7 +405,11 @@ class PaperTradingLoop:
         all see the tick-start count and can blow through
         max_total_open_positions / max_total_exposure together (audit M1.2).
         Keys mirror what RiskManager reads: len() for the count cap and
-        size/level/currency/epic for _position_notional_account_ccy.
+        size/level/epic for _position_notional_account_ccy. NO ``currency``
+        key on purpose: real broker rows don't carry one either, and adding
+        "USD" would route USD-base FX (USDJPY) into the currency branch
+        (size*level phantom notional) instead of the epic-prefix branch
+        (notional == size).
         """
         open_positions.append(
             {
@@ -414,7 +418,6 @@ class PaperTradingLoop:
                 "size": float(size),
                 "level": float(entry_price),
                 "entry_price": float(entry_price),
-                "currency": "USD",
                 "_intra_tick_stub": True,
             }
         )
@@ -2459,8 +2462,14 @@ class PaperTradingLoop:
 
         open_epics = {p.get("epic") for p in current_positions}
 
-        # Early exit: skip signal generation if already at max open positions
-        max_positions = self.risk_manager.circuit_breakers.config.max_open_positions
+        # Early exit: skip signal generation if already at max open positions.
+        # Use the BINDING cap: RiskLimits.max_total_open_positions (10) is what
+        # check_trade enforces; the circuit-breaker config (20) is looser, so
+        # comparing against it alone lets the intra-tick break fire too late.
+        max_positions = min(
+            self.risk_manager.circuit_breakers.config.max_open_positions,
+            self.risk_manager.limits.max_total_open_positions,
+        )
         if len(current_positions) >= max_positions:
             logger.debug(
                 f"Check #{self._check_count}: at max positions "
