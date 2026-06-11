@@ -1,74 +1,83 @@
 # syntax=docker/dockerfile:1
 
-# ===== Base Stage =====
-FROM python:3.12-slim as base
+# Dependencies are installed with pip from requirements.txt — the single
+# source of truth pinned from the working venv (pyproject.toml is tool
+# config only; the old poetry dependency set is abandoned). Mirrors the
+# CI install chain (.github/workflows/ci.yml): torch first from the CPU
+# wheel index so the requirements pass doesn't pull the multi-GB CUDA
+# wheel from PyPI.
 
-# Set environment variables
+# ===== Builder =====
+FROM python:3.12-slim AS builder
+
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    POETRY_VERSION=1.8.0 \
-    POETRY_HOME="/opt/poetry" \
-    POETRY_NO_INTERACTION=1 \
-    POETRY_VIRTUALENVS_CREATE=false
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    curl \
     libpq-dev \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry
-RUN curl -sSL https://install.python-poetry.org | python3 - && \
-    ln -s /opt/poetry/bin/poetry /usr/local/bin/poetry
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Set working directory
-WORKDIR /app
+RUN pip install torch --index-url https://download.pytorch.org/whl/cpu
+COPY requirements.txt .
+RUN pip install -r requirements.txt
 
 # ===== Development Stage =====
-FROM base as development
+FROM python:3.12-slim AS development
 
-# Copy dependency files
-COPY pyproject.toml poetry.lock* ./
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/opt/venv/bin:$PATH"
 
-# Install dependencies (including dev dependencies)
-RUN poetry install --no-root --with dev
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy application code
+COPY --from=builder /opt/venv /opt/venv
+WORKDIR /app
+COPY requirements-dev.txt .
+RUN pip install -r requirements-dev.txt
+
+# Code is bind-mounted by docker-compose in dev; this COPY is the fallback
 COPY . .
 
-# Expose port
 EXPOSE 8000
 
-# Command will be overridden by docker-compose
 CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 # ===== Production Stage =====
-FROM base as production
+FROM python:3.12-slim AS production
 
-# Copy dependency files
-COPY pyproject.toml poetry.lock* ./
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/opt/venv/bin:$PATH"
 
-# Install only production dependencies
-RUN poetry install --no-root --only main
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy application code
+COPY --from=builder /opt/venv /opt/venv
+WORKDIR /app
 COPY . .
 
-# Create non-root user
 RUN useradd -m -u 1000 algotrader && \
     chown -R algotrader:algotrader /app
 USER algotrader
 
-# Expose port
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Run application
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+# workers MUST stay 1: the app holds singleton in-process state (paper
+# trading loop, dedicated reconciler task, APScheduler P&L snapshotter,
+# broker session with 10-min token, WS quote cache). Multiple workers
+# would run multiple trading loops against one broker account.
+CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

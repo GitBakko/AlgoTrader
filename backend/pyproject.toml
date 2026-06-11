@@ -1,96 +1,12 @@
-[tool.poetry]
+# Tool configuration only. Dependencies live in requirements.txt /
+# requirements-dev.txt (pip + venv, pinned from the working venv) — the
+# old poetry dependency set was abandoned and removed 2026-06-11.
+
+[project]
 name = "algotrader-ai"
 version = "0.1.0"
-description = "AI-powered algorithmic trading system for Gold, Bitcoin, and S&P 500"
-authors = ["AlgoTrader Team"]
-readme = "README.md"
-packages = [{include = "src"}]
-
-[tool.poetry.dependencies]
-python = ">=3.11,<3.13"
-
-# Web Framework
-fastapi = "^0.115.0"
-uvicorn = {extras = ["standard"], version = "^0.32.0"}
-pydantic = "^2.9.0"
-pydantic-settings = "^2.6.0"
-
-# Deep Learning
-torch = "^2.5.0"
-pytorch-forecasting = "^1.2.0"  # Include TFT (Temporal Fusion Transformer)
-
-# Machine Learning
-xgboost = "^2.1.0"
-lightgbm = "^4.5.0"
-scikit-learn = "^1.5.0"
-
-# Data Processing
-pandas = "^2.2.0"
-numpy = "^2.1.0"
-pyarrow = "^18.0.0"  # For Parquet support
-polars = "^1.17.0"  # Fast alternative to pandas for large datasets
-
-# Database
-sqlalchemy = "^2.0.0"
-sqlmodel = "^0.0.22"
-alembic = "^1.14.0"
-psycopg2-binary = "^2.9.0"
-duckdb = "^1.1.0"
-redis = "^5.2.0"
-
-# HTTP & WebSocket
-httpx = "^0.28.0"
-websockets = "^14.1"
-aiohttp = "^3.11.0"
-
-# Scheduling & Background Tasks
-apscheduler = "^3.10.0"
-
-# Utilities
-loguru = "^0.7.0"
-python-dotenv = "^1.0.0"
-cryptography = "^44.0.0"
-python-jose = {extras = ["cryptography"], version = "^3.3.0"}  # JWT tokens
-passlib = {extras = ["bcrypt"], version = "^1.7.4"}
-
-# Data Sources
-yfinance = "^0.2.50"  # Fallback data source
-fredapi = "^0.5.2"  # Federal Reserve Economic Data
-
-# NLP & Sentiment
-transformers = "^4.47.0"  # For FinBERT sentiment
-tokenizers = "^0.21.0"
-
-# Numerical & Scientific
-scipy = "^1.14.0"
-statsmodels = "^0.14.0"
-
-[tool.poetry.group.dev.dependencies]
-# Testing
-pytest = "^8.3.0"
-pytest-asyncio = "^0.24.0"
-pytest-cov = "^6.0.0"
-pytest-mock = "^3.14.0"
-
-# Code Quality
-black = "^24.10.0"
-ruff = "^0.8.0"
-mypy = "^1.13.0"
-pre-commit = "^4.0.0"
-
-# Type Stubs
-pandas-stubs = "^2.2.0"
-types-redis = "^4.6.0"
-
-# Jupyter
-jupyter = "^1.1.0"
-ipykernel = "^6.29.0"
-matplotlib = "^3.9.0"
-seaborn = "^0.13.0"
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+description = "MANTIS AI — AI-powered algorithmic trading platform"
+requires-python = ">=3.11,<3.13"
 
 [tool.black]
 line-length = 100
@@ -171,20 +87,13 @@ module = [
 ]
 ignore_missing_imports = true
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-addopts = [
-    "--strict-markers",
-    "--cov=src",
-    "--cov-report=term-missing",
-    "--cov-report=html",
-    "--cov-fail-under=80",
-]
-asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "function"
+# NOTE: pytest config lives in pytest.ini (single source of truth) — the
+# duplicate [tool.pytest.ini_options] block was removed 2026-06-11 because
+# pytest.ini always won and the two had drifted (70% vs 80% cov floor).
+
+[tool.bandit]
+# Referenced by .pre-commit-config.yaml (bandit -c pyproject.toml).
+exclude_dirs = ["tests", ".venv"]
 
 [tool.coverage.run]
 source = ["src"]

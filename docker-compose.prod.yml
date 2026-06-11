@@ -13,7 +13,9 @@ services:
       # No bind mounts in production — use built image only
       - backend_data:/app/data
       - backend_logs:/app/logs
-    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --workers 4
+    # workers MUST stay 1: per-process singleton trading state (loop,
+    # reconciler, scheduler, broker session) — N workers = N trading loops.
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --workers 1
     deploy:
       resources:
         limits:
