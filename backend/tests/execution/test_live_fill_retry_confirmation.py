@@ -9,7 +9,7 @@ that after a timeout the order manager checks for (and adopts) an actual fill
 instead of blindly re-submitting a duplicate position.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -59,8 +59,12 @@ def sample_order():
     )
 
 
-def _filled_position(deal_id="DEAL-FILLED-1", level=500.1):
-    """Broker position matching sample_order epic/direction/size."""
+def _filled_position(deal_id="DEAL-FILLED-1", level=500.1, age_seconds=5.0):
+    """Broker position matching sample_order epic/direction/size.
+
+    ``age_seconds`` controls creation recency: the adoption guard only
+    accepts positions created within the last 120 seconds.
+    """
     return Position(
         deal_id=deal_id,
         epic="TSLA",
@@ -68,7 +72,7 @@ def _filled_position(deal_id="DEAL-FILLED-1", level=500.1):
         size=1.0,
         level=level,
         currency="USD",
-        created_date=datetime.now(UTC),
+        created_date=datetime.now(UTC) - timedelta(seconds=age_seconds),
     )
 
 
@@ -107,9 +111,10 @@ class TestLiveFillRetryConfirmation:
             # with a different deal — making the duplicate visible.
             _open_confirmation("DEAL-DUP-2"),
         ]
-        # The timed-out corrected create actually filled on the broker.
+        # The timed-out corrected create actually filled on the broker
+        # moments ago (fresh: created now-5s, within the recency window).
         mock_broker.list_positions.return_value = [
-            _filled_position(deal_id="DEAL-FILLED-1", level=500.1)
+            _filled_position(deal_id="DEAL-FILLED-1", level=500.1, age_seconds=5.0)
         ]
 
         result = await live_order_manager.submit_order(sample_order)
@@ -153,4 +158,25 @@ class TestLiveFillRetryConfirmation:
 
         assert result.success is True
         assert result.deal_id == "DEAL-NOSTOPS"
+        assert mock_broker.create_position.await_count == 3
+
+    async def test_stale_position_not_adopted(self, live_order_manager, sample_order, mock_broker):
+        """A PRE-EXISTING position matching epic/direction/size (created 1h
+        ago) must NOT be adopted as the timed-out create's fill — adopting
+        it would overwrite ITS stops with the new order's levels. The
+        no-stops re-submit proceeds instead."""
+        mock_broker.create_position.side_effect = [
+            CapitalComError(SLTP_ERROR),  # first create: SL/TP rejected
+            TimeoutError(),  # corrected retry: confirm timeout
+            _open_confirmation("DEAL-NOSTOPS-FRESH"),  # no-stops retry succeeds
+        ]
+        # Only a STALE same-epic/dir/size position exists on the broker.
+        mock_broker.list_positions.return_value = [
+            _filled_position(deal_id="DEAL-STALE-OLD", level=480.0, age_seconds=3600.0)
+        ]
+
+        result = await live_order_manager.submit_order(sample_order)
+
+        assert result.success is True
+        assert result.deal_id == "DEAL-NOSTOPS-FRESH"  # NOT the stale deal
         assert mock_broker.create_position.await_count == 3

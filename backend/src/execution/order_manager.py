@@ -4,6 +4,7 @@ Order management: creates, closes, and modifies orders via broker or paper tradi
 
 import asyncio
 import time
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from loguru import logger
@@ -20,6 +21,13 @@ from src.broker.exceptions import (
 from src.broker.models import CreatePositionRequest, Direction, ModifyPositionRequest
 from src.execution.schemas import ExecutionMode, ExecutionOrder, ExecutionResult
 from src.utils.broker_error_parser import parse_broker_error
+
+# Max age for a broker position to be adopted as the fill of a timed-out
+# create (audit M1.3 review follow-up). Generous vs the 10s confirm timeout
+# plus retry latency, and tolerant of modest clock skew — while excluding
+# pre-existing same-epic/direction/size positions whose stops we must NOT
+# overwrite with the new order's levels.
+_RECENT_FILL_MAX_AGE_SECONDS = 120.0
 
 
 class OrderManager:
@@ -508,9 +516,11 @@ class OrderManager:
 
         A 10s confirm timeout does NOT mean the broker rejected the create
         (two-phase POST+confirm). Re-submitting blindly opened duplicate
-        positions (audit M1.3). Match on epic+direction+size — the position
-        opened by the timed-out request, if any. Returns the broker
-        Position or None.
+        positions (audit M1.3). Match on epic+direction+size AND creation
+        recency (<= _RECENT_FILL_MAX_AGE_SECONDS): a pre-existing position
+        that merely matches epic/direction/size must NOT be adopted — the
+        adoption path would overwrite ITS stops with the new order's levels.
+        Returns the broker Position or None.
         """
         try:
             positions = await asyncio.wait_for(self._broker.list_positions(), timeout=10.0)
@@ -520,12 +530,46 @@ class OrderManager:
         for pos in positions or []:
             pos_dir = getattr(pos.direction, "value", pos.direction)
             if (
-                pos.epic == epic
-                and str(pos_dir) == direction
-                and abs(float(pos.size) - float(size)) < 1e-9
+                pos.epic != epic
+                or str(pos_dir) != direction
+                or abs(float(pos.size) - float(size)) >= 1e-9
             ):
-                return pos
+                continue
+            age = self._position_age_seconds(pos)
+            if age is None:
+                logger.warning(
+                    f"[{epic}] Fill-check candidate {pos.deal_id} has no usable "
+                    f"creation timestamp — skipping (never adopt un-datable positions)"
+                )
+                continue
+            if abs(age) > _RECENT_FILL_MAX_AGE_SECONDS:
+                logger.debug(
+                    f"[{epic}] Fill-check candidate {pos.deal_id} too old "
+                    f"({age:.0f}s) — not the timed-out create, skipping"
+                )
+                continue
+            return pos
         return None
+
+    @staticmethod
+    def _position_age_seconds(pos) -> float | None:
+        """Age in seconds of a broker position, or None if un-datable.
+
+        ``Position.created_date`` is normalized to a tz-aware UTC datetime by
+        the model validator, but parse defensively: ISO strings are accepted,
+        naive datetimes are AMBIGUOUS (broker-local wall clock, see
+        ``models._normalize_broker_datetime``) so we refuse to guess — the
+        caller must never adopt a position it cannot date.
+        """
+        ts = getattr(pos, "created_date", None)
+        if isinstance(ts, str):
+            try:
+                ts = datetime.fromisoformat(ts)
+            except ValueError:
+                return None
+        if not isinstance(ts, datetime) or ts.tzinfo is None:
+            return None
+        return (datetime.now(UTC) - ts).total_seconds()
 
     async def _set_stops_after_fill(
         self,
