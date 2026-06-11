@@ -108,6 +108,26 @@ async def _connect_broker_with_retry(
             wait *= 2
 
 
+def _validate_execution_mode_request(*, desired: str, use_demo: bool) -> None:
+    """Refuse silently-incoherent EXECUTION_MODE / USE_DEMO combos (audit M1.8).
+
+    EXECUTION_MODE=LIVE with USE_DEMO=true previously no-op'd the engine
+    upgrade: the backend kept simulating fills on the throwaway PAPER engine
+    with zero warning.  EXECUTION_MODE=DEMO with USE_DEMO=false has the same
+    silent no-op problem in the opposite direction.
+    """
+    if desired == "LIVE" and use_demo:
+        raise RuntimeError(
+            "EXECUTION_MODE=LIVE requires USE_DEMO=false — refusing to boot "
+            "into silent PAPER simulation."
+        )
+    if desired == "DEMO" and not use_demo:
+        raise RuntimeError(
+            "EXECUTION_MODE=DEMO requires USE_DEMO=true — refusing to boot "
+            "into silent PAPER simulation."
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -130,6 +150,13 @@ async def lifespan(app: FastAPI):
             "LIVE mode requires AUTH_REQUIRED=true. Refusing to start "
             "with anonymous access to trading control surface."
         )
+
+    # M1.8 — execution-mode coherence guard: fail fast before broker connect
+    # so a mismatch surfaces even when the broker is unreachable.
+    _validate_execution_mode_request(
+        desired=getattr(app.state, "_desired_execution_mode", "PAPER"),
+        use_demo=settings.use_demo,
+    )
 
     # Initialize shutdown flag
     app.state.is_shutting_down = False

@@ -6,7 +6,7 @@ Loads settings from environment variables and .env file.
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -571,6 +571,21 @@ class Settings(BaseSettings):
                 stacklevel=2,
             )
         return v
+
+    @model_validator(mode="after")
+    def _enforce_secret_key_outside_demo(self) -> "Settings":
+        """Hard-fail on default SECRET_KEY when not in demo mode (audit M1.8).
+
+        In demo mode a warning is sufficient; outside demo every JWT
+        (kill-switch, order endpoints) would be forgeable with the default key.
+        """
+        if not self.use_demo and self.secret_key == "dev_secret_key_change_in_production":
+            raise ValueError(
+                "SECRET_KEY is still the default in a non-demo configuration. "
+                "Every JWT (kill-switch, order endpoints) would be forgeable. "
+                "Set SECRET_KEY before any LIVE deploy (audit M1.8)."
+            )
+        return self
 
     encryption_key: str = Field(
         default="", alias="ENCRYPTION_KEY", description="Fernet encryption key (32 bytes base64)"
