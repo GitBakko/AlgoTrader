@@ -389,12 +389,19 @@ class ExecutionEngine:
                         # Audit M1.9 backfill — same never-clobber rule as
                         # paper_loop._persist_position_close: repair a NULL
                         # profit_loss once the Position row carries the real
-                        # value; fill_price is broker-resolved, more
-                        # authoritative than the earlier estimate.
+                        # value. fill_price here is always the broker
+                        # close-confirmation (no placeholder path on this
+                        # caller), so refreshing price is safe; quantize to
+                        # Trade.price Numeric(15,4) (ROUND_HALF_EVEN default)
+                        # so re-fires compare equal instead of re-writing.
+                        # NOTE: the injected-repos fallback guard below stays
+                        # intentionally skip-only (test-only wiring).
                         if position_db.profit_loss is not None and _existing.profit_loss is None:
                             _existing.profit_loss = position_db.profit_loss
-                        if fill_price and _existing.price != Decimal(str(fill_price)):
-                            _existing.price = Decimal(str(fill_price))
+                        if fill_price:
+                            fill_q = Decimal(str(fill_price)).quantize(Decimal("0.0001"))
+                            if _existing.price != fill_q:
+                                _existing.price = fill_q
                     await session.commit()
 
                     logger.debug(f"Position closed in DB: {deal_id} P&L={position_db.profit_loss}")

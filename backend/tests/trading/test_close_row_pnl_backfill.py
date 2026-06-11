@@ -12,8 +12,11 @@ never repaired and per-trade analytics under-reported.
 Contract:
 - non-NULL incoming P&L + NULL on the existing row  → backfill.
 - incoming exit/fill price (broker-resolved, authoritative) differing from
-  the stored one → overwrite.
+  the stored one → overwrite, quantized to Trade.price Numeric(15,4).
 - NULL incoming P&L must NEVER clobber a non-NULL stored value.
+- Tier-3 UNRECONCILED calls (pnl=None + placeholder exit_price == entry
+  level) must NEVER degrade a real fill price already on the row — the
+  loop-guard price refresh is gated on pnl being non-NULL.
 - Invariant #10 holds: NO second CLOSE Trade INSERT in either guard branch.
 """
 
@@ -135,6 +138,50 @@ async def test_loop_guard_never_clobbers_with_null(monkeypatch):
     assert existing_trade.price == Decimal("2000.0")
     session.add.assert_not_called()
     repo.create.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_tier3_placeholder_never_degrades_real_price(monkeypatch):
+    """Tier-3 UNRECONCILED scenario: our-close inserted the CLOSE row with
+    the REAL fill price (pnl=NULL), then every reconciliation tier failed
+    and ``_emit_unreconciled_close`` re-fires ``_persist_position_close``
+    with pnl=None + placeholder exit_price == entry level. The guard must
+    leave both price and P&L untouched and log a plain skip."""
+    existing_trade = _existing_close_row(
+        profit_loss=None,  # broker P&L never resolved
+        price=Decimal("2010.0"),  # REAL fill price from the close confirmation
+    )
+    loop, repo, session, pos = _make_loop_with_existing_close(existing_trade)
+
+    from src.database import repositories as _repos
+
+    monkeypatch.setattr(_repos, "PositionRepository", lambda s: repo)
+
+    from loguru import logger as _loguru_logger
+
+    messages: list[str] = []
+    sink_id = _loguru_logger.add(lambda m: messages.append(str(m)), level="INFO")
+    try:
+        await loop._persist_position_close(
+            deal_id="DEAL-BACKFILL-1",
+            epic="XAUUSD",
+            direction="BUY",
+            size=1.0,
+            entry_price=2000.0,
+            exit_price=2000.0,  # Tier-3 placeholder == entry level
+            pnl=None,  # UNRECONCILED
+            close_reason="UNRECONCILED",
+        )
+    finally:
+        _loguru_logger.remove(sink_id)
+
+    # The real fill price must survive the placeholder call.
+    assert existing_trade.price == Decimal("2010.0")
+    assert existing_trade.profit_loss is None
+    session.add.assert_not_called()
+    repo.create.assert_not_called()
+    assert any("Skip duplicate CLOSE Trade row" in m for m in messages)
+    assert not any("Backfilled CLOSE Trade row" in m for m in messages)
 
 
 # ---------------------------------------------------------------------------

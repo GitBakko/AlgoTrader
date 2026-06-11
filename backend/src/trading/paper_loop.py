@@ -881,17 +881,25 @@ class PaperTradingLoop:
                     # Audit M1.9: locally-initiated closes insert this row
                     # with profit_loss=NULL (engine path, broker P&L not yet
                     # known). Backfill once reconciliation has real values —
-                    # never clobber a non-NULL value with NULL. The incoming
-                    # exit_price on the reconciler path is broker-resolved,
-                    # more authoritative than the locally-estimated value
-                    # inserted earlier.
+                    # never clobber a non-NULL value with NULL.
                     backfilled = False
                     if pnl_decimal is not None and existing_close.profit_loss is None:
                         existing_close.profit_loss = pnl_decimal
                         backfilled = True
-                    if exit_price and existing_close.price != Decimal(str(exit_price)):
-                        existing_close.price = Decimal(str(exit_price))
-                        backfilled = True
+                    # Price refresh is ALSO gated on pnl_decimal: only the
+                    # reconciler path carries a broker-resolved exit_price
+                    # (together with a real pnl). Tier-3 UNRECONCILED calls
+                    # pass pnl=None + a placeholder exit_price (== entry
+                    # level) — letting that through would degrade a real
+                    # fill price already on the row. Quantize to
+                    # Trade.price's Numeric(15,4) scale (ROUND_HALF_EVEN
+                    # default) so re-fires compare equal instead of
+                    # re-writing + logging "Backfilled" forever.
+                    if pnl_decimal is not None and exit_price:
+                        exit_q = Decimal(str(exit_price)).quantize(Decimal("0.0001"))
+                        if existing_close.price != exit_q:
+                            existing_close.price = exit_q
+                            backfilled = True
                     await session.commit()
                     logger.info(
                         f"{'Backfilled' if backfilled else 'Skip duplicate'} "
