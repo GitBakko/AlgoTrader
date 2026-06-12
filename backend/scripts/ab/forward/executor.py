@@ -22,6 +22,7 @@ class ExperimentExecutor:
     notional_usd: float = 200.0
     max_concurrent: int = 5
     daily_loss_limit_usd: float = 100.0
+    account_ccy: str = "EUR"   # experiment account denomination (broker P&L arrives in this ccy)
     dry_run: bool = True
     _halted: bool = field(default=False, init=False, repr=False)
 

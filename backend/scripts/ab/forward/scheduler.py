@@ -393,7 +393,7 @@ class ExperimentScheduler:
                 )
                 logger.info(
                     f"[forward-lab] closed {row['epic']} ({row['strategy']}) "
-                    f"net={net:+.2f} ({reason})"
+                    f"net={net:+.2f} {self.executor.account_ccy} ({reason})"
                 )
 
     def _row_age_hours(self, row: dict, now: datetime) -> float:
@@ -428,7 +428,7 @@ class ExperimentScheduler:
         own_ids = {row["deal_id"], row.get("close_deal_id")} - {None}
         for t in trades:
             if t.deal_id and t.deal_id in own_ids:
-                pnl = t.pl_value_in("USD")
+                pnl = t.pl_value_in(self.executor.account_ccy)
                 if pnl is not None:
                     return float(pnl), fallback_px, "BROKER_TRADE"
 
@@ -463,7 +463,7 @@ class ExperimentScheduler:
                         continue
                 for t in trades:
                     if t.deal_id and t.deal_id == a.deal_id:
-                        pnl = t.pl_value_in("USD")
+                        pnl = t.pl_value_in(self.executor.account_ccy)
                         if pnl is not None:
                             level = a.details.level
                             if level is None:
