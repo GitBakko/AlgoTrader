@@ -90,7 +90,7 @@ class Settings(BaseSettings):
     capital_experiment_account_id: str | None = None
     forward_lab_notional_usd: float = 200.0
     forward_lab_max_concurrent: int = 10  # shared gap_fade+ORB cap (raised 5->10, wider ORB)
-    forward_lab_daily_loss_limit_usd: float = 100.0
+    forward_lab_daily_loss_limit_usd: float = 100.0  # EUR-denominated despite the suffix (experiment acct is EUR); key name kept for .env compat
     forward_lab_scan_pacing_s: float = 0.20  # pre-call per-epic GET pacing (10 req/s limit; was 0.12 post-_mid only)
     forward_lab_gap_threshold: float = 0.01
     forward_lab_session_open_et: str = "09:30"  # US cash open (America/New_York wall-clock)

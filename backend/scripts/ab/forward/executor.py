@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from loguru import logger
@@ -21,10 +21,9 @@ class ExperimentExecutor:
     ledger: object              # ForwardLedger
     notional_usd: float = 200.0
     max_concurrent: int = 5
-    daily_loss_limit_usd: float = 100.0
+    daily_loss_limit_eur: float = 100.0
     account_ccy: str = "EUR"   # experiment account denomination (broker P&L arrives in this ccy)
     dry_run: bool = True
-    _halted: bool = field(default=False, init=False, repr=False)
 
     async def assert_isolation(self) -> None:
         active = await self.client.get_active_account_id()
@@ -38,7 +37,12 @@ class ExperimentExecutor:
 
     async def try_enter(self, strat: ForwardStrategy, ctx: MarketContext,
                         session_date: str) -> Signal | object | None:
-        if self._halted:
+        net_today = self.ledger.session_net(session_date)
+        if net_today <= -self.daily_loss_limit_eur:
+            logger.critical(
+                f"[forward-lab] DAILY LOSS LIMIT: session {session_date} realized "
+                f"{net_today:+.2f} {self.account_ccy} <= -{self.daily_loss_limit_eur:.2f} "
+                "— blocking new entries (open positions keep broker SL + EOD flatten)")
             return None
         if self.ledger.exists(strat.name, ctx.epic, session_date):
             return None                              # one trade per strategy/epic/day (idempotent)

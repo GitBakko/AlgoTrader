@@ -154,7 +154,7 @@ def _make_executor(client, dry_run: bool) -> ExperimentExecutor:
         client=client, experiment_account_id=s.capital_experiment_account_id or "",
         ledger=ForwardLedger(LEDGER_PATH), notional_usd=s.forward_lab_notional_usd,
         max_concurrent=s.forward_lab_max_concurrent,
-        daily_loss_limit_usd=s.forward_lab_daily_loss_limit_usd, dry_run=dry_run)
+        daily_loss_limit_eur=s.forward_lab_daily_loss_limit_usd, dry_run=dry_run)
 
 
 async def cmd_dry_run() -> None:
