@@ -29,14 +29,16 @@ class ForwardLedger:
                     rationale TEXT, opened_at TEXT,
                     prev_close REAL, today_open REAL,
                     exit_price REAL, net_pnl REAL, closed_at TEXT, close_reason TEXT,
+                    close_deal_id TEXT,
                     UNIQUE(strategy, epic, session_date))"""
             )
             # Idempotent migration: add columns missing from legacy DBs.
             existing = {row[1] for row in c.execute("PRAGMA table_info(trades)")}
-            for col in ("prev_close", "today_open"):
+            for col in ("prev_close", "today_open", "close_deal_id"):
                 if col not in existing:
                     try:
-                        c.execute(f"ALTER TABLE trades ADD COLUMN {col} REAL")
+                        col_type = "REAL" if col in ("prev_close", "today_open") else "TEXT"
+                        c.execute(f"ALTER TABLE trades ADD COLUMN {col} {col_type}")
                     except sqlite3.OperationalError:
                         pass  # lost the migration race — column already added by a concurrent init
 
@@ -83,3 +85,23 @@ class ForwardLedger:
             return [dict(r) for r in c.execute(
                 "SELECT * FROM trades WHERE strategy=? AND closed_at IS NOT NULL "
                 "ORDER BY closed_at", (strategy,))]
+
+    def set_close_deal_id(self, deal_id: str, close_deal_id: str) -> None:
+        """Persist the broker's CURRENT dealId at the moment WE send the close
+        (Capital.com may have rotated it vs the stored create-confirmation id).
+        _realized Tier-1 then matches the TRADE row on either id."""
+        with self._conn() as c:
+            c.execute(
+                "UPDATE trades SET close_deal_id=? WHERE deal_id=? AND closed_at IS NULL",
+                (close_deal_id, deal_id),
+            )
+
+    def session_net(self, session_date: str) -> float:
+        """Realized net P&L (account currency) of CLOSED rows for one session day."""
+        with self._conn() as c:
+            row = c.execute(
+                "SELECT COALESCE(SUM(net_pnl), 0.0) FROM trades "
+                "WHERE session_date=? AND closed_at IS NOT NULL",
+                (session_date,),
+            ).fetchone()
+            return float(row[0])

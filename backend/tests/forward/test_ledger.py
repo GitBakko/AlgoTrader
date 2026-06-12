@@ -72,3 +72,37 @@ def test_init_migrates_legacy_db_missing_columns(tmp_path):
                     rationale="y", opened_at="2026-06-03T14:30:00+00:00",
                     prev_close=495.0, today_open=500.0)
     assert led.list_open()[0]["prev_close"] == 495.0
+
+
+def test_close_deal_id_migration_and_roundtrip(tmp_path):
+    from forward.ledger import ForwardLedger
+    led = ForwardLedger(tmp_path / "cd.db")
+    led.record_open(strategy="orb", epic="AAPL", session_date="2026-06-12",
+                    deal_id="D1", direction="BUY", entry=100.0, size=1.0,
+                    stop_level=99.0, rationale="t", opened_at="2026-06-12T14:00:00+00:00")
+    led.set_close_deal_id("D1", "DROT")
+    row = led.list_open()[0]
+    assert row["close_deal_id"] == "DROT"
+    # re-init on the same file must be idempotent (ADD COLUMN guarded)
+    ForwardLedger(tmp_path / "cd.db")
+
+
+def test_session_net_sums_only_closed_rows_of_that_day(tmp_path):
+    from forward.ledger import ForwardLedger
+    led = ForwardLedger(tmp_path / "sn.db")
+    # closed today: -60 and -50; open today: ignored; closed yesterday: ignored
+    for i, (sd, pnl, closed) in enumerate([
+        ("2026-06-12", -60.0, True),
+        ("2026-06-12", -50.0, True),
+        ("2026-06-12", None, False),
+        ("2026-06-11", -500.0, True),
+    ]):
+        led.record_open(strategy="orb", epic=f"E{i}", session_date=sd,
+                        deal_id=f"D{i}", direction="BUY", entry=100.0, size=1.0,
+                        stop_level=99.0, rationale="t",
+                        opened_at=f"{sd}T14:00:00+00:00")
+        if closed:
+            led.record_close(deal_id=f"D{i}", exit_price=99.0, net_pnl=pnl,
+                             closed_at=f"{sd}T19:45:00+00:00", close_reason="BROKER_TRADE")
+    assert led.session_net("2026-06-12") == -110.0
+    assert led.session_net("2026-06-10") == 0.0
