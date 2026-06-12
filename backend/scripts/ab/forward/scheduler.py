@@ -113,6 +113,14 @@ class ExperimentScheduler:
         end_dt = self._et_to_utc(now.date(), self.watch_end_et)
         return open_dt <= now < end_dt
 
+    async def _paced(self) -> None:
+        """Sleep scan_pacing_s BEFORE a per-epic broker GET (10 req/s limit).
+        Cold-cache first pass fires up to ~3 GETs per epic; pacing must precede
+        EVERY call or the M5 fetches burst the client token bucket (capacity 20)
+        and draw 429s — observed 153x on 2026-06-05, 112x on 2026-06-08."""
+        if self.scan_pacing_s:
+            await asyncio.sleep(self.scan_pacing_s)
+
     async def _opening_range(self, epic: str, now: datetime) -> tuple[float, float] | None:
         """OR high/low from Capital.com MINUTE_5 bars in [open, open+or_window_min).
 
@@ -224,6 +232,7 @@ class ExperimentScheduler:
                 # a failed/absent daily close.
                 if strat.needs_prev_close:
                     if epic not in self._state.prev_close:
+                        await self._paced()
                         pc = await self._prev_close(epic, now)
                         if pc is None:
                             continue
@@ -232,17 +241,17 @@ class ExperimentScheduler:
                 else:
                     prev_close = 0.0
 
+                await self._paced()
                 mid = await self._mid(epic)
                 if mid is None:
                     continue
-                if self.scan_pacing_s:  # pace per-epic GETs (10 req/s limit)
-                    await asyncio.sleep(self.scan_pacing_s)
 
                 # today_open = the TRUE 09:30 cash-session open (historical M5 bar),
                 # not the live mid — so a mid-session restart can't re-snapshot a
                 # false gap. Only strategies that consume today_open pay the fetch
                 # (ORB ignores it). Falls back to mid until the open bar exists.
                 if epic not in self._state.open_px and strat.uses_today_open:
+                    await self._paced()
                     sop = await self._session_open_price(epic, now)
                     if sop is not None:
                         self._state.open_px[epic] = sop
@@ -250,6 +259,7 @@ class ExperimentScheduler:
 
                 if strat.needs_opening_range:
                     if epic not in self._state.or_levels:
+                        await self._paced()
                         orng = await self._opening_range(epic, now)
                         if orng is None:
                             continue
