@@ -360,6 +360,7 @@ class ExperimentScheduler:
                     await self.client.close_position(
                         matched.deal_id
                     )  # broker's CURRENT dealId, not the stored one
+                    self.executor.ledger.set_close_deal_id(row["deal_id"], matched.deal_id)
                     logger.info(
                         f"[forward-lab] close sent for {row['epic']} ({row['strategy']}) "
                         "— reconcile deferred to next pass (broker history lag)"
@@ -422,9 +423,11 @@ class ExperimentScheduler:
         txns = await self.client.get_transaction_history(from_date, to_date)
         trades = [t for t in txns if (t.transaction_type or "").upper() == "TRADE"]
 
-        # Tier 1 — exact dealId (our own close)
+        # Tier 1 — exact dealId (our own close). The TRADE row may carry either the
+        # stored create-confirmation id or the rotated id we used to send the close.
+        own_ids = {row["deal_id"], row.get("close_deal_id")} - {None}
         for t in trades:
-            if t.deal_id and t.deal_id == row["deal_id"]:
+            if t.deal_id and t.deal_id in own_ids:
                 pnl = t.pl_value_in("USD")
                 if pnl is not None:
                     return float(pnl), fallback_px, "BROKER_TRADE"
@@ -462,7 +465,14 @@ class ExperimentScheduler:
                     if t.deal_id and t.deal_id == a.deal_id:
                         pnl = t.pl_value_in("USD")
                         if pnl is not None:
-                            return float(pnl), fallback_px, "BROKER_ACTIVITY"
+                            level = a.details.level
+                            if level is None:
+                                logger.debug(
+                                    f"[forward-lab] {row['epic']} close activity has no "
+                                    "level — exit_price falls back to reconcile-time mid"
+                                )
+                            close_px = float(level) if level is not None else fallback_px
+                            return float(pnl), close_px, "BROKER_ACTIVITY"
         return 0.0, fallback_px, "PENDING_RECONCILE"
 
     @staticmethod

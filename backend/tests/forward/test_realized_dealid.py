@@ -68,9 +68,12 @@ async def test_realized_unmatched_dealid_is_pending(tmp_path):
     assert net == 0.0 and reason == "PENDING_RECONCILE"
 
 
-def _activity(deal_id, open_price, epic="AAPL", source="SL"):
+def _activity(deal_id, open_price, epic="AAPL", source="SL", level=None):
     from src.broker.models import ActivityEvent
 
+    details = {"openPrice": open_price, "direction": "SELL"}
+    if level is not None:
+        details["level"] = level
     return ActivityEvent.model_validate(
         {
             "date": "2026-06-03T16:00:00",
@@ -79,7 +82,7 @@ def _activity(deal_id, open_price, epic="AAPL", source="SL"):
             "type": "POSITION",
             "status": "ACCEPTED",
             "dealId": deal_id,
-            "details": {"openPrice": open_price, "direction": "SELL"},
+            "details": details,
         }
     )
 
@@ -288,3 +291,99 @@ async def test_realized_overnight_carry_clamps_activity_window(tmp_path):
     # activity window clamped to <=24h (would have been ~31h, broker-rejected, before the fix)
     act_frm, act_to = captured["act"]
     assert (act_to - act_frm) <= timedelta(hours=24)
+
+
+@pytest.mark.asyncio
+async def test_tier2_exit_price_uses_activity_level(tmp_path):
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import ORBStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+
+    client = AsyncMock()
+    client.get_transaction_history.return_value = [_txn("DPOS1", "-7.50")]
+    client.get_activity_history.return_value = [
+        _activity("DPOS1", open_price=103.0, level=101.25)]
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(tmp_path / "lv.db"), dry_run=False)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[ORBStrategy(epics=["AAPL"])])
+    row = {"epic": "AAPL", "deal_id": "DPOS", "entry": 103.0,
+           "opened_at": "2026-06-03T14:30:00+00:00", "direction": "BUY"}
+    net, px, reason = await sched._realized(row, fallback_px=100.0)
+    assert reason == "BROKER_ACTIVITY" and px == 101.25  # broker close level, not mid
+
+
+@pytest.mark.asyncio
+async def test_tier2_exit_price_falls_back_to_mid_when_level_absent(tmp_path):
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import ORBStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+
+    client = AsyncMock()
+    client.get_transaction_history.return_value = [_txn("DPOS1", "-7.50")]
+    client.get_activity_history.return_value = [_activity("DPOS1", open_price=103.0)]
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(tmp_path / "lv2.db"), dry_run=False)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[ORBStrategy(epics=["AAPL"])])
+    row = {"epic": "AAPL", "deal_id": "DPOS", "entry": 103.0,
+           "opened_at": "2026-06-03T14:30:00+00:00", "direction": "BUY"}
+    net, px, reason = await sched._realized(row, fallback_px=100.0)
+    assert reason == "BROKER_ACTIVITY" and px == 100.0
+
+
+@pytest.mark.asyncio
+async def test_tier1_matches_persisted_close_deal_id(tmp_path):
+    """Our own close was sent with the broker's CURRENT (rotated) dealId; the TRADE
+    row carries that id, not the stored create-confirmation id. Tier-1 must match
+    via row['close_deal_id'] without any activity call."""
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import GapFadeStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+
+    client = AsyncMock()
+    client.get_transaction_history.return_value = [_txn("DROT", "4.00")]
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(tmp_path / "cdid.db"), dry_run=False)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[GapFadeStrategy(epics=["AAPL"])])
+    row = {"epic": "AAPL", "deal_id": "DMINE", "close_deal_id": "DROT",
+           "entry": 100.0, "opened_at": "2026-06-03T14:00:00+00:00",
+           "direction": "SELL"}
+    net, _px, reason = await sched._realized(row, fallback_px=100.0)
+    assert net == 4.00 and reason == "BROKER_TRADE"
+    client.get_activity_history.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_mark_pass_persists_close_deal_id_on_our_close(tmp_path):
+    from forward.scheduler import ExperimentScheduler
+    from forward.strategy import ORBStrategy
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+    from src.broker.models import Position
+
+    client = AsyncMock()
+    # broker position with ROTATED dealId vs the stored one; same epic+dir+level
+    client.list_positions.return_value = [Position.model_validate({
+        "dealId": "DCUR", "epic": "AAPL", "direction": "BUY",
+        "size": 1.0, "level": 103.0, "currency": "USD",
+        "createdDate": "2026-06-12T14:00:00"})]
+    client.get_market_details.return_value = {"snapshot": {"bid": 104.0, "offer": 104.2}}
+    client.get_active_account_id.return_value = "EXP"
+    led = ForwardLedger(tmp_path / "mp.db")
+    led.record_open(strategy="orb", epic="AAPL", session_date="2026-06-12",
+                    deal_id="DSTORED", direction="BUY", entry=103.0, size=1.0,
+                    stop_level=99.0, rationale="t",
+                    opened_at="2026-06-12T14:00:00+00:00")
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=led, dry_run=False)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[ORBStrategy(epics=["AAPL"])])
+    # past session_close (15:45 ET = 19:45 UTC) -> ORB exit_rule fires -> our close
+    await sched.mark_pass(now=datetime(2026, 6, 12, 20, 0, tzinfo=timezone.utc))
+    client.close_position.assert_awaited_once_with("DCUR")
+    assert led.list_open()[0]["close_deal_id"] == "DCUR"
