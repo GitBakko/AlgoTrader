@@ -247,15 +247,23 @@ class ExperimentScheduler:
                     continue
 
                 # today_open = the TRUE 09:30 cash-session open (historical M5 bar),
-                # not the live mid — so a mid-session restart can't re-snapshot a
-                # false gap. Only strategies that consume today_open pay the fetch
-                # (ORB ignores it). Falls back to mid until the open bar exists.
-                if epic not in self._state.open_px and strat.uses_today_open:
-                    await self._paced()
-                    sop = await self._session_open_price(epic, now)
-                    if sop is not None:
+                # never the live mid: entering on a mid-fallback gap is the residual
+                # restart wart. If the bar is not yet available (first minutes of the
+                # session or fetch error), SKIP the epic this pass and retry in 5 min.
+                if strat.uses_today_open:
+                    if epic not in self._state.open_px:
+                        await self._paced()
+                        sop = await self._session_open_price(epic, now)
+                        if sop is None:
+                            logger.info(
+                                f"[forward-lab] {epic} 09:30 M5 bar not yet available "
+                                "— skip this pass, retry next"
+                            )
+                            continue
                         self._state.open_px[epic] = sop
-                today_open = self._state.open_px.get(epic, mid)
+                    today_open = self._state.open_px[epic]
+                else:
+                    today_open = mid  # ORB ignores today_open (exit_rule never reads it)
 
                 if strat.needs_opening_range:
                     if epic not in self._state.or_levels:
@@ -285,26 +293,6 @@ class ExperimentScheduler:
                         now=now,
                         session_close=self._session_close(now),
                     )
-                await self.executor.try_enter(strat, ctx, session_date)
-
-    async def on_session_open(self, now: datetime | None = None) -> None:
-        now = now or datetime.now(timezone.utc)
-        session_date = now.date().isoformat()
-        for strat in self.strategies:
-            for epic in strat.universe():
-                prev_close = await self._prev_close(epic, now)
-                mid = await self._mid(epic)
-                if prev_close is None or mid is None:
-                    logger.warning(f"[forward-lab] missing price for {epic} — skip")
-                    continue
-                ctx = MarketContext(
-                    epic=epic,
-                    prev_close=prev_close,
-                    today_open=mid,
-                    current_price=mid,
-                    now=now,
-                    session_close=self._session_close(now),
-                )
                 await self.executor.try_enter(strat, ctx, session_date)
 
     def _match_broker_position(self, row: dict, positions: list):
@@ -361,7 +349,7 @@ class ExperimentScheduler:
             ctx = MarketContext(
                 epic=row["epic"],
                 prev_close=0.0,
-                today_open=row["entry"],
+                today_open=row["today_open"] if row.get("today_open") is not None else row["entry"],
                 current_price=mid,
                 now=now,
                 session_close=self._session_close(now),
