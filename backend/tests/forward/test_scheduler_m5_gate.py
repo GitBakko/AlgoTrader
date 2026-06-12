@@ -143,3 +143,49 @@ async def test_mark_pass_ctx_today_open_from_ledger_not_entry(tmp_path):
     await sched.mark_pass(now=NOW)
     assert seen["pos_today_open"] == 105.0
     assert seen["ctx_today_open"] == 105.0  # was row['entry']=103.0 before fix
+
+
+@pytest.mark.asyncio
+async def test_mark_pass_ctx_today_open_null_falls_back_to_entry(tmp_path):
+    """record_open WITHOUT today_open (NULL in DB) → mark_pass must fall back to
+    entry for both pos.today_open and ctx.today_open, NOT 0.0 (the old default
+    that produced an unreachable 50%-fill target = 0.5 * prev_close)."""
+    from forward.strategy import GapFadeStrategy
+    from forward.scheduler import ExperimentScheduler
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+
+    seen = {}
+
+    class SpyGapFade(GapFadeStrategy):
+        def exit_rule(self, pos, ctx):
+            seen["ctx_today_open"] = ctx.today_open
+            seen["pos_today_open"] = pos.today_open
+            return False
+
+    client = AsyncMock()
+    client.list_positions.return_value = []
+    client.get_market_details.return_value = {"snapshot": {"bid": 101.9, "offer": 102.1}}
+    client.get_active_account_id.return_value = "EXP"
+    client.get_transaction_history.return_value = []
+    client.get_activity_history.return_value = []
+    led = ForwardLedger(tmp_path / "null_open.db")
+    # Deliberately omit today_open — should write NULL to DB, not 0.0
+    led.record_open(strategy="gap_fade", epic="AMD", session_date="2026-06-12",
+                    deal_id="D2", direction="SELL", entry=103.0, size=1.0,
+                    stop_level=104.5, rationale="t",
+                    opened_at=datetime.now(timezone.utc).isoformat(),
+                    prev_close=100.0)
+    # Verify the DB actually stored NULL (not 0.0) — catches the default trap
+    row = led.list_open()[0]
+    assert row["today_open"] is None, (
+        f"expected today_open=NULL in DB, got {row['today_open']!r}; "
+        "ledger.record_open default must be None, not 0.0"
+    )
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=led, dry_run=False)
+    sched = ExperimentScheduler(client=client, executor=ex,
+                                strategies=[SpyGapFade(epics=["AMD"])])
+    await sched.mark_pass(now=NOW)
+    assert seen["pos_today_open"] == 103.0   # entry fallback, not 0.0
+    assert seen["ctx_today_open"] == 103.0   # entry fallback, not 0.0

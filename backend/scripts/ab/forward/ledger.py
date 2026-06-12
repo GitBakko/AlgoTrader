@@ -43,7 +43,7 @@ class ForwardLedger:
     def record_open(self, *, strategy: str, epic: str, session_date: str, deal_id: str,
                     direction: str, entry: float, size: float, stop_level: float,
                     rationale: str, opened_at: str,
-                    prev_close: float = 0.0, today_open: float = 0.0) -> bool:
+                    prev_close: float = 0.0, today_open: float | None = None) -> bool:
         try:
             with self._conn() as c:
                 c.execute(
