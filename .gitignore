@@ -27,6 +27,7 @@ backend/data/diagnostics/
 backend/data/crypto_perp/
 backend/data/sharadar/
 backend/data/forward_lab/
+backend/data/vix_gate/
 *.parquet
 *.h5
 *.pt
