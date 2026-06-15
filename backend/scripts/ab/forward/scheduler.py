@@ -293,7 +293,15 @@ class ExperimentScheduler:
                         now=now,
                         session_close=self._session_close(now),
                     )
-                await self.executor.try_enter(strat, ctx, session_date)
+                try:
+                    await self.executor.try_enter(strat, ctx, session_date)
+                except Exception as e:  # noqa: BLE001 — one epic's broker error
+                    # (reject, network, rate-limit) must NEVER abort the whole pass
+                    # and starve the remaining epics + the ORB strategy that follows.
+                    logger.warning(
+                        f"[forward-lab] {strat.name} {epic} try_enter failed: {e} "
+                        "— skip epic, continue pass"
+                    )
 
     def _match_broker_position(self, row: dict, positions: list):
         """Find the live broker position for a ledger row WITHOUT relying on exact

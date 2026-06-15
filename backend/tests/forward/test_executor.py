@@ -104,6 +104,53 @@ async def test_size_uses_current_price_not_today_open(tmp_path):
     assert client.create_position.call_args.args[0].size == 1.0
 
 
+# ---------------------------------------------------------------------------
+# Broker stop-side validation — gap-up that keeps running leaves a fade-short
+# stop BELOW spot (wrong side); the broker rejects it. We skip, never crash.
+# ---------------------------------------------------------------------------
+
+def _rules_client(level=103.0, min_pct=0.01):
+    client = AsyncMock()
+    client.get_active_account_id.return_value = "EXP"
+    client.get_market_details.return_value = {
+        "dealingRules": {"minStopOrProfitDistance": {"unit": "PERCENTAGE", "value": min_pct}}}
+    client.create_position.return_value = DealConfirmation.model_validate({
+        "dealId": "D1", "dealReference": "R1", "dealStatus": "ACCEPTED", "epic": "AAPL",
+        "direction": "SELL", "size": 1.0, "level": level, "status": "OPEN"})
+    return client
+
+
+@pytest.mark.asyncio
+async def test_skips_when_sell_stop_below_spot(tmp_path):
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+    client = _rules_client()
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(tmp_path / "w.db"),
+                            notional_usd=200.0, dry_run=False)
+    # gap +3% -> SELL stop ~104.5, but price ran to 110 -> stop is below spot -> wrong side
+    res = await ex.try_enter(_strat(), _ctx(100.0, 103.0, 110.0), "2026-06-02")
+    assert res is None
+    client.create_position.assert_not_called()
+    assert ex.ledger.list_open() == []
+
+
+@pytest.mark.asyncio
+async def test_sends_and_records_clamped_stop_when_correct_side(tmp_path):
+    from forward.executor import ExperimentExecutor
+    from forward.ledger import ForwardLedger
+    client = _rules_client(level=103.0)
+    ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
+                            ledger=ForwardLedger(tmp_path / "ok.db"),
+                            notional_usd=200.0, dry_run=False)
+    await ex.try_enter(_strat(), _ctx(100.0, 103.0, 103.0), "2026-06-02")  # stop ~104.5 > spot
+    client.create_position.assert_awaited_once()
+    req = client.create_position.call_args.args[0]
+    assert req.stop_level > 103.0
+    # ledger persists the stop ACTUALLY sent (not the raw signal stop)
+    assert ex.ledger.list_open()[0]["stop_level"] == req.stop_level
+
+
 @pytest.mark.asyncio
 async def test_try_enter_idempotent_no_double_order(tmp_path):
     from forward.executor import ExperimentExecutor

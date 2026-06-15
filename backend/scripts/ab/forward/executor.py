@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from loguru import logger
 
-from src.broker.models import CreatePositionRequest
+from src.broker.models import CreatePositionRequest, Direction
 from forward.strategy import ForwardStrategy, MarketContext, Signal
 
 
@@ -35,6 +35,40 @@ class ExperimentExecutor:
     def _size_for(self, price: float) -> float:
         return round(self.notional_usd / price, 4)
 
+    async def _broker_safe_stop(self, sig, ref_price: float) -> float | None:
+        """Validate/clamp the signal stop against the LIVE price before sending.
+
+        Strategies anchor stops to today_open / opening-range levels, but
+        Capital.com validates the stop relative to the *current* market price.
+        A fast move (e.g. a gap-up that keeps running) can leave a fade-short
+        stop *below* spot — a wrong-side stop the broker rejects with
+        ``error.invalid.stoploss.minvalue``. Returns:
+          • the signal stop unchanged when it already clears the broker minimum,
+          • a nudged stop when it is the correct side but inside the minimum,
+          • ``None`` when it is on the wrong side of spot (skip — the fade/breakout
+            thesis is already invalidated by the move).
+        """
+        try:
+            details = await self.client.get_market_details(sig.epic)
+            rules = details.get("dealingRules", {})
+            msd = rules.get("minStopOrProfitDistance", {}) or {}
+            unit, val = msd.get("unit"), msd.get("value")
+            if not isinstance(val, (int, float)):
+                return sig.stop_level  # rules unavailable (e.g. mocked) — trust the signal
+            min_dist = ref_price * float(val) / 100.0 if unit == "PERCENTAGE" else float(val)
+        except Exception as e:  # noqa: BLE001 — a recon GET must never block an entry
+            logger.warning(f"[forward-lab] {sig.epic} dealingRules fetch failed: {e} "
+                           "— sending signal stop unchecked")
+            return sig.stop_level
+        pad = min_dist * 1.10 + ref_price * 5e-4  # margin over the raw broker minimum + spread
+        if sig.direction == Direction.SELL:        # SELL stop must sit ABOVE the entry
+            if sig.stop_level <= ref_price:
+                return None                          # wrong side — skip
+            return max(sig.stop_level, ref_price + pad)
+        if sig.stop_level >= ref_price:              # BUY stop must sit BELOW the entry
+            return None                              # wrong side — skip
+        return min(sig.stop_level, ref_price - pad)
+
     async def try_enter(self, strat: ForwardStrategy, ctx: MarketContext,
                         session_date: str) -> Signal | object | None:
         net_today = self.ledger.session_net(session_date)
@@ -58,13 +92,20 @@ class ExperimentExecutor:
                         f"size={size} sl={sig.stop_level:.4f} :: {sig.rationale}")
             return sig
         await self.assert_isolation()  # MUST pass before any real order
+        stop_level = await self._broker_safe_stop(sig, ctx.current_price)
+        if stop_level is None:
+            logger.warning(
+                f"[forward-lab] {strat.name} {sig.epic} {sig.direction.value} stop "
+                f"{sig.stop_level:.4f} is on the wrong side of live {ctx.current_price:.4f} "
+                "— skip (price ran past the entry stop; fade/breakout thesis invalidated)")
+            return None
         req = CreatePositionRequest(epic=sig.epic, direction=sig.direction,
-                                    size=size, stop_level=sig.stop_level)
+                                    size=size, stop_level=stop_level)
         conf = await self.client.create_position(req)
         self.ledger.record_open(
             strategy=strat.name, epic=sig.epic, session_date=session_date,
             deal_id=conf.deal_id, direction=sig.direction.value, entry=conf.level,
-            size=size, stop_level=sig.stop_level, rationale=sig.rationale,
+            size=size, stop_level=stop_level, rationale=sig.rationale,
             opened_at=datetime.now(timezone.utc).isoformat(),
             prev_close=ctx.prev_close, today_open=ctx.today_open)
         logger.success(f"[LIVE] opened {sig.epic} {sig.direction.value} "
