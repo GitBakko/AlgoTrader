@@ -410,7 +410,8 @@ async def test_entry_pass_gapfade_uses_session_open_not_live_mid(tmp_path, monke
     ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
                             ledger=ForwardLedger(tmp_path / "rwart.db"), dry_run=False)
     sched = ExperimentScheduler(client=client, executor=ex,
-                                strategies=[GapFadeStrategy(epics=["AAPL"], gap_threshold=0.01)])
+                                strategies=[GapFadeStrategy(epics=["AAPL"], gap_threshold=0.01,
+                                                            min_rr=0.0)])
     monkeypatch.setattr(sched, "_prev_close", AsyncMock(return_value=100.0))  # open 103 vs prev 100 = +3% gap
     now = datetime(2026, 6, 3, 15, 0, tzinfo=timezone.utc)   # restart well after the 13:30 open
     await sched.entry_pass(now=now)
@@ -441,7 +442,8 @@ async def test_entry_pass_gapfade_enters_on_gap(tmp_path, monkeypatch):
     ex = ExperimentExecutor(client=client, experiment_account_id="EXP",
                             ledger=ForwardLedger(tmp_path / "g.db"), dry_run=False)
     sched = ExperimentScheduler(client=client, executor=ex,
-                                strategies=[GapFadeStrategy(epics=["AAPL"], gap_threshold=0.01)])
+                                strategies=[GapFadeStrategy(epics=["AAPL"], gap_threshold=0.01,
+                                                            min_rr=0.0)])
     monkeypatch.setattr(sched, "_prev_close", AsyncMock(return_value=100.0))  # +3% gap -> short
     now = datetime(2026, 6, 3, 13, 35, tzinfo=timezone.utc)   # in window
     await sched.entry_pass(now=now)

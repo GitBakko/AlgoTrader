@@ -30,6 +30,7 @@ class SessionState:
     or_levels: dict[str, tuple[float, float]] = field(default_factory=dict)  # epic -> (hi, lo)
     rvol: dict[str, float] = field(default_factory=dict)
     eligible: set[str] = field(default_factory=set)
+    ref_price: dict[str, float] = field(default_factory=dict)  # epic -> independent ref close (cached/day)
     screened: bool = False
 
     def ensure_day(self, d: _date) -> None:
@@ -40,6 +41,7 @@ class SessionState:
             self.or_levels.clear()
             self.rvol.clear()
             self.eligible.clear()
+            self.ref_price.clear()
             self.screened = False
 
 
@@ -56,6 +58,7 @@ class ExperimentScheduler:
     or_window_min: int = 30
     watch_end_et: str = "12:00"
     scan_pacing_s: float = 0.0  # sleep between per-epic broker GETs (10 req/s limit; wide universe)
+    ref_price_fetch: object | None = None  # Callable[[epic], float|None]: INDEPENDENT price for sanity-gating
     _state: SessionState = field(default_factory=SessionState, init=False, repr=False)
 
     @property
@@ -97,6 +100,25 @@ class ExperimentScheduler:
         if bid is None or offer is None:
             return None
         return (float(bid) + float(offer)) / 2.0
+
+    def _reference_price(self, epic: str) -> float | None:
+        """An INDEPENDENT (non-broker) reference close for `epic`, cached per day.
+        Used only to sanity-gate the broker entry price against a gross feed anomaly
+        (the broker's own prev_close/OR/mid share the same feed, so they cannot).
+        Graceful: no fetcher or any error => None => the executor gate stays inert."""
+        if self.ref_price_fetch is None:
+            return None
+        if epic in self._state.ref_price:
+            return self._state.ref_price[epic]
+        try:
+            ref = self.ref_price_fetch(epic)
+        except Exception as e:  # noqa: BLE001 — a reference lookup must never block an entry
+            logger.warning(f"[forward-lab] {epic} reference-price fetch failed: {e}")
+            return None
+        if ref and float(ref) > 0:
+            self._state.ref_price[epic] = float(ref)
+            return float(ref)
+        return None
 
     def _et_to_utc(self, d: _date, hhmm: str) -> datetime:
         """An ET wall-clock HH:MM on calendar date d, as a tz-aware UTC datetime (DST-correct)."""
@@ -283,6 +305,7 @@ class ExperimentScheduler:
                         or_high=hi,
                         or_low=lo,
                         rvol=self._state.rvol.get(epic),
+                        reference_price=self._reference_price(epic),
                     )
                 else:
                     ctx = MarketContext(
@@ -292,6 +315,7 @@ class ExperimentScheduler:
                         current_price=mid,
                         now=now,
                         session_close=self._session_close(now),
+                        reference_price=self._reference_price(epic),
                     )
                 try:
                     await self.executor.try_enter(strat, ctx, session_date)

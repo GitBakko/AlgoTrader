@@ -77,6 +77,21 @@ def _screener():
                         or_window_min=s.forward_lab_orb_or_window_min)
 
 
+def _yf_ref_close(epic: str) -> float | None:
+    """Independent daily-close reference for the executor price-sanity gate (yfinance).
+    US-stock epics map 1:1 to yfinance tickers. Graceful: returns None on any failure,
+    which leaves the gate inert (never blocks an entry on a reference-lookup hiccup)."""
+    try:
+        import yfinance as yf
+
+        d = yf.download(epic, period="5d", interval="1d", progress=False, auto_adjust=False)["Close"]
+        ser = d[d.columns[0]] if hasattr(d, "columns") else d
+        ser = ser.dropna()
+        return float(ser.iloc[-1]) if len(ser) else None
+    except Exception:  # noqa: BLE001 — sanity reference is best-effort; never raise into the loop
+        return None
+
+
 def _build_scheduler(client, executor):
     s = get_settings()
     return ExperimentScheduler(
@@ -85,7 +100,8 @@ def _build_scheduler(client, executor):
         or_window_min=s.forward_lab_orb_or_window_min,
         session_open_et=s.forward_lab_session_open_et,
         watch_end_et=s.forward_lab_orb_watch_end_et,
-        scan_pacing_s=s.forward_lab_scan_pacing_s)
+        scan_pacing_s=s.forward_lab_scan_pacing_s,
+        ref_price_fetch=_yf_ref_close)
 
 
 async def _connected_client(experiment: bool = False) -> CapitalComClient:

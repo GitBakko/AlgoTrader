@@ -16,7 +16,8 @@ def _ctx():
 
 def _strat():
     from forward.strategy import GapFadeStrategy
-    return GapFadeStrategy(epics=["AAPL"])
+    # min_rr=0.0: this suite tests the daily-loss guard, not the R:R entry gate.
+    return GapFadeStrategy(epics=["AAPL"], min_rr=0.0)
 
 
 def _seed_closed(led, session_date, pnl, key):

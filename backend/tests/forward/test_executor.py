@@ -16,7 +16,9 @@ def _ctx(prev, open_, cur):
 
 def _strat():
     from forward.strategy import GapFadeStrategy
-    return GapFadeStrategy(epics=["AAPL"], gap_threshold=0.01, stop_pct_fallback=0.015)
+    # min_rr=0.0: these tests exercise executor mechanics (isolation, sizing, stop
+    # clamp, idempotency), not the R:R entry gate — keep the +3% gap entering.
+    return GapFadeStrategy(epics=["AAPL"], gap_threshold=0.01, stop_pct_fallback=0.015, min_rr=0.0)
 
 
 @pytest.mark.asyncio

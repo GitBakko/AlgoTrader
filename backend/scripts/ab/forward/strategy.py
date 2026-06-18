@@ -19,6 +19,7 @@ class MarketContext:
     or_high: float | None = None
     or_low: float | None = None
     rvol: float | None = None
+    reference_price: float | None = None  # independent (non-broker) price for sanity-gating
 
     @property
     def gap(self) -> float:
@@ -72,6 +73,7 @@ class GapFadeStrategy(ForwardStrategy):
     stop_atr_mult: float = 1.0
     stop_pct_fallback: float = 0.015
     fill_fraction: float = 0.5
+    min_rr: float = 1.0   # refuse entries whose 50%-fill target is closer than the stop (R:R<min)
     name: str = field(default="gap_fade")
 
     def universe(self) -> list[str]:
@@ -89,6 +91,12 @@ class GapFadeStrategy(ForwardStrategy):
         if abs(gap) < self.gap_threshold:
             return None
         dist = self._stop_distance(ctx)
+        # R:R floor — the 50%-fill take-profit (fill_fraction * gap) must clear the
+        # stop, else the trade is -EV by construction (small gaps near the threshold
+        # fade to a target tighter than the ~1.5% stop -> R:R ~0.3-0.5). min_rr=0 disables.
+        target = self.fill_fraction * abs(ctx.today_open - ctx.prev_close)
+        if dist <= 0 or target < self.min_rr * dist:
+            return None
         if gap > 0:  # gap up -> fade short, stop above
             return Signal(ctx.epic, Direction.SELL, ctx.today_open + dist,
                           f"gap +{gap * 100:.2f}% fade short")

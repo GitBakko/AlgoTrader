@@ -23,6 +23,7 @@ class ExperimentExecutor:
     max_concurrent: int = 5
     daily_loss_limit_eur: float = 100.0
     account_ccy: str = "EUR"   # experiment account denomination (broker P&L arrives in this ccy)
+    max_price_deviation: float = 0.35  # skip entry if broker price deviates >this from the independent ref
     dry_run: bool = True
 
     async def assert_isolation(self) -> None:
@@ -86,6 +87,21 @@ class ExperimentExecutor:
         sig = strat.should_enter(ctx)
         if sig is None:
             return None
+        # Price-sanity gate — refuse the order when the broker entry price deviates
+        # implausibly from an INDEPENDENT reference (e.g. yfinance daily close). Catches
+        # gross broker price-feed anomalies that no intra-broker check sees (prev_close /
+        # OR / mid are all the same poisoned feed — cf. KLAC quoted ~9x on 2026-06-09/10).
+        # Inert when no reference is supplied, so dry-run/back-compat paths are unaffected.
+        ref = getattr(ctx, "reference_price", None)
+        if ref and ref > 0 and self.max_price_deviation > 0:
+            dev = abs(ctx.current_price / ref - 1.0)
+            if dev > self.max_price_deviation:
+                logger.warning(
+                    f"[forward-lab] {strat.name} {sig.epic} {sig.direction.value} entry price "
+                    f"{ctx.current_price:.4f} deviates {dev * 100:.1f}% from independent reference "
+                    f"{ref:.4f} (> {self.max_price_deviation * 100:.0f}%) — skip "
+                    "(suspected broker price-feed anomaly)")
+                return None
         size = self._size_for(ctx.current_price)
         if self.dry_run:
             logger.info(f"[DRY-RUN] {strat.name} {sig.direction.value} {sig.epic} "
