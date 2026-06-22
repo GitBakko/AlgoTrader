@@ -125,6 +125,31 @@ async def _ensure_account(client, account_id: str | None) -> None:
         await client.switch_account(account_id)
 
 
+async def _bootstrap_with_retry(factory, *, what: str, timeout_s: float,
+                                attempts: int = 20):
+    """Run an async bootstrap step with a hard per-attempt timeout + bounded retry.
+
+    Boot-race guard: at logon the watchdog may relaunch the loop before the
+    network stack is up, and Capital.com connect/switch can hang past httpx's own
+    timeouts (observed 2026-06-22: silent wedge — process alive 6.5h, zero log,
+    ledger frozen). ``asyncio.wait_for`` cancels the stuck attempt so the loop
+    fails fast and retries with capped backoff instead of wedging forever. After
+    ``attempts`` failures it raises so the process exits and the watchdog
+    relaunches at its next tick."""
+    last_err: Exception | None = None
+    for i in range(1, attempts + 1):
+        try:
+            return await asyncio.wait_for(factory(), timeout=timeout_s)
+        except Exception as e:  # noqa: BLE001 — boot path: any failure → retry
+            last_err = e
+            backoff = min(60.0, 5.0 * i)
+            logger.warning(f"[forward-lab] {what} attempt {i}/{attempts} failed "
+                           f"({type(e).__name__}: {e}); retry in {backoff:.0f}s")
+            await asyncio.sleep(backoff)
+    raise RuntimeError(
+        f"[forward-lab] {what} failed after {attempts} attempts") from last_err
+
+
 async def cmd_discover() -> None:
     client = await _connected_client(experiment=True)
     try:
@@ -219,8 +244,14 @@ async def cmd_run() -> None:
     from apscheduler.triggers.interval import IntervalTrigger
 
     s = get_settings()
-    client = await _connected_client(experiment=True)
-    await client.switch_account(s.capital_experiment_account_id)
+    # Boot-race guard (see _bootstrap_with_retry): bound connect + account switch
+    # with a hard timeout + retry so a post-reboot network hang self-heals instead
+    # of wedging the loop silently.
+    client = await _bootstrap_with_retry(
+        lambda: _connected_client(experiment=True), what="connect", timeout_s=30.0)
+    await _bootstrap_with_retry(
+        lambda: client.switch_account(s.capital_experiment_account_id),
+        what="switch_account", timeout_s=20.0)
     ex = _make_executor(client, dry_run=False)
     sched = _build_scheduler(client, ex)
     scheduler = AsyncIOScheduler(timezone="UTC")

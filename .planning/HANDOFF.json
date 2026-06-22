@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-25T08:51:46.136Z",
+  "timestamp": "2026-06-22T14:05:43.470Z",
   "source": "auto-postool",
   "partial": false,
   "phase": null,
@@ -18,11 +18,7 @@
   "uncommitted_files": [
     {
       "status": "M",
-      "path": ".claude-flow/config.yaml"
-    },
-    {
-      "status": "D",
-      "path": ".claude/scheduled_tasks.lock"
+      "path": ".claude/settings.json"
     },
     {
       "status": "M",
@@ -33,78 +29,174 @@
       "path": "backend/.planning/HANDOFF.json"
     },
     {
-      "status": "M",
-      "path": "frontend/src/app/core/models/paper-trading.ts"
-    },
-    {
-      "status": "M",
-      "path": "frontend/src/app/views/paper-trading/components/position-card/position-card.component.html"
-    },
-    {
-      "status": "M",
-      "path": "frontend/src/app/views/paper-trading/components/position-card/position-card.component.scss"
-    },
-    {
-      "status": "M",
-      "path": "frontend/src/app/views/paper-trading/components/position-card/position-card.component.ts"
-    },
-    {
-      "status": "M",
-      "path": "frontend/src/app/views/paper-trading/paper-trading.component.ts"
+      "status": "??",
+      "path": "\"D\\357\\200\\272tmppaper_loop_new.py\""
     },
     {
       "status": "??",
-      "path": ".claude/helpers/context-persistence-hook.mjs"
+      "path": "\"D\\357\\200\\272tmppaper_loop_old.py\""
     },
     {
       "status": "??",
-      "path": ".parquet`"
+      "path": "backend/data/shap_analysis/"
     },
     {
       "status": "??",
-      "path": "1.2"
+      "path": "backend/scripts/ab/alt_signals.py"
     },
     {
       "status": "??",
-      "path": "100"
+      "path": "backend/scripts/ab/audit_integrity.py"
     },
     {
       "status": "??",
-      "path": "100%"
+      "path": "backend/scripts/ab/cap_test.py"
     },
     {
       "status": "??",
-      "path": "40"
+      "path": "backend/scripts/ab/capacity_fill.py"
     },
     {
       "status": "??",
-      "path": "5"
+      "path": "backend/scripts/ab/confirm_sharadar_interface.py"
     },
     {
       "status": "??",
-      "path": "5.0,"
+      "path": "backend/scripts/ab/deeper_tsmom.py"
     },
     {
       "status": "??",
-      "path": "None"
+      "path": "backend/scripts/ab/delisting_audit.py"
     },
     {
       "status": "??",
-      "path": "backend/dict"
+      "path": "backend/scripts/ab/fetch_crypto_perp_universe.py"
     },
     {
       "status": "??",
-      "path": "backend/scripts/phase1_optuna_full_basket.py"
+      "path": "backend/scripts/ab/fetch_dukascopy_intraday.py"
     },
     {
       "status": "??",
-      "path": "dict"
+      "path": "backend/scripts/ab/fetch_sharadar.py"
     },
     {
       "status": "??",
-      "path": "limit"
+      "path": "backend/scripts/ab/generate_portfolio.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/inst_13f.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/intraday_momentum.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/intraday_probe.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/namecount_test.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/neutralize_compare.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/paper_trade.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/pit_funding.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/pit_momentum.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/pit_vrp.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/probe_crypto_universe.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/smoke_sharadar.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/test_combo.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/test_cot.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/test_crypto_basis.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/test_crypto_funding.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/test_crypto_funding_rm.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/test_fomc.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/test_fx_xsec.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/test_gold_seasonal.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/test_pairs.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/test_pairs_1h.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/test_tsmom.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/test_vix_gate.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/test_volmanaged.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/verify_buyback.py"
+    },
+    {
+      "status": "??",
+      "path": "backend/scripts/ab/xsec_factors.py"
+    },
+    {
+      "status": "??",
+      "path": "docs/SEP_tc.md"
+    },
+    {
+      "status": "??",
+      "path": "docs/strategy/XSEC_MOMENTUM_SPEC.md"
     }
   ],
   "next_action": null,
-  "context_notes": "Recent commits:\n1674dba docs(handoff): paper soak started 2026-05-23 — check 2026-06-06\nb817122 test(paper_loop): unit tests for _status_from_opening_hours\n4fdb612 feat(constants): drop AMD + META + AMZN from TRADABLE_ASSETS (18-asset paper soak basket)\ndcfd8f8 fix(paper_loop): retry correlation matrix on next tick after failure\nc8e41c1 feat(config): Settings.max_total_open_positions default 5 → 10"
+  "context_notes": "Recent commits:\n7a8b244 test(forward-lab): post-deploy gate verification script\nee369cc fix(forward-lab): R:R floor on gap-fade + price-sanity gate on entries\na7bb674 fix(vix-gate-track): ffill ^VIX3M onto S&P calendar so live track advances\nac02743 feat(vix-gate-track): forward paper-track for the VIX term-structure gate\n1af400b fix(forward-lab): skip wrong-side stops + isolate per-epic entry errors"
 }

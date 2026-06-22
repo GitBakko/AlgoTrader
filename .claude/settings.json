@@ -181,12 +181,12 @@
       "Bash(npx @claude-flow*)",
       "Bash(npx claude-flow*)",
       "Bash(node .claude/*)",
-      "mcp__claude-flow__:*",
+      "mcp__ruflo__*",
       "Bash(\"C:\\\\Users\\\\bakko\\\\AppData\\\\Roaming\\\\Python\\\\Python311\\\\Scripts\\\\poetry.exe\" env use py -3.11)"
     ],
     "deny": [
-      "Read(./.env)",
-      "Read(./.env.*)"
+      "Read(//D:/Develop/AI/_ClaudeCode/AlgoTrader/.env)",
+      "Read(//D:/Develop/AI/_ClaudeCode/AlgoTrader/.env.*)"
     ]
   },
   "enabledPlugins": {

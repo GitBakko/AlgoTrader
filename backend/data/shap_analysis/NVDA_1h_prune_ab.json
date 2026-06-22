@@ -1,0 +1,26 @@
+{
+  "baseline": {
+    "label": "BASELINE",
+    "n_features_requested": 199,
+    "num_folds": 24,
+    "test_f1_macro": 0.51118031094228,
+    "test_accuracy": 0.5492424242424242,
+    "test_log_loss": 0.9183248933412737,
+    "test_f1_BUY": 0.6215980886286955,
+    "test_f1_SELL": 0.5693370076634625,
+    "test_f1_HOLD": 0.342605836534682,
+    "val_f1_macro": 0.5282951866029101
+  },
+  "pruned": {
+    "label": "PRUNED",
+    "n_features_requested": 77,
+    "num_folds": 24,
+    "test_f1_macro": 0.5172995778880167,
+    "test_accuracy": 0.5518939393939393,
+    "test_log_loss": 0.9058899702019182,
+    "test_f1_BUY": 0.6248789147945787,
+    "test_f1_SELL": 0.5679218215135755,
+    "test_f1_HOLD": 0.3590979973558959,
+    "val_f1_macro": 0.5380821402753926
+  }
+}
